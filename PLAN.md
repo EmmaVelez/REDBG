@@ -41,22 +41,37 @@ Smoke test: coder writes `game-core/src/util/rng.ts` + test, validation green.
 ### M1 — Game core engine (pure TS, no UI)
 All tasks land in `game-core/src/` with vitest tests.
 - M1-T01 `types.ts` — Card, CardType, Zone, PlayerState, GameState, Action union *(Hermes writes: this is the contract everything else conforms to)*
-- M1-T02 `util/rng.ts` — seeded PRNG (mulberry32) + seeded shuffle ✅ smoke task
-- M1-T03 `engine/deck.ts` — draw/discard/reshuffle/exile pile ops
-- M1-T04 `engine/resources.ts` — ammo & XP tracking per player
-- M1-T05 `engine/turn.ts` — turn phases: start → actions → cleanup; turn order
-- M1-T06 `engine/market.ts` — the card line (market): display, buy with ammo/XP, refill
-- M1-T07 `engine/combat.ts` — damage from weapons/characters vs infected, kill → XP, infected attacks players (damage → infection cards into deck)
-- M1-T08 `engine/infection.ts` — infection deck, gaining infection cards, death by damage
-- M1-T09 `engine/locations.ts` — location deck: explore, location powers, mansion deck
-- M1-T10 `engine/characters.ts` — starting characters, their abilities, level-ups
-- M1-T11 `engine/actions.ts` — the root reducer: validate + apply every Action; illegal → reject
-- M1-T12 `engine/game.ts` — setup (N players + bots, seed), win conditions (infected deck empty / location objectives), game-over state
+- M1-T02 `util/rng.ts` — seeded PRNG (mulberry32) + seeded shuffle ✅ DONE (hand-fixed)
+- M1-T03 `engine/deck.ts` — draw/discard/reshuffle pile ops ✅ DONE (Hermes 3-line fix)
+- M1-T04 `engine/resources.ts` — ammo/gold counter ops + HP tracker ✅ DONE (Hermes fixes)
+- M1-T05 `engine/turn.ts` — seat advancement skipping downed/dead, turn counter (spec'd)
+- M1-T06 `engine/market.ts` — Resource Area: build the 18 piles from card data (combined
+  piles pre-shuffled), Buy = pay Gold, take top card of a pile to discard
+- M1-T07 `engine/explore.ts` — Explore resolution: play Weapons+Ammo from hand, sum Damage
+  (weapon effects + per-turn bonus), reveal Mansion top; defeated Infected → attach +
+  Decorations (+ level-up check); not defeated → Character takes its Damage, card to
+  Mansion bottom (Uroboros: shuffle back); multi-Explore combined-damage rule; non-Infected
+  reveals (Yellow Herb / tokens: take-or-bottom)
+- M1-T08 `engine/mansion.ts` — Mansion deck build (33 Infected + 2 tokens + 3 Yellow Herb),
+  reveal-top, send-to-bottom, shuffle-back-into-deck
+- M1-T09 `engine/characters.ts` — down/revive cycle (flip down, -20 maxHp on revive, skip
+  turn, death at maxHp 0), level-ups at decoration thresholds, ability hooks
+- M1-T10 `engine/cards.ts` — play card from hand: bonus icons (+X Cards/Gold/Ammo/Buy/
+  Action/Explore), action-card effects via Prompts, item effects, trash semantics
+- M1-T11 `engine/actions.ts` — the root reducer: validate + apply every Action; illegal →
+  reject; Prompt creation/resolution (chooseOption)
+- M1-T12 `engine/game.ts` — setup (deal characters, 10-card starting inventories, draw 5,
+  build piles + Mansion, seed RNG), turn start (reset pools to 1/1/1, downed handling),
+  endTurn (discard play area + hand, draw 5 with reshuffle), win conditions (Uroboros
+  defeated → most Decorations wins, tie → most HP, shared win; all players dead)
 - M1-T13 `engine/replay.ts` — serialize action log, replay to identical state (determinism proof)
-- M1-T14a..g `data/base-set.ts` — full Premier Edition card data in batches:
-  characters, weapons (light/heavy), ammo, items, actions, locations, infected — each batch
-  ≤ 15 cards, schema given, source: BGG master card list (research step first → `docs/rules/`)
-- M1-T15 `engine/rules-faq.ts` — edge cases from the official Master FAQ (stacking, timing)
+- M1-T14a..g `data/premier.ts` — full Premier Edition card data in batches (counts from
+  rulebook box layout): a) 10 characters, b) 16 weapons, c) ammo+items, d) 12 actions,
+  e) 17 infected, f) 2 tokens + scenario pile config, g) integrity test (every card in the
+  digest manifest, copies match box counts, ids unique)
+- M1-T15 `engine/rules-faq.ts` — edge cases from rulebook FAQ ch. VIII (Gatling Gun Majini
+  ammo increments, Jill/Grenade/Rocket Launcher interactions, partial effects "do as much
+  as you can")
 
 ### M2 — AI players
 - M2-T01 `ai/enumerate.ts` — list legal Actions from a GameState (uses engine validator)
