@@ -1,39 +1,42 @@
 # HANDOFF — resume here
 
-**Paused (2nd time):** 2026-10-14 late — Manny is installing a FASTER local Ollama model.
-Previous pause reason (bigger model) was resolved: `qwen3.8:27b` is now installed and
-wired into the harness, but it runs at ~8.7 tok/s (2000-token file ≈ 4 min; 3 attempts
-blew past the 420s foreground cap once — background runs are mandatory at this speed).
+**Paused (3rd):** night of 2026-10-14 — resuming in the morning. Manny is reinstalling
+`qwen3.5:4b` (the original model) because he judged it performed better.
+NOTE FROM HERMES: for M1-T03, qwen2.5-coder:14b reproduced the SAME two failure classes as
+4b (draw() reshuffle semantics + type sloppiness), so M1-T03 difficulty is spec-side, not
+model-side. The feedback file `.coder-cache/feedback-M1-T03.txt` has been ENRICHED by Hermes
+with the exact corrected draw() algorithm + type fixes — with it, either model should pass.
+Don't read M1-T03 failures as evidence against 4b.
 
 ## Resume checklist
-1. Check what's on Ollama now: `curl -s http://localhost:11434/api/tags` — ask Manny which
-   model to use. Speed-test it first: tiny chat completion, note wall time + eval tokens/s.
-2. If the model changed from qwen3.8:27b: update `DEFAULT_MODEL` in `tools/coder.py` and
-   `"model"` in every `docs/tasks/*.json` (there's a one-liner python snippet pattern in git
-   history; or sed the JSON files).
-3. ALWAYS run `python tools/orchestrate.py <task.json> --fresh` as a BACKGROUND terminal job
-   (never foreground) — coder calls routinely exceed the 420s tool cap.
-4. Current mid-flight task: **M1-T03** (deck.ts pile ops). Its previous broken deck.ts/deck.test.ts
-   were deleted; the orchestrator run was killed mid attempt-1 (27b was still generating).
-   Re-run it fresh: `python tools/orchestrate.py docs/tasks/M1-T03.json --fresh`.
-   Next queued spec: **M1-T04** (resources.ts) — already written in docs/tasks/.
-5. After T03 lands green, validate whole suite: `cd game-core && npx tsc --noEmit && npx vitest run`.
-6. With a faster/smarter model, consider relaxing chunking (PLAN.md): bigger files per task,
-   fewer micro-specs. Retest assumptions on M1-T03/T04 results first.
+1. Verify model is back: `curl -s http://localhost:11434/api/tags` — expect `qwen3.5:4b`.
+   Speed-test it (tiny completion). Reference: 4b ≈ 17-21s for a full M1-T03 file pair;
+   14b took 428s for the same task; 27b ≈ 8.7 tok/s. 4b is by far the fastest.
+2. Repoint harness to qwen3.5:4b (currently set to qwen2.5-coder:14b):
+   - `tools/coder.py`: DEFAULT_MODEL = "qwen3.5:4b"
+   - every `docs/tasks/*.json`: "model": "qwen3.5:4b" (python json load/dump one-liner).
+3. Resume M1-T03 WITH the existing enriched feedback — do NOT pass --fresh (orchestrate.py
+   feeds `.coder-cache/feedback-M1-T03.txt` on attempt 1 automatically):
+   `python tools/orchestrate.py docs/tasks/M1-T03.json`   (BACKGROUND job — always)
+   deck.ts/deck.test.ts on disk are the failed 14b attempt-1 output; coder overwrites wholesale.
+4. After T03 green: validate suite (`cd game-core && npx tsc --noEmit && npx vitest run`),
+   then run M1-T04 (spec already written in docs/tasks/; its model field gets fixed in step 2).
+5. Continue M1-T05+ per PLAN.md. Keep chunking tight for 4b: one small file + test per task,
+   exact signatures, spell out the algorithm when non-trivial (proven necessary for draw()).
 
-## State at pause (all committed through 9ef85c0 EXCEPT below)
-- Working tree has UNCOMMITTED changes: coder.py DEFAULT_MODEL=qwen3.8:27b, task JSONs
-  updated to 27b/num_ctx 32768, docs/tasks/M1-T04.json (new), deleted deck.ts/deck.test.ts.
-  -> First action on resume: review `git status`/`git diff`, then commit as
-  "resume-prep: switch harness to <model>, queue M1-T04".
-- rng.ts hand-fix is VALIDATED: tsc clean + 7/7 rng tests pass (verified 23:22 before pause).
-- LEDGER.jsonl: last entry is the old M1-T03 3-attempt failure (4b era) — stale, ignore.
+## State at pause (git: last commit aeb3886 "PAUSE 2")
+- UNCOMMITTED: coder.py + 3 task JSONs switched to 14b (switch back in step 2), untracked
+  game-core/src/engine/deck.ts + deck.test.ts (failed 14b output — regenerated next run),
+  enriched feedback file, this HANDOFF.
+- rng.ts hand-fix VALIDATED (tsc clean, 7/7 pass).
+- LEDGER last entry = stale 4b-era M1-T03 failure; ignore.
 
 ## Harness facts learned (baked into tools/)
 - Small models drop `===END===` markers -> coder.py splits on `===FILE:` markers only.
-- Small models omit files / break state-threading in pure-functional signatures -> always
-  run the full validate gate; NEVER commit on coder.py success alone (it only checks the file set).
-- orchestrate.py = coder -> tsc -> vitest -> feedback-retry (max 3) -> git commit + LEDGER.
-  Stale feedback from a previous run is reused on attempt 1 unless `--fresh` is passed.
-- Killed orchestrator runs leave partial .coder-cache/*.txt; harmless — coder.py rewrites files
-  only on a complete response.
+- NEVER commit on coder.py success alone (it only checks the file set). orchestrate.py runs
+  the full gate: coder -> tsc -> vitest -> feedback-retry (max 3) -> git commit + LEDGER.
+- orchestrate.py reuses a stale feedback file on attempt 1 unless `--fresh` — this resume
+  plan deliberately exploits that (step 3).
+- Killed orchestrator runs are safe; partial .coder-cache/*.txt harmless.
+- Raw tsc/vitest errors alone often aren't enough for small models: enrich feedback with the
+  corrected algorithm spelled out in code (worked pattern — see feedback-M1-T03.txt).
