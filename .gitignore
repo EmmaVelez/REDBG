@@ -1,0 +1,4 @@
+node_modules/
+.coder-cache/
+dist/
+*.log

@@ -1,0 +1,2 @@
+# LEDGER — task outcomes (JSONL, append-only)
+# Fields: ts, task, status(ok|failed|hermes-written|split), attempts, note
