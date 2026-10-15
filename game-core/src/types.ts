@@ -122,7 +122,8 @@ export type WeaponEffect =
 
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
-  | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: attacker chooses a player (Prompt)
+  | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
+  | { readonly kind: "noActionsNextTurnOfAPlayerOnDefeat" }                  // Zombie (Female): on defeat, choose a player (Prompt); they can't play Actions next turn
   | { readonly kind: "plusDamagePerFull10AmmoOfAttacker"; readonly amount: number }; // Gatling Gun Majini: +5 per full 10 Ammo
 
 export type ItemEffect =
