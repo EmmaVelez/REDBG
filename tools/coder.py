@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 OLLAMA = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "qwen3.5:4b"
+DEFAULT_MODEL = "qwen2.5-coder:14b"
 CACHE = REPO / ".coder-cache"
 
 SYSTEM_PROMPT = """You are a meticulous TypeScript coder working on one small, fully-specified task.
