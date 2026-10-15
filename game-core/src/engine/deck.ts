@@ -26,17 +26,26 @@ export function draw(params: {
   let remainingDeck = params.deck;
   let remainingDiscard = params.discard;
 
-  for (let i = 0; i < params.count; i++) {
-    if (remainingDeck.length > 0) {
-      hand.push(remainingDeck[0]);
+  while (hand.length < params.count && remainingDeck.length > 0) {
+    const card = remainingDeck[0];
+    if (card === undefined) {
+      throw new Error('draw: unexpected undefined card in deck');
+    }
+    hand.push(card);
+    remainingDeck = remainingDeck.slice(1);
+  }
+
+  if (hand.length < params.count && params.reshuffledDiscard.length > 0) {
+    remainingDeck = params.reshuffledDiscard;
+    remainingDiscard = [];
+
+    while (hand.length < params.count && remainingDeck.length > 0) {
+      const card = remainingDeck[0];
+      if (card === undefined) {
+        throw new Error('draw: unexpected undefined card in reshuffled discard');
+      }
+      hand.push(card);
       remainingDeck = remainingDeck.slice(1);
-    } else if (remainingDiscard.length > 0) {
-      remainingDeck = params.reshuffledDiscard;
-      remainingDiscard = [];
-      hand.push(remainingDeck[0]);
-      remainingDeck = remainingDeck.slice(1);
-    } else {
-      break;
     }
   }
 
@@ -76,6 +85,6 @@ export function discardHand(params: {
 }): { hand: readonly string[]; discard: readonly string[] } {
   return {
     hand: [],
-    discard: [...params.discard, ...params.hand],
+    discard: [...params.hand, ...params.discard],
   };
 }

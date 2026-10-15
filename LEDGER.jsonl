@@ -1,3 +1,5 @@
 # LEDGER — task outcomes (JSONL, append-only)
 # Fields: ts, task, status(ok|failed|hermes-written|split), attempts, note
 {"ts": "2026-10-14T22:15:36", "task": "M1-T03", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T07:52:28", "task": "M1-T03", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T07:54:36", "task": "M1-T03", "status": "ok", "attempts": 4, "note": "14b x3 failed (same draw() gate bug + implicit-any); Hermes applied 3-line fix, suite green 16/16"}
