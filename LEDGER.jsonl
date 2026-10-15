@@ -20,3 +20,5 @@
 {"ts": "2026-10-15T12:19:41", "task": "M1-T11", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T12:22:19", "task": "M1-T11", "status": "ok", "attempts": 4, "note": "14b x3 failed (startGame union narrow, CardDef import, buy top undefined; model WAS right on both vitest fails - MY fixture ignored dead/marketPiles overrides + missing prompt text); Hermes fixed 7 spots; suite green 165/165"}
 {"ts": "2026-10-15T17:34:14", "task": "M1-T12", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T18:25:12", "task": "M1-T12", "status": "ok", "attempts": 1, "note": "14b impl 501 lines (mostly correct); test file TRUNCATED at 8192-token cap; Hermes rewrote actions.ts (rngState threading via makeRng, readonly-safe spreads, outcome narrowing) + completed test suite; suite green 187/187"}
+{"ts": "2026-10-15T19:01:30", "task": "M1-T13", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
