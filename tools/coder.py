@@ -41,7 +41,20 @@ Rules:
 ===END===
 
 - Output every file listed in EXPECTED FILES, with exactly those paths.
-- Prefer simple, explicit code over clever code."""
+- Prefer simple, explicit code over clever code.
+
+CRITICAL — this project's tsconfig uses `strict` + `noUncheckedIndexedAccess`. Recurring
+mistakes you MUST avoid:
+1. `arr[i]` has type `T | undefined`. Assign to a local const, check `=== undefined`, then use it.
+2. Empty array literals need explicit types: `const xs: string[] = [];` — never leave them
+   implicit (TS7034/TS7005 errors).
+3. `{ ...obj }` spread copies only the TOP level. If obj contains arrays and the tests check
+   reference identity, copy them explicitly: `aliveSeats: [...ctx.aliveSeats]`.
+4. Error messages must match the spec EXACTLY, including any interpolated values
+   (e.g. 'duplicate seat: ' + seat — the seat number must be appended when specified).
+5. Record lookups (`rec[key]`) are also `T | undefined` — check before use.
+6. In test files, import types you annotate with: `import type { Foo } from './module';`
+7. Never mutate function inputs — always construct new arrays/objects."""
 
 
 def build_user_prompt(task: dict, feedback: str | None) -> str:
