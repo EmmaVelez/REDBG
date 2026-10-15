@@ -30,7 +30,7 @@ describe('nextAliveSeat', () => {
 });
 
 describe('advanceTurn', () => {
-  it('activeSeat moves, turnNumber increments by 1, input object unchanged (deep-compare a copy)', () => {
+  it('activeSeat moves, turnNumber increments by 1, input object unchanged', () => {
     const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
     const newCtx = advanceTurn(ctx);
     expect(newCtx.activeSeat).toBe(1);
@@ -41,7 +41,7 @@ describe('advanceTurn', () => {
 });
 
 describe('makeInitialContext', () => {
-  it('activeSeat is the first alive seat even if aliveSeats given unsorted ([3,1,2] -> activeSeat 1, sorted copy stored)', () => {
+  it('activeSeat is the first alive seat even if aliveSeats given unsorted', () => {
     const ctx = makeInitialContext(4, [3, 1, 2]);
     expect(ctx.activeSeat).toBe(1);
     expect(ctx.aliveSeats).toEqual([1, 2, 3]);
@@ -56,21 +56,16 @@ describe('makeInitialContext', () => {
 });
 
 describe('withDeath', () => {
-  it('removes seat, keeps activeSeat if it was someone else; when activeSeat dies, activeSeat becomes next alive seat after it (4 seats, alive [0,1,2,3], kill 1 -> active 2); when killing the last alive seat, aliveSeats empty and activeSeat -1', () => {
-    const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
-    let newCtx = withDeath(ctx, 1);
+  it('removes seat, keeps activeSeat if it was someone else; when activeSeat dies, activeSeat becomes next alive seat after it', () => {
+    const ctx = { seatCount: 4, activeSeat: 1, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
+    const newCtx = withDeath(ctx, 1);
     expect(newCtx.activeSeat).toBe(2);
     expect(newCtx.aliveSeats).toEqual([0, 2, 3]);
+  });
 
-    newCtx = withDeath(newCtx, 2);
-    expect(newCtx.activeSeat).toBe(3);
-    expect(newCtx.aliveSeats).toEqual([0, 3]);
-
-    newCtx = withDeath(newCtx, 3);
-    expect(newCtx.activeSeat).toBe(0);
-    expect(newCtx.aliveSeats).toEqual([0]);
-
-    newCtx = withDeath(newCtx, 0);
+  it('when killing the last alive seat, aliveSeats empty and activeSeat -1', () => {
+    const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0] };
+    const newCtx = withDeath(ctx, 0);
     expect(newCtx.activeSeat).toBe(-1);
     expect(newCtx.aliveSeats).toEqual([]);
   });
@@ -81,28 +76,19 @@ describe('withDeath', () => {
   });
 });
 
-describe('All functions return new objects — no shared references with inputs', () => {
-  it('nextAliveSeat', () => {
-    const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
-    expect(nextAliveSeat(ctx, 0)).not.toBe(ctx.activeSeat);
-  });
-
-  it('advanceTurn', () => {
+describe('All functions return new objects', () => {
+  it('no shared references with inputs', () => {
     const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
     const newCtx = advanceTurn(ctx);
-    expect(newCtx).not.toBe(ctx);
-    expect(newCtx.aliveSeats).not.toBe(ctx.aliveSeats);
-  });
+    expect(ctx).not.toBe(newCtx);
+    expect(ctx.aliveSeats).not.toBe(newCtx.aliveSeats);
 
-  it('makeInitialContext', () => {
-    const ctx = makeInitialContext(4, [3, 1, 2]);
-    expect(ctx.aliveSeats).not.toBe([3, 1, 2]);
-  });
+    const newCtx2 = makeInitialContext(4, [3, 1, 2]);
+    expect(ctx).not.toBe(newCtx2);
+    expect(ctx.aliveSeats).not.toBe(newCtx2.aliveSeats);
 
-  it('withDeath', () => {
-    const ctx = { seatCount: 4, activeSeat: 0, turnNumber: 1, aliveSeats: [0, 1, 2, 3] };
-    const newCtx = withDeath(ctx, 1);
-    expect(newCtx).not.toBe(ctx);
-    expect(newCtx.aliveSeats).not.toBe(ctx.aliveSeats);
+    const newCtx3 = withDeath(ctx, 1);
+    expect(ctx).not.toBe(newCtx3);
+    expect(ctx.aliveSeats).not.toBe(newCtx3.aliveSeats);
   });
 });

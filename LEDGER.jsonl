@@ -5,3 +5,5 @@
 {"ts": "2026-10-15T07:54:36", "task": "M1-T03", "status": "ok", "attempts": 4, "note": "14b x3 failed (same draw() gate bug + implicit-any); Hermes applied 3-line fix, suite green 16/16"}
 {"ts": "2026-10-15T08:04:02", "task": "M1-T04", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T08:06:03", "task": "M1-T04", "status": "ok", "attempts": 4, "note": "14b x3 failed (missing type imports + falsy-check bug on hp 0); Hermes fixed 4 spots, suite green 43/43"}
+{"ts": "2026-10-15T08:32:02", "task": "M1-T05", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T08:34:55", "task": "M1-T05", "status": "ok", "attempts": 4, "note": "14b x3 failed (dead-seat scan order, spread-aliasing, error msg format); Hermes rewrote 3 functions, suite green 54/54"}

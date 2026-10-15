@@ -16,23 +16,22 @@ export function nextAliveSeat(ctx: TurnContext, fromSeat: number): number {
     throw new Error('nextAliveSeat: seat out of range: ' + fromSeat);
   }
 
-  const index = ctx.aliveSeats.indexOf(fromSeat);
-  if (index !== -1) {
-    return ctx.aliveSeats[(index + 1) % ctx.aliveSeats.length];
+  const alive = new Set(ctx.aliveSeats);
+  for (let step = 1; step <= ctx.seatCount; step++) {
+    const candidate = (fromSeat + step) % ctx.seatCount;
+    if (alive.has(candidate)) {
+      return candidate;
+    }
   }
-
-  let nextSeat = (fromSeat + 1) % ctx.seatCount;
-  while (ctx.aliveSeats.indexOf(nextSeat) === -1) {
-    nextSeat = (nextSeat + 1) % ctx.seatCount;
-  }
-  return nextSeat;
+  throw new Error('nextAliveSeat: no alive seats');
 }
 
 export function advanceTurn(ctx: TurnContext): TurnContext {
   return {
-    ...ctx,
+    seatCount: ctx.seatCount,
     activeSeat: nextAliveSeat(ctx, ctx.activeSeat),
     turnNumber: ctx.turnNumber + 1,
+    aliveSeats: [...ctx.aliveSeats],
   };
 }
 
@@ -43,20 +42,25 @@ export function makeInitialContext(seatCount: number, aliveSeats: readonly numbe
   if (aliveSeats.length === 0) {
     throw new Error('makeInitialContext: no alive seats');
   }
-  const sortedAliveSeats = [...aliveSeats].sort((a, b) => a - b);
-  for (const seat of sortedAliveSeats) {
+  const seen = new Set<number>();
+  for (const seat of aliveSeats) {
     if (seat < 0 || seat >= seatCount) {
       throw new Error('makeInitialContext: seat out of range: ' + seat);
     }
-  }
-  const seatSet = new Set(sortedAliveSeats);
-  if (seatSet.size !== sortedAliveSeats.length) {
-    throw new Error('makeInitialContext: duplicate seat');
+    if (seen.has(seat)) {
+      throw new Error('makeInitialContext: duplicate seat: ' + seat);
+    }
+    seen.add(seat);
   }
 
+  const sortedAliveSeats = [...aliveSeats].sort((a, b) => a - b);
+  const firstSeat = sortedAliveSeats[0];
+  if (firstSeat === undefined) {
+    throw new Error('makeInitialContext: no alive seats');
+  }
   return {
     seatCount,
-    activeSeat: sortedAliveSeats[0],
+    activeSeat: firstSeat,
     turnNumber: 1,
     aliveSeats: sortedAliveSeats,
   };
@@ -69,13 +73,19 @@ export function withDeath(ctx: TurnContext, deadSeat: number): TurnContext {
   }
 
   const newAliveSeats = ctx.aliveSeats.filter(seat => seat !== deadSeat);
-  const newActiveSeat = ctx.activeSeat === deadSeat
-    ? newAliveSeats.length > 0 ? nextAliveSeat({ ...ctx, aliveSeats: newAliveSeats }, ctx.activeSeat) : -1
-    : ctx.activeSeat;
+  let newActiveSeat = ctx.activeSeat;
+  if (ctx.activeSeat === deadSeat) {
+    if (newAliveSeats.length > 0) {
+      newActiveSeat = nextAliveSeat({ ...ctx, aliveSeats: newAliveSeats }, ctx.activeSeat);
+    } else {
+      newActiveSeat = -1;
+    }
+  }
 
   return {
-    ...ctx,
+    seatCount: ctx.seatCount,
     activeSeat: newActiveSeat,
+    turnNumber: ctx.turnNumber,
     aliveSeats: newAliveSeats,
   };
 }
