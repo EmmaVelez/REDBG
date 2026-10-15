@@ -47,13 +47,13 @@ All tasks land in `game-core/src/` with vitest tests.
 - M1-T05 `engine/turn.ts` — seat advancement skipping downed/dead, turn counter (spec'd)
 - M1-T06 `engine/market.ts` — Resource Area: build the 18 piles from card data (combined
   piles pre-shuffled), Buy = pay Gold, take top card of a pile to discard
-- M1-T07 `engine/explore.ts` — Explore resolution: play Weapons+Ammo from hand, sum Damage
+- M1-T07 `engine/mansion.ts` — Mansion deck build (33 Infected + 2 tokens + 3 Yellow Herb),
+  reveal-top, send-to-bottom, shuffle-back-into-deck (spec'd — simple pile ops first)
+- M1-T08 `engine/explore.ts` — Explore resolution: play Weapons+Ammo from hand, sum Damage
   (weapon effects + per-turn bonus), reveal Mansion top; defeated Infected → attach +
   Decorations (+ level-up check); not defeated → Character takes its Damage, card to
   Mansion bottom (Uroboros: shuffle back); multi-Explore combined-damage rule; non-Infected
   reveals (Yellow Herb / tokens: take-or-bottom)
-- M1-T08 `engine/mansion.ts` — Mansion deck build (33 Infected + 2 tokens + 3 Yellow Herb),
-  reveal-top, send-to-bottom, shuffle-back-into-deck
 - M1-T09 `engine/characters.ts` — down/revive cycle (flip down, -20 maxHp on revive, skip
   turn, death at maxHp 0), level-ups at decoration thresholds, ability hooks
 - M1-T10 `engine/cards.ts` — play card from hand: bonus icons (+X Cards/Gold/Ammo/Buy/
