@@ -1,4 +1,3 @@
-
 export type RngState = { readonly s: number };
 
 function advance(s: number): { value: number; s: number } {
@@ -14,25 +13,27 @@ export function makeRng(seed: number): RngState {
 }
 
 export function nextFloat(rng: RngState): { value: number; rng: RngState } {
-  const { s } = advance(rng.s);
-  return { value: s, rng: { s } };
+  const { value, s } = advance(rng.s);
+  return { value, rng: { s } };
 }
 
 export function nextInt(rng: RngState, maxExclusive: number): { value: number; rng: RngState } {
   if (maxExclusive < 1) {
-    throw new Error('nextInt: maxExclusive must be positive');
+    throw new Error("nextInt: maxExclusive must be positive");
   }
-  const float = nextFloat(rng).value;
-  return { value: Math.floor(float * maxExclusive), rng };
+  const { value, rng: next } = nextFloat(rng);
+  return { value: Math.floor(value * maxExclusive), rng: next };
 }
 
 export function shuffle<T>(rng: RngState, items: readonly T[]): { value: T[]; rng: RngState } {
   const result = [...items];
+  let current = rng;
   for (let i = result.length - 1; i > 0; i--) {
-    const j = nextInt(rng, i + 1);
-    const temp = result[i]!;
-    result[i] = result[j]!;
+    const { value: j, rng: next } = nextInt(current, i + 1);
+    current = next;
+    const temp = result[i] as T;
+    result[i] = result[j] as T;
     result[j] = temp;
   }
-  return { value: result, rng };
+  return { value: result, rng: current };
 }
