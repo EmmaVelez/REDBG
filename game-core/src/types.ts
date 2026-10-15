@@ -253,6 +253,11 @@ export interface GameState {
   /** Every card instance, keyed by instanceId. */
   readonly cards: Readonly<Record<string, CardInstance>>;
 
+  /** Card database, keyed by cardId — the static defs the engine reads
+   *  (cost, damage, ammoReq, effects). Populated at setup from the card
+   *  data; kept in state so validate/apply are self-contained. */
+  readonly cardDefs: Readonly<Record<string, CardDef>>;
+
   /** Decisions awaiting a player (targeting, optional effects). */
   readonly prompts: readonly Prompt[];
 

@@ -16,3 +16,5 @@
 {"ts": "2026-10-15T10:37:26", "task": "M1-T08", "status": "ok", "attempts": 4, "note": "14b x3 failed (test file syntax: missing ] in weapons array + missing bonusDamage field; tsc errors on CardDef re-export + Burst-Fire calls); Hermes fixed 4 spots + 1 wrong spec value (damage 40 vs combinedHp 35); suite green 92/92"}
 {"ts": "2026-10-15T10:51:30", "task": "M1-T09", "status": "ok", "attempts": 2, "note": "auto-validated tsc+vitest"}
 {"ts": "2026-10-15T11:25:26", "task": "M1-T10", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T11:27:02", "task": "M1-T10", "status": "ok", "attempts": 4, "note": "14b x3 failed (sumBonuses mutated readonly reduce acc; ammo test used type item not ammunition); Hermes fixed 2 spots; suite green 128/128"}
+{"ts": "2026-10-15T12:19:41", "task": "M1-T11", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
