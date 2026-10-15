@@ -19,3 +19,4 @@
 {"ts": "2026-10-15T11:27:02", "task": "M1-T10", "status": "ok", "attempts": 4, "note": "14b x3 failed (sumBonuses mutated readonly reduce acc; ammo test used type item not ammunition); Hermes fixed 2 spots; suite green 128/128"}
 {"ts": "2026-10-15T12:19:41", "task": "M1-T11", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T12:22:19", "task": "M1-T11", "status": "ok", "attempts": 4, "note": "14b x3 failed (startGame union narrow, CardDef import, buy top undefined; model WAS right on both vitest fails - MY fixture ignored dead/marketPiles overrides + missing prompt text); Hermes fixed 7 spots; suite green 165/165"}
+{"ts": "2026-10-15T17:34:14", "task": "M1-T12", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}

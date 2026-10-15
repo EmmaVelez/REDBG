@@ -83,7 +83,7 @@ def call_ollama(model: str, system: str, user: str, num_ctx: int) -> dict:
         "model": model,
         "stream": False,
         "keep_alive": "15m",
-        "options": {"temperature": 0.1, "num_ctx": num_ctx, "num_predict": 8192},
+        "options": {"temperature": 0.1, "num_ctx": num_ctx, "num_predict": 16384},
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
     }).encode()
