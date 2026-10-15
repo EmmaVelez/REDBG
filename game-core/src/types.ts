@@ -143,10 +143,10 @@ export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
 
 export type CharacterAbility =
-  | { readonly kind: "weaponPlusDamagePerInfectedFought"; readonly amount: number } // Chris L1: +5 per Infected being fought
-  | { readonly kind: "noHealingNoNonInfectedAttach" }                              // Chris restriction
-  | { readonly kind: "explosivesGoToDiscardInsteadOfTrash" }                        // Jill L2
-  | { readonly kind: "generic"; readonly level: number };                           // fallback: text-only ability, engine treats as no-op (v1)
+  | { readonly kind: "weaponPlusDamagePerInfectedFought"; readonly amount: number; readonly level: 1 | 2 } // Chris L1: +5 per Infected being fought
+  | { readonly kind: "noHealingNoNonInfectedAttach"; readonly level: 1 | 2 }                              // Chris restriction
+  | { readonly kind: "explosivesGoToDiscardInsteadOfTrash"; readonly level: 1 | 2 }                       // Jill L2
+  | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------
 // Card instances

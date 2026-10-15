@@ -13,3 +13,4 @@
 {"ts": "2026-10-15T10:10:23", "task": "M1-T07", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T10:13:24", "task": "M1-T07", "status": "ok", "attempts": 4, "note": "4b x3 failed (missing function imports, wrong sendToBottom/shuffleBack expectations, same string|undefined bug); Hermes restored correct mansion.ts + proven-revert test file; suite green 77/77"}
 {"ts": "2026-10-15T10:34:57", "task": "M1-T08", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T10:37:26", "task": "M1-T08", "status": "ok", "attempts": 4, "note": "14b x3 failed (test file syntax: missing ] in weapons array + missing bonusDamage field; tsc errors on CardDef re-export + Burst-Fire calls); Hermes fixed 4 spots + 1 wrong spec value (damage 40 vs combinedHp 35); suite green 92/92"}
