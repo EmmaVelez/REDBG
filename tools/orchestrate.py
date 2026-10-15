@@ -69,9 +69,12 @@ def main() -> int:
             cmd += ["--feedback", str(feedback_file)]
         rc, out = run(" ".join(f'"{c}"' if " " in c else c for c in cmd), REPO)
         print(out)
-        if rc != 0 and "MISSING" in out:
-            # harness-level failure (wrong file set): feed that back too
-            feedback_file.write_text(out, encoding="utf-8")
+        if rc != 0:
+            # coder-level failure (missing files, generation timeout, crash):
+            # feed the error back and retry — NEVER fall through to validate on
+            # a stale tree (a timeout produces no MISSING marker, which used to
+            # cause false-green commits on unchanged files).
+            feedback_file.write_text(out[-6000:], encoding="utf-8")
             continue
 
         green, errs = validate()

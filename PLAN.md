@@ -58,20 +58,25 @@ All tasks land in `game-core/src/` with vitest tests.
   turn, death at maxHp 0), level-ups at decoration thresholds, ability hooks
 - M1-T10 `engine/cards.ts` — play card from hand: bonus icons (+X Cards/Gold/Ammo/Buy/
   Action/Explore), action-card effects via Prompts, item effects, trash semantics
-- M1-T11 `engine/actions.ts` — the root reducer: validate + apply every Action; illegal →
-  reject; Prompt creation/resolution (chooseOption)
-- M1-T12 `engine/game.ts` — setup (deal characters, 10-card starting inventories, draw 5,
-  build piles + Mansion, seed RNG), turn start (reset pools to 1/1/1, downed handling),
-  endTurn (discard play area + hand, draw 5 with reshuffle), win conditions (Uroboros
-  defeated → most Decorations wins, tie → most HP, shared win; all players dead)
-- M1-T13 `engine/replay.ts` — serialize action log, replay to identical state (determinism proof)
-- M1-T14a..g `data/premier.ts` — full Premier Edition card data in batches (counts from
+- M1-T11 `engine/validate.ts` — action validation gate: `validateAction(state, action)` for
+  every Action (phase/seat/pools/hand/cost/ammo math, exact reason strings) ✅ DONE (split of T11)
+- M1-T12 `engine/actions.ts` — apply layer (reducer): validated Action → NEW GameState; play
+  action/item/ammo (bonus icons, prompt-requiring effects), explore (reveal, defeat/not-defeated,
+  attach + Decorations, level-up check, HP loss + downed, Uroboros shuffle-back, take-or-bottom),
+  buy (pay Gold → discard), endTurn (discard play area + hand, draw 5 w/ reshuffle, advance seat),
+  useCharacterAbility (hook), chooseOption (resolve prompts via payload)
+- M1-T13 `engine/game.ts` — setup (build piles + Mansion + cardDefs, deal characters, 10-card
+  starting inventories, draw 5, seed RNG), turn start (reset pools to 1/1/1, downed handling),
+  win conditions (Uroboros defeated → most Decorations wins, tie → most HP, shared win; all
+  players dead)
+- M1-T14 `engine/replay.ts` — serialize action log, replay to identical state (determinism proof)
+- M1-T15a..g `data/premier.ts` — full Premier Edition card data in batches (counts from
   rulebook box layout): a) 10 characters, b) 16 weapons, c) ammo+items, d) 12 actions,
   e) 17 infected, f) 2 tokens + scenario pile config, g) integrity test (every card in the
   digest manifest, copies match box counts, ids unique)
-- M1-T15 `engine/rules-faq.ts` — edge cases from rulebook FAQ ch. VIII (Gatling Gun Majini
-  ammo increments, Jill/Grenade/Rocket Launcher interactions, partial effects "do as much
-  as you can")
+- M1-T16 `engine/rules-faq.ts` — edge cases from rulebook FAQ ch. VIII (Gatling Gun Majini
+  ammo increments, Jill/Grenade/Rocket Launcher interactions, partial effects "do as much as
+  you can")
 
 ### M2 — AI players
 - M2-T01 `ai/enumerate.ts` — list legal Actions from a GameState (uses engine validator)

@@ -90,7 +90,7 @@ def call_ollama(model: str, system: str, user: str, num_ctx: int) -> dict:
     req = urllib.request.Request(OLLAMA, data=body,
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=900) as r:
+    with urllib.request.urlopen(req, timeout=1800) as r:
         resp = json.loads(r.read().decode())
     resp["_wall_s"] = round(time.time() - t0, 1)
     return resp
