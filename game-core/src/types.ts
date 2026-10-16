@@ -207,8 +207,8 @@ export interface PlayerState {
   readonly maxHp: number;
   /** Persistent victory currency. */
     readonly decorations: number;
-      /** Highest tier unlocked: 0 = below L1 gate, 1 = L1, 2 = L2 (per-card gates). */
-      readonly level: 0 | 1 | 2;
+    /** Highest tier unlocked: 0 = below L1 gate, 1 = L1, 2 = L2 (per-card gates). */
+    readonly level: 0 | 1 | 2;
 
   /** Per-turn resource pools (reset at turn start; granted by played cards). */
   readonly turnAmmo: number;

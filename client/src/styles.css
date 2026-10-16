@@ -336,6 +336,99 @@ h1, h2 { margin: 0 0 8px; }
 .play-area { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
 .zone-label { color: var(--muted); font-size: 11px; width: 52px; }
 .play-area-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+.zone-empty { color: var(--muted); font-size: 11px; }
+
+/* ---- card piles (deck / discard / mansion) ---- */
+.zone-piles { display: flex; gap: 18px; align-items: flex-start; margin-top: 6px; }
+.zone-pile { display: flex; flex-direction: column; gap: 4px; align-items: center; min-width: 64px; }
+.zone-pile-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.zone-pile-stack { position: relative; width: 64px; height: 86px; }
+.zone-pile-cards { position: absolute; inset: 0; }
+.zone-pile-card { position: absolute; inset: 0; }
+.zone-pile-card[data-depth="0"] { transform: translate(0, 0); }
+.zone-pile-card[data-depth="1"] { transform: translate(-2px, 1px); }
+.zone-pile-card[data-depth="2"] { transform: translate(-4px, 2px); }
+.zone-pile-top { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.zone-pile-top .card { width: 60px; min-height: 82px; padding: 4px 5px; gap: 2px; font-size: 8px; }
+.zone-pile-top .card::before { height: 14px; }
+.zone-pile-top .card-cost { min-width: 14px; height: 14px; line-height: 12px; font-size: 8px; }
+.zone-pile-top .card-name { font-size: 8px; }
+.zone-pile-count {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  background: var(--gold);
+  color: #1c1a12;
+  font-weight: 800;
+  font-size: 11px;
+  border-radius: 50%;
+  min-width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  border: 1px solid #6b5513;
+}
+.mansion-piles { display: flex; gap: 18px; align-items: flex-end; }
+
+/* card back */
+.card-back {
+  position: relative;
+  width: 64px;
+  height: 86px;
+  border-radius: 7px;
+  border: 1px solid #2a2d36;
+  background:
+    radial-gradient(circle at 50% 40%, #23262f 0%, #15171d 70%),
+    linear-gradient(180deg, #1b1e26 0%, #0e1014 100%);
+  box-shadow: inset 0 0 0 2px #12141a, inset 0 0 0 3px #2f3440, 0 2px 4px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-back-compact { width: 60px; height: 82px; }
+.card-back-emblem {
+  color: #c9a86a;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 6px rgba(201, 168, 106, 0.5);
+  border: 1px solid #3a3223;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ---- card flight layer ---- */
+.card-flight-layer { display: none; }
+.flight-card {
+  position: fixed;
+  width: 96px;
+  height: 126px;
+  z-index: 500;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.flight-card-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 1px solid #3a3d47;
+  background: linear-gradient(180deg, #23262f 0%, #16181f 100%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.flight-card-name { color: #fff; font-weight: 800; font-size: 13px; text-shadow: 0 1px 2px #000; }
+.flight-card-type { color: var(--gold); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; }
+.flight-face-down { background: linear-gradient(180deg, #1b1e26 0%, #0e1014 100%); }
 
 /* ---- action bar / log ---- */
 .action-bar {

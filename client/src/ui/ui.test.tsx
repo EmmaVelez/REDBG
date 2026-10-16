@@ -143,15 +143,21 @@ describe('Hand + Zones (T04)', () => {
     expect((html.match(/class="hand-card"/g) ?? []).length).toBe(hand.length);
   });
 
-  it('renders deck/discard/hand counts and play area', () => {
+  it('renders deck/discard piles with counts and the play area', () => {
     const state = twoPlayerState();
     const player = state.seats[0];
     expect(player).toBeDefined();
     if (player === undefined) return;
     const html = renderToStaticMarkup(<Zones state={state} seat={0} />);
-    expect(html).toContain(`Deck: ${player.inventory.length}`);
-    expect(html).toContain(`Discard: ${player.discard.length}`);
+    // visual piles carry anchor + count; hand count is a text badge
+    expect(html).toContain('data-anim-zone="deck"');
+    expect(html).toContain('data-anim-zone="discard"');
+    expect(html).toContain(`data-pile-count="${player.inventory.length}"`);
+    expect(html).toContain(`data-pile-count="${player.discard.length}"`);
     expect(html).toContain(`Hand: ${player.hand.length}`);
+    // play area anchor present even when empty (flight target stability)
+    expect(html).toContain('data-anim-zone="play"');
+    expect(html).toContain('<span class="zone-empty">none</span>');
   });
 
   it('renders an empty-hand message when the hand is empty', () => {
@@ -208,17 +214,21 @@ describe('PlayerPanel (T06)', () => {
 });
 
 describe('Board (T05)', () => {
-  it('renders market piles, mansion counts, panels and my hand', () => {
+  it('renders market piles, mansion piles, panels and my hand', () => {
     const state = twoPlayerState();
     const html = renderToStaticMarkup(<Board state={state} mySeat={0} onAction={() => {}} />);
     expect(html).toContain('Resource Area');
     expect(html).toContain('Mansion');
-    expect(html).toContain(`Deck: ${state.mansionDeck.length}`);
+    // mansion deck is a visual pile with anchor + count
+    expect(html).toContain('data-anim-zone="mansion"');
+    expect(html).toContain(`data-pile-count="${state.mansionDeck.length}"`);
     expect(html).toContain('Your hand');
     // every seated player gets a panel
     expect((html.match(/class="player-panel/g) ?? []).length).toBe(2);
     // at least one purchasable pile shows a gold cost
     expect(html).toMatch(/\d+g/);
+    // flight layer mounts with zero active flights (SSR-safe)
+    expect(html).toContain('data-flight-count="0"');
   });
 });
 

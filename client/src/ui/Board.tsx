@@ -5,11 +5,14 @@ import { HoverCard } from './HoverCard';
 import { PlayerPanel } from './PlayerPanel';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
+import { ZonePile } from './ZonePile';
+import { CardFlightLayer } from './CardFlightLayer';
 import { defForInstance, costText } from './cards';
 
 /**
  * M4-T05: Board — the table. Market resource piles (click to buy), Mansion
  * deck counts, every player's panel, and the viewing player's hand + zones.
+ * The CardFlightLayer animates cards moving between anchored zones.
  */
 
 export interface BoardProps {
@@ -48,6 +51,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
                 type="button"
                 className="market-pile"
                 data-pile={pile.pileId}
+                data-anim-zone={`market-${pile.pileId}`}
                 onClick={() => clickable && onAction({ type: 'buy', seat: mySeat, pileId: pile.pileId })}
                 disabled={!clickable}
                 title={`Buy ${def.name} for ${costText(def)} gold`}
@@ -65,10 +69,12 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
 
       <div className="board-mansion">
         <h2 className="board-section-title">Mansion</h2>
-        <div className="mansion-counts">
-          <span>Deck: {state.mansionDeck.length}</span>
-          <span>Bottom: {state.mansionBottom.length}</span>
-          <span>Removed: {state.removed.length}</span>
+        <div className="mansion-piles">
+          <ZonePile label="Deck" count={state.mansionDeck.length} animZone="mansion" />
+          <div className="mansion-counts" data-anim-zone="mansionBottom">
+            <span>Bottom: {state.mansionBottom.length}</span>
+            <span>Removed: {state.removed.length}</span>
+          </div>
         </div>
       </div>
 
@@ -83,6 +89,8 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
         <Hand state={state} seat={mySeat} onPlay={instanceId => onPlayFromHand(state, mySeat, instanceId, onAction)} disabled={disabled || state.activeSeat !== mySeat || state.phase !== 'main'} />
         <Zones state={state} seat={mySeat} />
       </div>
+
+      <CardFlightLayer state={state} />
     </div>
   );
 }

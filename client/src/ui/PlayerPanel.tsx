@@ -53,7 +53,7 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         <span title="Defeated infected attached">Attached {player.attached.length}</span>
       </div>
       {charDef !== null && (
-        <div className="player-character-card" data-character-card>
+        <div className="player-character-card" data-character-card data-anim-zone="attached">
           <HoverCard def={charDef} decorations={player.decorations}>
             <CardView def={charDef} compact decorations={player.decorations} />
           </HoverCard>
