@@ -131,6 +131,26 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
 }
 
 /**
+ * Downed/death detection for the viewing player (RE-style "YOU DIED" screen).
+ * Returns "downed" when their HP just hit 0 (they recover with -20 max HP),
+ * or "dead" when the character is permanently dead this step.
+ */
+export function detectPlayerDowned(
+  prev: GameState,
+  next: GameState,
+  mySeat: number
+): 'downed' | 'dead' | null {
+  const prevPlayer = prev.seats[mySeat];
+  const nextPlayer = next.seats[mySeat];
+  if (prevPlayer === undefined || nextPlayer === undefined) return null;
+  // Permanent death (maxHp token reached 0 / revive impossible).
+  if (!prevPlayer.dead && nextPlayer.dead) return 'dead';
+  // HP dropped to zero this step -> downed (recoverable).
+  if (prevPlayer.hp > 0 && nextPlayer.hp === 0 && !nextPlayer.dead) return 'downed';
+  return null;
+}
+
+/**
  * Zone changes between two consecutive states, capped to keep the table
  * readable. Identifiers the server hides (`hidden-*`) are skipped.
  */

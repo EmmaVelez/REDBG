@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '@re/game-core';
-import { detectReveal, diffCardMoves } from './anims';
+import { detectPlayerDowned, detectReveal, diffCardMoves } from './anims';
 import { flightPath, splitFlightPhases } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
@@ -12,6 +12,9 @@ function makeState(over: {
     discard?: readonly string[];
     playArea?: readonly string[];
     attached?: readonly string[];
+    hp?: number;
+    downed?: boolean;
+    dead?: boolean;
   }>;
   marketPiles?: Readonly<Record<string, { readonly pileId: string; readonly cards: readonly string[] }>>;
   mansionDeck?: readonly string[];
@@ -32,7 +35,7 @@ function makeState(over: {
       name: `p${s.seat}`,
       controller: 'human' as const,
       characterInstanceId: '',
-      hp: 100,
+      hp: s.hp ?? 100,
       maxHp: 100,
       decorations: 0,
       level: 0 as const,
@@ -47,8 +50,8 @@ function makeState(over: {
       hand: s.hand ?? [],
       discard: s.discard ?? [],
       playArea: s.playArea ?? [],
-      downed: false,
-      dead: false,
+      downed: s.downed ?? false,
+      dead: s.dead ?? false,
     })),
     marketPiles: over.marketPiles ?? {},
     mansionDeck: over.mansionDeck ?? [],
@@ -220,5 +223,31 @@ describe('splitFlightPhases', () => {
     const { reshuffle, rest } = splitFlightPhases([drawMove]);
     expect(reshuffle).toHaveLength(0);
     expect(rest).toEqual([drawMove]);
+  });
+});
+
+describe('detectPlayerDowned', () => {
+  it('detects downed when own HP drops to zero this step', () => {
+    const prev = makeState({ seats: [{ seat: 0, hp: 40 }] });
+    const next = makeState({ version: 2, seats: [{ seat: 0, hp: 0, downed: true }] });
+    expect(detectPlayerDowned(prev, next, 0)).toBe('downed');
+  });
+
+  it('detects permanent death when the dead flag flips', () => {
+    const prev = makeState({ seats: [{ seat: 0, hp: 0, downed: true }] });
+    const next = makeState({ version: 2, seats: [{ seat: 0, hp: 0, dead: true }] });
+    expect(detectPlayerDowned(prev, next, 0)).toBe('dead');
+  });
+
+  it('ignores other players losing HP', () => {
+    const prev = makeState({ seats: [{ seat: 0 }, { seat: 1, hp: 40 }] });
+    const next = makeState({ version: 2, seats: [{ seat: 0 }, { seat: 1, hp: 0, downed: true }] });
+    expect(detectPlayerDowned(prev, next, 0)).toBeNull();
+  });
+
+  it('does not retrigger while already downed', () => {
+    const prev = makeState({ seats: [{ seat: 0, hp: 0, downed: true }] });
+    const next = makeState({ version: 2, seats: [{ seat: 0, hp: 0, downed: true }] });
+    expect(detectPlayerDowned(prev, next, 0)).toBeNull();
   });
 });

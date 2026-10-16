@@ -9,7 +9,8 @@ import { Board } from './ui/Board';
 import { GameLog } from './ui/GameLog';
 import { Lobby } from './ui/Lobby';
 import { MansionReveal } from './ui/MansionReveal';
-import { detectReveal } from './ui/anims';
+import { YouDiedOverlay } from './ui/YouDiedOverlay';
+import { detectPlayerDowned, detectReveal } from './ui/anims';
 import { defForInstance } from './ui/cards';
 
 /**
@@ -69,11 +70,18 @@ export function App(): JSX.Element {
   // reveal until the player clicks Continue.
   const prevStateRef = useRef<GameState | null>(null);
   const [reveal, setReveal] = useState<{ def: CardDef; resultText: string } | null>(null);
+  const [youDied, setYouDied] = useState<boolean | null>(null);
   const state = view?.state ?? null;
   useEffect(() => {
     const prev = prevStateRef.current;
     prevStateRef.current = state;
     if (prev === null || state === null || prev.version === state.version) return;
+    // Downed/death wins over the mansion reveal (both on the same step).
+    const downed = detectPlayerDowned(prev, state, mySeat);
+    if (downed !== null) {
+      setYouDied(downed === 'dead');
+      return;
+    }
     const detected = detectReveal(prev, state, mySeat);
     if (detected === null) return;
     const def = defForInstance(state, detected.instanceId);
@@ -113,7 +121,8 @@ export function App(): JSX.Element {
     gameState.phase !== 'main' ||
     gameState.activeSeat !== mySeat ||
     gameState.prompts.some(p => p.seat === mySeat) ||
-    reveal !== null;
+    reveal !== null ||
+    youDied !== null;
 
   return (
     <div className="app">
@@ -136,6 +145,9 @@ export function App(): JSX.Element {
       </main>
       {reveal !== null && (
         <MansionReveal def={reveal.def} resultText={reveal.resultText} onContinue={() => setReveal(null)} />
+      )}
+      {youDied !== null && (
+        <YouDiedOverlay dead={youDied} onContinue={() => setYouDied(null)} />
       )}
     </div>
   );

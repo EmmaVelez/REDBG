@@ -4,6 +4,7 @@ import type { GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
+import { YouDiedOverlay } from './YouDiedOverlay';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
@@ -253,6 +254,22 @@ describe('MansionReveal', () => {
     expect(html).toContain(monster.name);
     expect(html).toContain('Defeated! +4 ★');
     expect(html).toContain('Continue');
+  });
+});
+
+describe('YouDiedOverlay', () => {
+  it('renders YOU DIED with the downed subtitle for downed players', () => {
+    const html = renderToStaticMarkup(<YouDiedOverlay dead={false} onContinue={() => {}} />);
+    expect(html).toContain('YOU DIED');
+    expect(html).toContain('data-you-died="downed"');
+    expect(html).toContain('revive');
+    expect(html).toContain('Continue');
+  });
+
+  it('renders the death subtitle for dead players', () => {
+    const html = renderToStaticMarkup(<YouDiedOverlay dead onContinue={() => {}} />);
+    expect(html).toContain('data-you-died="dead"');
+    expect(html).toContain('dead');
   });
 });
 
