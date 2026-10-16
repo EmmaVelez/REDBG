@@ -86,6 +86,22 @@ describe('CardView (T03)', () => {
     expect(unlockedHtml).not.toContain('skill-locked');
   });
 
+  it('Krauser requires 1 decoration for his level-1 ability (level1At gate)', () => {
+    const krauser = PREMIER_CARDS.find(c => c.id === 'ch-007');
+    expect(krauser).toBeDefined();
+    if (krauser === undefined || krauser.level1At === undefined) return;
+    expect(krauser.level1At).toBe(1);
+    // at 0 decorations: level 1 locked with ★ 1
+    const fresh = renderToStaticMarkup(<CardView def={krauser} decorations={0} />);
+    expect(fresh).toContain(`★ 1`);
+    expect(fresh).toContain('skill-locked');
+    // at 1 decoration: level 1 row unlocked (★ 0), level 2 still gated
+    const earned = renderToStaticMarkup(<CardView def={krauser} decorations={1} />);
+    expect(earned).toContain(`★ 0`);
+    expect(earned).toContain('skill-unlocked');
+    expect(earned).toContain(`★ 6`);
+  });
+
   it('renders a character card with max HP when non-compact and undecorated', () => {
     const charDef = PREMIER_CARDS.find(c => c.type === 'character');
     expect(charDef).toBeDefined();

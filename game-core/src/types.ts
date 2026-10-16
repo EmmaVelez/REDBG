@@ -94,10 +94,12 @@ export interface CardDef {
   readonly infectedEffects?: readonly InfectedEffect[];
 
   // -- character --
-  /** Starting AND maximum Health at Level 1. */
-  readonly maxHp?: number;
-  /** Decorations needed to reach Level 2. */
-  readonly level2At?: number;
+    /** Starting AND maximum Health at Level 1. */
+    readonly maxHp?: number;
+    /** Decorations needed to reach Level 2. */
+    readonly level2At?: number;
+    /** Decorations needed to reach Level 1 (default 0; Krauser requires 1). */
+    readonly level1At?: number;
   /** Ability text per level (level 1 first). */
   readonly levels?: ReadonlyArray<{ readonly level: number; readonly text: string }>;
   /** Machine-readable ability keys (see CharacterAbility). */

@@ -33,7 +33,7 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
       <div className="player-header">
         <span className="player-name">{player.name}{status}</span>
         {isMe && <span className="player-me">YOU</span>}
-        {charDef !== null && <span className="player-character">{charDef.name} · Lv{player.level}</span>}
+        {charDef !== null && <span className="player-character">{charDef.name} · Lv{player.level - 1}</span>}
       </div>
       <div className="player-row">
         <span className="player-hp">HP {player.hp}/{player.maxHp}</span>

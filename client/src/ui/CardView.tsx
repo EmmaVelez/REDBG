@@ -44,16 +44,20 @@ export function CardView({ def, compact = false, decorations }: CardViewProps): 
 }
 
 function CharacterSkills({ def, decorations }: { def: CardDef; decorations: number }): JSX.Element {
+  // Each tier has its own decoration gate: L1 at level1At (default 0; Krauser
+  // requires 1), L2 at level2At. Characters start at level 0, so even the
+  // first ability shows its gate until the decorations are earned.
+  const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
   const levels = def.levels ?? [];
   if (levels.length === 0) {
     return <div className="card-text">{def.text}</div>;
   }
   return (
-    <div className="card-skills" data-decorations={decorations} data-level2-at={level2At}>
+    <div className="card-skills" data-decorations={decorations} data-level1-at={level1At} data-level2-at={level2At}>
       {levels.map(entry => {
-        // Level 1 unlocks at 0 decorations; level 2 at the level2At gate.
-        const need = entry.level === 1 ? 0 : Math.max(level2At - decorations, 0);
+        const gate = entry.level === 1 ? level1At : level2At;
+        const need = Math.max(gate - decorations, 0);
         const unlocked = need === 0;
         return (
           <div
