@@ -51,6 +51,36 @@ function buildFlightCard(def: CardDef | null): HTMLElement {
   return host;
 }
 
+/**
+ * Straight-line flight geometry: the flying card is placed AT the source
+ * rect (fixed position) and translated by (dx, dy) to the destination, so it
+ * never passes through the viewport origin.
+ */
+export interface FlightPath {
+  readonly from: { x: number; y: number };
+  readonly dx: number;
+  readonly dy: number;
+}
+
+export function flightPath(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  base = 96
+): FlightPath {
+  const start = { x: from.x - base / 2, y: from.y - base / 2 };
+  const end = { x: to.x - base / 2, y: to.y - base / 2 };
+  return { from: start, dx: end.x - start.x, dy: end.y - start.y };
+}
+
+/** True when the rect is at least partially inside the viewport. */
+function visible(sel: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const el = document.querySelector<HTMLElement>(sel);
+  if (el === null) return false;
+  const r = el.getBoundingClientRect();
+  return r.bottom > 0 && r.top < (window.innerHeight ?? 0) && r.right > 0 && r.left < (window.innerWidth ?? 0);
+}
+
 function flyCard(flight: Flight, state: GameState, done: () => void): void {
   const from = rectCenter(zoneSelector(flight.fromZone, flight.fromPileId));
   const to = rectCenter(zoneSelector(flight.toZone, flight.toPileId));
@@ -58,26 +88,28 @@ function flyCard(flight: Flight, state: GameState, done: () => void): void {
     done();
     return;
   }
+  // Skip flights whose source or destination is off-screen — the card would
+  // travel through the viewport edge for no benefit.
+  if (!visible(zoneSelector(flight.fromZone, flight.fromPileId)) || !visible(zoneSelector(flight.toZone, flight.toPileId))) {
+    done();
+    return;
+  }
   const el = document.createElement('div');
   el.className = 'flight-card';
-  el.style.left = '0px';
-  el.style.top = '0px';
+  const path = flightPath(from, to);
+  el.style.left = `${path.from.x}px`;
+  el.style.top = `${path.from.y}px`;
   el.appendChild(
     buildFlightCard(flight.faceDown ? null : defForInstance(state, flight.instanceId))
   );
   document.body.appendChild(el);
-  const base = 96; // flight-card footprint (px)
-  const start = { x: from.x - base / 2, y: from.y - base / 2 };
-  const end = { x: to.x - base / 2, y: to.y - base / 2 };
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
+  // Linear travel: straight translate from the source position to the target.
   el.animate(
     [
       { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1 },
-      { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 30}px) rotate(180deg) scale(0.9)`, opacity: 1 },
-      { transform: `translate(${dx}px, ${dy}px) rotate(360deg) scale(0.7)`, opacity: 0 },
+      { transform: `translate(${path.dx}px, ${path.dy}px) rotate(0deg) scale(0.75)`, opacity: 0 },
     ],
-    { duration: 550, easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)' }
+    { duration: 380, easing: 'linear' }
   ).finished.then(() => {
     el.remove();
     done();

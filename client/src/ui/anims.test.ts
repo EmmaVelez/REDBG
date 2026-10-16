@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '@re/game-core';
 import { detectReveal, diffCardMoves } from './anims';
+import { flightPath } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
 function makeState(over: {
@@ -185,5 +186,22 @@ describe('detectReveal', () => {
       log: [],
     });
     expect(detectReveal(prev, next, 0)).toBeNull();
+  });
+});
+
+describe('flightPath', () => {
+  it('positions the flying card at the source and translates to the target', () => {
+    // source rect center (300, 200), target rect center (400, 500), base 96
+    const path = flightPath({ x: 300, y: 200 }, { x: 400, y: 500 });
+    // start = center - base/2 so the card centers on the source
+    expect(path.from).toEqual({ x: 252, y: 152 });
+    expect(path.dx).toBe(100);
+    expect(path.dy).toBe(300);
+  });
+
+  it('produces zero translation for overlapping zones', () => {
+    const path = flightPath({ x: 100, y: 100 }, { x: 100, y: 100 });
+    expect(path.dx).toBe(0);
+    expect(path.dy).toBe(0);
   });
 });
