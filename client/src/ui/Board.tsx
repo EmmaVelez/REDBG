@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { GameState, Action } from '@re/game-core';
 import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { PlayerPanel } from './PlayerPanel';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
@@ -51,7 +52,9 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
                 disabled={!clickable}
                 title={`Buy ${def.name} for ${costText(def)} gold`}
               >
-                <CardView def={def} compact />
+                <HoverCard def={def}>
+                  <CardView def={def} compact />
+                </HoverCard>
                 <span className="pile-count">{count} left</span>
                 <span className="pile-cost">{costText(def)}g</span>
               </button>

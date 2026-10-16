@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { GameState } from '@re/game-core';
 import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { defForInstance } from './cards';
 
 /**
@@ -34,7 +35,11 @@ export function Zones({ state, seat }: ZonesProps): JSX.Element {
               if (def === null) {
                 return <div key={`${seat}-pa-${i}`} className="card card-hidden">?</div>;
               }
-              return <CardView key={instanceId} def={def} compact />;
+              return (
+                <HoverCard key={instanceId} def={def}>
+                  <CardView def={def} compact />
+                </HoverCard>
+              );
             })}
           </div>
         </div>

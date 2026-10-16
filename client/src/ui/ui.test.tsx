@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { GameState } from '@re/game-core';
 import { setup, startTurn, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
 import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
 import { PlayerPanel } from './PlayerPanel';
@@ -197,6 +198,22 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Seat 0');
     expect(html).toContain('Bot');
     expect(html).toContain('Start game');
+  });
+});
+
+describe('HoverCard (M4-T11)', () => {
+  it('wraps its trigger; popup is state-driven (renders on hover, not in static markup)', () => {
+    const state = twoPlayerState();
+    const { def } = firstWeaponDef(state);
+    const html = renderToStaticMarkup(
+      <HoverCard def={def}>
+        <span className="trigger-marker">T</span>
+      </HoverCard>,
+    );
+    expect(html).toContain('hover-card');
+    expect(html).toContain('trigger-marker');
+    // popup only mounts after onMouseEnter sets position state
+    expect(html).not.toContain('hover-card-pop');
   });
 });
 

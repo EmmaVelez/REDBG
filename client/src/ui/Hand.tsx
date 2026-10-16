@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { GameState } from '@re/game-core';
 import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { defForInstance } from './cards';
 
 /**
@@ -28,16 +29,17 @@ export function Hand({ state, seat, onPlay, disabled = false }: HandProps): JSX.
           return <div key={`${seat}-${i}`} className="card card-hidden">?</div>;
         }
         return (
-          <button
-            key={instanceId}
-            type="button"
-            className="hand-card"
-            onClick={() => onPlay?.(instanceId)}
-            disabled={disabled || onPlay === undefined}
-            title={`Play ${def.name}`}
-          >
-            <CardView def={def} compact />
-          </button>
+          <HoverCard key={instanceId} def={def}>
+            <button
+              type="button"
+              className="hand-card"
+              onClick={() => onPlay?.(instanceId)}
+              disabled={disabled || onPlay === undefined}
+              title={`Play ${def.name}`}
+            >
+              <CardView def={def} compact />
+            </button>
+          </HoverCard>
         );
       })}
     </div>

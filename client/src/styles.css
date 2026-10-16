@@ -1,4 +1,6 @@
-/* Bare-bones functional layout — polish comes later (M4-T11). */
+/* M4-T11 polish: Resident Evil DBG-style card frames + hover card popup.
+   The original game's cards: dark distressed frame with a colored band per
+   type, badge cost, and double-border (outer type color, inner black). */
 
 :root {
   --bg: #14161a;
@@ -7,13 +9,16 @@
   --text: #e8e6e3;
   --muted: #9aa1ad;
   --border: #3a4050;
+  --gold: #d4af37;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 70% -10%, #23262e 0%, transparent 60%),
+    var(--bg);
   color: var(--text);
   font: 14px/1.4 system-ui, sans-serif;
 }
@@ -54,44 +59,151 @@ h1, h2 { margin: 0 0 8px; }
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
-.app-header h1 { font-size: 18px; }
+.app-header h1 { font-size: 18px; letter-spacing: 1px; }
 .app-room { color: var(--muted); }
 .app-status { margin-left: auto; color: var(--muted); font-size: 12px; }
 .app-status-connected { color: #7bd88f; }
 .app-main { display: flex; gap: 16px; padding: 16px; flex: 1; min-height: 0; }
 .app-side { width: 340px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
 
-/* ---- cards ---- */
+/* ---- cards (RE DBG frame) ---- */
 .card {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel-2);
-  padding: 6px 8px;
+  --card-accent: #8fa3b0; /* default steel */
+  position: relative;
   width: 150px;
   min-height: 90px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 4px),
+    linear-gradient(160deg, #2b2f36 0%, #1c1f25 55%, #171a1f 100%);
+  border: 2px solid var(--card-accent);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  color: var(--text);
 }
-.card-top { display: flex; justify-content: space-between; align-items: center; }
-.card-type { font-size: 9px; letter-spacing: 1px; color: var(--muted); }
-.card-cost { font-weight: 700; }
-.card-name { font-weight: 700; }
-.card-stats, .card-bonus { color: #ffd479; }
-.card-text { color: var(--muted); font-size: 10px; }
-.card-character { border-color: #6fae6f; }
-.card-weapon { border-color: #c98a4b; }
-.card-ammo { border-color: #c9b84b; }
-.card-item { border-color: #5b93c9; }
-.card-action { border-color: #9c6fce; }
-.card-token { border-color: #4fb3a8; }
-.card-infected { border-color: #c95b5b; }
+
+/* type band across the top, like the original's colored header */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 55%, #000) 0%, transparent 100%);
+  height: 26px;
+  pointer-events: none;
+}
+
+.card-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1;
+}
+.card-type {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.card-cost {
+  font-weight: 700;
+  color: #1c1a12;
+  background: linear-gradient(180deg, #f0d67c 0%, var(--gold) 60%, #9a7b1c 100%);
+  border: 1px solid #6b5513;
+  border-radius: 50%;
+  min-width: 22px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  font-size: 11px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.card-name {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}
+.card-stats {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.card-bonus { color: #ffd479; font-size: 10px; }
+.card-text {
+  color: #cfd4dd;
+  font-size: 10px;
+  line-height: 1.35;
+}
 .card-hidden { color: var(--muted); display: flex; align-items: center; justify-content: center; }
+
+/* per-type accents (matching the game's color language) */
+.card-character { --card-accent: #c9a86a; }
+.card-weapon    { --card-accent: #8fa3b0; }
+.card-ammo      { --card-accent: #c9a227; }
+.card-item      { --card-accent: #6fae6f; }
+.card-action    { --card-accent: #9c6fce; }
+.card-token     { --card-accent: #d4af37; }
+.card-infected  { --card-accent: #b3403a; }
+
+/* ---- hover card ---- */
+.hover-card { position: relative; display: inline-block; }
+
+.hover-card-pop {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+  animation: hover-pop 0.12s ease-out;
+}
+.hover-card-pop.above { transform: translate(-50%, -100%); }
+.hover-card-pop .card {
+  width: 232px;
+  min-height: 150px;
+  padding: 10px 12px;
+  gap: 6px;
+  font-size: 13px;
+}
+.hover-card-pop .card::before { height: 34px; }
+.hover-card-pop .card-type { font-size: 11px; }
+.hover-card-pop .card-cost { min-width: 28px; height: 28px; line-height: 26px; font-size: 14px; }
+.hover-card-pop .card-name { font-size: 15px; }
+.hover-card-pop .card-stats { font-size: 13px; }
+.hover-card-pop .card-bonus { font-size: 12px; }
+.hover-card-pop .card-text { font-size: 12px; }
+.hover-card-pop .card-emoji {
+  font-size: 44px;
+  line-height: 1.2;
+  text-align: center;
+  margin: 6px 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+@keyframes hover-pop {
+  from { opacity: 0; transform: translate(-50%, -6px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.hover-card-pop.above { animation-name: hover-pop-above; }
+@keyframes hover-pop-above {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
 
 /* ---- lobby ---- */
 .lobby { max-width: 720px; margin: 40px auto; padding: 0 16px; }
-.lobby-title { text-align: center; }
+.lobby-title { text-align: center; letter-spacing: 2px; }
 .lobby-entry { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; }
 .lobby-form { display: flex; gap: 8px; align-items: center; }
 .lobby-code { font-size: 18px; }
@@ -126,8 +238,10 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 11px;
   color: var(--muted);
 }
-.market-pile .card { cursor: pointer; }
+.market-pile .card { cursor: pointer; transition: transform 0.1s ease-out; }
+.market-pile .card:hover { transform: translateY(-3px); }
 .market-pile:disabled .card { cursor: not-allowed; opacity: 0.5; }
+.market-pile:disabled .card:hover { transform: none; }
 .pile-cost { color: #ffd479; font-weight: 700; }
 .mansion-counts { display: flex; gap: 14px; color: var(--muted); }
 .board-players { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -156,8 +270,15 @@ h1, h2 { margin: 0 0 8px; }
 
 /* ---- hand / zones ---- */
 .hand { display: flex; flex-wrap: wrap; gap: 8px; }
-.hand-card { background: transparent; border: none; padding: 0; }
+.hand-card {
+  background: transparent;
+  border: none;
+  padding: 0;
+  transition: transform 0.12s ease-out;
+}
+.hand-card:hover { transform: translateY(-6px) scale(1.04); z-index: 2; }
 .hand-card:disabled { opacity: 0.45; }
+.hand-card:disabled:hover { transform: none; }
 .hand-empty, .zones { color: var(--muted); }
 .zone-counts { display: flex; gap: 12px; color: var(--muted); font-size: 12px; }
 .play-area { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
