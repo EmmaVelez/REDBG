@@ -42,20 +42,32 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     const characterInstanceId = `${characterCardId}#${i + 1}`;
     register(characterInstanceId, characterCardId, 'hand');
 
-    const ammoId = 'am-1';
-    const handgunId = 'we-1';
-    const knifeId = 'we-4';
+    // Starting deck per the rulebook (First Timer): 7x Ammo x10, 1x Handgun,
+    // 2x Combat Knife. The card IDs are NOT hardcoded — they are DERIVED from
+    // each card's stats so this works with any database, including the real
+    // Premier data (am-001/we-009/we-004) and the short-id test fixtures:
+    //   Ammo x10     => ammunition, bonuses { ammo: 10, gold: 10 }
+    //   Handgun      => weapon, cost 20, ammoReq 20, damage 10
+    //   Combat Knife => weapon, cost 0, ammoReq 0, damage 5
+    const ammoDef = cards.find(c => c.type === 'ammunition' && c.bonuses?.ammo === 10 && c.bonuses?.gold === 10);
+    const handgunDef = cards.find(c => c.type === 'weapon' && c.cost === 20 && c.ammoReq === 20 && c.damage === 10);
+    const knifeDef = cards.find(c => c.type === 'weapon' && c.cost === 0 && c.ammoReq === 0 && c.damage === 5);
+    const ammoId = ammoDef?.id ?? '';
+    const handgunId = handgunDef?.id ?? '';
+    const knifeId = knifeDef?.id ?? '';
     const deckCards: string[] = [];
-    for (let j = 0; j < 7; j++) {
-      const id = `${ammoId}#${j + 1}`;
-      deckCards.push(id);
-      register(id, ammoId, 'hand');
+    if (ammoId !== '') {
+      for (let j = 0; j < 7; j++) {
+        const id = `${ammoId}#${j + 1}`;
+        deckCards.push(id);
+        register(id, ammoId, 'hand');
+      }
     }
-    if (defsById.has(handgunId)) {
+    if (handgunId !== '') {
       deckCards.push(`${handgunId}#1`);
       register(`${handgunId}#1`, handgunId, 'hand');
     }
-    if (defsById.has(knifeId)) {
+    if (knifeId !== '') {
       for (let j = 0; j < 2; j++) {
         const id = `${knifeId}#${j + 1}`;
         deckCards.push(id);
@@ -96,10 +108,10 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     return { ...seat, inventory: d.deck, hand: d.hand };
   });
 
-  // Mansion: infected + token + Yellow Herb (it-3)
+  // Mansion: infected + token + Yellow Herb (plusMaxHp20 item — id-independent)
   const mansionIds: string[] = [];
   for (const c of cards) {
-    if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.id === 'it-3')) {
+    if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp20'))) {
       for (let j = 0; j < c.copies; j++) {
         const id = `${c.id}#${j + 1}`;
         mansionIds.push(id);

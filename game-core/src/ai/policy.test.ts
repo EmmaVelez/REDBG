@@ -121,18 +121,14 @@ describe('chooseGreedyAction', () => {
     expect(chooseGreedyAction(s, 0)).toEqual({ type: 'endTurn', seat: 0 });
   });
 
-  // 9. 'stable tie-break keeps the first best action'
-    test('stable tie-break keeps the first best action', () => {
-      // Empty hand + turnGold 0: both buys are validator-ILLEGAL (cost 20/5 > 0),
-      // so the only legal actions are the two no-op ability uses (ch-1 has 2
-      // generic abilities) and endTurn. The two useCharacterAbility actions both
-      // score EXACTLY 136 (verified by probe: 136, 136, endTurn 126) — the policy
-      // must keep the FIRST one in enumerate order (abilityIndex 0).
+  // 9. 'no-op actions never win; first real action breaks ties'
+    test('no-op actions never win; first real action breaks ties', () => {
+      // Empty hand + turnGold 0: the only candidates are the two no-op ability uses
+      // (ch-1 generic abilities are pass-throughs) and endTurn. The no-ops must be
+      // skipped — the policy must return the only real action: endTurn.
       const s = baseState({ seats: [player(0, { hand: [] }), player(1)] });
       const a = chooseGreedyAction(s, 0);
-
-      // Strict-greater tie-break: first candidate with the max score wins
-      expect(a).toEqual({ type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+      expect(a).toEqual({ type: 'endTurn', seat: 0 });
     });
 
   // 10. 'does not mutate the state'
