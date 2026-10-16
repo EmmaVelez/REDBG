@@ -67,23 +67,44 @@ describe('CardView (T03)', () => {
   });
 
   it('renders a character card with its skill list and unlock gates', () => {
-    const charDef = PREMIER_CARDS.find(c => c.type === 'character' && c.level2At !== undefined && (c.levels?.length ?? 0) >= 2);
-    expect(charDef).toBeDefined();
-    if (charDef === undefined || charDef.level2At === undefined) return;
+    // Chris: L1 gate 0 -> L1 unlocked from the start, L2 gated
+    const chris = PREMIER_CARDS.find(c => c.id === 'ch-008');
+    expect(chris).toBeDefined();
+    if (chris === undefined || chris.level2At === undefined) return;
     // locked: decorations below the level-2 threshold
-    const lockedHtml = renderToStaticMarkup(<CardView def={charDef} decorations={charDef.level2At - 1} />);
-    expect(lockedHtml).toContain('skill-locked');
+    const lockedHtml = renderToStaticMarkup(<CardView def={chris} decorations={chris.level2At - 1} />);
+    expect(lockedHtml).toContain('skill-unlocked'); // L1 active (gate 0)
+    expect(lockedHtml).toContain('skill-locked'); // L2 still gated
     expect(lockedHtml).toContain(`data-skill-level="1"`);
     expect(lockedHtml).toContain(`data-skill-level="2"`);
-    // every level shows the gate; Lv1 is always ★ 0, Lv2 shows remaining
+    // every level shows the gate: L1 ★ 0 (start), L2 shows remaining
     expect(lockedHtml).toContain(`★ 0`);
     expect(lockedHtml).toContain(`★ 1`); // one more decoration needed
     expect((lockedHtml.match(/data-skill-gate/g) ?? []).length).toBe(2);
     // unlocked: at or above threshold -> both gates read ★ 0
-    const unlockedHtml = renderToStaticMarkup(<CardView def={charDef} decorations={charDef.level2At} />);
+    const unlockedHtml = renderToStaticMarkup(<CardView def={chris} decorations={chris.level2At} />);
     expect(unlockedHtml).toContain(`★ 0`);
     expect(unlockedHtml).not.toContain(`★ 1`);
     expect(unlockedHtml).not.toContain('skill-locked');
+  });
+
+  it('Leon/Jill gates: L1 requires decorations — greyed on a fresh character', () => {
+    const leon = PREMIER_CARDS.find(c => c.id === 'ch-002');
+    const jill = PREMIER_CARDS.find(c => c.id === 'ch-009');
+    expect(leon).toBeDefined();
+    expect(jill).toBeDefined();
+    if (leon === undefined || jill === undefined || leon.level1At === undefined) return;
+    expect(leon.level1At).toBe(2);
+    expect(jill.level1At).toBe(5);
+    // fresh Leon: L1 locked with ★ 2, L2 locked with ★ 6
+    const fresh = renderToStaticMarkup(<CardView def={leon} decorations={0} />);
+    expect(fresh).toContain(`★ 2`);
+    expect(fresh).not.toContain('skill-unlocked');
+    // Leon at his L1 gate: L1 unlocked, L2 still gated
+    const atGate = renderToStaticMarkup(<CardView def={leon} decorations={2} />);
+    expect(atGate).toContain(`★ 0`);
+    expect(atGate).toContain('skill-unlocked');
+    expect(atGate).toContain(`★ 4`);
   });
 
   it('Krauser requires 1 decoration for his level-1 ability (level1At gate)', () => {

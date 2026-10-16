@@ -86,7 +86,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       hp: maxHp,
       maxHp,
       decorations: 0,
-      level: 1 as const,
+      level: 0 as const,
       turnAmmo: 0,
       turnGold: 0,
       actionsLeft: 1,

@@ -304,7 +304,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (outcome.kind === 'defeated') {
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
         const charDef = cardDef(state, player.characterInstanceId);
-        const level = charDef?.level2At !== undefined ? levelForDecorations(charDef.level2At, decorations) : player.level;
+        const level = charDef !== undefined ? levelForDecorations(charDef.level1At, charDef.level2At, decorations) : player.level;
         const newPlayer: PlayerState = {
                   ...player,
                   hand: handAfter,

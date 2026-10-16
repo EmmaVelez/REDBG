@@ -197,11 +197,15 @@ test('revive no-op when dead', () => {
 });
 
 test('levelForDecorations', () => {
-  expect(levelForDecorations(4, 3)).toBe(1);
-  expect(levelForDecorations(4, 4)).toBe(2);
-  expect(levelForDecorations(4, 5)).toBe(2);
-  expect(levelForDecorations(undefined, 10)).toBe(1);
-  expect(levelForDecorations(2, 1)).toBe(1);
+  expect(levelForDecorations(2, 4, 0)).toBe(0);
+  expect(levelForDecorations(2, 4, 1)).toBe(0);
+  expect(levelForDecorations(2, 4, 2)).toBe(1);
+  expect(levelForDecorations(2, 4, 3)).toBe(1);
+  expect(levelForDecorations(2, 4, 4)).toBe(2);
+  expect(levelForDecorations(2, 4, 5)).toBe(2);
+  expect(levelForDecorations(0, 4, 0)).toBe(1); // Chris: gate 0 -> starts with L1
+  expect(levelForDecorations(undefined, undefined, 10)).toBe(1);
+  expect(levelForDecorations(2, undefined, 5)).toBe(1);
 });
 
 test('abilitiesForLevel', () => {
