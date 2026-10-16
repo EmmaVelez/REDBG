@@ -53,7 +53,7 @@ test('character data', () => {
 
 test('chris and jill machine abilities', () => {
   expect(card('ch-008').abilities).toEqual([{ kind: 'noHealingNoNonInfectedAttach', level: 1 }, { kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 2 }]);
-  expect(card('ch-009').abilities).toEqual([{ kind: 'generic', level: 1 }, { kind: 'explosivesGoToDiscardInsteadOfTrash', level: 2 }]);
+  expect(card('ch-009').abilities).toEqual([{ kind: 'explosivesPlusDamage', amount: 5, level: 1 }, { kind: 'explosivesGoToDiscardInsteadOfTrash', level: 2 }]);
 });
 
 test('ammunition data', () => {
