@@ -32,6 +32,12 @@ function sameCoreState(a: GameState, b: GameState): boolean {
  * that yields the highest score. Ties are broken deterministically by action order.
  * No-op candidates (state unchanged) are skipped — see sameCoreState.
  *
+ * End-turn honesty: the apply layer's endTurn keeps the seat's turn pools (gold,
+ * ammo, actions) in the state, but the game loop's startTurn zeroes them when
+ * that seat's next turn begins — the pools can never buy anything after the turn
+ * ends. Simulating endTurn against the raw post-state would let it win purely on
+ * phantom unspent gold, so the evaluated post-state zeroes them.
+ *
  * @param state The current game state.
  * @param seat The seat ID for which to choose an action.
  * @returns The chosen Action.
@@ -66,8 +72,8 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
       continue;
     }
 
-    // b. Score the resulting state
-    const score = evaluateState(next, seat);
+    // b. Score the resulting state — with honest end-turn carry-over
+    const score = evaluateState(action.type === 'endTurn' ? withSpentTurnPoolsZeroed(next, seat) : next, seat);
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).
@@ -82,4 +88,29 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     return { type: 'endTurn', seat };
   }
   return best.action;
+}
+
+/**
+ * Returns a copy of the state where the given seat's turn-scoped pools are
+ * zeroed — the state that seat actually faces once its turn has ended and
+ * startTurn has wiped the pools (spent gold/ammo cannot carry into the next
+ * round by design of the engine loop).
+ */
+function withSpentTurnPoolsZeroed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s =>
+      s.seat === seat
+        ? {
+            ...s,
+            turnGold: 0,
+            turnAmmo: 0,
+            actionsLeft: 0,
+            buysLeft: 0,
+            exploresLeft: 0,
+            weaponDamageBonusThisTurn: 0,
+          }
+        : s,
+    ),
+  };
 }

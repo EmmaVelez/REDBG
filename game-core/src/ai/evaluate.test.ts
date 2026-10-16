@@ -83,18 +83,19 @@ describe('evaluateState', () => {
   });
 
   // 7. 'gold and ammo pools add value'
-  test('gold and ammo pools add value', () => {
-    const s = baseState({ seats: [player(0, { turnGold: 50, turnAmmo: 10 }), player(1)] });
-    // Derivation: 136 + 50*5 + 10*3 + 30 (affordable: BOTH piles cost <= 50 -> 2*15) = 136 + 250 + 30 + 30 = 446.
-    expect(evaluateState(s, 0)).toBe(446);
-  });
+    test('gold and ammo pools add value', () => {
+      const s = baseState({ seats: [player(0, { turnGold: 50, turnAmmo: 10 }), player(1)] });
+      // Derivation: 136 + 50*1 (gold is transient: 1/point) + 10*3 + 20 (affordable:
+      // BOTH piles cost <= 50 -> 2 piles * 10 potential) = 136 + 50 + 30 + 20 = 236.
+      expect(evaluateState(s, 0)).toBe(236);
+    });
 
-  // 8. 'hand cards count by type'
-  test('hand cards count by type', () => {
-    const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'we-1#1', 'ac-1#1', 'it-1#1'] }), player(1)] });
-    // 136 + 8 (ammo) + 15 (weapon) + 5 (action) + 5 (item) = 169.
-    expect(evaluateState(s, 0)).toBe(169);
-  });
+    // 8. 'hand cards count by type'
+    test('hand cards count by type', () => {
+      const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'we-1#1', 'ac-1#1', 'it-1#1'] }), player(1)] });
+      // 136 + 8 (ammo) + 12 (we-1 damage 10 -> 10 + 10/5) + 5 (action) + 5 (item) = 166.
+      expect(evaluateState(s, 0)).toBe(166);
+    });
 
   // 9. 'attached infected trophies are valuable'
   test('attached infected trophies are valuable', () => {
@@ -136,9 +137,131 @@ describe('evaluateState', () => {
   });
 
   // 15. 'no NaN for a normal setup'
-  test('no NaN for a normal setup', () => {
-    const s = baseState();
-    expect(Number.isFinite(evaluateState(s, 0))).toBe(true);
-    expect(Number.isFinite(evaluateState(s, 1))).toBe(true);
+    test('no NaN for a normal setup', () => {
+      const s = baseState();
+      expect(Number.isFinite(evaluateState(s, 0))).toBe(true);
+      expect(Number.isFinite(evaluateState(s, 1))).toBe(true);
+    });
+
+    // 16. 'character ability: Leon pistol affinity raises handgun value in hand'
+    test('character ability: Leon pistol affinity raises handgun value in hand', () => {
+      const s = baseState({
+        seats: [
+          // ch-002 = Leon with weaponTagBonus pistol 10 at level 1
+          player(0, { characterInstanceId: 'ch-002#0', hand: ['we-9#1'] }),
+          player(1),
+        ],
+        cards: Object.fromEntries(
+          ['ch-002#0', 'ch-1#1', 'am-1#1', 'we-9#1', 'we-2#1', 'ac-1#1', 'it-1#1', 'ma-1#1', 'ma-1#2'].map(id => [
+            id,
+            { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },
+          ]),
+        ),
+        cardDefs: {
+          ...DEFS,
+          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponTagBonus', tag: 'pistol', amount: 10, level: 1 }, { kind: 'weaponTagBonus', tag: 'pistol', amount: 20, level: 2 }] }),
+          'we-9': def('we-9', { type: 'weapon', cost: 20, ammoReq: 20, damage: 10, weaponTags: ['gun', 'pistol'] as const }),
+        },
+      });
+      // Without any affinity this hand would score 136 + 12 (we-9 dmg 10 -> 10 + 10/5) = 148;
+      // Leon's pistol bonus 10 makes the handgun worth 22 -> 158.
+      expect(evaluateState(s, 0)).toBe(158);
+    });
+
+    // 17. 'character ability: non-matching weapon tag gets no bonus'
+    test('character ability: non-matching weapon tag gets no bonus', () => {
+      const s = baseState({
+        seats: [player(0, { characterInstanceId: 'ch-002#0', hand: ['we-2#1'] }), player(1)],
+        cards: Object.fromEntries(
+          ['ch-002#0', 'ch-1#1', 'we-2#1', 'ma-1#1', 'ma-1#2'].map(id => [
+            id,
+            { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },
+          ]),
+        ),
+        cardDefs: {
+          ...DEFS,
+          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponTagBonus', tag: 'pistol', amount: 10, level: 1 }, { kind: 'weaponTagBonus', tag: 'pistol', amount: 20, level: 2 }] }),
+        },
+      });
+      // we-2 (damage 8, NO pistol tag): 136 + (10 + 8/5=1 -> 11) = 147. No affinity bonus.
+      expect(evaluateState(s, 0)).toBe(147);
+    });
+
+    // 18. 'character ability: back-off amount to unlock at level 2'
+    test('character ability: level-gated affinity only at the unlocked level', () => {
+      const s = baseState({
+        seats: [
+          // Barry ch-005: weaponTagBonus magnum 20 only at level 2 — at level 1 no bonus
+          player(0, { characterInstanceId: 'ch-005#0', level: 1 as const, hand: ['we-6#1'] }),
+          player(1),
+        ],
+        cards: Object.fromEntries(
+          ['ch-005#0', 'ch-1#1', 'we-6#1', 'ma-1#1', 'ma-1#2'].map(id => [
+            id,
+            { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },
+          ]),
+        ),
+        cardDefs: {
+          ...DEFS,
+          'ch-005': def('ch-005', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'weaponTagBonus', tag: 'magnum', amount: 20, level: 2 }] }),
+          'we-6': def('we-6', { type: 'weapon', cost: 90, ammoReq: 50, damage: 50, weaponTags: ['gun', 'magnum'] as const }),
+        },
+      });
+      // magnum damage 50 -> 10 + 10 = 20 base. Barry is level 1, magnum bonus is L2: no affinity.
+            // 136 + 20 = 156.
+            expect(evaluateState(s, 0)).toBe(156);
+
+            // At level 2 the same hand gets the +200 level bonus AND +20 magnum affinity:
+            // 156 + 200 + 20 = 376.
+            const s2 = { ...s, seats: s.seats.map((x, i) => (i === 0 ? { ...x, level: 2 as const } : x)) };
+            expect(evaluateState(s2, 0)).toBe(376);
+    });
+
+    // 19. 'character ability: Claire ammo bonus values ammo cards higher'
+    test('character ability: Claire ammo bonus values ammo cards higher', () => {
+      const s = baseState({
+        seats: [player(0, { characterInstanceId: 'ch-003#0', hand: ['am-1#1'] }), player(1)],
+        cards: Object.fromEntries(
+          ['ch-003#0', 'ch-1#1', 'am-1#1', 'ma-1#1', 'ma-1#2'].map(id => [
+            id,
+            { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },
+          ]),
+        ),
+        cardDefs: {
+          ...DEFS,
+          'ch-003': def('ch-003', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'ammunitionBonus', ammoAmount: 10, goldAmount: 0, level: 1 }, { kind: 'ammunitionBonus', ammoAmount: 0, goldAmount: 10, level: 2 }] }),
+        },
+      });
+      // Claire L1: ammo cards worth extra 10 ammo * 3 = +30 each on top of the 8 base:
+      // 136 + 8 + 30 = 174.
+      expect(evaluateState(s, 0)).toBe(174);
+    });
+
+    // 20. 'character ability: Wesker explore gold bonus values explores higher'
+    test('character ability: Wesker explore gold bonus values explores higher', () => {
+      const s = baseState({
+        seats: [player(0, { characterInstanceId: 'ch-001#0', exploresLeft: 1 }), player(1)],
+        cards: Object.fromEntries(
+          ['ch-001#0', 'ch-1#1', 'am-1#1', 'we-1#1', 'we-2#1', 'ac-1#1', 'it-1#1', 'ma-1#1', 'ma-1#2'].map(id => [
+            id,
+            { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },
+          ]),
+        ),
+        cardDefs: {
+          ...DEFS,
+          'ch-001': def('ch-001', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'exploreGoldBonus', amount: 20, level: 1 }, { kind: 'generic', level: 2 }] }),
+        },
+      });
+      // Baseline 136 already includes the exploresLeft term (40). Wesker's
+            // exploreGoldBonus adds +20 gold per explore at 5/gold = +100: 136 + 100 = 236
+            // (vs 136 for a generic character whose explore term is already inside baseline).
+            expect(evaluateState(s, 0)).toBe(236);
+    });
+
+    // 21. 'discarded weapons keep their value (bought cards are real assets)'
+    test('discarded weapons keep their value (bought cards are real assets)', () => {
+      const s = baseState({ seats: [player(0, { discard: ['we-1#1'] }), player(1)] });
+      // we-1 damage 10 -> 12, same as if it were in hand: 136 + 12 = 148.
+      expect(evaluateState(s, 0)).toBe(148);
+    });
   });
-});

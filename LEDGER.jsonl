@@ -35,3 +35,4 @@
 {"ts": "2026-10-15T22:43:28", "task": "M2-T04", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T22:44:31", "task": "M2-T04", "status": "ok", "attempts": 3, "note": "spec pre-verified by engine probe (user-requested double-check); attempts failed on shorthand->literal invention (explore instanceId); fixed expected Action shape; 301/301"}
 {"ts": "2026-10-15T23:09:22", "task": "M2-T05", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T23:13:52", "task": "M2-T05", "status": "ok", "attempts": 3, "note": "fixes: imports, toBe contradictions, ?? narrowing; M2 COMPLETE 5/5; 307/307"}

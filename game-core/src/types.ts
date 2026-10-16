@@ -113,7 +113,7 @@ export interface CardDef {
  * Machine-readable effects. The engine switches on these keys; card `text`
  * is only for display. Effects requiring choices resolve via Prompt.
  */
-export type WeaponTag = "explosive" | "melee" | "gun";
+export type WeaponTag = "explosive" | "melee" | "gun" | "pistol" | "magnum" | "rifle" | "knife" | "shotgun" | "machineGun";
 
 export type WeaponEffect =
   | { readonly kind: "plusDamagePerExtraWeapon"; readonly amount: number }   // Burst-Fire Handgun: +20 when attacking with >1 weapon
@@ -156,6 +156,9 @@ export type CharacterAbility =
   | { readonly kind: "noHealingNoNonInfectedAttach"; readonly level: 1 | 2 }                              // Chris restriction
   | { readonly kind: "explosivesGoToDiscardInsteadOfTrash"; readonly level: 1 | 2 }                       // Jill L2
   | { readonly kind: "explosivesPlusDamage"; readonly amount: number; readonly level: 1 | 2 }             // Jill L1: +amount per Explosive weapon used
+  | { readonly kind: "weaponTagBonus"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // Leon L2 pistols (double use), Barry L2 magnums, Sheva L2 rifles, Krauser L2 knives
+  | { readonly kind: "ammunitionBonus"; readonly ammoAmount: number; readonly goldAmount: number; readonly level: 1 | 2 } // Claire: +10 Ammo (L1) / +10 Gold (L2) per Ammo card
+  | { readonly kind: "exploreGoldBonus"; readonly amount: number; readonly level: 1 | 2 }                 // Wesker L1: +Gold that turn whenever he Explores
   | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------
