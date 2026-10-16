@@ -36,3 +36,5 @@
 {"ts": "2026-10-15T22:44:31", "task": "M2-T04", "status": "ok", "attempts": 3, "note": "spec pre-verified by engine probe (user-requested double-check); attempts failed on shorthand->literal invention (explore instanceId); fixed expected Action shape; 301/301"}
 {"ts": "2026-10-15T23:09:22", "task": "M2-T05", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
 {"ts": "2026-10-15T23:13:52", "task": "M2-T05", "status": "ok", "attempts": 3, "note": "fixes: imports, toBe contradictions, ?? narrowing; M2 COMPLETE 5/5; 307/307"}
+{"ts": "2026-10-16T01:12:40", "task": "M3-T02", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-16T01:20:00", "task": "M3-T02", "status": "hermes-written", "attempts": 3, "note": "3 coder attempts failed on factory object-literal syntax (readonly modifier + default in object literal -> esbuild parse fail) + 400-line test TS storm; Hermes rewrote rooms.ts + rooms.test.ts; server gate tsc+vitest green"}
