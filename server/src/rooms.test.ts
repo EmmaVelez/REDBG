@@ -178,6 +178,16 @@ describe('createRoomStore', () => {
     });
   });
 
+  it('setConnected flips a player connection flag; guards unknown players', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host');
+    let latest = store.setConnected(room.roomCode, 'c1', false);
+    expect(latest.players[0]?.connected).toBe(false);
+    latest = store.setConnected(room.roomCode, 'c1', true);
+    expect(latest.players[0]?.connected).toBe(true);
+    expect(() => store.setConnected(room.roomCode, 'stranger', true)).toThrow('not in room');
+  });
+
   it('two stores are fully isolated, including bot counters', () => {
     const s1 = createRoomStore(() => 0.3);
     const s2 = createRoomStore(() => 0.3);

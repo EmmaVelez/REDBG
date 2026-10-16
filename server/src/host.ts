@@ -153,6 +153,9 @@ export function createHost(room: Room): GameHost {
  * discard and play-area contents are replaced with placeholder ids (length
  * preserved), so a client only sees the cards it is entitled to see. The
  * viewing seat's own zones, the market, mansion, and defs stay intact.
+ *
+ * viewerSeat -1 = spectator view: EVERY seat's zones are hidden (including the
+ * active player's), preserving lengths and the public board.
  */
 export function sanitize(state: GameState, viewerSeat: number): GameState {
   const hiddenFor = (zone: readonly string[]): readonly string[] => zone.map((_, i) => `${HIDDEN_ID}-${i}`);

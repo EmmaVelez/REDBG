@@ -196,4 +196,22 @@ describe('sanitize', () => {
       }
     }
   });
+
+  it('spectator view (viewerSeat -1) hides every seat including the active one', () => {
+    const host = createHost(makePlayingRoom().room);
+    const s = host.start(7);
+    const out = sanitize(s, -1);
+    for (const seat of out.seats) {
+      expect(seat?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
+      expect(seat?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
+      expect(seat?.discard.every(id => id.startsWith('hidden-'))).toBe(true);
+      expect(seat?.playArea.every(id => id.startsWith('hidden-'))).toBe(true);
+    }
+    // lengths preserved vs the raw state
+    expect(out.seats[0]?.hand).toHaveLength(s.seats[0]?.hand.length ?? 0);
+    // public board intact
+    expect(out.marketPiles).toEqual(s.marketPiles);
+    expect(out.mansionDeck).toEqual(s.mansionDeck);
+    expect(out.cardDefs).toEqual(s.cardDefs);
+  });
 });

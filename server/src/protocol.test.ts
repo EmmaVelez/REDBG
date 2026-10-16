@@ -7,6 +7,7 @@ describe('protocol round trips', () => {
     { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny' } },
     { name: 'joinRoom', msg: { kind: 'joinRoom', roomCode: 'ABCDEF', playerName: 'Ada' } },
     { name: 'reconnect', msg: { kind: 'reconnect', token: 'tok-123' } },
+    { name: 'spectate', msg: { kind: 'spectate', roomCode: 'ABCDEF' } },
     { name: 'leaveRoom', msg: { kind: 'leaveRoom' } },
     { name: 'selectSeat', msg: { kind: 'selectSeat', seat: 2 } },
     { name: 'addBot', msg: { kind: 'addBot' } },
@@ -93,6 +94,12 @@ describe('protocol validation', () => {
   it('rejects ping without ts', () => {
     expect(validateMessage({ kind: 'ping' }).ok).toBe(false);
     expect(validateMessage({ kind: 'ping', ts: 'now' }).ok).toBe(false);
+  });
+
+  it('rejects spectate without roomCode', () => {
+    expect(validateMessage({ kind: 'spectate' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'spectate', roomCode: 7 }).ok).toBe(false);
+    expect(validateMessage({ kind: 'spectate', roomCode: 'ABCDEF' }).ok).toBe(true);
   });
 
   it('rejects sendAction without an action object', () => {

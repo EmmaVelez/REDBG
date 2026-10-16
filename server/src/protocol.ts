@@ -47,6 +47,8 @@ export type ClientMessage =
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
+  /** Watch a room without playing: receive roomState + all-hidden stateSync. */
+  | { readonly kind: 'spectate'; readonly roomCode: string }
   | { readonly kind: 'selectSeat'; readonly seat: number }
   /** Host control: fill an empty seat (or a specific seat) with a bot. */
   | { readonly kind: 'addBot'; readonly seat?: number }
@@ -146,6 +148,11 @@ export function validateMessage(value: unknown): DecodeResult {
   if (k === 'reconnect') {
     const m = value as { kind: string; token?: unknown };
     if (typeof m.token !== 'string') return { ok: false, error: 'reconnect requires a token string' };
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'spectate') {
+    const m = value as { kind: string; roomCode?: unknown };
+    if (typeof m.roomCode !== 'string') return { ok: false, error: 'spectate requires a roomCode string' };
     return { ok: true, msg: value as WireMessage };
   }
   if (k === 'selectSeat' || k === 'removeBot') {

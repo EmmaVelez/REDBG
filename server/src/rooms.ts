@@ -33,6 +33,8 @@ export interface RoomStore {
   removeBot(roomCode: string, hostClientId: string, seat: number): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
   startGame(roomCode: string, hostClientId: string): Room;
+  /** Mark a player's connection state (used on ws open/close + reconnect). */
+  setConnected(roomCode: string, clientId: string, connected: boolean): Room;
   getRoom(roomCode: string): Room | undefined;
   /** Converts a Room into the protocol snapshot shape. */
   toSnapshot(room: Room): RoomSnapshot;
@@ -240,6 +242,19 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       requireLobby(room);
       requireHost(roomCode, hostClientId);
       return save(roomCode, { ...room, phase: 'playing' });
+    },
+
+    setConnected(roomCode: string, clientId: string, connected: boolean): Room {
+      const room = requireRoom(roomCode);
+      const player = findPlayer(room, clientId);
+      if (player === undefined) {
+        throw new Error('not in room');
+      }
+      const next: Room = {
+        ...room,
+        players: room.players.map(p => (p.clientId === clientId ? { ...p, connected } : p)),
+      };
+      return save(roomCode, next);
     },
 
     getRoom(roomCode: string): Room | undefined {
