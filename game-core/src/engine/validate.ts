@@ -11,6 +11,15 @@ function cardDef(state: GameState, instanceId: string): CardDef | undefined {
 export function validateAction(state: GameState, action: Action): ValidationResult {
   const player = 'seat' in action ? state.seats[action.seat] : undefined;
 
+  // Prompt-gating: while any prompt awaits this seat, only chooseOption (for
+  // that prompt) is legal. Choice effects must resolve before further cards
+  // can be played (user rule: "resolve before another card").
+  if (action.type !== 'startGame' && action.type !== 'chooseOption') {
+    if ('seat' in action && state.prompts.some(p => p.seat === action.seat)) {
+      return { ok: false, reason: `${action.type}: resolve pending prompt first` };
+    }
+  }
+
   switch (action.type) {
     case 'startGame':
       if (state.phase !== 'setup') {

@@ -175,8 +175,22 @@ describe('validateAction', () => {
     });
 
     it('chooseOption bad option', () => {
-      expect(validateAction(baseState({ prompts: [{ id: 'p1', seat: 0, text: 't', options: ['A'] }] }), { type: 'chooseOption', seat: 0, promptId: 'p1', option: 2 })).toEqual({ ok: false, reason: 'chooseOption: bad option: 2' });
-    });
+          expect(validateAction(baseState({ prompts: [{ id: 'p1', seat: 0, text: 't', options: ['A'] }] }), { type: 'chooseOption', seat: 0, promptId: 'p1', option: 2 })).toEqual({ ok: false, reason: 'chooseOption: bad option: 2' });
+        });
+
+        it('actions are blocked while a prompt awaits this seat', () => {
+          const promptState = baseState({ prompts: [{ id: 'p1', seat: 0, text: 't', options: ['A', 'B'] }] });
+          expect(validateAction(promptState, { type: 'playActionCard', seat: 0, instanceId: 'a-1' })).toEqual({ ok: false, reason: 'playActionCard: resolve pending prompt first' });
+          expect(validateAction(promptState, { type: 'playItem', seat: 0, instanceId: 'i-1' })).toEqual({ ok: false, reason: 'playItem: resolve pending prompt first' });
+          expect(validateAction(promptState, { type: 'playAmmo', seat: 0, instanceId: 'm-1' })).toEqual({ ok: false, reason: 'playAmmo: resolve pending prompt first' });
+          expect(validateAction(promptState, { type: 'endTurn', seat: 0 })).toEqual({ ok: false, reason: 'endTurn: resolve pending prompt first' });
+          expect(validateAction(promptState, { type: 'buy', seat: 0, pileId: 'hg' })).toEqual({ ok: false, reason: 'buy: resolve pending prompt first' });
+        });
+
+        it('a prompt for another seat does not block this seat', () => {
+          const otherPrompt = baseState({ prompts: [{ id: 'p1', seat: 1, text: 't', options: ['A'] }] });
+          expect(validateAction(otherPrompt, { type: 'playActionCard', seat: 0, instanceId: 'a-1' })).toEqual({ ok: true });
+        });
 
   it('unknown seat', () => {
     expect(validateAction(baseState(), { type: 'endTurn', seat: 9 })).toEqual({ ok: false, reason: 'endTurn: unknown seat: 9' });

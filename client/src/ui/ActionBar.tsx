@@ -48,7 +48,7 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
     <div className="action-bar" data-seat={seat}>
       {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
 
-      {prompt !== undefined && !disabled && (
+      {prompt !== undefined && (
         <div className="action-prompt" data-prompt={prompt.id}>
           <span className="prompt-text">{prompt.text}</span>
           <div className="prompt-options">
