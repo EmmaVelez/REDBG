@@ -333,7 +333,16 @@ h1, h2 { margin: 0 0 8px; }
 .hand-card:disabled:hover { transform: none; }
 .hand-empty, .zones { color: var(--muted); }
 .zone-counts { display: flex; gap: 12px; color: var(--muted); font-size: 12px; }
-.play-area { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.play-area {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 8px 10px;
+}
 .zone-label { color: var(--muted); font-size: 11px; width: 52px; }
 .play-area-cards { display: flex; gap: 8px; flex-wrap: wrap; }
 .zone-empty { color: var(--muted); font-size: 11px; }
