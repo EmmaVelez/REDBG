@@ -54,8 +54,8 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
       </div>
       {charDef !== null && (
         <div className="player-character-card" data-character-card>
-          <HoverCard def={charDef}>
-            <CardView def={charDef} compact />
+          <HoverCard def={charDef} decorations={player.decorations}>
+            <CardView def={charDef} compact decorations={player.decorations} />
           </HoverCard>
         </div>
       )}

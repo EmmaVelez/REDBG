@@ -274,7 +274,55 @@ h1, h2 { margin: 0 0 8px; }
   padding-top: 6px;
   border-top: 1px solid var(--border);
 }
-.player-character-card .card { width: 132px; min-height: 82px; }
+.player-character-card .card { width: 140px; min-height: 82px; }
+
+/* ---- character skill list ---- */
+.card-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+.skill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-left: 2px solid rgba(255, 255, 255, 0.25);
+  padding-left: 6px;
+}
+.skill-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skill-level {
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+}
+.skill-gate {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffb86b;
+}
+.skill-gate-open {
+  color: #7bd88f;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.skill-text {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--text);
+}
+/* locked skills: greyed, no accent border */
+.skill-locked {
+  opacity: 0.45;
+  border-left-color: rgba(255, 255, 255, 0.12);
+}
+.skill-locked .skill-level { color: var(--muted); }
 
 /* ---- hand / zones ---- */
 .hand { display: flex; flex-wrap: wrap; gap: 8px; }

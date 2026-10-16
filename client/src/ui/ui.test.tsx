@@ -66,7 +66,27 @@ describe('CardView (T03)', () => {
     expect(html).toContain(`data-card-id="${def.id}"`);
   });
 
-  it('renders a character card with max HP when non-compact', () => {
+  it('renders a character card with its skill list and unlock gates', () => {
+    const charDef = PREMIER_CARDS.find(c => c.type === 'character' && c.level2At !== undefined && (c.levels?.length ?? 0) >= 2);
+    expect(charDef).toBeDefined();
+    if (charDef === undefined || charDef.level2At === undefined) return;
+    // locked: decorations below the level-2 threshold
+    const lockedHtml = renderToStaticMarkup(<CardView def={charDef} decorations={charDef.level2At - 1} />);
+    expect(lockedHtml).toContain('skill-locked');
+    expect(lockedHtml).toContain(`data-skill-level="1"`);
+    expect(lockedHtml).toContain(`data-skill-level="2"`);
+    expect(lockedHtml).toContain(`data-skill-gate`);
+    expect(lockedHtml).toContain(`★ 1`); // needs one more decoration
+    // level 1 is always unlocked
+    expect(lockedHtml).toContain('skill-unlocked');
+    // unlocked: at or above threshold
+    const unlockedHtml = renderToStaticMarkup(<CardView def={charDef} decorations={charDef.level2At} />);
+    expect(unlockedHtml).not.toContain('data-skill-gate');
+    expect(unlockedHtml).toContain('unlocked');
+    expect(unlockedHtml).not.toContain('skill-locked');
+  });
+
+  it('renders a character card with max HP when non-compact and undecorated', () => {
     const charDef = PREMIER_CARDS.find(c => c.type === 'character');
     expect(charDef).toBeDefined();
     if (charDef === undefined) return;
