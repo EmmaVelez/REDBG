@@ -339,6 +339,15 @@ h1, h2 { margin: 0 0 8px; }
 .zone-empty { color: var(--muted); font-size: 11px; }
 
 /* ---- card piles (deck / discard / mansion) ---- */
+.zone-row { display: flex; gap: 16px; align-items: center; margin-top: 6px; }
+.zone-hand-slot { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+.zone-hand-slot .hand {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+}
 .zone-piles { display: flex; gap: 18px; align-items: flex-start; margin-top: 6px; }
 .zone-pile { display: flex; flex-direction: column; gap: 4px; align-items: center; min-width: 64px; }
 .zone-pile-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }

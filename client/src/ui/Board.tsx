@@ -85,9 +85,10 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
       </div>
 
       <div className="board-self">
-        <h2 className="board-section-title">Your hand</h2>
-        <Hand state={state} seat={mySeat} onPlay={instanceId => onPlayFromHand(state, mySeat, instanceId, onAction)} disabled={disabled || state.activeSeat !== mySeat || state.phase !== 'main'} />
-        <Zones state={state} seat={mySeat} />
+        <h2 className="board-section-title">Your table</h2>
+        <Zones state={state} seat={mySeat}>
+          <Hand state={state} seat={mySeat} onPlay={instanceId => onPlayFromHand(state, mySeat, instanceId, onAction)} disabled={disabled || state.activeSeat !== mySeat || state.phase !== 'main'} />
+        </Zones>
       </div>
 
       <CardFlightLayer state={state} />

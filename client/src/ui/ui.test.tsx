@@ -145,18 +145,24 @@ describe('Hand + Zones (T04)', () => {
     expect((html.match(/class="hand-card"/g) ?? []).length).toBe(hand.length);
   });
 
-  it('renders deck/discard piles with counts and the play area', () => {
+  it('renders deck/discard piles flanking the hand slot and the play area', () => {
     const state = twoPlayerState();
     const player = state.seats[0];
     expect(player).toBeDefined();
     if (player === undefined) return;
-    const html = renderToStaticMarkup(<Zones state={state} seat={0} />);
-    // visual piles carry anchor + count; hand count is a text badge
+    const html = renderToStaticMarkup(
+      <Zones state={state} seat={0}>
+        <Hand state={state} seat={0} onPlay={() => {}} />
+      </Zones>
+    );
+    // deck (left) and discard (right) piles carry anchors + counts
     expect(html).toContain('data-anim-zone="deck"');
     expect(html).toContain('data-anim-zone="discard"');
     expect(html).toContain(`data-pile-count="${player.inventory.length}"`);
     expect(html).toContain(`data-pile-count="${player.discard.length}"`);
-    expect(html).toContain(`Hand: ${player.hand.length}`);
+    // hand slot contains the actual hand component
+    expect(html).toContain('zone-hand-slot');
+    expect(html).toContain('class="hand"');
     // play area anchor present even when empty (flight target stability)
     expect(html).toContain('data-anim-zone="play"');
     expect(html).toContain('<span class="zone-empty">none</span>');
@@ -224,7 +230,7 @@ describe('Board (T05)', () => {
     // mansion deck is a visual pile with anchor + count
     expect(html).toContain('data-anim-zone="mansion"');
     expect(html).toContain(`data-pile-count="${state.mansionDeck.length}"`);
-    expect(html).toContain('Your hand');
+    expect(html).toContain('Your table');
     // every seated player gets a panel
     expect((html.match(/class="player-panel/g) ?? []).length).toBe(2);
     // at least one purchasable pile shows a gold cost
