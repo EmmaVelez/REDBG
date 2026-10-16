@@ -87,8 +87,47 @@ function travelsFaceDown(from: AnimZone, to: AnimZone): boolean {
   return hidden.has(from) || hidden.has(to);
 }
 
+/**
+ * Explore-reveal support: when the OWN seat explores and an Infected is
+ * revealed, the engine resolves the fight in the same action — the client
+ * detects it via the same instance-diff and pauses on a readable reveal.
+ */
+
+export interface Reveal {
+  readonly instanceId: string;
+  /** Zone the revealed card ended up in after the fight resolved. */
+  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed';
+}
+
 function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
   return a.zone === b.zone && a.pileId === b.pileId;
+}
+
+/**
+ * The card revealed by the viewing player's most recent explore, if any.
+ * Requires the newest logged action to be an explore by `mySeat` AND an
+ * instance that left the mansion this step. Returns null when there is no
+ * fresh reveal (bots exploring, reshuffles, non-infected prompts).
+ */
+export function detectReveal(prev: GameState, next: GameState, mySeat: number): Reveal | null {
+  const last = next.log[next.log.length - 1];
+  if (last === undefined) return null;
+  const action = last.action;
+  if (action.type !== 'explore' || action.seat !== mySeat) return null;
+
+  const prevZones = zoneIndex(prev);
+  const nextZones = zoneIndex(next);
+  for (const [instanceId, nextLoc] of nextZones) {
+    if (instanceId.startsWith('hidden-')) continue;
+    const prevLoc = prevZones.get(instanceId);
+    if (prevLoc === undefined) continue;
+    if (prevLoc.zone !== 'mansion') continue;
+    if (sameLoc(prevLoc, nextLoc)) continue;
+    if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
+      return { instanceId, outcomeZone: nextLoc.zone };
+    }
+  }
+  return null;
 }
 
 /**

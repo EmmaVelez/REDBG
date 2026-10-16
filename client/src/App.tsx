@@ -1,11 +1,16 @@
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { ServerMessage, ClientMessage } from '@re/server';
+import type { CardDef, GameState } from '@re/game-core';
 import { useGameStore } from './store';
 import { createGameSocket } from './net/ws';
 import { ActionBar } from './ui/ActionBar';
 import { Board } from './ui/Board';
 import { GameLog } from './ui/GameLog';
 import { Lobby } from './ui/Lobby';
+import { MansionReveal } from './ui/MansionReveal';
+import { detectReveal } from './ui/anims';
+import { defForInstance } from './ui/cards';
 
 /**
  * M4 wiring: single socket for the app, store as the single source of truth,
@@ -59,10 +64,34 @@ export function App(): JSX.Element {
   const mySeat = useGameStore(s => s.mySeat);
   const clientId = useGameStore(s => s.clientId);
 
+  // Mansion-door reveal: remember the last seen state, detect when the OWN
+  // seat's explore revealed an Infected, and hold the table on a readable
+  // reveal until the player clicks Continue.
+  const prevStateRef = useRef<GameState | null>(null);
+  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string } | null>(null);
+  const state = view?.state ?? null;
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (prev === null || state === null || prev.version === state.version) return;
+    const detected = detectReveal(prev, state, mySeat);
+    if (detected === null) return;
+    const def = defForInstance(state, detected.instanceId);
+    if (def === null) return;
+    const resultText =
+      detected.outcomeZone === 'attached'
+        ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
+        : detected.outcomeZone === 'removed'
+          ? `${def.name} was removed from the Mansion.`
+          : `${def.name} escaped to the bottom of the Mansion.`;
+    setReveal({ def, resultText });
+  }, [state, mySeat]);
+
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
   const seatNames = room?.players.map(p => p.name) ?? [];
 
   if (view === null || room === null) {
+    prevStateRef.current = null; // reset across lobby/game switches
     return (
       <Lobby
         room={room}
@@ -79,8 +108,12 @@ export function App(): JSX.Element {
   }
   void inLobby;
 
-  const state = view.state;
-  const disabled = state.phase !== 'main' || state.activeSeat !== mySeat || state.prompts.some(p => p.seat === mySeat);
+  const gameState = view.state;
+  const disabled =
+    gameState.phase !== 'main' ||
+    gameState.activeSeat !== mySeat ||
+    gameState.prompts.some(p => p.seat === mySeat) ||
+    reveal !== null;
 
   return (
     <div className="app">
@@ -90,17 +123,20 @@ export function App(): JSX.Element {
         <span className={`app-status app-status-${status}`}>{status}</span>
       </header>
       <main className="app-main">
-        <Board state={state} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
+        <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         <aside className="app-side">
           <ActionBar
-            state={state}
+            state={gameState}
             seat={mySeat}
             onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
             disabled={disabled}
           />
-          <GameLog state={state} chat={chat} lastError={lastError} seatNames={seatNames} />
+          <GameLog state={gameState} chat={chat} lastError={lastError} seatNames={seatNames} />
         </aside>
       </main>
+      {reveal !== null && (
+        <MansionReveal def={reveal.def} resultText={reveal.resultText} onContinue={() => setReveal(null)} />
+      )}
     </div>
   );
 }

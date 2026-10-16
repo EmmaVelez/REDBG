@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
+import { ZonePile } from './ZonePile';
+import { MansionReveal } from './MansionReveal';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
@@ -229,6 +231,22 @@ describe('Board (T05)', () => {
     expect(html).toMatch(/\d+g/);
     // flight layer mounts with zero active flights (SSR-safe)
     expect(html).toContain('data-flight-count="0"');
+  });
+});
+
+describe('MansionReveal', () => {
+  it('renders the revealed card, result text and a Continue button', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    expect(monster).toBeDefined();
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated! +4 ★" onContinue={() => {}} />
+    );
+    expect(html).toContain('data-mansion-door');
+    expect(html).toContain('The door creaks open');
+    expect(html).toContain(monster.name);
+    expect(html).toContain('Defeated! +4 ★');
+    expect(html).toContain('Continue');
   });
 });
 

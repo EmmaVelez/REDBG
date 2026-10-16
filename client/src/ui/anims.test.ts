@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '@re/game-core';
-import { diffCardMoves } from './anims';
+import { detectReveal, diffCardMoves } from './anims';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
 function makeState(over: {
@@ -17,6 +17,7 @@ function makeState(over: {
   mansionBottom?: readonly string[];
   removed?: readonly string[];
   version?: number;
+  log?: ReadonlyArray<{ seq: number; action: Record<string, unknown> }>;
 }): GameState {
   return {
     version: over.version ?? 1,
@@ -56,7 +57,7 @@ function makeState(over: {
     cardDefs: {},
     prompts: [],
     winners: [],
-    log: [],
+    log: (over.log ?? []).map(e => ({ seq: e.seq, action: e.action as never })),
   };
 }
 
@@ -123,5 +124,66 @@ describe('diffCardMoves', () => {
     const manyPrev = makeState({ seats: [{ seat: 0, hand: ['a1#1', 'a2#1', 'a3#1'] }] });
     const manyNext = makeState({ version: 2, seats: [{ seat: 0, playArea: ['a1#1', 'a2#1', 'a3#1'] }] });
     expect(diffCardMoves(manyPrev, manyNext, 2)).toHaveLength(2);
+  });
+});
+
+describe('detectReveal', () => {
+  const exploreLog = [{ seq: 1, action: { type: 'explore' as const, seat: 0 } }];
+
+  it('detects a defeated Infected: mansion -> attached', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0, attached: ['ma-001#7'] }],
+      log: exploreLog,
+    });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached' });
+  });
+
+  it('detects an escaped Infected: mansion -> mansionBottom', () => {
+    const prev = makeState({ mansionDeck: ['ma-002#7'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      mansionBottom: ['ma-002#7'],
+      seats: [{ seat: 0 }],
+      log: exploreLog,
+    });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom' });
+  });
+
+  it('ignores another player exploring', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1 } }],
+    });
+    expect(detectReveal(prev, next, 0)).toBeNull();
+  });
+
+  it('ignores a non-explore action that moves a mansion card (reshuffle)', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      mansionBottom: ['ma-001#7'],
+      seats: [{ seat: 0 }],
+      log: [{ seq: 1, action: { type: 'buy' as const, seat: 0, pileId: 'we-001' as const } }],
+    });
+    expect(detectReveal(prev, next, 0)).toBeNull();
+  });
+
+  it('returns null when the newest action is not an explore', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0, attached: ['ma-001#7'] }],
+      log: [],
+    });
+    expect(detectReveal(prev, next, 0)).toBeNull();
   });
 });
