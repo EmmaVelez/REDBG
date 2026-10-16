@@ -1,0 +1,224 @@
+import { describe, it, expect } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { GameState } from '@re/game-core';
+import { setup, startTurn, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
+import { CardView } from './CardView';
+import { Hand } from './Hand';
+import { Zones } from './Zones';
+import { PlayerPanel } from './PlayerPanel';
+import { Board } from './Board';
+import { ActionBar } from './ActionBar';
+import { Lobby } from './Lobby';
+import { GameLog } from './GameLog';
+import { defForInstance, typeLabel, statLine, costText } from './cards';
+
+/**
+ * M4-T03..T09 component tests. Pure render checks via renderToStaticMarkup
+ * (node env — no jsdom dependency); the components take prop data and render
+ * declaratively, so static markup assertions cover the contract.
+ */
+
+function twoPlayerState(seed = 11): GameState {
+  return startTurn(
+    setup(
+      { seed, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'bot' }] },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES,
+    ),
+  );
+}
+
+function firstWeaponDef(state: GameState): { instanceId: string; def: NonNullable<ReturnType<typeof defForInstance>> } {
+  const hand = state.seats[0]?.hand ?? [];
+  for (const instanceId of hand) {
+    const def = defForInstance(state, instanceId);
+    if (def !== null && def.type === 'weapon') return { instanceId, def };
+  }
+  throw new Error('no weapon in starting hand');
+}
+
+describe('cards helper', () => {
+  it('resolves instance ids through the state index', () => {
+    const state = twoPlayerState();
+    const { instanceId, def } = firstWeaponDef(state);
+    expect(defForInstance(state, instanceId)).toBe(def);
+    expect(defForInstance(state, 'bogus')).toBeNull();
+  });
+
+  it('produces labels and stat lines', () => {
+    expect(typeLabel('weapon')).toBe('WEAPON');
+    expect(typeLabel('infected')).toBe('INFECTED');
+    const state = twoPlayerState();
+    const { def } = firstWeaponDef(state);
+    expect(statLine(def)).toContain('DMG');
+    expect(costText(def)).toMatch(/^\d+$|—/);
+  });
+});
+
+describe('CardView (T03)', () => {
+  it('renders name, type banner, cost', () => {
+    const state = twoPlayerState();
+    const { def } = firstWeaponDef(state);
+    const html = renderToStaticMarkup(<CardView def={def} />);
+    expect(html).toContain(def.name);
+    expect(html).toContain('WEAPON');
+    expect(html).toContain(`data-card-id="${def.id}"`);
+  });
+
+  it('renders a character card with max HP when non-compact', () => {
+    const charDef = PREMIER_CARDS.find(c => c.type === 'character');
+    expect(charDef).toBeDefined();
+    if (charDef === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={charDef} />);
+    expect(html).toContain('CHARACTER');
+    expect(html).toContain(String(charDef.maxHp ?? -1));
+  });
+});
+
+describe('Hand + Zones (T04)', () => {
+  it('renders a playable button per hand card for my seat', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<Hand state={state} seat={0} onPlay={() => {}} />);
+    const hand = state.seats[0]?.hand ?? [];
+    expect(html).toMatch(/class="hand"/);
+    expect((html.match(/class="hand-card"/g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect((html.match(/class="hand-card"/g) ?? []).length).toBe(hand.length);
+  });
+
+  it('renders deck/discard/hand counts and play area', () => {
+    const state = twoPlayerState();
+    const player = state.seats[0];
+    expect(player).toBeDefined();
+    if (player === undefined) return;
+    const html = renderToStaticMarkup(<Zones state={state} seat={0} />);
+    expect(html).toContain(`Deck: ${player.inventory.length}`);
+    expect(html).toContain(`Discard: ${player.discard.length}`);
+    expect(html).toContain(`Hand: ${player.hand.length}`);
+  });
+
+  it('renders an empty-hand message when the hand is empty', () => {
+    const state = twoPlayerState();
+    const empty = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, hand: [] } : s)) };
+    const html = renderToStaticMarkup(<Hand state={empty} seat={0} onPlay={() => {}} />);
+    expect(html).toContain('No cards in hand');
+  });
+});
+
+describe('PlayerPanel (T06)', () => {
+  it('shows name, HP, decorations, pools and zone counts', () => {
+    const state = twoPlayerState();
+    const player = state.seats[0];
+    expect(player).toBeDefined();
+    if (player === undefined) return;
+    const html = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
+    expect(html).toContain(player.name);
+    expect(html).toContain(`HP ${player.hp}/${player.maxHp}`);
+    expect(html).toContain(`★ ${player.decorations}`);
+    expect(html).toContain(`Ammo ${player.turnAmmo}`);
+    expect(html).toContain(`Gold ${player.turnGold}`);
+    expect(html).toContain('YOU');
+  });
+
+  it('marks dead players', () => {
+    const state = twoPlayerState();
+    const dead = { ...state, seats: state.seats.map((s, i) => (i === 1 ? { ...s, dead: true } : s)) };
+    const html = renderToStaticMarkup(<PlayerPanel state={dead} seat={1} />);
+    expect(html).toContain('player-dead');
+    expect(html).toContain('(dead)');
+  });
+});
+
+describe('Board (T05)', () => {
+  it('renders market piles, mansion counts, panels and my hand', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<Board state={state} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('Resource Area');
+    expect(html).toContain('Mansion');
+    expect(html).toContain(`Deck: ${state.mansionDeck.length}`);
+    expect(html).toContain('Your hand');
+    // every seated player gets a panel
+    expect((html.match(/class="player-panel/g) ?? []).length).toBe(2);
+    // at least one purchasable pile shows a gold cost
+    expect(html).toMatch(/\d+g/);
+  });
+});
+
+describe('ActionBar (T07)', () => {
+  it('offers end turn on my turn and disables explore with no legal combo', () => {
+    const state = twoPlayerState();
+    const player = state.seats[0];
+    expect(player).toBeDefined();
+    if (player === undefined) return;
+    // revoke explores so no explore is legal (deterministic: empty the pool)
+    const noExplore = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, exploresLeft: 0 } : s)) };
+    const html = renderToStaticMarkup(<ActionBar state={noExplore} seat={0} onAction={() => {}} />);
+    expect(html).toContain('End turn');
+    expect(html).toContain('disabled=""'); // explore button (has no legal action)
+  });
+
+  it('offers explore when weapons make it legal', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Explore');
+  });
+
+  it('shows a waiting note off turn', () => {
+    const state = twoPlayerState();
+    // seat 1 is active: don't call startTurn again — construct by switching active seat
+    const otherTurn = { ...state, activeSeat: 1 };
+    const html = renderToStaticMarkup(<ActionBar state={otherTurn} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Waiting for');
+  });
+});
+
+describe('Lobby (T08)', () => {
+  it('renders the create/join forms with no room', () => {
+    const html = renderToStaticMarkup(
+      <Lobby room={null} clientId={null} status="connected" onCreateRoom={() => {}} onJoinRoom={() => {}} onSelectSeat={() => {}} onAddBot={() => {}} onRemoveBot={() => {}} onStart={() => {}} />,
+    );
+    expect(html).toContain('Create room');
+    expect(html).toContain('Join room');
+  });
+
+  it('renders seats, room code and host controls in a room', () => {
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      players: [
+        { clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true },
+        { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <Lobby room={room} clientId="c1" status="connected" onCreateRoom={() => {}} onJoinRoom={() => {}} onSelectSeat={() => {}} onAddBot={() => {}} onRemoveBot={() => {}} onStart={() => {}} />,
+    );
+    expect(html).toContain('ABCDEF');
+    expect(html).toContain('Seat 0');
+    expect(html).toContain('Bot');
+    expect(html).toContain('Start game');
+  });
+});
+
+describe('GameLog (T09)', () => {
+  it('shows turn, active player, chat and errors', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(
+      <GameLog
+        state={state}
+        chat={[{ seat: 0, text: 'glhf' }]}
+        lastError="not your turn"
+        seatNames={['Me', 'Bot']}
+      />,
+    );
+    expect(html).toContain(`Turn ${state.turnNumber}`);
+    expect(html).toContain(`Active: ${state.seats[state.activeSeat]?.name}`);
+    expect(html).toContain('glhf');
+    expect(html).toContain('not your turn');
+  });
+
+  it('renders an empty log without a state', () => {
+    const html = renderToStaticMarkup(<GameLog state={null} chat={[]} lastError={null} seatNames={[]} />);
+    expect(html).toContain('No messages yet');
+  });
+});
