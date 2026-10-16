@@ -45,104 +45,41 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
   }
 
   // --- 4. explore ---
-  // 4a. Build weaponsInHand
-  const weaponsInHand: readonly string[] = player.hand.filter((instanceId) => {
-    const cardData = state.cards[instanceId];
-    if (cardData) {
-      const cardDef = state.cardDefs[cardData.cardId];
-      return cardDef?.type === 'weapon';
-    }
-    return false;
-  });
-
-  // 4b. Ammo coverage helper (deterministic greedy)
-  // Note: We must pass the state object to the helper function scope if it relies on state.cardDefs
-  // Since the helper is defined outside, we must pass state explicitly or redefine it inside.
-  // Redefining inside to capture state scope cleanly.
-  const getAmmoCards = (weaponIds: readonly string[]): readonly string[] => {
-    let totalAmmoReq = 0;
-    for (const instanceId of weaponIds) {
+    // 4a. Build weaponsInHand
+    const weaponsInHand: readonly string[] = player.hand.filter((instanceId) => {
       const cardData = state.cards[instanceId];
       if (cardData) {
         const cardDef = state.cardDefs[cardData.cardId];
-        if (cardDef?.ammoReq !== undefined) {
-          totalAmmoReq += cardDef.ammoReq;
-        }
+        return cardDef?.type === 'weapon';
       }
-    }
-
-    if (totalAmmoReq === 0) {
-      return [];
-    }
-
-    // Identify and sort ammo cards in hand
-    const ammoCards = player.hand
-      .map(instanceId => {
-        const cardData = state.cards[instanceId];
-        if (cardData) {
-          const cardDef = state.cardDefs[cardData.cardId];
-          return {
-            instanceId,
-            ammoBonus: cardDef?.bonuses?.ammo ?? 0,
-          };
-        }
-        return null;
-      })
-      .filter((card): card is { instanceId: string, ammoBonus: number } => card !== null)
-      .sort((a, b) => {
-        if (b.ammoBonus !== a.ammoBonus) {
-          return b.ammoBonus - a.ammoBonus; // DESC
-        }
-        return a.instanceId.localeCompare(b.instanceId); // ASC
-      });
-
-    // Greedily pick cards
-    let currentAmmo = 0;
-    const pickedAmmoCards: string[] = [];
-
-    for (const card of ammoCards) {
-      if (currentAmmo < totalAmmoReq) {
-        pickedAmmoCards.push(card.instanceId);
-        currentAmmo += card.ammoBonus;
-      } else {
-        break;
-      }
-    }
-
-    // Return picked cards in original hand order
-    const pickedSet = new Set(pickedAmmoCards);
-    return player.hand.filter(instanceId => pickedSet.has(instanceId));
-  };
-
-  // 4c. Generate candidates: Singles
-  for (const weaponInstanceId of weaponsInHand) {
-    const ammoCards = getAmmoCards([weaponInstanceId]);
-    generatedActions.push({
-      type: 'explore',
-      seat,
-      weapons: [weaponInstanceId],
-      ammoCards,
-      exploreCount: 1,
+      return false;
     });
-  }
 
-  // 4c. Generate candidates: Pairs (i < j)
-    for (let i = 0; i < weaponsInHand.length; i++) {
-      const weapon1 = weaponsInHand[i];
-      if (weapon1 === undefined) continue;
-      for (let j = i + 1; j < weaponsInHand.length; j++) {
-        const weapon2 = weaponsInHand[j];
-        if (weapon2 === undefined) continue;
-        const ammoCards = getAmmoCards([weapon1, weapon2]);
-        generatedActions.push({
-          type: 'explore',
-          seat,
-          weapons: [weapon1, weapon2],
-          ammoCards,
-          exploreCount: 1,
-        });
-      }
+    // 4b. Generate candidates: Singles
+    for (const weaponInstanceId of weaponsInHand) {
+      generatedActions.push({
+        type: 'explore',
+        seat,
+        weapons: [weaponInstanceId],
+        exploreCount: 1,
+      });
     }
+
+    // 4c. Generate candidates: Pairs (i < j)
+      for (let i = 0; i < weaponsInHand.length; i++) {
+        const weapon1 = weaponsInHand[i];
+        if (weapon1 === undefined) continue;
+        for (let j = i + 1; j < weaponsInHand.length; j++) {
+          const weapon2 = weaponsInHand[j];
+          if (weapon2 === undefined) continue;
+          generatedActions.push({
+            type: 'explore',
+            seat,
+            weapons: [weapon1, weapon2],
+            exploreCount: 1,
+          });
+        }
+      }
 
   // --- 5. buy ---
   // Object.keys preserves insertion order in modern JS environments

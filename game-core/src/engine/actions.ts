@@ -226,18 +226,27 @@ export function applyAction(state: GameState, action: Action): GameState {
           }
 
     case 'explore': {
-      const { seat, weapons, ammoCards, exploreCount } = action;
-      const player = state.seats[seat] as PlayerState;
+          const { seat, weapons, exploreCount } = action;
+          const player = state.seats[seat] as PlayerState;
 
-      const handAfter = player.hand.filter(id => !weapons.includes(id) && !ammoCards.includes(id));
-      const playAreaAfter = [...player.playArea, ...weapons, ...ammoCards];
-      const exploresLeft = player.exploresLeft - exploreCount;
+          // Ammo comes from the cumulative ammo resource, not from cards in hand.
+          const requiredAmmo = weapons.reduce((sum, weaponId) => {
+            const w = cardDef(state, weaponId);
+            return sum + (w?.ammoReq ?? 0);
+          }, 0);
+          const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
-      const exploreWeapons = weapons.map(id => {
-        const w = cardDef(state, id);
-        return { damage: w?.damage ?? 0, ammoReq: w?.ammoReq ?? 0, weaponEffects: w?.weaponEffects };
-      });
-      const ammo = ammoCards.reduce((acc, id) => acc + (cardDef(state, id)?.bonuses?.ammo ?? 0), 0);
+          const handAfter = player.hand.filter(id => !weapons.includes(id));
+          const playAreaAfter = [...player.playArea, ...weapons];
+          const exploresLeft = player.exploresLeft - exploreCount;
+
+          const exploreWeapons = weapons.map(id => {
+            const w = cardDef(state, id);
+            return { damage: w?.damage ?? 0, ammoReq: w?.ammoReq ?? 0, weaponEffects: w?.weaponEffects };
+          });
+          // Weapon effects like "plusDamageIfAmmoAbove" read the ammo the player
+          // has available for this attack — the pool before it is spent.
+          const ammoForEffects = player.turnAmmo;
 
       const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
@@ -266,7 +275,7 @@ export function applyAction(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, exploresLeft } : s)),
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, exploresLeft, turnAmmo: turnAmmoAfter } : s)),
           mansionDeck,
           mansionBottom,
           prompts,
@@ -274,11 +283,11 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       const outcome = resolveExplore({
-        weapons: exploreWeapons,
-        ammo,
-        bonusDamage: player.weaponDamageBonusThisTurn,
-        revealed: revealedDef,
-      });
+              weapons: exploreWeapons,
+              ammo: ammoForEffects,
+              bonusDamage: player.weaponDamageBonusThisTurn,
+              revealed: revealedDef,
+            });
 
       if (outcome.kind === 'insufficientAmmo') {
         throw new Error('applyAction: explore: insufficient ammo');
@@ -289,14 +298,15 @@ export function applyAction(state: GameState, action: Action): GameState {
         const charDef = cardDef(state, player.characterInstanceId);
         const level = charDef?.level2At !== undefined ? levelForDecorations(charDef.level2At, decorations) : player.level;
         const newPlayer: PlayerState = {
-          ...player,
-          hand: handAfter,
-          playArea: playAreaAfter,
-          exploresLeft,
-          decorations,
-          level,
-          attached: [...player.attached, revealedInstanceId],
-        };
+                  ...player,
+                  hand: handAfter,
+                  playArea: playAreaAfter,
+                  exploresLeft,
+                  turnAmmo: turnAmmoAfter,
+                  decorations,
+                  level,
+                  attached: [...player.attached, revealedInstanceId],
+                };
         return {
           ...state,
           ...nextBase,
@@ -350,15 +360,16 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       const newPlayer: PlayerState = {
-        ...player,
-        hand,
-        playArea: playAreaAfter,
-        discard,
-        inventory,
-        exploresLeft,
-        hp: newHp,
-        downed,
-      };
+              ...player,
+              hand,
+              playArea: playAreaAfter,
+              discard,
+              inventory,
+              exploresLeft,
+              turnAmmo: turnAmmoAfter,
+              hp: newHp,
+              downed,
+            };
 
       return {
         ...state,

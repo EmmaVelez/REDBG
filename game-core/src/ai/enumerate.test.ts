@@ -92,35 +92,35 @@ describe('enumerateLegalActions', () => {
     expect(pileIds).toEqual(['hg', 'kn']);
   });
 
-  // 5. 'explore singles and pairs with greedy ammo'
-    test('explore singles and pairs with greedy ammo', () => {
-      // We-1 (20 req), We-2 (0 req), We-3 (10 req). Am-1 (10 ammo).
-      // Hand order: [we-1#1, we-2#1, we-3#1, am-1#1]
-      const s = baseState({ seats: [player(0, { hand: ['we-1#1', 'we-2#1', 'we-3#1', 'am-1#1'] }), player(1)] });
-      const acts = enumerateLegalActions(s, 0);
-      const filteredExplores = acts.filter(a => a.type === 'explore' && a.seat === 0) as Array<Extract<Action, { type: 'explore' }>>;
+  // 5. 'explore singles and pairs gated by the ammo pool'
+      test('explore singles and pairs gated by the ammo pool', () => {
+        // We-1 (20 req), We-2 (0 req), We-3 (10 req). 10 ammo in the pool.
+        // Hand order: [we-1#1, we-2#1, we-3#1]
+        const s = baseState({ seats: [player(0, { hand: ['we-1#1', 'we-2#1', 'we-3#1'], turnAmmo: 10 }), player(1)] });
+        const acts = enumerateLegalActions(s, 0);
+        const filteredExplores = acts.filter(a => a.type === 'explore' && a.seat === 0) as Array<Extract<Action, { type: 'explore' }>>;
 
-      /*
-      Reasoning for expected filtered set (3 total — only ONE ammo card, 10 ammo, in hand):
-      1. Single we-2#1 (Req 0): AmmoCards [] -> LEGAL
-      2. Single we-3#1 (Req 10): AmmoCards ['am-1#1'] (10 >= 10) -> LEGAL
-      3. Single we-1#1 (Req 20): AmmoCards ['am-1#1'] (10 < 20) -> ILLEGAL (Rejected by validator)
-      4. Pair we-2#1 + we-3#1 (Req 10): AmmoCards ['am-1#1'] (10 >= 10) -> LEGAL
-      5. Pair we-1#1 + we-2#1 (Req 20): AmmoCards ['am-1#1'] (10 < 20) -> ILLEGAL (Rejected by validator)
-      6. Pair we-1#1 + we-3#1 (Req 30): AmmoCards ['am-1#1'] (10 < 30) -> ILLEGAL (Rejected by validator)
-      */
+        /*
+        Reasoning for expected filtered set (3 total — 10 ammo in the pool):
+        1. Single we-2#1 (Req 0): pool 10 >= 0 -> LEGAL
+        2. Single we-3#1 (Req 10): pool 10 >= 10 -> LEGAL
+        3. Single we-1#1 (Req 20): pool 10 < 20 -> ILLEGAL (Rejected by validator)
+        4. Pair we-2#1 + we-3#1 (Req 10): pool 10 >= 10 -> LEGAL
+        5. Pair we-2#1 + we-1#1 (Req 20): pool 10 < 20 -> ILLEGAL (Rejected by validator)
+        6. Pair we-3#1 + we-1#1 (Req 30): pool 10 < 30 -> ILLEGAL (Rejected by validator)
+        */
 
-      const expectedStrings = [
-        JSON.stringify({ w: ['we-2#1'], a: [] }),
-        JSON.stringify({ w: ['we-3#1'], a: ['am-1#1'] }),
-        JSON.stringify({ w: ['we-2#1', 'we-3#1'], a: ['am-1#1'] }),
-      ];
+        const expectedStrings = [
+          JSON.stringify({ w: ['we-2#1'] }),
+          JSON.stringify({ w: ['we-3#1'] }),
+          JSON.stringify({ w: ['we-2#1', 'we-3#1'] }),
+        ];
 
-      const actualStrings = filteredExplores.map(a => JSON.stringify({ w: a.weapons, a: a.ammoCards }));
+        const actualStrings = filteredExplores.map(a => JSON.stringify({ w: a.weapons }));
 
-      expect(actualStrings).toEqual(expect.arrayContaining(expectedStrings));
-      expect(filteredExplores.length).toBe(3);
-    });
+        expect(actualStrings).toEqual(expect.arrayContaining(expectedStrings));
+        expect(filteredExplores.length).toBe(3);
+      });
 
   // 6. 'ability actions for each character ability index'
   test('ability actions for each character ability index', () => {

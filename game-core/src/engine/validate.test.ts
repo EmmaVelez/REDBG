@@ -6,7 +6,7 @@ function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
   return {
     seat: s, name: 'P' + s, controller: 'human',
     characterInstanceId: 'c' + s, hp: 100, maxHp: 100, decorations: 0, level: 1,
-    turnAmmo: 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
+    turnAmmo: over.turnAmmo ?? 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
     buysLeft: over.buysLeft ?? 1, exploresLeft: over.exploresLeft ?? 1,
     weaponDamageBonusThisTurn: 0, attached: [],
     inventory: [], hand: over.hand ?? ['a-1', 'i-1', 'm-1', 'w-1', 'w-2'],
@@ -90,36 +90,33 @@ describe('validateAction', () => {
   });
 
   it('explore ok', () => {
-    expect(validateAction(baseState({ seat0: { hand: ['w-1', 'm-1', 'm-2'] } }), { type: 'explore', seat: 0, weapons: ['w-1'], ammoCards: ['m-1', 'm-2'], exploreCount: 1 })).toEqual({ ok: true });
-  });
+      expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1'], exploreCount: 1 })).toEqual({ ok: true });
+    });
 
-  it('explore insufficient ammo', () => {
-    expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: ['w-1'], ammoCards: ['m-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: insufficient ammo' });
-  });
+    it('explore insufficient ammo (pool below weapon requirements)', () => {
+      expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 10 } }), { type: 'explore', seat: 0, weapons: ['w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: insufficient ammo' });
+    });
 
-  it('explore no weapons', () => {
-    expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: [], ammoCards: [], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: no weapons' });
-  });
+    it('explore no weapons', () => {
+      expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: no weapons' });
+    });
 
-  it('explore weapon not in hand', () => {
-    expect(validateAction(baseState({ seat0: { hand: ['m-1'] } }), { type: 'explore', seat: 0, weapons: ['w-1'], ammoCards: [], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon not in hand: w-1' });
-  });
+    it('explore weapon not in hand', () => {
+      expect(validateAction(baseState({ seat0: { hand: ['m-1'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon not in hand: w-1' });
+    });
 
-  it('explore not a weapon', () => {
-    expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: ['a-1'], ammoCards: [], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: not a weapon: a-1' });
-  });
+    it('explore not a weapon', () => {
+      expect(validateAction(baseState({ seat0: { turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['m-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: not a weapon: m-1' });
+    });
 
-  it('explore duplicate weapon', () => {
-    expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: ['w-1', 'w-1'], ammoCards: ['m-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: duplicate weapon: w-1' });
-  });
+    it('explore duplicate weapon', () => {
+      expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1', 'w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: duplicate weapon: w-1' });
+    });
 
-  it('explore ammo card not in hand', () => {
-    expect(validateAction(baseState({ seat0: { hand: ['w-1'] } }), { type: 'explore', seat: 0, weapons: ['w-1'], ammoCards: ['m-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: ammo card not in hand: m-1' });
-  });
-
-  it('explore not an ammo card', () => {
-    expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: ['w-1'], ammoCards: ['a-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: not an ammo card: a-1' });
-  });
+    it('explore ok with ammo cards still in hand (pool-based ammo, cards not consumed)', () => {
+      // ammo cards in hand are NOT required; the pool covers the requirement
+      expect(validateAction(baseState({ seat0: { hand: ['w-1', 'm-1', 'm-2'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1'], exploreCount: 1 })).toEqual({ ok: true });
+    });
 
   it('buy ok', () => {
     expect(validateAction(baseState(), { type: 'buy', seat: 0, pileId: 'hg' })).toEqual({ ok: true });

@@ -148,7 +148,7 @@ test('replay with explore + shuffle determinism', () => {
     expect(true).toBe(true);
     return;
   }
-  const acts: Action[] = [{ type: 'explore', seat: 0, weapons: [knifeId], ammoCards: [], exploreCount: 1 }];
+  const acts: Action[] = [{ type: 'explore', seat: 0, weapons: [knifeId], exploreCount: 1 }];
     const r1 = replay(spec(1), CARDS, PILES, acts);
     const expected = applyAction(s0, acts[0] as Action);
     expect(r1).toEqual(expected);

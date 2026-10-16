@@ -6,7 +6,7 @@ function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
     seat: s, name: 'P' + s, controller: 'human',
     characterInstanceId: 'c' + s, hp: over.hp ?? 100, maxHp: over.maxHp ?? 100,
     decorations: over.decorations ?? 0, level: 1,
-    turnAmmo: 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
+    turnAmmo: over.turnAmmo ?? 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
     buysLeft: over.buysLeft ?? 1, exploresLeft: over.exploresLeft ?? 1,
     weaponDamageBonusThisTurn: over.weaponDamageBonusThisTurn ?? 0, attached: [],
     inventory: over.inventory ?? ['inv1', 'inv2', 'inv3', 'inv4', 'inv5', 'inv6', 'inv7', 'inv8'],
@@ -159,7 +159,7 @@ test('buy', () => {
 });
 
 test('explore defeated', () => {
-  const s = applyAction(baseState({ seat0: { hand: ['w20', 'w5'] } }), { type: 'explore', seat: 0, weapons: ['w20'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ seat0: { hand: ['w20', 'w5'] } }), { type: 'explore', seat: 0, weapons: ['w20'], exploreCount: 1 });
   expect(p0(s).decorations).toBe(1);
   expect(p0(s).attached).toEqual(['inf1']);
   expect(s.mansionDeck).toEqual([]);
@@ -169,13 +169,38 @@ test('explore defeated', () => {
   expect(p0(s).hp).toBe(100);
 });
 
+test('explore consumes ammo from the pool, keeps ammo cards in hand', () => {
+  // w1 = we-1 (ammoReq 20). Pool starts at 30; two ammo cards in hand.
+  const s = applyAction(baseState({ seat0: { hand: ['w1', 'am1', 'am2'], turnAmmo: 30 } }), { type: 'explore', seat: 0, weapons: ['w1'], exploreCount: 1 });
+  expect(p0(s).turnAmmo).toBe(10); // 30 - 20 requirement consumed
+  expect(p0(s).hand).toEqual(['am1', 'am2']); // ammo cards stay in hand
+  expect(p0(s).playArea).toContain('w1'); // weapon moved to play area
+});
+
+test('explore with ammo cards removed from hand still works (pool-based ammo)', () => {
+  // Classic bug repro: play ammo cards (for gold) BEFORE exploring; the
+  // weapon must still be usable because ammo is a resource, not hand cards.
+  const s1 = applyAction(baseState({ seat0: { hand: ['w1', 'am1', 'am2'] } }), { type: 'playAmmo', seat: 0, instanceId: 'am1' });
+  // am1 grants +10 ammo +10 gold; the card leaves the hand
+  expect(p0(s1).turnAmmo).toBe(10);
+  expect(p0(s1).turnGold).toBe(60); // 50 base + 10
+  expect(p0(s1).hand).not.toContain('am1');
+  const s2 = applyAction(s1, { type: 'playAmmo', seat: 0, instanceId: 'am2' });
+  expect(p0(s2).turnAmmo).toBe(20); // pool now covers w1's 20 ammo req
+  expect(p0(s2).hand).not.toContain('am2');
+  // explore with the weapon alone — no ammo cards in hand — pool funds it
+  const s3 = applyAction(s2, { type: 'explore', seat: 0, weapons: ['w1'], exploreCount: 1 });
+  expect(p0(s3).turnAmmo).toBe(0); // 20 pool - 20 req consumed
+  expect(p0(s3).playArea).toContain('w1');
+});
+
 test('explore level-up', () => {
-  const s = applyAction(baseState({ seat0: { hand: ['w20', 'w5'], decorations: 4 } }), { type: 'explore', seat: 0, weapons: ['w20'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ seat0: { hand: ['w20', 'w5'], decorations: 4 } }), { type: 'explore', seat: 0, weapons: ['w20'], exploreCount: 1 });
   expect(p0(s).level).toBe(2);
 });
 
 test('explore not defeated', () => {
-  const s = applyAction(baseState({ seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).hp).toBe(80);
   expect(s.mansionBottom).toEqual(['inf1']);
   expect(p0(s).attached).toEqual([]);
@@ -183,7 +208,7 @@ test('explore not defeated', () => {
 });
 
 test('explore downed', () => {
-  const s = applyAction(baseState({ seat0: { hp: 10, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ seat0: { hp: 10, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).downed).toBe(true);
   expect(p0(s).hand).toEqual([]);
   expect(p0(s).playArea).toContain('w5'); // used weapons stay in play area
@@ -192,14 +217,14 @@ test('explore downed', () => {
 });
 
 test('explore Uroboros shuffle-back', () => {
-  const s = applyAction(baseState({ mansionDeck: ['uro1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ mansionDeck: ['uro1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).hp).toBe(30);
   expect(s.mansionDeck).toContain('uro1');
   expect(s.mansionBottom).toEqual([]);
 });
 
 test('explore non-infected take', () => {
-  const s = applyAction(baseState({ mansionDeck: ['gh1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ mansionDeck: ['gh1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(s.prompts.length).toBe(1);
   expect(pr(s).payload?.kind).toBe('takeOrBottom');
   expect(pr(s).options).toEqual(['Take', 'Send to bottom of Mansion']);
@@ -210,7 +235,7 @@ test('explore non-infected take', () => {
 });
 
 test('explore non-infected bottom', () => {
-  const s = applyAction(baseState({ mansionDeck: ['gh1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], ammoCards: [], exploreCount: 1 });
+  const s = applyAction(baseState({ mansionDeck: ['gh1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   const s2 = applyAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 1 });
   expect(s2.mansionBottom).toEqual(['gh1']);
   expect(p0(s2).discard).toEqual([]);
@@ -237,7 +262,7 @@ test('useCharacterAbility no-op', () => {
 
 test('invalid action throws', () => {
   expect(() => applyAction(baseState({ seat0: { hand: ['zzz'] } }), { type: 'playActionCard', seat: 0, instanceId: 'zzz' })).toThrow('applyAction: playActionCard: unknown card: zzz');
-  expect(() => applyAction(baseState(), { type: 'explore', seat: 0, weapons: [], ammoCards: [], exploreCount: 1 })).toThrow('applyAction: explore: no weapons');
+  expect(() => applyAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toThrow('applyAction: explore: no weapons');
 });
 
 test('startGame throws', () => {

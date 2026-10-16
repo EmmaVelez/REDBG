@@ -123,41 +123,25 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: `explore: duplicate weapon: ${action.weapons.find((id, index) => action.weapons.indexOf(id) !== index)}` };
       }
       for (const weaponId of action.weapons) {
-        if (!player.hand.includes(weaponId)) {
-          return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
-        }
-        const weaponCardDef = cardDef(state, weaponId);
-        if (weaponCardDef === undefined) {
-          return { ok: false, reason: `explore: unknown weapon: ${weaponId}` };
-        }
-        if (weaponCardDef.type !== 'weapon') {
-          return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
-        }
-      }
-      for (const ammoCardId of action.ammoCards) {
-        if (!player.hand.includes(ammoCardId)) {
-          return { ok: false, reason: `explore: ammo card not in hand: ${ammoCardId}` };
-        }
-        const ammoCardDef = cardDef(state, ammoCardId);
-        if (ammoCardDef === undefined) {
-          return { ok: false, reason: `explore: unknown ammo card: ${ammoCardId}` };
-        }
-        if (ammoCardDef.type !== 'ammunition') {
-          return { ok: false, reason: `explore: not an ammo card: ${ammoCardId}` };
-        }
-      }
-      const requiredAmmo = action.weapons.reduce((sum, weaponId) => {
-        const weaponCardDef = cardDef(state, weaponId);
-        return sum + (weaponCardDef?.ammoReq ?? 0);
-      }, 0);
-      const availableAmmo = action.ammoCards.reduce((sum, ammoCardId) => {
-        const ammoCardDef = cardDef(state, ammoCardId);
-        return sum + (ammoCardDef?.bonuses?.ammo ?? 0);
-      }, 0);
-      if (availableAmmo < requiredAmmo) {
-        return { ok: false, reason: 'explore: insufficient ammo' };
-      }
-      return { ok: true };
+              if (!player.hand.includes(weaponId)) {
+                return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
+              }
+              const weaponCardDef = cardDef(state, weaponId);
+              if (weaponCardDef === undefined) {
+                return { ok: false, reason: `explore: unknown weapon: ${weaponId}` };
+              }
+              if (weaponCardDef.type !== 'weapon') {
+                return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
+              }
+            }
+            const requiredAmmo = action.weapons.reduce((sum, weaponId) => {
+              const weaponCardDef = cardDef(state, weaponId);
+              return sum + (weaponCardDef?.ammoReq ?? 0);
+            }, 0);
+            if (player.turnAmmo < requiredAmmo) {
+              return { ok: false, reason: 'explore: insufficient ammo' };
+            }
+            return { ok: true };
 
     case 'buy':
       if (state.phase !== 'main') {

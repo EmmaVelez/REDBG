@@ -26,12 +26,9 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
-  // fullest legal explore = most weapons (tie-break: most ammo cards)
+  // fullest legal explore = most weapons (ammo comes from the cumulative pool)
   const bestExplore = explores.length > 0
-    ? explores.reduce((best, a) => {
-        const score = (x: Extract<Action, { type: 'explore' }>): number => x.weapons.length * 100 + x.ammoCards.length;
-        return score(a) > score(best) ? a : best;
-      })
+    ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
     : undefined;
   const prompt = state.prompts.find(p => p.seat === seat);
   const phaseNote = state.phase === 'gameOver' ? 'Game over'
@@ -61,7 +58,7 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
       )}
 
       <div className="action-buttons">
-        <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s), ${bestExplore.ammoCards.length} ammo card(s)` : undefined}>
+        <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s)` : undefined}>
           Explore{bestExplore !== undefined ? ` (${bestExplore.weapons.length} weapon${bestExplore.weapons.length === 1 ? '' : 's'})` : ''}
         </button>
         <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>

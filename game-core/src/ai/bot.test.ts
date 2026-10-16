@@ -96,7 +96,7 @@ describe('chooseBotAction', () => {
     expect(chooseBotAction(s, seat, 'normal', () => 0.001)).toEqual({ type: 'playActionCard', seat: 0, instanceId: 'ac-1#1' });
 
     // Case 2: r=0.1 < 0.2 noisy. idx = floor(0.1/0.2*8) = 4 -> the we-2+we-3 pair explore
-        expect(chooseBotAction(s, seat, 'normal', () => 0.1)).toEqual({ type: 'explore', seat: 0, weapons: ['we-2#1', 'we-3#1'], ammoCards: [], exploreCount: 1 });
+        expect(chooseBotAction(s, seat, 'normal', () => 0.1)).toEqual({ type: 'explore', seat: 0, weapons: ['we-2#1', 'we-3#1'], exploreCount: 1 });
 
     // Case 3: r=0.999 >= 0.2 -> greedy
     expect(chooseBotAction(s, seat, 'normal', () => 0.999)).toEqual(chooseGreedyAction(s, seat));
