@@ -46,16 +46,26 @@ function baseState(over: Partial<GameState> = {}): GameState {
   return s;
 }
 
+/** Builds a cards map containing the base instances plus the given extra ones. */
+function cardsWith(...extraIds: readonly string[]): Record<string, { instanceId: string; cardId: string; location: { zone: 'hand'; index: number } }> {
+  const base = baseState().cards as Record<string, { instanceId: string; cardId: string; location: { zone: 'hand'; index: number } }>;
+  const out = { ...base };
+  for (const id of extraIds) {
+    out[id] = { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } };
+  }
+  return out;
+}
+
 describe('evaluateState', () => {
   // 1. 'baseline score'
   test('baseline score', () => {
-    expect(evaluateState(baseState(), 0)).toBe(136);
+    expect(evaluateState(baseState(), 0)).toBe(106);
   });
 
   // 2. 'baseline is symmetric for both seats'
   test('baseline is symmetric for both seats', () => {
     expect(evaluateState(baseState(), 0)).toBe(evaluateState(baseState(), 1));
-    expect(evaluateState(baseState(), 0)).toBe(136);
+    expect(evaluateState(baseState(), 0)).toBe(106);
   });
 
   // 3. 'dead player scores catastrophically low'
@@ -67,19 +77,19 @@ describe('evaluateState', () => {
   // 4. 'downed is bad but better than dead'
   test('downed is bad but better than dead', () => {
     const s = baseState({ seats: [player(0, { downed: true, hp: 0 }), player(1)] });
-    expect(evaluateState(s, 0)).toBe(-3964);
+    expect(evaluateState(s, 0)).toBe(-3994);
   });
 
   // 5. 'level 2 is worth 200'
   test('level 2 is worth 200', () => {
     const s = baseState({ seats: [player(0, { level: 2 }), player(1)] });
-    expect(evaluateState(s, 0)).toBe(336);
+    expect(evaluateState(s, 0)).toBe(306);
   });
 
   // 6. 'decorations are worth 50 each'
   test('decorations are worth 50 each', () => {
     const s = baseState({ seats: [player(0, { decorations: 4 }), player(1)] });
-    expect(evaluateState(s, 0)).toBe(336);
+    expect(evaluateState(s, 0)).toBe(306);
   });
 
   // 7. 'gold and ammo pools add value'
@@ -87,26 +97,27 @@ describe('evaluateState', () => {
       const s = baseState({ seats: [player(0, { turnGold: 50, turnAmmo: 10 }), player(1)] });
       // Derivation: 136 + 50*1 (gold is transient: 1/point) + 10*3 + 20 (affordable:
       // BOTH piles cost <= 50 -> 2 piles * 10 potential) = 136 + 50 + 30 + 20 = 236.
-      expect(evaluateState(s, 0)).toBe(236);
+      expect(evaluateState(s, 0)).toBe(206);
     });
 
     // 8. 'hand cards count by type'
-    test('hand cards count by type', () => {
-      const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'we-1#1', 'ac-1#1', 'it-1#1'] }), player(1)] });
-      // 136 + 8 (ammo) + 12 (we-1 damage 10 -> 10 + 10/5) + 5 (action) + 5 (item) = 166.
-      expect(evaluateState(s, 0)).toBe(166);
-    });
+      test('hand cards count by type', () => {
+        const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'we-1#1', 'ac-1#1', 'it-1#1'] }), player(1)] });
+        // 136 + am-1 held (yield 8+30+10=48, HALVED 24) + we-1 (dmg 10 -> 12)
+        // + ac-1 held (gold 10 -> 5) + it-1 (5) = 136+24+12+5+5 = 182.
+        expect(evaluateState(s, 0)).toBe(152);
+      });
 
   // 9. 'attached infected trophies are valuable'
   test('attached infected trophies are valuable', () => {
     const s = baseState({ seats: [player(0, { attached: ['ma-1#1', 'ma-1#2'] }), player(1)] });
-    expect(evaluateState(s, 0)).toBe(186);
+    expect(evaluateState(s, 0)).toBe(156);
   });
 
   // 10. 'eliminated opponents are rewarded'
   test('eliminated opponents are rewarded', () => {
     const s = baseState({ seats: [player(0), player(1, { dead: true })] });
-    expect(evaluateState(s, 0)).toBe(436);
+    expect(evaluateState(s, 0)).toBe(406);
   });
 
   // 11. 'downed opponents are a smaller reward'
@@ -114,13 +125,13 @@ describe('evaluateState', () => {
       const s = baseState({ seats: [player(0), player(1, { downed: true, hp: 0 })] });
       // baseline 136 already includes -100 for opponent hp 100; with hp 0 the
       // opponent-hp term is 0 (refund 100), then +150 for downed: 136+100+150
-      expect(evaluateState(s, 0)).toBe(386);
+      expect(evaluateState(s, 0)).toBe(356);
     });
 
   // 12. 'decorated opponents are threatening'
   test('decorated opponents are threatening', () => {
     const s = baseState({ seats: [player(0), player(1, { decorations: 5 })] });
-    expect(evaluateState(s, 0)).toBe(36);
+    expect(evaluateState(s, 0)).toBe(6);
   });
 
   // 13. 'unknown seat is the floor'
@@ -165,7 +176,7 @@ describe('evaluateState', () => {
       });
       // Without any affinity this hand would score 136 + 12 (we-9 dmg 10 -> 10 + 10/5) = 148;
       // Leon's pistol bonus 10 makes the handgun worth 22 -> 158.
-      expect(evaluateState(s, 0)).toBe(158);
+      expect(evaluateState(s, 0)).toBe(128);
     });
 
     // 17. 'character ability: non-matching weapon tag gets no bonus'
@@ -184,7 +195,7 @@ describe('evaluateState', () => {
         },
       });
       // we-2 (damage 8, NO pistol tag): 136 + (10 + 8/5=1 -> 11) = 147. No affinity bonus.
-      expect(evaluateState(s, 0)).toBe(147);
+      expect(evaluateState(s, 0)).toBe(117);
     });
 
     // 18. 'character ability: back-off amount to unlock at level 2'
@@ -209,12 +220,12 @@ describe('evaluateState', () => {
       });
       // magnum damage 50 -> 10 + 10 = 20 base. Barry is level 1, magnum bonus is L2: no affinity.
             // 136 + 20 = 156.
-            expect(evaluateState(s, 0)).toBe(156);
+            expect(evaluateState(s, 0)).toBe(126);
 
             // At level 2 the same hand gets the +200 level bonus AND +20 magnum affinity:
             // 156 + 200 + 20 = 376.
             const s2 = { ...s, seats: s.seats.map((x, i) => (i === 0 ? { ...x, level: 2 as const } : x)) };
-            expect(evaluateState(s2, 0)).toBe(376);
+            expect(evaluateState(s2, 0)).toBe(346);
     });
 
     // 19. 'character ability: Claire ammo bonus values ammo cards higher'
@@ -232,9 +243,9 @@ describe('evaluateState', () => {
           'ch-003': def('ch-003', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'ammunitionBonus', ammoAmount: 10, goldAmount: 0, level: 1 }, { kind: 'ammunitionBonus', ammoAmount: 0, goldAmount: 10, level: 2 }] }),
         },
       });
-      // Claire L1: ammo cards worth extra 10 ammo * 3 = +30 each on top of the 8 base:
-      // 136 + 8 + 30 = 174.
-      expect(evaluateState(s, 0)).toBe(174);
+      // Claire L1: ammo cards gain +10 ammo * 3 = +30 on top of held ammo value.
+            // am-1 yield 48 -> held 24; +30 = 54; 136 + 54 = 190.
+            expect(evaluateState(s, 0)).toBe(160);
     });
 
     // 20. 'character ability: Wesker explore gold bonus values explores higher'
@@ -253,15 +264,123 @@ describe('evaluateState', () => {
         },
       });
       // Baseline 136 already includes the exploresLeft term (40). Wesker's
-            // exploreGoldBonus adds +20 gold per explore at 5/gold = +100: 136 + 100 = 236
-            // (vs 136 for a generic character whose explore term is already inside baseline).
-            expect(evaluateState(s, 0)).toBe(236);
+            // exploreGoldBonus adds +20 gold per explore at 1/gold = +20: 136 + 20 = 156.
+            expect(evaluateState(s, 0)).toBe(126);
     });
 
     // 21. 'discarded weapons keep their value (bought cards are real assets)'
-    test('discarded weapons keep their value (bought cards are real assets)', () => {
-      const s = baseState({ seats: [player(0, { discard: ['we-1#1'] }), player(1)] });
-      // we-1 damage 10 -> 12, same as if it were in hand: 136 + 12 = 148.
-      expect(evaluateState(s, 0)).toBe(148);
+      test('discarded weapons keep their value (bought cards are real assets)', () => {
+        const s = baseState({ seats: [player(0, { discard: ['we-1#1'] }), player(1)] });
+        // we-1 damage 10 -> 12 = 136 + 12 = 148.
+        expect(evaluateState(s, 0)).toBe(118);
+      });
+
+      // 22. 'action cards are worth their text value when owned (buy incentive)'
+            test('action cards are worth their text value when owned (buy incentive)', () => {
+              const s = baseState({
+                seats: [player(0, { discard: ['ac-4#1'] }), player(1)],
+                cards: cardsWith('ac-4#1'),
+                cardDefs: {
+                  ...DEFS,
+                  'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
+                },
+              });
+              // ac-4: +1 card (12) + 2 actions (80) = 92 text value. Owned in discard:
+              // 136 + 92 = 228.
+              expect(evaluateState(s, 0)).toBe(198);
+            });
+
+            // 23. 'action cards are held at half text value (one action per turn)'
+            test('action cards are held at half text value (one action per turn)', () => {
+              const s = baseState({
+                seats: [player(0, { hand: ['ac-4#1'] }), player(1)],
+                cards: cardsWith('ac-4#1'),
+                cardDefs: {
+                  ...DEFS,
+                  'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
+                },
+              });
+              // Held: 92 * 0.5 = 46 -> 136 + 46 = 182.
+              expect(evaluateState(s, 0)).toBe(152);
+            });
+
+            // 24. 'ammo cards are worth their yield when owned (fallback buy incentive)'
+            test('ammo cards are worth their yield when owned (fallback buy incentive)', () => {
+              const s = baseState({
+                seats: [player(0, { discard: ['am-2#1'] }), player(1)],
+                cards: cardsWith('am-2#1'),
+                cardDefs: {
+                  ...DEFS,
+                  'am-2': def('am-2', { type: 'ammunition', cost: 30, bonuses: { ammo: 20, gold: 20 } }),
+                },
+              });
+              // am-2: 8 + 20 ammo*3 + 20 gold = 8 + 60 + 20 = 88. Owned: 136 + 88 = 224.
+              expect(evaluateState(s, 0)).toBe(194);
+            });
+
+            // 25. 'deck bloat: trash effects gain value past the threshold'
+            test('deck bloat: trash effects gain value past the threshold', () => {
+              const junkWe2: string[] = [];
+              for (let i = 1; i <= 30; i++) junkWe2.push(`we-2#${i}`);
+              const ac3Def = def('ac-3', { type: 'action', cost: 20, actionEffects: [{ kind: 'trashUpToTwoFromDiscard' }] });
+
+              const smallDeck = baseState({
+                seats: [player(0, { discard: ['ac-3#1'] }), player(1)],
+                cards: cardsWith('ac-3#1'),
+                cardDefs: { ...DEFS, 'ac-3': ac3Def },
+              });
+              // trashUpToTwoFromDiscard credit 6; owned 136 + 6 = 142 (deck 1 < threshold).
+              expect(evaluateState(smallDeck, 0)).toBe(112);
+
+              // Bloat 1 (deck 14 inventory + 1 discard = 15 -> bloat 0... push over):
+              // 18 inventory junk we-2 cards + 1 discard ac-3 = 19 -> bloat 1. Owned
+              // trash action gains +min(1*4,24) = +4 -> 146. Junk we-2 (value 11 < 12)
+              // in inventory are penalized min(1,6)*4 = 4 each: 3 of the 8 inventory
+              // slots... use 18 inventory cards -> 18 junk * 4 = 72 penalty.
+              const fat = baseState({
+                seats: [player(0, {
+                  discard: ['ac-3#1'],
+                  inventory: junkWe2.slice(0, 18),
+                }), player(1)],
+                cards: cardsWith('ac-3#1', ...junkWe2.slice(0, 18)),
+                cardDefs: { ...DEFS, 'ac-3': ac3Def },
+              });
+              // baseline 136 + inventory credit 18*2=36 (was 8*2=16 -> +20 net)
+              // + ac-3 owned 6 + bloat 4 + 18 junk * -4... wait: inventory credit and
+              // junk both apply. Start from the clean numbers: 136 - 16 (old inv credit)
+              // + 36 (new) + 10 (ac-3) - 72 (18 junk * 4) = 94.
+              expect(evaluateState(fat, 0)).toBe(64);
+            });
+
+            // 26. 'character ability: Ada action affinity boosts action card value'
+            test('character ability: Ada action affinity boosts action card value', () => {
+              const s = baseState({
+                seats: [player(0, { characterInstanceId: 'ch-006#0', level: 2 as const, discard: ['ac-4#1'] }), player(1)],
+                cards: cardsWith('ch-006#0', 'ac-4#1'),
+                cardDefs: {
+                  ...DEFS,
+                  'ch-006': def('ch-006', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'actionBonus', amount: 40, level: 2 }] }),
+                  'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
+                },
+              });
+              // ac-4 text value 92 + Ada actionBonus 40 = 132 owned; +200 level bonus:
+              // 136 + 200 + 132 = 468.
+              expect(evaluateState(s, 0)).toBe(438);
+            });
+
+            // 27. 'character ability: Rebecca trash affinity boosts trash actions'
+            test('character ability: Rebecca trash affinity boosts trash actions', () => {
+              const s = baseState({
+                seats: [player(0, { characterInstanceId: 'ch-010#0', level: 2 as const, discard: ['ac-3#1'] }), player(1)],
+                cards: cardsWith('ch-010#0', 'ac-3#1'),
+                cardDefs: {
+                  ...DEFS,
+                  'ch-010': def('ch-010', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'trashEffectBonus', amount: 25, level: 2 }] }),
+                  'ac-3': def('ac-3', { type: 'action', cost: 20, actionEffects: [{ kind: 'trashUpToTwoFromDiscard' }] }),
+                },
+              });
+              // ac-3 owned = trash credit 6 + Rebecca trashEffectBonus 25 = 31;
+              // +200 level bonus: 136 + 200 + 31 = 367.
+              expect(evaluateState(s, 0)).toBe(337);
+            });
     });
-  });

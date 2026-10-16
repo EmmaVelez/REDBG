@@ -159,6 +159,8 @@ export type CharacterAbility =
   | { readonly kind: "weaponTagBonus"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // Leon L2 pistols (double use), Barry L2 magnums, Sheva L2 rifles, Krauser L2 knives
   | { readonly kind: "ammunitionBonus"; readonly ammoAmount: number; readonly goldAmount: number; readonly level: 1 | 2 } // Claire: +10 Ammo (L1) / +10 Gold (L2) per Ammo card
   | { readonly kind: "exploreGoldBonus"; readonly amount: number; readonly level: 1 | 2 }                 // Wesker L1: +Gold that turn whenever he Explores
+  | { readonly kind: "actionBonus"; readonly amount: number; readonly level: 1 | 2 }                       // Ada L2: buys -> actions, action cards worth more
+  | { readonly kind: "trashEffectBonus"; readonly amount: number; readonly level: 1 | 2 }                  // Rebecca L2: trash actions/effects worth more
   | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------

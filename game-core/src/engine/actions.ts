@@ -1,6 +1,6 @@
 import type { GameState, Action, PlayerState, CardDef } from '../types';
 import { validateAction } from './validate';
-import { draw, discardHand } from './deck';
+import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
 import { resolveExplore } from './explore';
 import { flipDown, levelForDecorations } from './characters';
@@ -15,7 +15,7 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
   return state.cardDefs[inst.cardId];
 }
 
-function withBonusesAndDraws(player: PlayerState, def: CardDef): PlayerState {
+function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number): { player: PlayerState; rngState: number } {
   const bonuses = sumBonuses([def]);
   const pools = applyBonusPools(
     {
@@ -31,26 +31,31 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef): PlayerState {
   let hand = player.hand;
   let inventory = player.inventory;
   let discard = player.discard;
+  let nextRng = rngState;
 
-  if (pools.draws > 0 && player.inventory.length > 0) {
-    const d = draw({ deck: player.inventory, discard: player.discard, reshuffledDiscard: [], count: pools.draws });
+  if (pools.draws > 0 && (player.inventory.length > 0 || player.discard.length > 0)) {
+    // "draw X from Inventory (reshuffle discard if needed)" — rulebook +X Cards
+    const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: pools.draws, rngState });
     hand = [...hand, ...d.hand];
     inventory = d.deck;
     discard = d.discard;
+    nextRng = d.rngState;
   }
 
-  return {
+  const nextPlayer: PlayerState = {
     ...player,
     hand,
     inventory,
     discard,
     turnAmmo: pools.pools.turnAmmo,
-    turnGold: pools.pools.turnGold,
-    actionsLeft: pools.pools.actionsLeft,
-    buysLeft: pools.pools.buysLeft,
-    exploresLeft: pools.pools.exploresLeft,
-  };
-}
+        turnGold: pools.pools.turnGold,
+        actionsLeft: pools.pools.actionsLeft,
+        buysLeft: pools.pools.buysLeft,
+        exploresLeft: pools.pools.exploresLeft,
+      };
+
+      return { player: nextPlayer, rngState: nextRng };
+    }
 
 export function applyAction(state: GameState, action: Action): GameState {
   if (action.type === 'startGame') {
@@ -74,22 +79,23 @@ export function applyAction(state: GameState, action: Action): GameState {
       const def = cardDef(state, instanceId) as CardDef;
 
       const played = withBonusesAndDraws(
-        {
-          ...player,
-          hand: player.hand.filter(id => id !== instanceId),
-          playArea: [...player.playArea, instanceId],
-          actionsLeft: player.actionsLeft - 1,
-        },
-        def,
-      );
+              {
+                ...player,
+                hand: player.hand.filter(id => id !== instanceId),
+                playArea: [...player.playArea, instanceId],
+                actionsLeft: player.actionsLeft - 1,
+              },
+              def,
+              state.rngState,
+            );
 
-      let weaponDamageBonusThisTurn = played.weaponDamageBonusThisTurn;
-      for (const e of def.actionEffects ?? []) {
-        if (e.kind === 'allWeaponsPlusDamageThisTurn') {
-          weaponDamageBonusThisTurn += e.amount;
-        }
-      }
-      const newPlayer: PlayerState = { ...played, weaponDamageBonusThisTurn };
+            let weaponDamageBonusThisTurn = played.player.weaponDamageBonusThisTurn;
+            for (const e of def.actionEffects ?? []) {
+              if (e.kind === 'allWeaponsPlusDamageThisTurn') {
+                weaponDamageBonusThisTurn += e.amount;
+              }
+            }
+            const newPlayer: PlayerState = { ...played.player, weaponDamageBonusThisTurn };
 
       let prompts = state.prompts;
       let promptKind: string | undefined;
@@ -104,19 +110,19 @@ export function applyAction(state: GameState, action: Action): GameState {
           break;
         }
         if (e.kind === 'moveHandCardToTopOfInventory') {
-          if (played.hand.length > 0) {
-            promptKind = 'moveHandCardToTopOfInventory';
-            promptOptions = played.hand;
-          }
-          break;
-        }
-        if (e.kind === 'trashHandCard') {
-          if (played.hand.length > 0) {
-            promptKind = 'trashHandCard';
-            promptOptions = played.hand;
-          }
-          break;
-        }
+                  if (played.player.hand.length > 0) {
+                    promptKind = 'moveHandCardToTopOfInventory';
+                    promptOptions = played.player.hand;
+                  }
+                  break;
+                }
+                if (e.kind === 'trashHandCard') {
+                  if (played.player.hand.length > 0) {
+                    promptKind = 'trashHandCard';
+                    promptOptions = played.player.hand;
+                  }
+                  break;
+                }
         if (e.kind === 'lookAtMansionTop') {
           promptKind = 'lookAtMansionTop';
           promptOptions = ['OK'];
@@ -138,37 +144,39 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       return {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-        prompts,
-      };
-    }
+              ...state,
+              ...nextBase,
+              seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+              prompts,
+              rngState: played.rngState,
+            };
+          }
 
-    case 'playItem': {
+          case 'playItem': {
       const { seat, instanceId } = action;
       const player = state.seats[seat] as PlayerState;
       const def = cardDef(state, instanceId) as CardDef;
 
       const played = withBonusesAndDraws(
-        { ...player, hand: player.hand.filter(id => id !== instanceId) },
-        def,
-      );
-      const newRemoved = [...state.removed, instanceId];
+              { ...player, hand: player.hand.filter(id => id !== instanceId) },
+              def,
+              state.rngState,
+            );
+            const newRemoved = [...state.removed, instanceId];
 
-      let prompts = state.prompts;
-      let hp = played.hp;
-      let maxHp = played.maxHp;
+            let prompts = state.prompts;
+            let hp = played.player.hp;
+            let maxHp = played.player.maxHp;
       let promptKind: string | undefined;
       for (const e of def.itemEffects ?? []) {
-        if (e.kind === 'healToFull') {
-          hp = played.maxHp;
-        } else if (e.kind === 'plusMaxHp20') {
-          maxHp = played.maxHp + 20;
-        } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
-          promptKind = 'healGreenHerb';
-        }
-      }
+              if (e.kind === 'healToFull') {
+                hp = played.player.maxHp;
+              } else if (e.kind === 'plusMaxHp20') {
+                maxHp = played.player.maxHp + 20;
+              } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
+                promptKind = 'healGreenHerb';
+              }
+            }
       if (promptKind !== undefined) {
         prompts = [
           ...prompts,
@@ -182,37 +190,40 @@ export function applyAction(state: GameState, action: Action): GameState {
         ];
       }
 
-      const newPlayer: PlayerState = { ...played, hp, maxHp };
+      const newPlayer: PlayerState = { ...played.player, hp, maxHp };
 
-      return {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-        removed: newRemoved,
-        prompts,
-      };
-    }
+            return {
+              ...state,
+              ...nextBase,
+              seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+              removed: newRemoved,
+              prompts,
+              rngState: played.rngState,
+            };
+          }
 
-    case 'playAmmo': {
-      const { seat, instanceId } = action;
-      const player = state.seats[seat] as PlayerState;
-      const def = cardDef(state, instanceId) as CardDef;
+          case 'playAmmo': {
+            const { seat, instanceId } = action;
+            const player = state.seats[seat] as PlayerState;
+            const def = cardDef(state, instanceId) as CardDef;
 
-      const newPlayer = withBonusesAndDraws(
-        {
-          ...player,
-          hand: player.hand.filter(id => id !== instanceId),
-          playArea: [...player.playArea, instanceId],
-        },
-        def,
-      );
+            const played = withBonusesAndDraws(
+              {
+                ...player,
+                hand: player.hand.filter(id => id !== instanceId),
+                playArea: [...player.playArea, instanceId],
+              },
+              def,
+              state.rngState,
+            );
 
-      return {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-      };
-    }
+            return {
+              ...state,
+              ...nextBase,
+              seats: state.seats.map(s => (s.seat === seat ? played.player : s)),
+              rngState: played.rngState,
+            };
+          }
 
     case 'explore': {
       const { seat, weapons, ammoCards, exploreCount } = action;
@@ -395,36 +406,39 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
 
     case 'endTurn': {
-      const { seat } = action;
-      const player = state.seats[seat] as PlayerState;
+          const { seat } = action;
+          const player = state.seats[seat] as PlayerState;
 
-      const dh = discardHand({ hand: player.hand, discard: player.discard });
-      const dh2 = discardHand({ hand: player.playArea, discard: dh.discard });
-      const d = draw({ deck: player.inventory, discard: dh2.discard, reshuffledDiscard: [], count: 5 });
+          const dh = discardHand({ hand: player.hand, discard: player.discard });
+          const dh2 = discardHand({ hand: player.playArea, discard: dh.discard });
+          // "End of turn: discard Play Area (non-attached) + hand, draw 5
+          // (reshuffle discard into inventory if needed)" — rulebook.
+          const d = drawWithReshuffle({ deck: player.inventory, discard: dh2.discard, count: 5, rngState: state.rngState });
 
-      const ctx = advanceTurn({
-        seatCount: state.seats.length,
-        activeSeat: seat,
-        turnNumber: state.turnNumber,
-        aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
-      });
+          const ctx = advanceTurn({
+            seatCount: state.seats.length,
+            activeSeat: seat,
+            turnNumber: state.turnNumber,
+            aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
+          });
 
-      const newPlayer: PlayerState = {
-        ...player,
-        hand: d.hand,
-        inventory: d.deck,
-        discard: d.discard,
-        playArea: [],
-      };
+          const newPlayer: PlayerState = {
+            ...player,
+            hand: d.hand,
+            inventory: d.deck,
+            discard: d.discard,
+            playArea: [],
+          };
 
-      return {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-        activeSeat: ctx.activeSeat,
-        turnNumber: ctx.turnNumber,
-      };
-    }
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+            activeSeat: ctx.activeSeat,
+            turnNumber: ctx.turnNumber,
+            rngState: d.rngState,
+          };
+        }
 
     case 'chooseOption': {
       const { seat, promptId, option } = action;

@@ -72,8 +72,13 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
       continue;
     }
 
-    // b. Score the resulting state — with honest end-turn carry-over
-    const score = evaluateState(action.type === 'endTurn' ? withSpentTurnPoolsZeroed(next, seat) : next, seat);
+    // b. Score the resulting state — with honest end-turn carry-over: endTurn
+        // keeps the seat's turn pools in the raw post-state, but the game loop's
+        // startTurn zeroes them; the dumped hand must also score at held value
+        // (no arbitrage). Non-endTurn actions score normally.
+        const score = action.type === 'endTurn'
+          ? evaluateState(withSpentTurnPoolsZeroed(next, seat), seat, { clampDiscardToHeld: true })
+          : evaluateState(next, seat);
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).

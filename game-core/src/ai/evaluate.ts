@@ -2,19 +2,54 @@ import type { GameState, PlayerState, CardDef, CharacterAbility } from '../types
 import { abilitiesForLevel } from '../engine/characters';
 
 /**
+ * Per-point value of the economy resources an action card grants, matching the
+ * state-side pool weights (turnAmmo *3, turnGold *1, buys/actions/explores *40)
+ * so that playing an action is scored exactly as the pools it creates.
+ */
+const GOLD_PER_POINT = 1;
+const AMMO_PER_POINT = 3;
+const POOL_PER_BONUS = 40; // buys / actions / explores each top out at 40/point
+/** Value of drawing one card (a fresh draw is worth about an average card). */
+const CARD_DRAW_VALUE = 12;
+/** Cards are held at half value: you can only play one Action a turn. */
+const HOLD_FACTOR = 0.5;
+/** Deck total (hand + inventory + discard + playArea) beyond which trash
+ * effects gain value and junk cards start to hurt (deck thinning pressure). */
+const BLOAT_THRESHOLD = 18;
+const TRASH_BLOAT_PER_CARD = 4;
+const TRASH_BLOAT_MAX = 24;
+/** A card whose owned value is below this floor is "junk" when the deck bloats. */
+const JUNK_FLOOR = 12;
+const JUNK_BLOAT_PENALTY = 4;
+
+/**
  * Evaluates the heuristic score of a specific seat in the current game state.
  * Higher score means a better position.
  *
- * The score is CHARACTER-AWARE: machine-readable abilities tilt the value of
- * cards toward what the character is good at (e.g. Leon values pistols more,
- * Barry values magnums, Claire values ammo cards, Wesker values explores).
- * Abilities apply only at levels the player has reached (abilitiesForLevel).
- * Generic/text-only abilities add nothing.
+ * The score is CHARACTER-AND-ACTION-AWARE:
+ * - machine-readable abilities tilt card value toward the character's kit
+ *   (Leon pistols, Barry magnums, Ada action cards, Rebecca trash effects);
+ * - action cards are worth their text (draw/gold/ammo/buy/action/explore
+ *   bonuses + trash effects), held at half value (one action per turn);
+ * - ammo cards are worth their yield, so ammo/gold-ammer are real buys;
+ * - past a deck-size threshold, trash effects gain value and low-value
+ *   ("junk") cards start to cost points — the bot thins instead of bloating.
  * @param state The current game state.
  * @param seat The index of the seat to evaluate.
  * @returns The heuristic score (number).
  */
-export function evaluateState(state: GameState, seat: number): number {
+export interface EvaluateOptions {
+  /**
+   * Score cards in the discard zone at HELD value instead of owned value.
+   * Used by the policy's endTurn simulation: the hand it dumps was already
+   * yours, so shipping it to discard must not create new points (that would
+   * make endTurn an arbitrage vs. playing/buying). A buy, in contrast, still
+   * scores its new discard at full owned value — that is the buy incentive.
+   */
+  readonly clampDiscardToHeld?: boolean;
+}
+
+export function evaluateState(state: GameState, seat: number, options?: EvaluateOptions): number {
   // 0. Guard: Check if the seat exists
   const player = state.seats[seat];
   if (player === undefined) {
@@ -28,6 +63,12 @@ export function evaluateState(state: GameState, seat: number): number {
 
   // 0b. Character abilities at the player's current level (empty for generic)
   const abilities = activeAbilities(state, player);
+
+  // 0c. Deck bloat: hand + inventory + discard + playArea. Above the threshold
+  // trash effects get better and junk cards get worse.
+  const deckSize =
+    player.hand.length + player.inventory.length + player.discard.length + player.playArea.length;
+  const bloat = Math.max(0, deckSize - BLOAT_THRESHOLD);
 
   let total = 0;
 
@@ -50,83 +91,71 @@ export function evaluateState(state: GameState, seat: number): number {
   }
 
   // 2.5. Turn Ammo
-  total += player.turnAmmo * 3;
+  total += player.turnAmmo * AMMO_PER_POINT;
 
   // 2.6. Turn Gold — transient: resets at turn end, only matters for buying now.
-  // Weighted at 1/point so spending it on an owned card can actually win.
-  total += player.turnGold;
+  total += player.turnGold * GOLD_PER_POINT;
 
   // 2.7. Actions Left
-  total += player.actionsLeft * 40;
+  total += player.actionsLeft * POOL_PER_BONUS;
 
   // 2.8. Buys Left
-  total += player.buysLeft * 40;
+  total += player.buysLeft * POOL_PER_BONUS;
 
-  // 2.9. Explores Left — plus Wesker-style exploreGoldBonus (gold per explore
-  // at the 5-points-per-gold weight).
-  total += player.exploresLeft * (40 + exploreGoldValue(abilities));
+  // 2.9. Explores Left — transient: resets to 1 every turn, so an unused explore
+  // is not a hoardable asset (same logic as gold). Weighted low; the BOT must
+  // actually spend explores to win. Plus Wesker-style exploreGoldBonus.
+  total += player.exploresLeft * (10 + exploreGoldValue(abilities));
 
-  // 2.10. Hand cards, split by def type; weapon/ammo cards get ability affinity
-  let weaponCount = 0;
-  let weaponValue = 0;
-  let weaponAffinity = 0;
-  let ammoCount = 0;
-  let actionCount = 0;
-  let itemCount = 0;
-  let infectedTokenCount = 0;
-  for (const instanceId of player.hand) {
-    const cardInstance = state.cards[instanceId];
-    if (!cardInstance) continue;
-    const cardDef = state.cardDefs[cardInstance.cardId];
-    if (!cardDef) continue;
-    if (cardDef.type === 'weapon') {
-      weaponCount += 1;
-      weaponAffinity += weaponAffinityBonus(abilities, cardDef);
-      // Weapons are worth more the harder they hit — a buy/keep decision should
-      // prefer real damage dealers, not just "a gun". Base 10 + damage/5:
-      // Rusty Knife 5 → 11, Handgun 10 → 12, Six Shooter 50 → 20, Rocket 100 → 30.
-      weaponValue += cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage);
-    } else if (cardDef.type === 'ammunition') {
-      ammoCount += 1;
-    } else if (cardDef.type === 'action') {
-      actionCount += 1;
-    } else if (cardDef.type === 'item') {
-      itemCount += 1;
-    } else if (cardDef.type === 'infected' || cardDef.type === 'token') {
-      infectedTokenCount += 1;
+  // 2.10. Hand cards, scored by their real held value (type-featured).
+  // Hand AND playArea cards are scored the same way: playArea cards were just
+  // spent this turn, so they are worth their held value, not zero.
+  const zones = [player.hand, player.playArea] as const;
+  for (const zone of zones) {
+    for (const instanceId of zone) {
+      const cardInstance = state.cards[instanceId];
+      if (!cardInstance) continue;
+      const cardDef = state.cardDefs[cardInstance.cardId];
+      if (!cardDef) continue;
+      total += cardHeldValue(cardDef, abilities, state, bloat);
     }
   }
-  total += weaponValue + weaponAffinity;
-  // 2.11. Hand ammo — Claire-style ammunitionBonus adds extra value per card
-  total += ammoCount * (8 + ammunitionValue(abilities));
-  // 2.12. Hand action
-  total += actionCount * 5;
-  // 2.13. Hand item
-  total += itemCount * 5;
-  // 2.14. Hand infected/token
-  total += infectedTokenCount * 5;
 
-  // 2.14b. Discard mirrors hand value (bought cards land here; they reshuffle
-  // back into the inventory at turn end, so they are real assets). Same type
-  // values + affinity so buying a favored weapon is not scored as a total loss.
+  // 2.11. Discard mirrors the OWNED value of cards (bought cards land here;
+  // they reshuffle back into the inventory at turn end — real assets). Owned
+  // value for actions/ammo is their full text value (no hold discount: they
+  // will be drawn and played), for weapons the full damage value.
+  // With clampDiscardToHeld (policy endTurn sim) the dump is scored at held
+  // value so ending the turn does not manufacture points.
   for (const instanceId of player.discard) {
     const cardInstance = state.cards[instanceId];
     if (!cardInstance) continue;
     const cardDef = state.cardDefs[cardInstance.cardId];
     if (!cardDef) continue;
-    if (cardDef.type === 'weapon') {
-      total += (cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage)) + weaponAffinityBonus(abilities, cardDef);
-    } else if (cardDef.type === 'ammunition') {
-      total += 8 + ammunitionValue(abilities);
-    } else if (cardDef.type === 'action' || cardDef.type === 'item' || cardDef.type === 'infected' || cardDef.type === 'token') {
-      total += 5;
+    total += options?.clampDiscardToHeld === true
+      ? cardHeldValue(cardDef, abilities, state, bloat)
+      : cardOwnedValue(cardDef, abilities, state, bloat);
+  }
+
+  // 2.12. Inventory size is mild structure credit; junk in inventory (cards
+  // below the value floor) gets penalized when the deck is bloated, so the bot
+  // wants to thin those out of its deck.
+  total += player.inventory.length * 2;
+  if (bloat > 0) {
+    for (const instanceId of player.inventory) {
+      const cardInstance = state.cards[instanceId];
+      if (!cardInstance) continue;
+      const cardDef = state.cardDefs[cardInstance.cardId];
+      if (!cardDef) continue;
+      if (cardHeldValue(cardDef, abilities, state, 0) < JUNK_FLOOR) {
+        total -= Math.min(bloat, 6) * JUNK_BLOAT_PENALTY;
+      }
     }
   }
 
-  // 2.15. Inventory size
-  total += player.inventory.length * 2;
-
-  // 2.16. Affordable piles — favored weapon types are worth more to buy
+  // 2.13. Affordable piles — market potential is worth LESS than owned cards
+  // (affordable = possibility, not possession): base 10, plus the card's
+  // affinity/pull so characters steer toward their favored piles.
   let affordablePiles = 0;
   for (const pile of Object.values(state.marketPiles)) {
     const topCardInstanceId = pile.cards[0];
@@ -135,16 +164,14 @@ export function evaluateState(state: GameState, seat: number): number {
     if (topCardInstance === undefined) continue;
     const topCardDef = state.cardDefs[topCardInstance.cardId];
     if (topCardDef === undefined || topCardDef.cost === undefined || topCardDef.cost > player.turnGold) continue;
-    // Market potential is worth LESS than owned cards (affordable = possibility,
-    // not possession) — a fractional 10 (plus affinity) vs owned 15 (+ affinity).
-    affordablePiles += 10 + (topCardDef.type === 'weapon' ? weaponAffinityBonus(abilities, topCardDef) : 0);
+    affordablePiles += 10 + marketPull(topCardDef, abilities, bloat);
   }
   total += affordablePiles;
 
-  // 2.17. Attached trophies
+  // 2.14. Attached trophies
   total += player.attached.length * 25;
 
-  // 2.18. Opponents
+  // 2.15. Opponents
   for (let i = 0; i < state.seats.length; i++) {
     if (i === seat) continue;
 
@@ -176,9 +203,150 @@ function activeAbilities(state: GameState, player: PlayerState): readonly Charac
   return abilitiesForLevel(charDef.abilities, player.level);
 }
 
+/**
+ * Value of a card while in hand or playArea. Weapons and ammo are "ready"
+ * — full value. Actions are held at half their text value: you can only play
+ * one Action a turn, so the option is worth less than the effect. Junk cards
+ * cost a little when the deck is bloated (you want them gone).
+ */
+function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number): number {
+  if (cardDef.type === 'weapon') {
+    const base = (cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage));
+    return base + weaponAffinityBonus(abilities, cardDef);
+  }
+  if (cardDef.type === 'ammunition') {
+    return Math.floor(ammoYieldValue(cardDef) * HOLD_FACTOR) + ammunitionValue(abilities);
+  }
+  if (cardDef.type === 'action') {
+    let v = Math.floor(actionTextValue(cardDef, abilities) * HOLD_FACTOR);
+    if (bloat > 0 && hasTrashEffect(cardDef)) {
+      v += trashBloatValue(bloat);
+    }
+    return v;
+  }
+  // actioN/items/tokens: flat small value
+  return 5;
+}
+
+/**
+ * Value of a card sitting owned in discard (or offered on the market):
+ * the full value it will deliver when drawn and used (no hold discount).
+ */
+function cardOwnedValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number): number {
+  if (cardDef.type === 'weapon') {
+    const base = (cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage));
+    return base + weaponAffinityBonus(abilities, cardDef);
+  }
+  if (cardDef.type === 'ammunition') {
+    return ammoYieldValue(cardDef) + ammunitionValue(abilities);
+  }
+  if (cardDef.type === 'action') {
+    let v = actionTextValue(cardDef, abilities);
+    if (bloat > 0 && hasTrashEffect(cardDef)) {
+      v += trashBloatValue(bloat);
+    }
+    return v;
+  }
+  return 5;
+}
+
+/** The "pull" of a market pile top card: how much the bot wants to own it. */
+function marketPull(cardDef: CardDef, abilities: readonly CharacterAbility[], bloat: number): number {
+  if (cardDef.type === 'weapon') {
+    return weaponAffinityBonus(abilities, cardDef);
+  }
+  if (cardDef.type === 'action') {
+    const pull = actionBonusValue(abilities);
+    return pull + (bloat > 0 && hasTrashEffect(cardDef) ? trashBloatValue(bloat) : 0);
+  }
+  return 0;
+}
+
 /** Base value of a weapon from its damage stat: 10 + damage/5 (floored). */
 function weaponBaseValue(damage: number): number {
   return 10 + Math.floor(damage / 5);
+}
+
+/**
+ * Value of an ammunition card's yield when played: what its bonuses grant in
+ * pools, scored at the pool weights (ammo 3/point, gold 1/point).
+ */
+function ammoYieldValue(cardDef: CardDef): number {
+  const b = cardDef.bonuses;
+  if (b === undefined) return 8;
+  return 8 + (b.ammo ?? 0) * AMMO_PER_POINT + (b.gold ?? 0) * GOLD_PER_POINT;
+}
+
+/** True when the action card trashes cards (deck thinning). */
+function hasTrashEffect(cardDef: CardDef): boolean {
+  return (
+    cardDef.actionEffects?.some(
+      e => e.kind === 'trashUpToTwoFromDiscard' || e.kind === 'trashHandCard' || e.kind === 'upgradeAmmoBy30Gold',
+    ) ?? false
+  );
+}
+
+/** Extra value a trash effect delivers per point of deck bloat (capped). */
+function trashBloatValue(bloat: number): number {
+  return Math.min(bloat * TRASH_BLOAT_PER_CARD, TRASH_BLOAT_MAX);
+}
+
+/**
+ * Value of an action card's text: its bonus icons scored at pool weights
+ * (cards drawn 12 each, gold 1, ammo 3, buys/actions/explores 40) plus
+ * trash-effect credit and per-action affinity (Ada).
+ */
+function actionTextValue(cardDef: CardDef, abilities: readonly CharacterAbility[]): number {
+  const b = cardDef.bonuses;
+  let v = 0;
+  if (b !== undefined) {
+    v += (b.cards ?? 0) * CARD_DRAW_VALUE;
+    v += (b.gold ?? 0) * GOLD_PER_POINT;
+    v += (b.ammo ?? 0) * AMMO_PER_POINT;
+    v += (b.buys ?? 0) * POOL_PER_BONUS;
+    v += (b.actions ?? 0) * POOL_PER_BONUS;
+    v += (b.explores ?? 0) * POOL_PER_BONUS;
+  }
+  v += truncActionCredit(cardDef);
+  v += actionBonusValue(abilities);
+  if (hasTrashEffect(cardDef)) {
+    v += trashAffinityValue(abilities);
+  }
+  return v;
+}
+
+/** Per-trash-action affinity from trashEffectBonus characters (Rebecca L2). */
+function trashAffinityValue(abilities: readonly CharacterAbility[]): number {
+  let v = 0;
+  for (const ability of abilities) {
+    if (ability.kind === 'trashEffectBonus') v += ability.amount;
+  }
+  return v;
+}
+
+/** Base credit for the non-icon text of action cards (healing/recovery/etc.). */
+function truncActionCredit(cardDef: CardDef): number {
+  if (cardDef.actionEffects === undefined || cardDef.actionEffects.length === 0) return 0;
+  let v = 0;
+  for (const e of cardDef.actionEffects) {
+    if (e.kind === 'allWeaponsPlusDamageThisTurn') v += e.amount * 2;
+    else if (e.kind === 'recoverWeaponFromDiscardToHand') v += 12;
+    else if (e.kind === 'moveHandCardToTopOfInventory') v += 6;
+    else if (e.kind === 'negateWeaponCost40OrLessFromHand') v += 8;
+    else if (e.kind === 'stealRevealedWeaponsFromOpponentsTopCards') v += 18;
+    else if (e.kind === 'upgradeAmmoBy30Gold') v += 12;
+    else if (e.kind === 'trashUpToTwoFromDiscard' || e.kind === 'trashHandCard') v += 6;
+  }
+  return v;
+}
+
+/** Per-action-card affinity from actionBonus characters (Ada L2). */
+function actionBonusValue(abilities: readonly CharacterAbility[]): number {
+  let v = 0;
+  for (const ability of abilities) {
+    if (ability.kind === 'actionBonus') v += ability.amount;
+  }
+  return v;
 }
 
 /**
@@ -204,7 +372,7 @@ function ammunitionValue(abilities: readonly CharacterAbility[]): number {
   let value = 0;
   for (const ability of abilities) {
     if (ability.kind === 'ammunitionBonus') {
-      value += ability.ammoAmount * 3 + ability.goldAmount * 5;
+      value += ability.ammoAmount * AMMO_PER_POINT + ability.goldAmount * GOLD_PER_POINT;
     }
   }
   return value;
@@ -215,7 +383,7 @@ function exploreGoldValue(abilities: readonly CharacterAbility[]): number {
   let value = 0;
   for (const ability of abilities) {
     if (ability.kind === 'exploreGoldBonus') {
-      value += ability.amount * 5;
+      value += ability.amount * GOLD_PER_POINT;
     }
   }
   return value;
