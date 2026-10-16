@@ -99,11 +99,10 @@ export const FIRST_TIMER_PILES: ReadonlyArray<{ pileId: string; cardIds: readonl
 ];
 
 /**
- * Classic Horror (rulebook "Additional Story Mode Options"): the base-game
- * scenarios feature — Basic Resources plus Umbrella Corp, Mansion Foyer,
- * Deadly Aim, Shattered Memories, Reload, Item Management, First Aid Spray,
- * Longbow, Grenade, and the combined shotgun/rifle/MG piles. Escape from the
- * Dead City, The Merchant and Six Shooter are First-Timer-only.
+ * Classic Horror (rulebook p.8 "Additional Story Mode Options"): the base-game
+ * scenario — Basic Resources plus Umbrella Corp, Mansion Foyer, Deadly Aim,
+ * Shattered Memories, Reload, Item Management, First Aid Spray, Longbow,
+ * Grenade, Submission, and the combined shotgun/MG piles.
  */
 export const CLASSIC_HORROR_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
   { pileId: 'am10', cardIds: ['am-001'] },
@@ -121,12 +120,38 @@ export const CLASSIC_HORROR_PILES: ReadonlyArray<{ pileId: string; cardIds: read
   { pileId: 'spray', cardIds: ['it-003'] },
   { pileId: 'longbow', cardIds: ['we-002'] },
   { pileId: 'grn', cardIds: ['we-001'] },
+  { pileId: 'sub', cardIds: ['we-003'] },
   { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
-  { pileId: 'rf', cardIds: ['we-015', 'we-016'] },
   { pileId: 'mg', cardIds: ['we-011', 'we-012'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror';
+/**
+ * Spy Games (rulebook p.8): 18 piles featuring Master of Unlocking (steal
+ * revealed weapons) and Ominous Battle alongside the classic arsenal, with
+ * Escape from the Dead City back in and the rifles out.
+ */
+export const SPY_GAMES_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'umb', cardIds: ['ac-007'] },
+  { pileId: 'omin', cardIds: ['ac-010'] },
+  { pileId: 'escape', cardIds: ['ac-004'] },
+  { pileId: 'mou', cardIds: ['ac-011'] },
+  { pileId: 'itemmgmt', cardIds: ['ac-009'] },
+  { pileId: 'aim', cardIds: ['ac-002'] },
+  { pileId: 'spray', cardIds: ['it-003'] },
+  { pileId: 'longbow', cardIds: ['we-002'] },
+  { pileId: 'grn', cardIds: ['we-001'] },
+  { pileId: 'six', cardIds: ['we-006'] },
+  { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
+  { pileId: 'mg', cardIds: ['we-011', 'we-012'] }
+];
+
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames';
 
 export interface ScenarioDef {
   readonly id: ScenarioId;
@@ -145,8 +170,14 @@ export const SCENARIOS: ReadonlyArray<ScenarioDef> = [
   {
     id: 'classicHorror',
     name: 'Classic Horror',
-    description: 'The base-game scenario — Item Management, First Aid Spray and Longbow for the classic RE arsenal.',
+    description: 'The base-game scenario — Item Management, First Aid Spray, Longbow and Submission for the classic RE arsenal.',
     piles: CLASSIC_HORROR_PILES,
+  },
+  {
+    id: 'spyGames',
+    name: 'Spy Games',
+    description: 'Master of Unlocking lets you steal weapons from other survivors — plus Ominous Battle and Six Shooter.',
+    piles: SPY_GAMES_PILES,
   },
 ];
 

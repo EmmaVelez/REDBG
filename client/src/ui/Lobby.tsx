@@ -9,8 +9,8 @@ import { SCENARIOS } from '@re/game-core';
  * and start. Bare-bones forms driven by the store's dispatch.
  * M4-T10: a Pass & Play section starts an in-browser hot-seat game with
  * 2-4 named players on this device (no server).
- * Scenario support: the host picks First Timer or Classic Horror when
- * creating the room (or in the lobby before start); Pass & Play picks too.
+ * Scenarios: a <select> dropdown picks First Timer, Classic Horror or Spy
+ * Games for Pass & Play, create-room, and host pre-start.
  */
 
 export interface LobbyProps {
@@ -29,26 +29,33 @@ export interface LobbyProps {
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
 
-function ScenarioPicker(props: {
+function ScenarioDropdown(props: {
   readonly value: ScenarioId;
   readonly disabled?: boolean;
   readonly onChange: (scenario: ScenarioId) => void;
 }): JSX.Element {
   return (
-    <div className="scenario-picker" data-scenario={props.value}>
-      {SCENARIOS.map(s => (
-        <button
-          key={s.id}
-          type="button"
-          className={`scenario-option ${props.value === s.id ? 'scenario-option-on' : ''}`}
-          disabled={props.disabled === true}
-          onClick={() => props.onChange(s.id)}
-          data-scenario-id={s.id}
-        >
-          <span className="scenario-name">{s.name}</span>
-          <span className="scenario-desc">{s.description}</span>
-        </button>
-      ))}
+    <div className="scenario-picker">
+      <label className="lobby-hint" htmlFor={`scenario-${props.value}`}>
+        Scenario
+      </label>
+      <select
+        id={`scenario-${props.value}`}
+        className="scenario-select"
+        value={props.value}
+        disabled={props.disabled === true}
+        onChange={e => props.onChange(e.target.value as ScenarioId)}
+        data-testid="scenario-select"
+      >
+        {SCENARIOS.map(s => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <p className="scenario-desc">
+        {SCENARIOS.find(s => s.id === props.value)?.description ?? ''}
+      </p>
     </div>
   );
 }
@@ -69,7 +76,7 @@ function PassAndPlay(props: {
     <div className="passandplay" data-testid="pass-and-play">
       <h2 className="lobby-section">Pass &amp; Play (this device)</h2>
       <p className="lobby-hint">No room or server needed — everyone shares this screen.</p>
-      <ScenarioPicker value={scenario} onChange={setScenario} />
+      <ScenarioDropdown value={scenario} onChange={setScenario} />
       <div className="passandplay-count">
         {[2, 3, 4].map(n => (
           <button
@@ -130,9 +137,9 @@ export function Lobby({
 
       {room === null ? (
         <div className="lobby-modes">
-          <PassAndPlay onStart={onStartHotseat} />
-          <div className="lobby-divider">— or play online —</div>
           <RoomEntry onCreateRoom={onCreateRoom} onJoinRoom={onJoinRoom} />
+          <div className="lobby-divider">— or pass &amp; play —</div>
+          <PassAndPlay onStart={onStartHotseat} />
         </div>
       ) : (
         <div className="lobby-room">
@@ -145,8 +152,7 @@ export function Lobby({
 
           {isHost && room.phase === 'lobby' && (
             <div className="lobby-scenario-edit">
-              <span className="lobby-hint">Scenario (host, before start):</span>
-              <ScenarioPicker value={room.scenario} onChange={onSetScenario} />
+              <ScenarioDropdown value={room.scenario} onChange={onSetScenario} />
             </div>
           )}
 
@@ -225,8 +231,7 @@ function RoomEntry(props: {
         <button type="submit">Create room</button>
       </form>
       <div className="lobby-entry-scenario">
-        <span className="lobby-hint">Scenario</span>
-        <ScenarioPicker value={scenario} onChange={setScenario} />
+        <ScenarioDropdown value={scenario} onChange={setScenario} />
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

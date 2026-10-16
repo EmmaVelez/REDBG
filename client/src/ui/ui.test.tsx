@@ -351,7 +351,13 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Create room');
     expect(html).toContain('Join room');
     expect(html).toContain('Pass &amp; Play');
+    expect(html).toContain('First Timer');
     expect(html).toContain('Classic Horror');
+    expect(html).toContain('Spy Games');
+    expect(html).toContain('scenario-select');
+    // online play is listed first, pass & play second
+    expect(html.indexOf('Create room')).toBeLessThan(html.indexOf('Pass &amp; Play'));
+    expect(html.indexOf('Create room')).toBeLessThan(html.indexOf('or pass'));
   });
 
   it('renders seats, room code and host controls in a room', () => {
@@ -359,7 +365,7 @@ describe('Lobby (T08)', () => {
       roomCode: 'ABCDEF',
       phase: 'lobby' as const,
       maxSeats: 2,
-      scenario: 'classicHorror' as const,
+      scenario: 'spyGames' as const,
       players: [
         { clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true },
         { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
@@ -370,7 +376,7 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Seat 0');
     expect(html).toContain('Bot');
     expect(html).toContain('Start game');
-    expect(html).toContain('Classic Horror');
+    expect(html).toContain('Spy Games');
   });
 });
 

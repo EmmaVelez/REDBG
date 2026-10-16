@@ -27,6 +27,7 @@ const DEFS: Record<string, CardDef> = {
   'ac-4': { id: 'ac-4', name: 'Umbrella', type: 'action', set: 'premier', text: 'Umbrella', copies: 5, cost: 50, actionEffects: [{ kind: 'moveHandCardToTopOfInventory' }] },
   'ac-5': { id: 'ac-5', name: 'Ominous Battle', type: 'action', set: 'premier', text: 'Ominous Battle', copies: 5, cost: 60, actionEffects: [{ kind: 'trashHandCard' }] },
   'ac-6': { id: 'ac-6', name: 'Shattered Memories', type: 'action', set: 'premier', text: 'Shattered Memories', copies: 5, cost: 20, actionEffects: [{ kind: 'trashUpToTwoFromDiscard' }] },
+  'ac-7': { id: 'ac-7', name: 'Master of Unlocking', type: 'action', set: 'premier', text: 'Master of Unlocking', copies: 3, cost: 30, bonuses: { actions: 1 }, actionEffects: [{ kind: 'stealRevealedWeaponsFromOpponentsTopCards' }] },
   'it-1': { id: 'it-1', name: 'Green Herb', type: 'item', set: 'premier', text: 'Green Herb', copies: 6, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
   'it-2': { id: 'it-2', name: 'First Aid Spray', type: 'item', set: 'premier', text: 'First Aid Spray', copies: 5, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
   'am-1': { id: 'am-1', name: 'Ammo x10', type: 'ammunition', set: 'premier', text: 'Ammo x10', copies: 28, bonuses: { ammo: 10, gold: 10 } },
@@ -38,15 +39,15 @@ const DEFS: Record<string, CardDef> = {
   'ch-1': { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: 'Chris', copies: 1, maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] },
 };
 
-function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState> } = {}): GameState {
+function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; seat1?: Partial<PlayerState> } = {}): GameState {
   return {
     version: 1, seed: 1, rngState: over.rngState ?? 1, phase: 'main',
     activeSeat: 0, turnNumber: 1,
-    seats: [seat(0, over.seat0), seat(1)],
+    seats: [seat(0, over.seat0), seat(1, over.seat1)],
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: ['mkr1'] } },
     mansionDeck: over.mansionDeck ?? ['inf1'], mansionBottom: over.mansionBottom ?? [], removed: over.removed ?? [],
     cards: {
-      'a1': inst('a1', 'ac-1'), 'a2': inst('a2', 'ac-2'), 'a3': inst('a3', 'ac-3'), 'a4': inst('a4', 'ac-4'), 'a5': inst('a5', 'ac-5'), 'a6': inst('a6', 'ac-6'),
+      'a1': inst('a1', 'ac-1'), 'a2': inst('a2', 'ac-2'), 'a3': inst('a3', 'ac-3'), 'a4': inst('a4', 'ac-4'), 'a5': inst('a5', 'ac-5'), 'a6': inst('a6', 'ac-6'), 'a7': inst('a7', 'ac-7'),
       'i1': inst('i1', 'it-1'), 'i2': inst('i2', 'it-1'), 'i3': inst('i3', 'it-2'),
       'am1': inst('am1', 'am-1'), 'am2': inst('am2', 'am-1'),
       'w1': inst('w1', 'we-1'), 'w2': inst('w2', 'we-1'),
@@ -315,6 +316,49 @@ test('Shattered Memories: DONE immediately keeps the discard intact', () => {
   expect(s1.removed).toEqual([]);
   expect(p0(s1).discard).toEqual(['am2', 'w5']);
   expect(s1.prompts.length).toBe(0);
+});
+
+test('Master of Unlocking offers the opponents revealed top weapons', () => {
+  // seat 0 plays ac-7; seat 1 has a weapon (w2) and an ammo (am1) on top.
+  const s0 = applyAction(
+    baseState({ seat0: { hand: ['a7'] }, seat1: { inventory: ['w2', 'am1'] } }),
+    { type: 'playActionCard', seat: 0, instanceId: 'a7' }
+  );
+  expect(s0.prompts.length).toBe(1);
+  expect(pr(s0).payload?.kind).toBe('stealRevealedWeaponsFromOpponentsTopCards');
+  // only the top card (w2) is revealed; it is a weapon so it is offerable
+  expect(pr(s0).options).toEqual(['w2', 'DONE']);
+});
+
+test('Master of Unlocking: taking a weapon moves it to your discard and ends (only one revealed)', () => {
+  const s0 = applyAction(
+    baseState({ seat0: { hand: ['a7'] }, seat1: { inventory: ['w2', 'am1'] } }),
+    { type: 'playActionCard', seat: 0, instanceId: 'a7' }
+  );
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 0 }); // take w2
+    expect(p0(s1).discard).toContain('w2');
+    // seat 1 lost its top card; the revealed non-weapon (am1) stays on top
+    expect(s1.seats[1]?.inventory).toEqual(['am1']);
+    expect(s1.prompts.length).toBe(0);
+  });
+
+test('Master of Unlocking: DONE leaves the opponents inventory untouched', () => {
+  const s0 = applyAction(
+    baseState({ seat0: { hand: ['a7'] }, seat1: { inventory: ['w2', 'am1'] } }),
+    { type: 'playActionCard', seat: 0, instanceId: 'a7' }
+  );
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 1 }); // DONE
+    expect(s1.seats[1]?.inventory).toEqual(['w2', 'am1']);
+    expect(p0(s1).discard).toEqual([]);
+    expect(s1.prompts.length).toBe(0);
+  });
+
+test('Master of Unlocking: non-weapon top cards reveal nothing offerable (no prompt)', () => {
+  const s0 = applyAction(
+    baseState({ seat0: { hand: ['a7'] }, seat1: { inventory: ['am1'] } }),
+    { type: 'playActionCard', seat: 0, instanceId: 'a7' }
+  );
+  expect(s0.prompts.length).toBe(0);
 });
 
 test('invalid action throws', () => {

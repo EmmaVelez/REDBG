@@ -3,7 +3,7 @@ export { setup, startTurn, checkWin } from "./engine/game";
 export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { sanitize, viewForSeat } from "./engine/view";
-export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SCENARIOS, pilesForScenario } from "./data/cards";
+export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SPY_GAMES_PILES, SCENARIOS, pilesForScenario } from "./data/cards";
 export type { ScenarioId, ScenarioDef } from "./data/cards";
 export { chooseBotAction } from "./ai/bot";
 export { enumerateLegalActions } from "./ai/enumerate";

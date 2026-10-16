@@ -59,7 +59,8 @@ export type PromptKind =
   | 'trashHandCard'
   | 'lookAtMansionTop'
   | 'negateWeaponCost40OrLessFromHand'
-  | 'healGreenHerb';
+  | 'healGreenHerb'
+  | 'stealRevealedWeaponsFromOpponentsTopCards';
 
 export function promptsFor(card: CardDef): readonly PromptKind[] {
   const prompts: PromptKind[] = [];
@@ -95,13 +96,16 @@ export function promptsFor(card: CardDef): readonly PromptKind[] {
         addPrompt('lookAtMansionTop');
         break;
       case 'healFixed20OrTrashWithSecondFor60':
-        addPrompt('healGreenHerb');
-        break;
-    }
-  }
+              addPrompt('healGreenHerb');
+              break;
+            case 'stealRevealedWeaponsFromOpponentsTopCards':
+              addPrompt('stealRevealedWeaponsFromOpponentsTopCards');
+              break;
+          }
+        }
 
-  return prompts;
-}
+        return prompts;
+      }
 
 export function trashDestination(card: CardDef, opts?: { readonly explosivesToDiscard?: boolean }): 'removed' | 'discard' | 'keep' {
   if (card.type === 'item') {

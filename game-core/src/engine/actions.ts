@@ -137,16 +137,33 @@ export function applyAction(state: GameState, action: Action): GameState {
                   break;
                 }
                 if (e.kind === 'trashUpToTwoFromDiscard') {
-                  // Up to 2 choices: offer the whole discard, DONE ends the chain.
-                  if (player.discard.length > 0) {
-                    promptKind = 'trashUpToTwoFromDiscard';
-                    promptOptions = [...player.discard, 'DONE'];
-                  }
-                  break;
-                }
-                // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
-              }
-      if (promptKind !== undefined && promptOptions !== undefined) {
+                                  // Up to 2 choices: offer the whole discard, DONE ends the chain.
+                                  if (player.discard.length > 0) {
+                                    promptKind = 'trashUpToTwoFromDiscard';
+                                    promptOptions = [...player.discard, 'DONE'];
+                                  }
+                                  break;
+                                }
+                                if (e.kind === 'stealRevealedWeaponsFromOpponentsTopCards') {
+                                  // Master of Unlocking: everyone else's top inventory card is
+                                  // revealed; each revealed Weapon may be taken (chain, DONE ends).
+                                  const revealed: string[] = [];
+                                  for (const other of state.seats) {
+                                    if (other.seat === seat || other.dead) continue;
+                                    const top = other.inventory[0];
+                                    if (top !== undefined && cardDef(state, top)?.type === 'weapon') {
+                                      revealed.push(top);
+                                    }
+                                  }
+                                  if (revealed.length > 0) {
+                                    promptKind = 'stealRevealedWeaponsFromOpponentsTopCards';
+                                    promptOptions = [...revealed, 'DONE'];
+                                  }
+                                  break;
+                                }
+                                // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
+                              }
+                      if (promptKind !== undefined && promptOptions !== undefined) {
         prompts = [
           ...prompts,
           {
@@ -553,6 +570,58 @@ export function applyAction(state: GameState, action: Action): GameState {
                   s.seat === seat ? { ...player, discard: player.discard.filter(id => id !== chosenId) } : s,
                 ),
                 removed: [...state.removed, chosenId],
+                prompts,
+              };
+            }
+
+      if (kind === 'stealRevealedWeaponsFromOpponentsTopCards') {
+              // Master of Unlocking chain: options are revealed weapon instance
+              // ids + 'DONE'. Taking one moves it from the owner's inventory to
+              // this player's discard; the chain re-prompts with the rest.
+              if (chosenId === 'DONE' || chosenId === undefined) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  prompts: newPrompts,
+                };
+              }
+              // Find the opponent whose inventory top is the chosen weapon.
+              const owner = state.seats.find(s => s.seat !== seat && !s.dead && s.inventory[0] === chosenId);
+              if (owner === undefined) {
+                // Weapon vanished (defensive) — drop the chain.
+                return {
+                  ...state,
+                  ...nextBase,
+                  prompts: newPrompts,
+                };
+              }
+              const remaining = prompt.options.filter(id => id !== chosenId && id !== 'DONE');
+              let prompts = newPrompts;
+              if (remaining.length > 0) {
+                prompts = [
+                  ...prompts,
+                  {
+                    id: `${prompt.id}:t${state.prompts.length}`,
+                    seat,
+                    text: prompt.text,
+                    options: [...remaining, 'DONE'],
+                    payload: { kind: 'stealRevealedWeaponsFromOpponentsTopCards' },
+                  },
+                ];
+              }
+              const takenBySeat = (s: { seat: number }): boolean => s.seat === seat;
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => {
+                  if (s.seat === owner.seat) {
+                    return { ...s, inventory: s.inventory.slice(1) };
+                  }
+                  if (takenBySeat(s)) {
+                    return { ...player, discard: [...s.discard, chosenId] };
+                  }
+                  return s;
+                }),
                 prompts,
               };
             }

@@ -728,21 +728,21 @@ h1, h2 { margin: 0 0 8px; }
 .seat-swap-sub { color: var(--muted); font-size: 14px; margin: 0; }
 
 /* ---- scenario picker ---- */
-.scenario-picker { display: flex; flex-direction: column; gap: 8px; }
-.scenario-option {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  padding: 8px 10px;
+.scenario-picker { display: flex; flex-direction: column; gap: 4px; }
+.scenario-select {
+  padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: transparent;
+  background: var(--bg);
   color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  text-align: left;
+  width: 100%;
 }
-.scenario-option:hover { border-color: var(--primary); }
-.scenario-option-on { background: rgba(120, 40, 20, 0.35); border-color: var(--primary); }
-.scenario-option:disabled { opacity: 0.6; cursor: default; }
-.scenario-name { font-weight: 800; }
+.scenario-select:disabled { opacity: 0.6; cursor: default; }
 .scenario-desc { font-size: 12px; color: var(--muted); }
 .lobby-entry-scenario { display: flex; flex-direction: column; gap: 4px; padding: 0 4px 10px; }
-.lobby-scenario-edit { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.lobby-scenario-edit { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; max-width: 420px; }
+.passandplay { width: 100%; align-self: stretch; }
+.lobby-entry { width: 100%; }
