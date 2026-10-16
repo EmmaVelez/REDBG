@@ -1,4 +1,5 @@
 import { applyAction } from './actions';
+import { validateAction } from './validate';
 import type { GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
@@ -124,14 +125,25 @@ test('Green Herb heal 20', () => {
   expect(s.removed).toContain('i1');
   expect(s.prompts.length).toBe(1);
   expect(pr(s).payload?.kind).toBe('healGreenHerb');
+  // No second herb in hand: only "Heal 20" is offered — Heal 60 is illegal.
+  expect(pr(s).options).toEqual(['Heal 20']);
   const s2 = applyAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 0 });
   expect(p0(s2).hp).toBe(70);
 });
 
+test('Green Herb healing requires the option to be offered (validator rejects out-of-range)', () => {
+  const s = applyAction(baseState({ seat0: { hp: 50, hand: ['i1'] } }), { type: 'playItem', seat: 0, instanceId: 'i1' });
+  // Only one option exists here; option 1 (Heal 60) must be rejected.
+  expect(validateAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 1 }).ok).toBe(false);
+});
+
 test('Green Herb heal 60', () => {
   const s = applyAction(baseState({ seat0: { hp: 30, hand: ['i1', 'i2'] } }), { type: 'playItem', seat: 0, instanceId: 'i1' });
+  // With a second herb in hand, both options are offered.
+  expect(pr(s).options).toEqual(['Heal 20', 'Heal 60']);
   const s2 = applyAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 1 });
   expect(p0(s2).hp).toBe(90);
+  // Both the played herb AND the second herb from hand are trashed.
   expect(p0(s2).hand).not.toContain('i2');
   expect(s2.removed).toEqual(['i1', 'i2']);
 });

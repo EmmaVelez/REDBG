@@ -15,6 +15,14 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
   return state.cardDefs[inst.cardId];
 }
 
+/** True when the instance is a Green Herb (the only card with this effect). */
+function isGreenHerb(state: GameState, instanceId: string): boolean {
+  return (
+    cardDef(state, instanceId)?.itemEffects?.some(e => e.kind === 'healFixed20OrTrashWithSecondFor60') ??
+    false
+  );
+}
+
 function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number): { player: PlayerState; rngState: number } {
   const bonuses = sumBonuses([def]);
   const pools = applyBonusPools(
@@ -161,42 +169,45 @@ export function applyAction(state: GameState, action: Action): GameState {
           }
 
           case 'playItem': {
-      const { seat, instanceId } = action;
-      const player = state.seats[seat] as PlayerState;
-      const def = cardDef(state, instanceId) as CardDef;
+                const { seat, instanceId } = action;
+                const player = state.seats[seat] as PlayerState;
+                const def = cardDef(state, instanceId) as CardDef;
 
-      const played = withBonusesAndDraws(
-              { ...player, hand: player.hand.filter(id => id !== instanceId) },
-              def,
-              state.rngState,
-            );
-            const newRemoved = [...state.removed, instanceId];
+                const played = withBonusesAndDraws(
+                        { ...player, hand: player.hand.filter(id => id !== instanceId) },
+                        def,
+                        state.rngState,
+                      );
+                      const newRemoved = [...state.removed, instanceId];
 
-            let prompts = state.prompts;
-            let hp = played.player.hp;
-            let maxHp = played.player.maxHp;
-      let promptKind: string | undefined;
-      for (const e of def.itemEffects ?? []) {
-              if (e.kind === 'healToFull') {
-                hp = played.player.maxHp;
-              } else if (e.kind === 'plusMaxHp20') {
-                maxHp = played.player.maxHp + 20;
-              } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
-                promptKind = 'healGreenHerb';
-              }
-            }
-      if (promptKind !== undefined) {
-        prompts = [
-          ...prompts,
-          {
-            id: 'p' + (state.prompts.length + 1),
-            seat,
-            text: def.text,
-            options: ['Heal 20', 'Heal 60'],
-            payload: { kind: promptKind },
-          },
-        ];
-      }
+                      let prompts = state.prompts;
+                      let hp = played.player.hp;
+                      let maxHp = played.player.maxHp;
+                let promptKind: string | undefined;
+                for (const e of def.itemEffects ?? []) {
+                        if (e.kind === 'healToFull') {
+                          hp = played.player.maxHp;
+                        } else if (e.kind === 'plusMaxHp20') {
+                          maxHp = played.player.maxHp + 20;
+                        } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
+                          promptKind = 'healGreenHerb';
+                        }
+                      }
+                if (promptKind !== undefined) {
+                  // Heal 60 is only legal when the player still holds another Green
+                  // Herb in hand (the played one is already gone). Both are trashed.
+                  const hasSecondHerb = played.player.hand.some(id => isGreenHerb(state, id));
+                  prompts = [
+                    ...prompts,
+                    {
+                      id: 'p' + (state.prompts.length + 1),
+                      seat,
+                      text: def.text,
+                      options: hasSecondHerb ? ['Heal 20', 'Heal 60'] : ['Heal 20'],
+                      payload: { kind: promptKind },
+                    },
+                  ];
+                }
 
       const newPlayer: PlayerState = { ...played.player, hp, maxHp };
 
@@ -547,33 +558,45 @@ export function applyAction(state: GameState, action: Action): GameState {
             }
 
       if (kind === 'healGreenHerb') {
-        if (option === 0) {
-          return {
-            ...state,
-            ...nextBase,
-            seats: state.seats.map(s =>
-              s.seat === seat ? { ...player, hp: Math.min(player.hp + 20, player.maxHp) } : s,
-            ),
-            prompts: newPrompts,
-          };
-        }
-        const otherHerb = player.hand.find(id => cardDef(state, id)?.type === 'item' && cardDef(state, id)?.id === 'it-1');
-        let newHand = player.hand;
-        let newRemoved = state.removed;
-        if (otherHerb !== undefined) {
-          newHand = player.hand.filter(id => id !== otherHerb);
-          newRemoved = [...state.removed, otherHerb];
-        }
-        return {
-          ...state,
-          ...nextBase,
-          seats: state.seats.map(s =>
-            s.seat === seat ? { ...player, hp: Math.min(player.hp + 60, player.maxHp), hand: newHand } : s,
-          ),
-          removed: newRemoved,
-          prompts: newPrompts,
-        };
-      }
+              if (option === 0) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s =>
+                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20, player.maxHp) } : s,
+                  ),
+                  prompts: newPrompts,
+                };
+              }
+              // option === 1: Heal 60 requires a second Green Herb in hand; both
+              // the played herb (already in removed) and the hand herb are trashed.
+              const otherHerb = player.hand.find(id => isGreenHerb(state, id));
+              if (otherHerb === undefined) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s =>
+                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20, player.maxHp) } : s,
+                  ),
+                  prompts: newPrompts,
+                };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat
+                    ? {
+                        ...player,
+                        hp: Math.min(player.hp + 60, player.maxHp),
+                        hand: player.hand.filter(id => id !== otherHerb),
+                      }
+                    : s,
+                ),
+                removed: [...state.removed, otherHerb],
+                prompts: newPrompts,
+              };
+            }
 
       if (kind === 'takeOrBottom') {
         const instanceId = prompt.payload?.instanceId as string | undefined;
