@@ -27,3 +27,5 @@
 {"ts": "2026-10-15T21:21:15", "task": "M1-T15", "status": "ok", "attempts": 1, "note": "attempt 1 wrote files but gate never ran (Ollama timeout during retry); Hermes restored costs on 13 weapons (buy engine needs cost), fixed empty text + 2 test bugs; 241/241"}
 {"ts": "2026-10-15T22:02:46", "task": "M1-T16", "status": "ok", "attempts": 2, "note": "auto-validated tsc+vitest"}
 {"ts": "2026-10-15T22:12:59", "task": "M2-T01", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
+{"ts": "2026-10-15T22:16:02", "task": "M2-T01", "status": "ok", "attempts": 3, "note": "3 attempts; Hermes removed dead helper referencing out-of-scope state, guarded pair indices, fixed MY spec bug (4->3 explores; Gemma caught it); 266/266"}
+{"ts": "2026-10-15T22:21:43", "task": "M2-T02", "status": "failed", "attempts": 3, "note": "exhausted retries; see feedback file"}
