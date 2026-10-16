@@ -22,7 +22,7 @@ LEDGER = REPO / "LEDGER.jsonl"
 WORKSPACE = REPO / "game-core"
 
 
-def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
+def run(cmd: str, cwd: Path) -> tuple[int, str]:
     p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, shell=True)
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
@@ -34,15 +34,20 @@ def ledger(task_id: str, status: str, attempts: int, note: str) -> None:
         f.write(json.dumps(rec) + "\n")
 
 
-def validate() -> tuple[bool, str]:
-    """Return (green, combined_error_text). Runs tsc then vitest in game-core."""
+def validate(task: dict) -> tuple[bool, str]:
+    """Return (green, combined_error_text). Runs the task's validate commands
+    (each {cwd, cmd}, cwd relative to REPO), defaulting to tsc+vitest in
+    game-core when the spec omits a validate list."""
     errs: list[str] = []
-    rc, out = run("npx tsc --noEmit", WORKSPACE)
-    if rc != 0:
-        errs.append("=== tsc --noEmit FAILED ===\n" + out.strip())
-    rc, out = run("npx vitest run", WORKSPACE)
-    if rc != 0:
-        errs.append("=== vitest run FAILED ===\n" + out.strip())
+    checks = task.get("validate") or [
+        {"cwd": "game-core", "cmd": "npx tsc --noEmit"},
+        {"cwd": "game-core", "cmd": "npx vitest run"},
+    ]
+    for check in checks:
+        cwd = (REPO / str(check["cwd"])).resolve()
+        rc, out = run(str(check["cmd"]), cwd)
+        if rc != 0:
+            errs.append(f"=== {check['cmd']} (in {check['cwd']}) FAILED ===\n" + out.strip())
     return (len(errs) == 0), "\n\n".join(errs)
 
 
@@ -77,7 +82,7 @@ def main() -> int:
             feedback_file.write_text(out[-6000:], encoding="utf-8")
             continue
 
-        green, errs = validate()
+        green, errs = validate(task)
         if green:
             print(f"\n>>> {task_id} GREEN on attempt {attempt}. Committing.")
             run(f'git add -A && git -c user.email=dev@local -c user.name=Orchestrator '
