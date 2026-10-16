@@ -166,6 +166,16 @@ describe('createRoomStore', () => {
     expect(store.getRoom(room.roomCode)).toBeUndefined();
   });
 
+  it('setScenario changes the scenario; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host');
+    expect(room.scenario).toBe('firstTimer');
+    const changed = store.setScenario(room.roomCode, 'c1', 'classicHorror');
+    expect(changed.scenario).toBe('classicHorror');
+    // a non-host cannot change it
+    expect(() => store.setScenario(room.roomCode, 'stranger', 'classicHorror')).toThrow('not the host');
+  });
+
   it('toSnapshot matches the protocol RoomSnapshot shape', () => {
     const store = createRoomStore(() => 0.3);
     const room = store.createRoom('c1', 'Host');
@@ -174,6 +184,7 @@ describe('createRoomStore', () => {
       roomCode: room.roomCode,
       phase: 'lobby',
       maxSeats: 4,
+      scenario: 'firstTimer',
       players: room.players,
     });
   });

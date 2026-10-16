@@ -1,4 +1,4 @@
-import type { Action, PlayerView } from '@re/game-core';
+import type { Action, PlayerView, ScenarioId } from '@re/game-core';
 
 /**
  * WebSocket wire protocol — the contract shared between the server and the
@@ -35,6 +35,7 @@ export interface RoomSnapshot {
   readonly roomCode: string;
   readonly phase: RoomPhase;
   readonly maxSeats: number;
+  readonly scenario: ScenarioId;
   readonly players: readonly PlayerInfo[];
 }
 
@@ -43,7 +44,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -54,6 +55,8 @@ export type ClientMessage =
   | { readonly kind: 'addBot'; readonly seat?: number }
   /** Host control: remove the bot sitting on `seat`. */
   | { readonly kind: 'removeBot'; readonly seat: number }
+  /** Host control: change the scenario while still in the lobby. */
+  | { readonly kind: 'setScenario'; readonly scenario: ScenarioId }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
   /** Send a game action to the authoritative server engine. */
@@ -135,7 +138,24 @@ export function validateMessage(value: unknown): DecodeResult {
   const k = kind as string;
 
   // Client kinds
-  if (k === 'createRoom' || k === 'leaveRoom' || k === 'startGame') {
+  if (k === 'createRoom') {
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown };
+    if (typeof m.playerName !== 'string') {
+      return { ok: false, error: 'createRoom requires a playerName string' };
+    }
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror') {
+      return { ok: false, error: 'createRoom requires a valid scenario' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setScenario') {
+    const m = value as { kind: string; scenario?: unknown };
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror') {
+      return { ok: false, error: 'setScenario requires a valid scenario' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'leaveRoom' || k === 'startGame') {
     return { ok: true, msg: value as WireMessage };
   }
   if (k === 'joinRoom') {

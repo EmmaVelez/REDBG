@@ -1,4 +1,5 @@
 import type { PlayerInfo, RoomPhase, RoomSnapshot } from './protocol';
+import type { ScenarioId } from '@re/game-core';
 
 /**
  * In-memory room store (M3-T02). Rooms hold players (humans + bots) in seats,
@@ -12,6 +13,8 @@ export interface Room {
   /** 'lobby' until the host starts the game, then 'playing'. */
   readonly phase: RoomPhase;
   readonly maxSeats: number;
+  /** Which scenario's resource piles the game will use (host-set, lobby only). */
+  readonly scenario: ScenarioId;
   /** All players, in join order (bots are players with isBot: true). */
   readonly players: readonly PlayerInfo[];
 }
@@ -19,7 +22,7 @@ export interface Room {
 export interface RoomStore {
   readonly rooms: ReadonlyMap<string, Room>;
   /** Create a room; the creator becomes host seated at 0. */
-  createRoom(clientId: string, name: string): Room;
+  createRoom(clientId: string, name: string, scenario?: ScenarioId): Room;
   /** Add an unseated player (seat -1) to a lobby room. */
   joinRoom(roomCode: string, clientId: string, name: string): Room;
   /** Remove a player; host leaves -> lowest-seat remaining becomes host;
@@ -31,6 +34,8 @@ export interface RoomStore {
   addBot(roomCode: string, hostClientId: string, seat?: number): Room;
   /** Host only, lobby only: remove the bot at a seat (only actual bots). */
   removeBot(roomCode: string, hostClientId: string, seat: number): Room;
+  /** Host only, lobby only: change the scenario. */
+  setScenario(roomCode: string, hostClientId: string, scenario: ScenarioId): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
   startGame(roomCode: string, hostClientId: string): Room;
   /** Mark a player's connection state (used on ws open/close + reconnect). */
@@ -105,12 +110,13 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
   return {
     rooms,
 
-    createRoom(clientId: string, name: string): Room {
+    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer'): Room {
       const roomCode = allocateCode();
       const room: Room = {
         roomCode,
         phase: 'lobby',
         maxSeats: MAX_SEATS,
+        scenario,
         players: [{ clientId, name, seat: 0, isBot: false, connected: true }],
       };
       save(roomCode, room);
@@ -237,6 +243,13 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       return save(roomCode, next);
     },
 
+    setScenario(roomCode: string, hostClientId: string, scenario: ScenarioId): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      return save(roomCode, { ...room, scenario });
+    },
+
     startGame(roomCode: string, hostClientId: string): Room {
       const room = requireRoom(roomCode);
       requireLobby(room);
@@ -266,6 +279,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         roomCode: room.roomCode,
         phase: room.phase,
         maxSeats: room.maxSeats,
+        scenario: room.scenario,
         players: room.players,
       };
     },

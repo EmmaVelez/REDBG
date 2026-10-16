@@ -4,7 +4,9 @@ import type { WireMessage } from './protocol';
 
 describe('protocol round trips', () => {
   const cases: ReadonlyArray<{ readonly name: string; readonly msg: WireMessage }> = [
-    { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny' } },
+    { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' } },
+    { name: 'createRoom classicHorror', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'classicHorror' } },
+    { name: 'setScenario', msg: { kind: 'setScenario', scenario: 'classicHorror' } },
     { name: 'joinRoom', msg: { kind: 'joinRoom', roomCode: 'ABCDEF', playerName: 'Ada' } },
     { name: 'reconnect', msg: { kind: 'reconnect', token: 'tok-123' } },
     { name: 'spectate', msg: { kind: 'spectate', roomCode: 'ABCDEF' } },
@@ -20,7 +22,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }] } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }] } },
     },
     {
       name: 'stateSync',
@@ -120,7 +122,7 @@ describe('protocol validation', () => {
   });
 
   it('keeps extra fields when structurally valid (forward-compatible)', () => {
-    const r = validateMessage({ kind: 'createRoom', playerName: 'M', futureField: 7 });
+    const r = validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', futureField: 7 });
     expect(r.ok).toBe(true);
   });
 });

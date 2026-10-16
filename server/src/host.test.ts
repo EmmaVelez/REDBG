@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRoomStore } from './rooms';
 import { createHost } from './host';
-import { sanitize } from '@re/game-core';
+import { sanitize, pilesForScenario } from '@re/game-core';
 import type { GameState } from '@re/game-core';
 
 const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -19,6 +19,25 @@ function makePlayingRoom(seed = 7) {
 }
 
 describe('createHost', () => {
+  it('start builds the scenario piles the room selected', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('host-1', 'Host', 'classicHorror');
+    store.joinRoom(room.roomCode, 'p2', 'Player2');
+    store.selectSeat(room.roomCode, 'p2', 1);
+    const latest = store.getRoom(room.roomCode) as NonNullable<ReturnType<typeof store.getRoom>>;
+    const host = createHost(latest);
+    const s = host.start(7);
+    const pileIds = Object.keys(s.marketPiles);
+    expect(latest.scenario).toBe('classicHorror');
+    expect(pileIds).toContain('itemmgmt');
+    expect(pileIds).toContain('spray');
+    expect(pileIds).toContain('longbow');
+    expect(pileIds).not.toContain('merc');
+    expect(pileIds).not.toContain('six');
+    // A 2-player room on a seeded run: characters must stay unique too.
+    const chars = s.seats.map(p => p.characterInstanceId.split('#')[0] ?? '');
+    expect(new Set(chars).size).toBe(chars.length);
+  });
   it('start builds an engine state with all seated players', () => {
     const { room } = makePlayingRoom();
     const host = createHost(room);
@@ -43,6 +62,7 @@ describe('createHost', () => {
       roomCode: 'ABCDEF',
       phase: 'lobby',
       maxSeats: 4,
+      scenario: 'firstTimer',
       players: [],
     };
     const host = createHost(lonely);

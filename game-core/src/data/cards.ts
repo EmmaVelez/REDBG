@@ -98,6 +98,66 @@ export const FIRST_TIMER_PILES: ReadonlyArray<{ pileId: string; cardIds: readonl
   { pileId: 'mg', cardIds: ['we-011', 'we-012'] }
 ];
 
+/**
+ * Classic Horror (rulebook "Additional Story Mode Options"): the base-game
+ * scenarios feature — Basic Resources plus Umbrella Corp, Mansion Foyer,
+ * Deadly Aim, Shattered Memories, Reload, Item Management, First Aid Spray,
+ * Longbow, Grenade, and the combined shotgun/rifle/MG piles. Escape from the
+ * Dead City, The Merchant and Six Shooter are First-Timer-only.
+ */
+export const CLASSIC_HORROR_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'umb', cardIds: ['ac-007'] },
+  { pileId: 'foyer', cardIds: ['ac-001'] },
+  { pileId: 'aim', cardIds: ['ac-002'] },
+  { pileId: 'smt', cardIds: ['ac-003'] },
+  { pileId: 'reload', cardIds: ['ac-005'] },
+  { pileId: 'itemmgmt', cardIds: ['ac-009'] },
+  { pileId: 'spray', cardIds: ['it-003'] },
+  { pileId: 'longbow', cardIds: ['we-002'] },
+  { pileId: 'grn', cardIds: ['we-001'] },
+  { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
+  { pileId: 'rf', cardIds: ['we-015', 'we-016'] },
+  { pileId: 'mg', cardIds: ['we-011', 'we-012'] }
+];
+
+export type ScenarioId = 'firstTimer' | 'classicHorror';
+
+export interface ScenarioDef {
+  readonly id: ScenarioId;
+  readonly name: string;
+  readonly description: string;
+  readonly piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
+}
+
+export const SCENARIOS: ReadonlyArray<ScenarioDef> = [
+  {
+    id: 'firstTimer',
+    name: 'First Timer',
+    description: 'The starter scenario — a guided intro with The Merchant and Six Shooter.',
+    piles: FIRST_TIMER_PILES,
+  },
+  {
+    id: 'classicHorror',
+    name: 'Classic Horror',
+    description: 'The base-game scenario — Item Management, First Aid Spray and Longbow for the classic RE arsenal.',
+    piles: CLASSIC_HORROR_PILES,
+  },
+];
+
+export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
+  const found = SCENARIOS.find(s => s.id === id);
+  if (found === undefined) {
+    throw new Error(`unknown scenario: ${String(id)}`);
+  }
+  return found.piles;
+}
+
 export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
   { cardId: 'am-001', count: 7 },
   { cardId: 'we-009', count: 1 },

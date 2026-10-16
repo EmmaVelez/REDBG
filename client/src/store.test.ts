@@ -26,6 +26,7 @@ const roomState = (): Extract<ServerMessage, { kind: 'roomState' }> => ({
     roomCode: 'ABCDEF',
     phase: 'lobby',
     maxSeats: 4,
+    scenario: 'firstTimer',
     players: [
       { clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true },
       { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
@@ -130,7 +131,7 @@ describe('store dispatch/bind (M4-T02)', () => {
     };
     const st = useGameStore.getState();
     st.bindSocket(socket as never);
-    expect(st.dispatch({ kind: 'createRoom', playerName: 'Me' })).toBe(true);
+    expect(st.dispatch({ kind: 'createRoom', playerName: 'Me', scenario: 'firstTimer' })).toBe(true);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.kind).toBe('createRoom');
   });

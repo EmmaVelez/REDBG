@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ServerMessage, RoomSnapshot, ClientMessage } from '@re/server';
-import type { PlayerView, GameState, Action } from '@re/game-core';
+import type { PlayerView, GameState, Action, ScenarioId } from '@re/game-core';
 import type { ConnectionStatus, GameSocket } from './net/ws';
 import { createHotseatGame, applyHotseatAction, hotseatView } from './hotseat';
 import type { HotseatResult } from './hotseat';
@@ -24,6 +24,7 @@ export interface ChatEntry {
 export interface HotseatSession {
   readonly names: readonly string[];
   readonly seed: number;
+  readonly scenario: ScenarioId;
   /** The full authoritative engine state (never sanitized). */
   readonly game: GameState;
   /** Which seat currently holds the device and may see their own cards. */
@@ -49,7 +50,7 @@ export interface GameStore extends GameStoreState {
   readonly handleServerMessage: (msg: ServerMessage) => void;
   readonly dispatch: (msg: ClientMessage, opts?: { readonly silent?: boolean }) => boolean;
   readonly bindSocket: (socket: GameSocket) => void;
-  readonly startHotseat: (names: readonly string[], seed: number) => void;
+  readonly startHotseat: (names: readonly string[], seed: number, scenario?: ScenarioId) => void;
   readonly hotseatAction: (action: Action) => void;
   /** The new holder taps the pass screen: reveal their hand, unpause. */
   readonly continuePass: () => void;
@@ -130,11 +131,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socketForDispatch = socket;
     socket.connect();
   },
-  startHotseat: (names, seed) => {
-    const game = createHotseatGame(names, seed);
+  startHotseat: (names, seed, scenario = 'firstTimer') => {
+    const game = createHotseatGame(names, seed, scenario);
     const viewerSeat = game.activeSeat;
     set({
-      hotseat: { names, seed, game, viewerSeat, passPending: false },
+      hotseat: { names, seed, scenario, game, viewerSeat, passPending: false },
       view: hotseatView(game, viewerSeat),
       mySeat: viewerSeat,
       gameOver: null,

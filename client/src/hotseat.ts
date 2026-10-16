@@ -6,9 +6,9 @@ import {
   validateAction,
   viewForSeat,
   PREMIER_CARDS,
-  FIRST_TIMER_PILES,
+  pilesForScenario,
 } from '@re/game-core';
-import type { Action, GameState, PlayerView } from '@re/game-core';
+import type { Action, GameState, PlayerView, ScenarioId } from '@re/game-core';
 
 /**
  * M4-T10 pass-and-play hot-seat driver. The full engine runs IN THE BROWSER
@@ -34,7 +34,7 @@ export type HotseatResult =
       readonly winners: readonly [];
     };
 
-export function createHotseatGame(names: readonly string[], seed: number): GameState {
+export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer'): GameState {
   if (names.length < 2 || names.length > 4) {
     throw new Error(`pass-and-play needs 2-4 players, got ${names.length}`);
   }
@@ -43,7 +43,7 @@ export function createHotseatGame(names: readonly string[], seed: number): GameS
     controller: 'human' as const,
     characterCardId: undefined,
   }));
-  return setup({ seed, players }, PREMIER_CARDS, FIRST_TIMER_PILES);
+  return setup({ seed, players }, PREMIER_CARDS, pilesForScenario(scenario));
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

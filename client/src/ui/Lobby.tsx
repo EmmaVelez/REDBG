@@ -1,32 +1,64 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
+import type { ScenarioId } from '@re/game-core';
+import { SCENARIOS } from '@re/game-core';
 
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
  * and start. Bare-bones forms driven by the store's dispatch.
  * M4-T10: a Pass & Play section starts an in-browser hot-seat game with
  * 2-4 named players on this device (no server).
+ * Scenario support: the host picks First Timer or Classic Horror when
+ * creating the room (or in the lobby before start); Pass & Play picks too.
  */
 
 export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
   readonly onRemoveBot: (seat: number) => void;
+  readonly onSetScenario: (scenario: ScenarioId) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[]) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
 
-function PassAndPlay(props: { readonly onStart: (names: readonly string[]) => void }): JSX.Element {
+function ScenarioPicker(props: {
+  readonly value: ScenarioId;
+  readonly disabled?: boolean;
+  readonly onChange: (scenario: ScenarioId) => void;
+}): JSX.Element {
+  return (
+    <div className="scenario-picker" data-scenario={props.value}>
+      {SCENARIOS.map(s => (
+        <button
+          key={s.id}
+          type="button"
+          className={`scenario-option ${props.value === s.id ? 'scenario-option-on' : ''}`}
+          disabled={props.disabled === true}
+          onClick={() => props.onChange(s.id)}
+          data-scenario-id={s.id}
+        >
+          <span className="scenario-name">{s.name}</span>
+          <span className="scenario-desc">{s.description}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PassAndPlay(props: {
+  readonly onStart: (names: readonly string[], scenario: ScenarioId) => void;
+}): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
+  const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -37,6 +69,7 @@ function PassAndPlay(props: { readonly onStart: (names: readonly string[]) => vo
     <div className="passandplay" data-testid="pass-and-play">
       <h2 className="lobby-section">Pass &amp; Play (this device)</h2>
       <p className="lobby-hint">No room or server needed — everyone shares this screen.</p>
+      <ScenarioPicker value={scenario} onChange={setScenario} />
       <div className="passandplay-count">
         {[2, 3, 4].map(n => (
           <button
@@ -65,7 +98,7 @@ function PassAndPlay(props: { readonly onStart: (names: readonly string[]) => vo
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective)}
+        onClick={() => props.onStart(effective, scenario)}
       >
         Start pass &amp; play
       </button>
@@ -73,9 +106,22 @@ function PassAndPlay(props: { readonly onStart: (names: readonly string[]) => vo
   );
 }
 
-export function Lobby({ room, clientId, status, onCreateRoom, onJoinRoom, onSelectSeat, onAddBot, onRemoveBot, onStart, onStartHotseat }: LobbyProps): JSX.Element {
+export function Lobby({
+  room,
+  clientId,
+  status,
+  onCreateRoom,
+  onJoinRoom,
+  onSelectSeat,
+  onAddBot,
+  onRemoveBot,
+  onSetScenario,
+  onStart,
+  onStartHotseat,
+}: LobbyProps): JSX.Element {
   const me: PlayerInfo | undefined = room?.players.find(p => p.clientId === clientId);
   const isHost = me?.seat === 0;
+  const scenarioName = room ? (SCENARIOS.find(s => s.id === room.scenario)?.name ?? room.scenario) : '';
 
   return (
     <div className="lobby">
@@ -93,7 +139,16 @@ export function Lobby({ room, clientId, status, onCreateRoom, onJoinRoom, onSele
           <p className="lobby-code">
             Room code: <strong>{room.roomCode}</strong>
           </p>
-          <p className="lobby-phase">Phase: {room.phase}</p>
+          <p className="lobby-phase">
+            Phase: {room.phase} · Scenario: <strong>{scenarioName}</strong>
+          </p>
+
+          {isHost && room.phase === 'lobby' && (
+            <div className="lobby-scenario-edit">
+              <span className="lobby-hint">Scenario (host, before start):</span>
+              <ScenarioPicker value={room.scenario} onChange={onSetScenario} />
+            </div>
+          )}
 
           <div className="lobby-seats">
             {Array.from({ length: room.maxSeats }, (_, seat) => {
@@ -142,12 +197,16 @@ export function Lobby({ room, clientId, status, onCreateRoom, onJoinRoom, onSele
   );
 }
 
-function RoomEntry(props: { readonly onCreateRoom: (name: string) => void; readonly onJoinRoom: (code: string, name: string) => void }): JSX.Element {
+function RoomEntry(props: {
+  readonly onCreateRoom: (name: string, scenario: ScenarioId) => void;
+  readonly onJoinRoom: (code: string, name: string) => void;
+}): JSX.Element {
+  const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim());
+      props.onCreateRoom(name.trim(), scenario);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -165,6 +224,10 @@ function RoomEntry(props: { readonly onCreateRoom: (name: string) => void; reado
         <input name="name" placeholder="Your name" required />
         <button type="submit">Create room</button>
       </form>
+      <div className="lobby-entry-scenario">
+        <span className="lobby-hint">Scenario</span>
+        <ScenarioPicker value={scenario} onChange={setScenario} />
+      </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />
         <input name="joinName" placeholder="Your name" required />

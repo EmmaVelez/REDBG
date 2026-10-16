@@ -76,7 +76,7 @@ describe('game server over WebSocket', () => {
     const c = connect(server);
     await open(c);
     await c.next(); // welcome
-    c.send({ kind: 'createRoom', playerName: 'Manny' });
+    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
     const roomState = await c.next();
     expect(roomState.kind).toBe('roomState');
     if (roomState.kind === 'roomState') {
@@ -92,7 +92,7 @@ describe('game server over WebSocket', () => {
     const host = connect(server);
     await open(host);
     await host.next(); // welcome
-    host.send({ kind: 'createRoom', playerName: 'Host' });
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
     const hostRoom = await host.next();
     const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
 
@@ -110,13 +110,42 @@ describe('game server over WebSocket', () => {
     guest.ws.close();
   });
 
+  it('setScenario updates the room and broadcasts; non-host rejected', async () => {
+    const server = startServer({ tokenSeq: ['tok-a', 'tok-b'] });
+    const host = connect(server);
+    await open(host);
+    await host.next(); // welcome
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
+    const hostRoom = await host.next();
+    const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
+
+    host.send({ kind: 'setScenario', scenario: 'classicHorror' });
+    const hostUpdate = await host.next();
+    expect(hostUpdate.kind).toBe('roomState');
+    if (hostUpdate.kind === 'roomState') expect(hostUpdate.room.scenario).toBe('classicHorror');
+
+    // a guest cannot change the scenario
+    const guest = connect(server);
+    await open(guest);
+    await guest.next(); // welcome
+    guest.send({ kind: 'joinRoom', roomCode, playerName: 'Guest' });
+    await guest.next(); // roomState
+    await host.next(); // host join broadcast
+    guest.send({ kind: 'setScenario', scenario: 'firstTimer' });
+    const guestError = await guest.next();
+    expect(guestError.kind).toBe('error');
+
+    host.ws.close();
+    guest.ws.close();
+  });
+
   it('reconnect restores the session with a token', async () => {
     const server = startServer({ tokenSeq: ['tok-x', 'tok-y'] });
     const c1 = connect(server);
     await open(c1);
     const welcome = await c1.next();
     const token = welcome.kind === 'welcome' ? welcome.reconnectToken : '';
-    c1.send({ kind: 'createRoom', playerName: 'Traveler' });
+    c1.send({ kind: 'createRoom', playerName: 'Traveler', scenario: 'firstTimer' });
     await c1.next();
     c1.ws.close();
 
@@ -147,7 +176,7 @@ describe('game server over WebSocket', () => {
     const host = connect(server);
     await open(host);
     await host.next();
-    host.send({ kind: 'createRoom', playerName: 'Host' });
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
     const hostRoom = await host.next();
     const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
     host.send({ kind: 'startGame' });
@@ -181,7 +210,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -231,7 +260,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -270,7 +299,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -294,7 +323,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 

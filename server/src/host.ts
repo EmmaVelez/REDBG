@@ -6,8 +6,8 @@ import {
   validateAction,
   chooseBotAction,
   sanitize,
+  pilesForScenario,
   PREMIER_CARDS,
-  FIRST_TIMER_PILES,
 } from '@re/game-core';
 import type { Action, GameState, PlayerView, BotDifficulty } from '@re/game-core';
 import type { PlayerInfo } from './protocol';
@@ -80,7 +80,7 @@ export function createHost(room: Room): GameHost {
       if (players.length === 0) {
         throw new Error('no seated players');
       }
-      state = setup({ seed, players }, PREMIER_CARDS, FIRST_TIMER_PILES);
+      state = setup({ seed, players }, PREMIER_CARDS, pilesForScenario(room.scenario));
       return state;
     },
 

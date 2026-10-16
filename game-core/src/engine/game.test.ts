@@ -1,5 +1,5 @@
 import { setup, startTurn, checkWin } from './game';
-import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
+import { PREMIER_CARDS, FIRST_TIMER_PILES, pilesForScenario } from '../data/cards';
 import type { GameSetup, GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function def(id: string, over: Partial<CardDef> = {}): CardDef {
@@ -102,6 +102,30 @@ test('setup character assignment with explicit ids', () => {
   expect(p1(s).characterInstanceId).toMatch(/^ch-1#/);
   expect(p0(s).hp).toBe(80);
   expect(p1(s).hp).toBe(100);
+});
+
+test('setup with classicHorror piles offers Longbow, First Aid Spray and Item Management', () => {
+  const s = setup(
+    {
+      seed: 3,
+      players: [
+        { name: 'A', controller: 'human' },
+        { name: 'B', controller: 'human' },
+      ],
+    },
+    PREMIER_CARDS,
+    pilesForScenario('classicHorror')
+  );
+  const pileIds = Object.keys(s.marketPiles);
+  // Classic Horror replaces First-Timer-only cards: no Merchant/Six Shooter/
+  // Escape, but includes the classic arsenal.
+  expect(pileIds).toContain('longbow');
+  expect(pileIds).toContain('spray');
+  expect(pileIds).toContain('itemmgmt');
+  expect(pileIds).not.toContain('merc');
+  expect(pileIds).not.toContain('six');
+  expect(pileIds).not.toContain('escape');
+  expect(pileIds).toHaveLength(18);
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {

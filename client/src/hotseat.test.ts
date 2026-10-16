@@ -24,6 +24,16 @@ describe('createHotseatGame', () => {
     expect(() => createHotseatGame(['A', 'B', 'C', 'D', 'E'], 1)).toThrow();
   });
 
+  it('builds classicHorror piles when requested', () => {
+    const s = createHotseatGame(['Chris', 'Jill'], 42, 'classicHorror');
+    const pileIds = Object.keys(s.marketPiles);
+    expect(pileIds).toContain('itemmgmt');
+    expect(pileIds).toContain('spray');
+    expect(pileIds).toContain('longbow');
+    expect(pileIds).not.toContain('merc');
+    expect(pileIds).not.toContain('six');
+  });
+
   it('deals each player a character and a real opening hand', () => {
     const s = createHotseatGame(['Chris', 'Jill'], 42);
     for (const p of s.seats) {

@@ -171,7 +171,7 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           return;
         }
         if (session.clientId === null) return; // identity issued at connect
-        const room = roomStore.createRoom(session.clientId, msg.playerName);
+        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario);
         session.roomCode = room.roomCode;
         broadcastRoomState(room.roomCode);
         return;
@@ -271,6 +271,17 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         if (session.roomCode === null || session.clientId === null) return;
         try {
           roomStore.removeBot(session.roomCode, session.clientId, msg.seat);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
+      case 'setScenario': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setScenario(session.roomCode, session.clientId, msg.scenario);
           broadcastRoomState(session.roomCode);
         } catch (e) {
           send(ws, { kind: 'error', message: (e as Error).message });

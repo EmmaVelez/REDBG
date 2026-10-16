@@ -340,6 +340,7 @@ describe('Lobby (T08)', () => {
     onSelectSeat: () => {},
     onAddBot: () => {},
     onRemoveBot: () => {},
+    onSetScenario: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
     ...over,
@@ -350,6 +351,7 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Create room');
     expect(html).toContain('Join room');
     expect(html).toContain('Pass &amp; Play');
+    expect(html).toContain('Classic Horror');
   });
 
   it('renders seats, room code and host controls in a room', () => {
@@ -357,6 +359,7 @@ describe('Lobby (T08)', () => {
       roomCode: 'ABCDEF',
       phase: 'lobby' as const,
       maxSeats: 2,
+      scenario: 'classicHorror' as const,
       players: [
         { clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true },
         { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
@@ -367,6 +370,7 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Seat 0');
     expect(html).toContain('Bot');
     expect(html).toContain('Start game');
+    expect(html).toContain('Classic Horror');
   });
 });
 
