@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRoomStore } from './rooms';
-import { createHost, sanitize } from './host';
+import { createHost } from './host';
+import { sanitize } from '@re/game-core';
 import type { GameState } from '@re/game-core';
 
 const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -145,76 +146,7 @@ describe('createHost', () => {
   });
 });
 
-describe('sanitize', () => {
-  it('is a pure function: returns a new state, preserves the input', () => {
-    const { room } = makePlayingRoom();
-    const host = createHost(room);
-    const s = host.start(7);
-    const before = JSON.stringify(s);
-    const out = sanitize(s, 0);
-    expect(JSON.stringify(s)).toBe(before); // input not mutated
-    expect(out).not.toBe(s);
-    expect(out.seats[0]).toBe(s.seats[0]); // viewing seat identity preserved
-  });
-
-  it('keeps the viewing seat fully visible', () => {
-    const host = createHost(makePlayingRoom().room);
-    const s = host.start(7);
-    const out = sanitize(s, 0);
-    expect(out.seats[0]?.hand).toEqual(s.seats[0]?.hand);
-    expect(out.seats[0]?.inventory).toEqual(s.seats[0]?.inventory);
-  });
-
-  it('hides mansion deck? no — mansion stays public, other seats hidden', () => {
-    const host = createHost(makePlayingRoom().room);
-    const s = host.start(7);
-    const out = sanitize(s, 0);
-    expect(out.mansionDeck).toEqual(s.mansionDeck);
-    expect(out.seats[1]?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
-  });
-
-  it('placeholder length matches the hidden zone length', () => {
-    const host = createHost(makePlayingRoom().room);
-    const s = host.start(7);
-    const out = sanitize(s, 0);
-    const other = s.seats[1];
-    const hidden = out.seats[1];
-    expect(hidden?.hand).toHaveLength(other?.hand.length ?? 0);
-    expect(hidden?.inventory).toHaveLength(other?.inventory.length ?? 0);
-    expect(hidden?.discard).toHaveLength(other?.discard.length ?? 0);
-  });
-
-  it('never exposes hidden ids that resolve to real card defs', () => {
-    const host = createHost(makePlayingRoom().room);
-    const s = host.start(7);
-    const out = sanitize(s, 0);
-    for (const seat of out.seats) {
-      for (const id of [...(seat?.hand ?? []), ...(seat?.inventory ?? []), ...(seat?.discard ?? []), ...(seat?.playArea ?? [])]) {
-        if (id !== undefined && id.startsWith('hidden-')) {
-          expect(out.cardDefs[id ?? '']).toBeUndefined();
-        }
-      }
-    }
-  });
-
-  it('spectator view (viewerSeat -1) hides every seat including the active one', () => {
-    const host = createHost(makePlayingRoom().room);
-    const s = host.start(7);
-    const out = sanitize(s, -1);
-    for (const seat of out.seats) {
-      expect(seat?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
-      expect(seat?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
-      expect(seat?.discard.every(id => id.startsWith('hidden-'))).toBe(true);
-      expect(seat?.playArea.every(id => id.startsWith('hidden-'))).toBe(true);
-    }
-    // lengths preserved vs the raw state
-    expect(out.seats[0]?.hand).toHaveLength(s.seats[0]?.hand.length ?? 0);
-    // public board intact
-    expect(out.marketPiles).toEqual(s.marketPiles);
-    expect(out.mansionDeck).toEqual(s.mansionDeck);
-    expect(out.cardDefs).toEqual(s.cardDefs);
-  });
-
+describe('sanitize integration (log redaction across real host play)', () => {
   it('sanitize redacts OTHER seats logged card ids but keeps the viewer own and public data', () => {
     const { room } = makePlayingRoom();
     const host = createHost(room);

@@ -692,3 +692,37 @@ h1, h2 { margin: 0 0 8px; }
 .log-line { display: flex; gap: 8px; }
 .log-seat { color: var(--muted); flex-shrink: 0; }
 .log-empty { color: var(--muted); }
+/* ---- pass-and-play (hot-seat) ---- */
+.lobby-modes { display: flex; flex-direction: column; gap: 18px; max-width: 420px; margin: 0 auto; }
+.lobby-divider { color: var(--muted); text-align: center; font-size: 13px; }
+.lobby-section { font-size: 18px; margin: 0 0 6px; }
+.lobby-hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.passandplay { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.passandplay-count { display: flex; gap: 8px; }
+.count-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+.count-btn-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.passandplay-names { display: flex; flex-direction: column; gap: 6px; }
+.passandplay-name { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+
+/* ---- seat-swap overlay (pass the device) ---- */
+.seat-swap-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 640;
+  background: radial-gradient(circle at 50% 40%, rgba(20, 40, 20, 0.65) 0%, rgba(3, 8, 4, 0.95) 75%), #031008;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: you-died-in 0.6s ease-out;
+}
+.seat-swap-frame { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; max-width: 480px; padding: 20px; }
+.seat-swap-title {
+  color: #7dd87d;
+  font-weight: 900;
+  font-size: clamp(30px, 6vw, 56px);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 16px rgba(90, 220, 90, 0.6), 0 0 40px rgba(90, 220, 90, 0.3);
+  margin: 0;
+}
+.seat-swap-winner { color: #e6ffe6; font-size: 26px; font-weight: 800; margin: 0; }
+.seat-swap-sub { color: var(--muted); font-size: 14px; margin: 0; }

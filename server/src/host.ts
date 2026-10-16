@@ -5,6 +5,7 @@ import {
   applyAction,
   validateAction,
   chooseBotAction,
+  sanitize,
   PREMIER_CARDS,
   FIRST_TIMER_PILES,
 } from '@re/game-core';
@@ -43,14 +44,6 @@ export interface GameHost {
   stepBot(seed: number, difficulty?: BotDifficulty): HostResult | undefined;
   /** Sanitized per-seat view: own hand/inventory visible, others hidden. */
   viewFor(clientId: string): PlayerView | undefined;
-}
-
-/** Placeholder id used for hidden cards in sanitized views (not in cardDefs). */
-const HIDDEN_ID = 'hidden';
-
-/** True when the room is in the lobby (no game running). */
-function isLobby(room: Room): boolean {
-  return room.phase !== 'playing';
 }
 
 export function createHost(room: Room): GameHost {
@@ -135,6 +128,11 @@ export function createHost(room: Room): GameHost {
       return { ok: true, state, gameOver: win.gameOver, winners: win.winners };
     },
 
+    /**
+     * Sanitized per-seat view: own hand/inventory visible, others hidden.
+     * Implementation lives in game-core (engine/view.ts) so the in-browser
+     * hot-seat driver (M4-T10) shows identical per-seat views.
+     */
     viewFor(clientId: string): PlayerView | undefined {
       if (state === undefined) {
         return undefined;
@@ -145,51 +143,5 @@ export function createHost(room: Room): GameHost {
       }
       return { seat, state: sanitize(state, seat) };
     },
-  };
-}
-
-/**
- * Returns a copy of the state in which every OTHER seat's hand, inventory,
- * discard and play-area contents are replaced with placeholder ids (length
- * preserved), so a client only sees the cards it is entitled to see. The
- * viewing seat's own zones, the market, mansion, and defs stay intact.
- *
- * viewerSeat -1 = spectator view: EVERY seat's zones are hidden (including the
- * active player's), preserving lengths and the public board.
- */
-export function sanitize(state: GameState, viewerSeat: number): GameState {
-  const hiddenFor = (zone: readonly string[]): readonly string[] => zone.map((_, i) => `${HIDDEN_ID}-${i}`);
-  // Redact logged card ids of OTHER seats so the action history never leaks
-  // hidden info (hand plays, inventory draws, discard buys). The action kind
-  // and public data (pileId, seat, counts) stay visible; the viewer's own
-  // log entries keep real ids.
-  const redactAction = (action: Action): Action => {
-    if (!('seat' in action) || action.seat === viewerSeat) return action;
-    switch (action.type) {
-      case 'playActionCard':
-      case 'playItem':
-      case 'playAmmo':
-        return { ...action, instanceId: `${HIDDEN_ID}-card` };
-      case 'explore':
-        return { ...action, weapons: action.weapons.map((_, i) => `${HIDDEN_ID}-w${i}`) };
-      default:
-        return action;
-    }
-  };
-  return {
-    ...state,
-    seats: state.seats.map(s => {
-      if (s.seat === viewerSeat) {
-        return s;
-      }
-      return {
-        ...s,
-        hand: hiddenFor(s.hand),
-        inventory: hiddenFor(s.inventory),
-        discard: hiddenFor(s.discard),
-        playArea: hiddenFor(s.playArea),
-      };
-    }),
-    log: state.log.map(entry => ({ seq: entry.seq, action: redactAction(entry.action) })),
   };
 }

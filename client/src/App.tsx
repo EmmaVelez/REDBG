@@ -9,6 +9,7 @@ import { Board } from './ui/Board';
 import { GameLog } from './ui/GameLog';
 import { Lobby } from './ui/Lobby';
 import { MansionReveal } from './ui/MansionReveal';
+import { SeatSwap } from './ui/SeatSwap';
 import { YouDiedOverlay } from './ui/YouDiedOverlay';
 import { detectPlayerDowned, detectReveal } from './ui/anims';
 import { defForInstance } from './ui/cards';
@@ -64,6 +65,8 @@ export function App(): JSX.Element {
   const lastError = useGameStore(s => s.lastError);
   const mySeat = useGameStore(s => s.mySeat);
   const clientId = useGameStore(s => s.clientId);
+  const hotseat = useGameStore(s => s.hotseat);
+  const gameOver = useGameStore(s => s.gameOver);
 
   // Mansion-door reveal: remember the last seen state, detect when the OWN
   // seat's explore revealed an Infected, and hold the table on a readable
@@ -96,9 +99,12 @@ export function App(): JSX.Element {
   }, [state, mySeat]);
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
-  const seatNames = room?.players.map(p => p.name) ?? [];
+  const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
 
-  if (view === null || room === null) {
+  const passPending = hotseat !== null && hotseat.passPending && gameOver === null;
+  const showGameOverOverlay = hotseat !== null && gameOver !== null;
+
+  if (view === null || (room === null && hotseat === null)) {
     prevStateRef.current = null; // reset across lobby/game switches
     return (
       <Lobby
@@ -111,6 +117,7 @@ export function App(): JSX.Element {
         onAddBot={seat => dispatchClient({ kind: 'addBot', seat })}
         onRemoveBot={seat => dispatchClient({ kind: 'removeBot', seat })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
+        onStartHotseat={names => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31))}
       />
     );
   }
@@ -122,7 +129,8 @@ export function App(): JSX.Element {
     gameState.activeSeat !== mySeat ||
     gameState.prompts.some(p => p.seat === mySeat) ||
     reveal !== null ||
-    youDied !== null;
+    youDied !== null ||
+    passPending;
 
   return (
     <div className="app">
@@ -148,6 +156,21 @@ export function App(): JSX.Element {
       )}
       {youDied !== null && (
         <YouDiedOverlay dead={youDied} onContinue={() => setYouDied(null)} />
+      )}
+      {passPending && hotseat !== null && (
+        <SeatSwap
+          mode="pass"
+          nextName={hotseat.names[gameState.activeSeat] ?? `Player ${gameState.activeSeat + 1}`}
+          onContinue={() => useGameStore.getState().continuePass()}
+        />
+      )}
+      {showGameOverOverlay && (
+        <SeatSwap
+          mode="gameOver"
+          winners={gameOver?.winners}
+          playerNames={hotseat?.names}
+          onContinue={() => useGameStore.getState().quitHotseat()}
+        />
       )}
     </div>
   );

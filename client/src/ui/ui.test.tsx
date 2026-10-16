@@ -5,6 +5,7 @@ import { setup, startTurn, applyAction, PREMIER_CARDS, FIRST_TIMER_PILES } from 
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
 import { YouDiedOverlay } from './YouDiedOverlay';
+import { SeatSwap } from './SeatSwap';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
@@ -273,6 +274,34 @@ describe('YouDiedOverlay', () => {
   });
 });
 
+describe('SeatSwap (M4-T10)', () => {
+  it('pass mode names the next player and hides nothing until tapped', () => {
+    const html = renderToStaticMarkup(
+      <SeatSwap mode="pass" nextName="Jill" onContinue={() => {}} />
+    );
+    expect(html).toContain('PASS THE DEVICE');
+    expect(html).toContain('Jill');
+    expect(html).toContain('Reveal my hand');
+  });
+
+  it('gameOver mode lists the winners by name', () => {
+    const html = renderToStaticMarkup(
+      <SeatSwap mode="gameOver" winners={[1]} playerNames={['Chris', 'Jill']} onContinue={() => {}} />
+    );
+    expect(html).toContain('CHAMPION');
+    expect(html).toContain('Jill');
+    expect(html).toContain('Back to lobby');
+  });
+
+  it('gameOver with multiple winners reads as a shared victory', () => {
+    const html = renderToStaticMarkup(
+      <SeatSwap mode="gameOver" winners={[0, 2]} playerNames={['A', 'B', 'C']} onContinue={() => {}} />
+    );
+    expect(html).toContain('SHARED VICTORY');
+    expect(html).toContain('A &amp; C');
+  });
+});
+
 describe('ActionBar (T07)', () => {
   it('offers end turn on my turn and disables explore with no legal combo', () => {
     const state = twoPlayerState();
@@ -302,12 +331,25 @@ describe('ActionBar (T07)', () => {
 });
 
 describe('Lobby (T08)', () => {
+  const lobbyProps = (over: Partial<Parameters<typeof Lobby>[0]> = {}) => ({
+    room: null as Parameters<typeof Lobby>[0]['room'],
+    clientId: null,
+    status: 'connected',
+    onCreateRoom: () => {},
+    onJoinRoom: () => {},
+    onSelectSeat: () => {},
+    onAddBot: () => {},
+    onRemoveBot: () => {},
+    onStart: () => {},
+    onStartHotseat: () => {},
+    ...over,
+  });
+
   it('renders the create/join forms with no room', () => {
-    const html = renderToStaticMarkup(
-      <Lobby room={null} clientId={null} status="connected" onCreateRoom={() => {}} onJoinRoom={() => {}} onSelectSeat={() => {}} onAddBot={() => {}} onRemoveBot={() => {}} onStart={() => {}} />,
-    );
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     expect(html).toContain('Create room');
     expect(html).toContain('Join room');
+    expect(html).toContain('Pass &amp; Play');
   });
 
   it('renders seats, room code and host controls in a room', () => {
@@ -320,9 +362,7 @@ describe('Lobby (T08)', () => {
         { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
       ],
     };
-    const html = renderToStaticMarkup(
-      <Lobby room={room} clientId="c1" status="connected" onCreateRoom={() => {}} onJoinRoom={() => {}} onSelectSeat={() => {}} onAddBot={() => {}} onRemoveBot={() => {}} onStart={() => {}} />,
-    );
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
     expect(html).toContain('Seat 0');
     expect(html).toContain('Bot');
