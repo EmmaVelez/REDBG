@@ -306,12 +306,8 @@ h1, h2 { margin: 0 0 8px; }
   font-weight: 700;
   color: #ffb86b;
 }
-.skill-gate-open {
-  color: #7bd88f;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+.skill-locked .skill-gate { color: #ff8a6b; }
+.skill-unlocked .skill-gate { color: #7bd88f; }
 .skill-text {
   font-size: 10px;
   line-height: 1.3;

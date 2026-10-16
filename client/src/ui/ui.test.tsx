@@ -75,14 +75,14 @@ describe('CardView (T03)', () => {
     expect(lockedHtml).toContain('skill-locked');
     expect(lockedHtml).toContain(`data-skill-level="1"`);
     expect(lockedHtml).toContain(`data-skill-level="2"`);
-    expect(lockedHtml).toContain(`data-skill-gate`);
-    expect(lockedHtml).toContain(`★ 1`); // needs one more decoration
-    // level 1 is always unlocked
-    expect(lockedHtml).toContain('skill-unlocked');
-    // unlocked: at or above threshold
+    // every level shows the gate; Lv1 is always ★ 0, Lv2 shows remaining
+    expect(lockedHtml).toContain(`★ 0`);
+    expect(lockedHtml).toContain(`★ 1`); // one more decoration needed
+    expect((lockedHtml.match(/data-skill-gate/g) ?? []).length).toBe(2);
+    // unlocked: at or above threshold -> both gates read ★ 0
     const unlockedHtml = renderToStaticMarkup(<CardView def={charDef} decorations={charDef.level2At} />);
-    expect(unlockedHtml).not.toContain('data-skill-gate');
-    expect(unlockedHtml).toContain('unlocked');
+    expect(unlockedHtml).toContain(`★ 0`);
+    expect(unlockedHtml).not.toContain(`★ 1`);
     expect(unlockedHtml).not.toContain('skill-locked');
   });
 

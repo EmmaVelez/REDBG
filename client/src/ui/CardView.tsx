@@ -52,9 +52,9 @@ function CharacterSkills({ def, decorations }: { def: CardDef; decorations: numb
   return (
     <div className="card-skills" data-decorations={decorations} data-level2-at={level2At}>
       {levels.map(entry => {
-        // Level 1 is always unlocked; level 2 unlocks at the decoration gate.
-        const unlocked = entry.level === 1 || decorations >= level2At;
+        // Level 1 unlocks at 0 decorations; level 2 at the level2At gate.
         const need = entry.level === 1 ? 0 : Math.max(level2At - decorations, 0);
+        const unlocked = need === 0;
         return (
           <div
             key={entry.level}
@@ -64,8 +64,7 @@ function CharacterSkills({ def, decorations }: { def: CardDef; decorations: numb
           >
             <span className="skill-header">
               <span className="skill-level">Lv{entry.level}</span>
-              {!unlocked && <span className="skill-gate" data-skill-gate>★ {need}</span>}
-              {unlocked && entry.level > 1 && <span className="skill-gate skill-gate-open">unlocked</span>}
+              <span className="skill-gate" data-skill-gate>★ {need}</span>
             </span>
             <span className="skill-text">{entry.text}</span>
           </div>
