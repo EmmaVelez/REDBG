@@ -118,7 +118,13 @@ export type WeaponTag = "explosive" | "melee" | "gun";
 export type WeaponEffect =
   | { readonly kind: "plusDamagePerExtraWeapon"; readonly amount: number }   // Burst-Fire Handgun: +20 when attacking with >1 weapon
   | { readonly kind: "plusDamageIfAmmoAbove"; readonly threshold: number; readonly amount: number } // Full-Bore MG: +30 if ammo > 100
-  | { readonly kind: "grantExplores"; readonly amount: number };             // Pump-Action Shotgun: +1 Explore
+  | { readonly kind: "grantExplores"; readonly amount: number }             // Pump-Action Shotgun: +1 Explore
+  | { readonly kind: "instantKillAtOrBelowHp"; readonly hp: number }        // Automatic Shotgun: instantly defeats Infected with HP <= N
+  | { readonly kind: "plusDamagePerActionPlayedThisTurn"; readonly amount: number } // Semi-Automatic Rifle: +10 per Action card played this turn
+  | { readonly kind: "plusDamageIfSelfHpAtLeast"; readonly hp: number; readonly amount: number } // Submission: +5 if user has 80+ HP
+  | { readonly kind: "damageEqualsCurrentAmmo" }                            // Gatling Gun: X = player's current Ammo
+  | { readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number } // Bolt-Action Rifle: reveal top card of Inventory; if its Gold cost >= N, +amount dmg
+  | { readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number };   // Survival Knife: +5 per Knife-type weapon used this attack
 
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
@@ -137,7 +143,10 @@ export type ActionEffect =
   | { readonly kind: "moveHandCardToTopOfInventory" }                        // Umbrella Corp (choice via Prompt)
   | { readonly kind: "trashHandCard" }                                       // Ominous Battle (choice via Prompt)
   | { readonly kind: "negateWeaponCost40OrLessFromHand" }                    // Struggle for Survival (reactive)
-  | { readonly kind: "lookAtMansionTop"; readonly count: number };           // Mansion Foyer style peek (Prompt ordering)
+  | { readonly kind: "lookAtMansionTop"; readonly count: number }           // Mansion Foyer style peek (Prompt ordering)
+  | { readonly kind: "trashUpToTwoFromDiscard" }                             // Shattered Memories (multi-choice)
+  | { readonly kind: "upgradeAmmoBy30Gold" }                                 // Item Management: trash 1 Ammo from hand, gain one worth 30 Gold more
+  | { readonly kind: "stealRevealedWeaponsFromOpponentsTopCards" };          // Master of Unlocking
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
