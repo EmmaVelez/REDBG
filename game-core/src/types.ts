@@ -327,8 +327,8 @@ export interface Prompt {
   readonly text: string;
   readonly options: readonly string[];
   /** Machine-readable data the reducer needs to resolve this prompt
-   *  (e.g. which card instance to move/trash). Optional. */
-  readonly payload?: Readonly<Record<string, string>>;
+     *  (e.g. which card instance to move/trash). Optional. */
+    readonly payload?: Readonly<Record<string, string | number>>;
 }
 
 // ---------------------------------------------------------------------------

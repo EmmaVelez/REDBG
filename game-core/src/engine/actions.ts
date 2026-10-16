@@ -124,12 +124,20 @@ export function applyAction(state: GameState, action: Action): GameState {
                   break;
                 }
         if (e.kind === 'lookAtMansionTop') {
-          promptKind = 'lookAtMansionTop';
-          promptOptions = ['OK'];
-          break;
-        }
-        // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
-      }
+                  promptKind = 'lookAtMansionTop';
+                  promptOptions = ['OK'];
+                  break;
+                }
+                if (e.kind === 'trashUpToTwoFromDiscard') {
+                  // Up to 2 choices: offer the whole discard, DONE ends the chain.
+                  if (player.discard.length > 0) {
+                    promptKind = 'trashUpToTwoFromDiscard';
+                    promptOptions = [...player.discard, 'DONE'];
+                  }
+                  break;
+                }
+                // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
+              }
       if (promptKind !== undefined && promptOptions !== undefined) {
         prompts = [
           ...prompts,
@@ -486,16 +494,57 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       if (kind === 'trashHandCard' && chosenId !== undefined) {
-        return {
-          ...state,
-          ...nextBase,
-          seats: state.seats.map(s =>
-            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
-          ),
-          removed: [...state.removed, chosenId],
-          prompts: newPrompts,
-        };
-      }
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
+                ),
+                removed: [...state.removed, chosenId],
+                prompts: newPrompts,
+              };
+            }
+
+            if (kind === 'trashUpToTwoFromDiscard') {
+              // Options are discard instance ids + a 'DONE' sentinel. Each non-DONE
+              // choice trashes that card; up to 2 total, then the prompt chain ends.
+              const alreadyTrashed = typeof prompt.payload?.trashed === 'number' ? prompt.payload.trashed : 0;
+              if (chosenId === 'DONE' || chosenId === undefined || !player.discard.includes(chosenId)) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s => (s.seat === seat ? { ...player, discard: player.discard.filter(id => id !== chosenId) } : s)),
+                  removed: chosenId !== 'DONE' && chosenId !== undefined ? [...state.removed, chosenId] : state.removed,
+                  prompts: newPrompts,
+                };
+              }
+              const n = alreadyTrashed + 1;
+              let prompts = newPrompts;
+              if (n < 2) {
+                const remaining = player.discard.filter(id => id !== chosenId);
+                if (remaining.length > 0) {
+                  prompts = [
+                    ...prompts,
+                    {
+                      id: `${prompt.id}:t${n}`,
+                      seat,
+                      text: prompt.text,
+                      options: [...remaining, 'DONE'],
+                      payload: { kind: 'trashUpToTwoFromDiscard', trashed: n },
+                    },
+                  ];
+                }
+              }
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat ? { ...player, discard: player.discard.filter(id => id !== chosenId) } : s,
+                ),
+                removed: [...state.removed, chosenId],
+                prompts,
+              };
+            }
 
       if (kind === 'healGreenHerb') {
         if (option === 0) {

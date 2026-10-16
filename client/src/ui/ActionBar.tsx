@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
+import { defForInstance } from './cards';
 
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
@@ -31,6 +32,13 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
     ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
     : undefined;
   const prompt = state.prompts.find(p => p.seat === seat);
+  // Prompt options are instance ids (or 'DONE' for multi-choice chains);
+  // render readable names when the id resolves to a card def.
+  const optionLabel = (opt: string): string => {
+    if (opt === 'DONE') return 'Done';
+    const def = defForInstance(state, opt);
+    return def !== null ? def.name : opt;
+  };
   const phaseNote = state.phase === 'gameOver' ? 'Game over'
     : state.phase === 'turnEnd' ? 'Resolving turn end…'
     : state.activeSeat === seat ? undefined
@@ -45,14 +53,14 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
           <span className="prompt-text">{prompt.text}</span>
           <div className="prompt-options">
             {prompt.options.map((opt, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onAction({ type: 'chooseOption', seat, promptId: prompt.id, option: i })}
-              >
-                {opt}
-              </button>
-            ))}
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => onAction({ type: 'chooseOption', seat, promptId: prompt.id, option: i })}
+                          >
+                            {optionLabel(opt)}
+                          </button>
+                        ))}
           </div>
         </div>
       )}

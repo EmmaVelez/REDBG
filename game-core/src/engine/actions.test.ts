@@ -25,6 +25,7 @@ const DEFS: Record<string, CardDef> = {
   'ac-3': { id: 'ac-3', name: 'Reload', type: 'action', set: 'premier', text: 'Reload', copies: 5, cost: 20, actionEffects: [{ kind: 'recoverWeaponFromDiscardToHand' }] },
   'ac-4': { id: 'ac-4', name: 'Umbrella', type: 'action', set: 'premier', text: 'Umbrella', copies: 5, cost: 50, actionEffects: [{ kind: 'moveHandCardToTopOfInventory' }] },
   'ac-5': { id: 'ac-5', name: 'Ominous Battle', type: 'action', set: 'premier', text: 'Ominous Battle', copies: 5, cost: 60, actionEffects: [{ kind: 'trashHandCard' }] },
+  'ac-6': { id: 'ac-6', name: 'Shattered Memories', type: 'action', set: 'premier', text: 'Shattered Memories', copies: 5, cost: 20, actionEffects: [{ kind: 'trashUpToTwoFromDiscard' }] },
   'it-1': { id: 'it-1', name: 'Green Herb', type: 'item', set: 'premier', text: 'Green Herb', copies: 6, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
   'it-2': { id: 'it-2', name: 'First Aid Spray', type: 'item', set: 'premier', text: 'First Aid Spray', copies: 5, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
   'am-1': { id: 'am-1', name: 'Ammo x10', type: 'ammunition', set: 'premier', text: 'Ammo x10', copies: 28, bonuses: { ammo: 10, gold: 10 } },
@@ -44,7 +45,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState> } =
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: ['mkr1'] } },
     mansionDeck: over.mansionDeck ?? ['inf1'], mansionBottom: over.mansionBottom ?? [], removed: over.removed ?? [],
     cards: {
-      'a1': inst('a1', 'ac-1'), 'a2': inst('a2', 'ac-2'), 'a3': inst('a3', 'ac-3'), 'a4': inst('a4', 'ac-4'), 'a5': inst('a5', 'ac-5'),
+      'a1': inst('a1', 'ac-1'), 'a2': inst('a2', 'ac-2'), 'a3': inst('a3', 'ac-3'), 'a4': inst('a4', 'ac-4'), 'a5': inst('a5', 'ac-5'), 'a6': inst('a6', 'ac-6'),
       'i1': inst('i1', 'it-1'), 'i2': inst('i2', 'it-1'), 'i3': inst('i3', 'it-2'),
       'am1': inst('am1', 'am-1'), 'am2': inst('am2', 'am-1'),
       'w1': inst('w1', 'we-1'), 'w2': inst('w2', 'we-1'),
@@ -258,6 +259,50 @@ test('useCharacterAbility no-op', () => {
   expect(s.log.length).toBe(1);
   expect(p0(s).hp).toBe(100);
   expect(p0(s).decorations).toBe(0);
+});
+
+test('Shattered Memories (trashUpToTwoFromDiscard) prompts with discard options', () => {
+  // ac-6 = Shattered Memories; seat 0 has three cards in discard
+  const s = applyAction(baseState({ seat0: { hand: ['a6'], discard: ['am2', 'w5', 'inv1'] } }), { type: 'playActionCard', seat: 0, instanceId: 'a6' });
+  expect(s.prompts.length).toBe(1);
+  expect(pr(s).payload?.kind).toBe('trashUpToTwoFromDiscard');
+  // options = discard cards (in order) + DONE sentinel
+  expect(pr(s).options).toEqual(['am2', 'w5', 'inv1', 'DONE']);
+});
+
+test('Shattered Memories: choosing a card trashes it and chains the prompt', () => {
+  const s0 = applyAction(baseState({ seat0: { hand: ['a6'], discard: ['am2', 'w5', 'inv1'] } }), { type: 'playActionCard', seat: 0, instanceId: 'a6' });
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 0 }); // trash am2
+  expect(s1.removed).toContain('am2');
+  expect(p0(s1).discard).toEqual(['w5', 'inv1']);
+  // up to 2: a follow-up prompt offers the remaining discard
+  expect(s1.prompts.length).toBe(1);
+  expect(pr(s1).payload?.kind).toBe('trashUpToTwoFromDiscard');
+  expect(pr(s1).payload?.trashed).toBe(1);
+  expect(pr(s1).options).toEqual(['w5', 'inv1', 'DONE']);
+  // trash a second card — chain ends (max 2)
+  const s2 = applyAction(s1, { type: 'chooseOption', seat: 0, promptId: pr(s1).id, option: 0 }); // trash w5
+  expect(s2.removed).toEqual(['am2', 'w5']);
+  expect(p0(s2).discard).toEqual(['inv1']);
+  expect(s2.prompts.length).toBe(0); // hit the 2-card cap, prompt closed
+});
+
+test('Shattered Memories: DONE ends the chain without trashing more', () => {
+  const s0 = applyAction(baseState({ seat0: { hand: ['a6'], discard: ['am2', 'w5', 'inv1'] } }), { type: 'playActionCard', seat: 0, instanceId: 'a6' });
+  // choose one card, then DONE
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 0 });
+  const s2 = applyAction(s1, { type: 'chooseOption', seat: 0, promptId: pr(s1).id, option: 2 }); // DONE
+  expect(s2.removed).toEqual(['am2']);
+  expect(p0(s2).discard).toEqual(['w5', 'inv1']);
+  expect(s2.prompts.length).toBe(0);
+});
+
+test('Shattered Memories: DONE immediately keeps the discard intact', () => {
+  const s0 = applyAction(baseState({ seat0: { hand: ['a6'], discard: ['am2', 'w5'] } }), { type: 'playActionCard', seat: 0, instanceId: 'a6' });
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 2 }); // DONE
+  expect(s1.removed).toEqual([]);
+  expect(p0(s1).discard).toEqual(['am2', 'w5']);
+  expect(s1.prompts.length).toBe(0);
 });
 
 test('invalid action throws', () => {
