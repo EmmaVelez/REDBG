@@ -1,4 +1,5 @@
 import { setup, startTurn, checkWin } from './game';
+import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
 import type { GameSetup, GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function def(id: string, over: Partial<CardDef> = {}): CardDef {
@@ -103,6 +104,52 @@ test('setup character assignment with explicit ids', () => {
   expect(p1(s).hp).toBe(100);
 });
 
+test('setup never deals the same character twice (random picks draw without replacement)', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const s = setup(
+      {
+        seed,
+        players: [
+          { name: 'A', controller: 'human' as const },
+          { name: 'B', controller: 'human' as const },
+          { name: 'C', controller: 'human' as const },
+          { name: 'D', controller: 'human' as const },
+        ],
+      },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES
+    );
+    const seen = new Set<string>();
+    for (const p of s.seats) {
+      const id = p.characterInstanceId.replace(/#.*$/, '');
+      expect(id).not.toBe('');
+      expect(seen.has(id)).toBe(false);
+      seen.add(id);
+    }
+  }
+});
+
+test('setup rejects a duplicate explicit character', () => {
+  expect(() =>
+    setup2(1, [
+      { name: 'A', characterCardId: 'ch-1' },
+      { name: 'B', characterCardId: 'ch-1' },
+    ])
+  ).toThrow(/already assigned/);
+});
+
+test('setup rejects when players outnumber unique characters', () => {
+  expect(() =>
+    setup2(1, [
+      { name: 'A', characterCardId: 'ch-1' },
+      { name: 'B', characterCardId: 'ch-2' },
+      { name: 'C' },
+      { name: 'D' },
+      { name: 'E' },
+    ])
+  ).toThrow(/not enough unique characters/);
+});
+
 test('setup deterministic', () => {
   expect(setup2(1)).toEqual(setup2(1));
 });
@@ -137,7 +184,7 @@ test('startTurn resets pools', () => {
 });
 
 test('startTurn skips downed player', () => {
-  const s = setup2(1, [{ name: 'A', characterCardId: 'ch-1' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const s = setup2(1, [{ name: 'A', characterCardId: 'ch-1' }, { name: 'B', characterCardId: 'ch-2' }]);
   const downed = seatMap(s, (p, i) => i === 0 ? {
     ...p,
     downed: true,

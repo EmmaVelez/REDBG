@@ -28,14 +28,31 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
 
   const characterIds = cards.filter(c => c.type === 'character').map(c => c.id);
+  // Characters are unique per game (user ruling): each seat gets its own
+  // character card. Random picks draw from the remaining pool (no
+  // replacement), and explicit picks consume their slot — a duplicate
+  // explicit character that another seat already claimed is a setup error.
+  const remainingCharacters = [...characterIds];
 
   const seats: PlayerState[] = setup.players.map((p, i) => {
     let characterCardId = p.characterCardId;
-    if (characterCardId === undefined && characterIds.length > 0) {
-      const pick = nextInt(rng, characterIds.length);
+    if (characterCardId === undefined) {
+      if (remainingCharacters.length === 0) {
+        throw new Error(`not enough unique characters for ${setup.players.length} players`);
+      }
+      const pick = nextInt(rng, remainingCharacters.length);
       rng = pick.rng;
-      characterCardId = characterIds[pick.value];
+      characterCardId = remainingCharacters[pick.value] as string;
+      remainingCharacters.splice(pick.value, 1);
+    } else if (remainingCharacters.includes(characterCardId)) {
+      // Explicit pick: remove it from the pool so later random picks cannot
+      // collide with it.
+      remainingCharacters.splice(remainingCharacters.indexOf(characterCardId), 1);
+    } else if (characterIds.includes(characterCardId)) {
+      // A known character that an earlier seat already claimed.
+      throw new Error(`character ${characterCardId} already assigned to another player`);
     }
+    // Unknown explicit id: legacy lenient behavior (default stats), no pool slot.
     characterCardId = characterCardId ?? '';
     const def = defsById.get(characterCardId);
     const maxHp = def?.maxHp ?? 100;
