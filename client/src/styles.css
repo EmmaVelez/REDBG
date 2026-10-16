@@ -310,7 +310,7 @@ h1, h2 { margin: 0 0 8px; }
   flex-direction: column;
   gap: 6px;
   flex: 1;
-  min-height: 140px;
+  min-height: 260px;
   overflow: hidden;
 }
 .log-turn { display: flex; gap: 10px; align-items: baseline; }
@@ -318,7 +318,51 @@ h1, h2 { margin: 0 0 8px; }
 .turn-active { color: var(--muted); }
 .phase-note { color: #ffd479; }
 .log-error { color: #ff8a7a; font-weight: 700; }
-.log-chat { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+.log-section {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* scrollable turn history (all seats) */
+.log-history { display: flex; flex-direction: column; gap: 4px; min-height: 0; flex: 1; }
+.log-history-scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 60px;
+  max-height: 40vh;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-line {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.history-turn { color: var(--gold); font-weight: 700; flex-shrink: 0; }
+.history-seat { color: var(--muted); flex-shrink: 0; }
+.history-text { color: var(--text); }
+
+/* chat */
+.log-chat-block { display: flex; flex-direction: column; gap: 4px; }
+.log-chat {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: 110px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  padding: 4px 8px;
+}
 .log-line { display: flex; gap: 8px; }
 .log-seat { color: var(--muted); flex-shrink: 0; }
 .log-empty { color: var(--muted); }

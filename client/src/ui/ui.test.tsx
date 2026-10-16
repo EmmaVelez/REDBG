@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { GameState } from '@re/game-core';
-import { setup, startTurn, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
+import { setup, startTurn, applyAction, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
@@ -238,4 +238,31 @@ describe('GameLog (T09)', () => {
     const html = renderToStaticMarkup(<GameLog state={null} chat={[]} lastError={null} seatNames={[]} />);
     expect(html).toContain('No messages yet');
   });
+
+  it('renders a scrollable turn history with all seats', () => {
+    const s0 = twoPlayerState();
+    // build a small action history: seat 0 plays ammo, ends turn; seat 1 buys
+    const s1 = applyAction(s0, { type: 'playAmmo', seat: 0, instanceId: firstAmmoInHand(s0) } as never);
+    const s2 = applyAction(s1, { type: 'endTurn', seat: 0 } as never);
+    const pileId = Object.keys(s2.marketPiles)[0] as string;
+    const s3 = applyAction(s2, { type: 'buy', seat: 1, pileId } as never);
+    const html = renderToStaticMarkup(
+      <GameLog state={s3} chat={[]} lastError={null} seatNames={['Me', 'Bot']} />,
+    );
+    expect(html).toContain('Turn history');
+    expect(html).toContain('T1');
+    expect(html).toContain('Me:');
+    expect(html).toContain('Bot:');
+    expect(html).toContain('played ammo');
+    expect(html).toContain('ended their turn');
+    expect(html).toContain('bought');
+    expect((html.match(/data-history/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
 });
+
+function firstAmmoInHand(state: GameState): string | undefined {
+  return state.seats[0]?.hand.find(id => {
+    const inst = state.cards[id];
+    return inst !== undefined && state.cardDefs[inst.cardId]?.type === 'ammunition';
+  });
+}

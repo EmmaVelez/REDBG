@@ -159,6 +159,23 @@ export function createHost(room: Room): GameHost {
  */
 export function sanitize(state: GameState, viewerSeat: number): GameState {
   const hiddenFor = (zone: readonly string[]): readonly string[] => zone.map((_, i) => `${HIDDEN_ID}-${i}`);
+  // Redact logged card ids of OTHER seats so the action history never leaks
+  // hidden info (hand plays, inventory draws, discard buys). The action kind
+  // and public data (pileId, seat, counts) stay visible; the viewer's own
+  // log entries keep real ids.
+  const redactAction = (action: Action): Action => {
+    if (!('seat' in action) || action.seat === viewerSeat) return action;
+    switch (action.type) {
+      case 'playActionCard':
+      case 'playItem':
+      case 'playAmmo':
+        return { ...action, instanceId: `${HIDDEN_ID}-card` };
+      case 'explore':
+        return { ...action, weapons: action.weapons.map((_, i) => `${HIDDEN_ID}-w${i}`) };
+      default:
+        return action;
+    }
+  };
   return {
     ...state,
     seats: state.seats.map(s => {
@@ -173,5 +190,6 @@ export function sanitize(state: GameState, viewerSeat: number): GameState {
         playArea: hiddenFor(s.playArea),
       };
     }),
+    log: state.log.map(entry => ({ seq: entry.seq, action: redactAction(entry.action) })),
   };
 }
