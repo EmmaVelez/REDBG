@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '@re/game-core';
 import { detectReveal, diffCardMoves } from './anims';
-import { flightPath } from './CardFlightLayer';
+import { flightPath, splitFlightPhases } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
 function makeState(over: {
@@ -203,5 +203,22 @@ describe('flightPath', () => {
     const path = flightPath({ x: 100, y: 100 }, { x: 100, y: 100 });
     expect(path.dx).toBe(0);
     expect(path.dy).toBe(0);
+  });
+});
+
+describe('splitFlightPhases', () => {
+  const reshuffleMove = { instanceId: 'd1', fromZone: 'discard' as const, toZone: 'deck' as const, faceDown: true };
+  const drawMove = { instanceId: 'c1', fromZone: 'deck' as const, toZone: 'hand' as const, faceDown: true };
+
+  it('puts the reshuffle (discard->deck) in phase 1 and draws in phase 2', () => {
+    const { reshuffle, rest } = splitFlightPhases([drawMove, reshuffleMove, drawMove]);
+    expect(reshuffle).toEqual([reshuffleMove]);
+    expect(rest).toEqual([drawMove, drawMove]);
+  });
+
+  it('returns everything as rest when there is no reshuffle', () => {
+    const { reshuffle, rest } = splitFlightPhases([drawMove]);
+    expect(reshuffle).toHaveLength(0);
+    expect(rest).toEqual([drawMove]);
   });
 });

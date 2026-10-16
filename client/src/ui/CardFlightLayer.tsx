@@ -81,46 +81,75 @@ function visible(sel: string): boolean {
   return r.bottom > 0 && r.top < (window.innerHeight ?? 0) && r.right > 0 && r.left < (window.innerWidth ?? 0);
 }
 
-function flyCard(flight: Flight, state: GameState, done: () => void): void {
-  const from = rectCenter(zoneSelector(flight.fromZone, flight.fromPileId));
-  const to = rectCenter(zoneSelector(flight.toZone, flight.toPileId));
-  if (from === null || to === null) {
-    done();
-    return;
-  }
-  // Skip flights whose source or destination is off-screen — the card would
-  // travel through the viewport edge for no benefit.
-  if (!visible(zoneSelector(flight.fromZone, flight.fromPileId)) || !visible(zoneSelector(flight.toZone, flight.toPileId))) {
-    done();
-    return;
-  }
-  const el = document.createElement('div');
-  el.className = 'flight-card';
-  const path = flightPath(from, to);
-  el.style.left = `${path.from.x}px`;
-  el.style.top = `${path.from.y}px`;
-  el.appendChild(
-    buildFlightCard(flight.faceDown ? null : defForInstance(state, flight.instanceId))
-  );
-  document.body.appendChild(el);
-  // Linear travel: straight translate from the source position to the target.
-  // 665ms = 380ms slowed by 75% — readable without dragging.
-  el.animate(
-    [
-      { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1 },
-      { transform: `translate(${path.dx}px, ${path.dy}px) rotate(0deg) scale(0.75)`, opacity: 0 },
-    ],
-    { duration: 665, easing: 'linear' }
-  ).finished.then(() => {
-    el.remove();
-    done();
+const FLIGHT_MS = 665; // per-card travel time (linear)
+const STAGGER_MS = 80; // gap between flights in the same batch
+const PHASE_GAP_MS = 180; // beat between reshuffle and draw phases
+
+function flyCard(flight: Flight, state: GameState): Promise<void> {
+  return new Promise(resolve => {
+    const from = rectCenter(zoneSelector(flight.fromZone, flight.fromPileId));
+    const to = rectCenter(zoneSelector(flight.toZone, flight.toPileId));
+    if (from === null || to === null) {
+      resolve();
+      return;
+    }
+    // Skip flights whose source or destination is off-screen — the card would
+    // travel through the viewport edge for no benefit.
+    if (!visible(zoneSelector(flight.fromZone, flight.fromPileId)) || !visible(zoneSelector(flight.toZone, flight.toPileId))) {
+      resolve();
+      return;
+    }
+    const el = document.createElement('div');
+    el.className = 'flight-card';
+    const path = flightPath(from, to);
+    el.style.left = `${path.from.x}px`;
+    el.style.top = `${path.from.y}px`;
+    el.appendChild(
+      buildFlightCard(flight.faceDown ? null : defForInstance(state, flight.instanceId))
+    );
+    document.body.appendChild(el);
+    // Linear travel: straight translate from the source position to the target.
+    el.animate(
+      [
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1 },
+        { transform: `translate(${path.dx}px, ${path.dy}px) rotate(0deg) scale(0.75)`, opacity: 0 },
+      ],
+      { duration: FLIGHT_MS, easing: 'linear' }
+    ).finished.then(() => {
+      el.remove();
+      resolve();
+    });
   });
+}
+
+/** Wait for the longest flight in a staggered batch to land. */
+function batchDuration(count: number): number {
+  return count === 0 ? 0 : (count - 1) * STAGGER_MS + FLIGHT_MS;
+}
+
+/** True when a move is the reshuffle of the discard pile back into the deck. */
+function isReshuffle(move: CardMove): boolean {
+  return move.fromZone === 'discard' && move.toZone === 'deck';
+}
+
+/**
+ * Order moves for playback: the reshuffle phase (discard -> deck) comes
+ * FIRST, everything else (usually draws) second. The draw flights only start
+ * after the reshuffle has landed.
+ */
+export function splitFlightPhases(
+  moves: readonly CardMove[]
+): { readonly reshuffle: readonly CardMove[]; readonly rest: readonly CardMove[] } {
+  const reshuffle = moves.filter(isReshuffle);
+  const rest = moves.filter(m => !isReshuffle(m));
+  return { reshuffle, rest };
 }
 
 export function CardFlightLayer({ state }: { state: GameState }): JSX.Element {
   const prevRef = useRef<GameState | null>(null);
   const batchRef = useRef<ReadonlySet<string>>(new Set());
   const [flights, setFlights] = useState<readonly Flight[]>([]);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     const prev = prevRef.current;
@@ -131,36 +160,75 @@ export function CardFlightLayer({ state }: { state: GameState }): JSX.Element {
     if (typeof document === 'undefined') {
       return; // SSR test rendering — no DOM to animate
     }
-    const moves = diffCardMoves(prev, state);
+    // Cap generously (16): a reshuffle (discard -> deck) plus a 5-card draw
+    // both fly in this transition; the default 10 could truncate the pile.
+    const moves = diffCardMoves(prev, state, 16);
     // Drop any previous batch that never got to fly (superseded mid-burst).
     setFlights(prevFlights => prevFlights.filter(f => !batchRef.current.has(f.key)));
     if (moves.length === 0) {
       batchRef.current = new Set();
       return;
     }
-    const after: Flight[] = moves.map((m, i) => ({
-      ...m,
-      key: `${state.version}-${m.instanceId}-${i}`,
-    }));
-    batchRef.current = new Set(after.map(f => f.key));
-    setFlights(prevFlights => [...prevFlights, ...after]);
-    const timers = after.map((flight, i) =>
-      setTimeout(() => {
-        flyCard(flight, state, () => {
-          setFlights(prevFlights => prevFlights.filter(f => f.key !== flight.key));
-        });
-      }, i * 80)
+
+    // Phase 1: reshuffle (discard flies back into the deck). Phase 2: the rest
+    // (usually draws). The draw flights never start until the reshuffle has
+    // finished landing, so the player sees the pile rebuild first.
+    const { reshuffle, rest } = splitFlightPhases(moves);
+
+    const all: readonly (readonly CardMove[])[] = reshuffle.length > 0 ? [reshuffle, rest] : [rest];
+    const allFlattened: Flight[] = [];
+    let stamp = 0;
+    const keyed: Flight[][] = all.map(group =>
+      group.map((m, i) => {
+        const flight: Flight = { ...m, key: `${state.version}-${stamp++}-${i}` };
+        allFlattened.push(flight);
+        return flight;
+      })
     );
-    // Fallback purge so a batch can never leak if a flight's animation is
-    // interrupted (e.g. tab hidden). Runs after the longest flight + margin.
+    batchRef.current = new Set(allFlattened.map(f => f.key));
+    setFlights(prevFlights => [...prevFlights, ...allFlattened]);
+
+    cancelledRef.current = false;
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
+
+    // Play the phases in order; each flight in a phase is staggered, and the
+    // next phase waits for this phase's longest flight plus a beat.
+    const playPhases = async (): Promise<void> => {
+      for (const group of keyed) {
+        if (cancelledRef.current) break;
+        if (group.length === 0) continue;
+        group.forEach((flight, i) => {
+          timers.push(
+            setTimeout(() => {
+              if (cancelledRef.current) return;
+              void flyCard(flight, state).then(() => {
+                setFlights(prevFlights => prevFlights.filter(f => f.key !== flight.key));
+              });
+            }, i * STAGGER_MS)
+          );
+        });
+        // Wait for this phase's longest flight + the inter-phase beat before
+        // scheduling the next phase (draws only start once the reshuffle
+        // has landed).
+        const waitFor = Date.now() + batchDuration(group.length) + PHASE_GAP_MS;
+        while (!cancelledRef.current && Date.now() < waitFor) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+      }
+    };
+    void playPhases();
+
+    // Fallback purge so a batch can never leak if flights are interrupted.
+    const total = keyed.reduce((sum, g) => sum + batchDuration(g.length), 0) + PHASE_GAP_MS * (keyed.length - 1);
     const purge = setTimeout(() => {
       setFlights(prevFlights =>
-        prevFlights.filter(f => !after.some(a => a.key === f.key))
+        prevFlights.filter(f => !allFlattened.some(a => a.key === f.key))
       );
-    }, 700 + after.length * 80 + 600);
+    }, total + 800);
+    timers.push(purge);
     return () => {
+      cancelledRef.current = true;
       timers.forEach(t => clearTimeout(t));
-      clearTimeout(purge);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
