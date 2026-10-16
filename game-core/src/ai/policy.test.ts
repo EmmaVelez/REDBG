@@ -1,0 +1,145 @@
+
+import { chooseGreedyAction } from './policy';
+import { enumerateLegalActions } from './enumerate';
+import { evaluateState } from './evaluate';
+import { applyAction } from '../engine/actions';
+import type { Action, GameState, CardDef, PlayerState } from '../types';
+
+function def(id: string, over: Partial<CardDef> = {}): CardDef {
+  return { id, name: id, type: 'weapon', set: 'premier', text: '', copies: 1, ...over } as CardDef;
+}
+
+const DEFS: Record<string, CardDef> = {
+  'ch-1': def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'generic', level: 2 }] }),
+  'am-1': def('am-1', { type: 'ammunition', copies: 28, bonuses: { ammo: 10, gold: 10 } }),
+  'we-1': def('we-1', { type: 'weapon', cost: 20, ammoReq: 20, damage: 10 }),
+  'we-2': def('we-2', { type: 'weapon', cost: 5, ammoReq: 0, damage: 8 }),
+  'we-3': def('we-3', { type: 'weapon', cost: 30, ammoReq: 0, damage: 30 }),
+  'ac-1': def('ac-1', { type: 'action', cost: 20, bonuses: { gold: 10 } }),
+  'it-1': def('it-1', { type: 'item', itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] }),
+  'ma-1': def('ma-1', { type: 'infected', hp: 25, attack: 10, decorations: 1 }),
+};
+
+function player(seat: number, over: Partial<PlayerState> = {}): PlayerState {
+  return {
+    seat, name: 'P' + seat, controller: 'human',
+    characterInstanceId: 'ch-1#' + seat, hp: 100, maxHp: 100,
+    decorations: 0, level: 1 as const,
+    turnAmmo: 0, turnGold: 0, actionsLeft: 1, buysLeft: 1, exploresLeft: 1,
+    weaponDamageBonusThisTurn: 0, attached: [],
+    inventory: ['inv1', 'inv2', 'inv3', 'inv4', 'inv5', 'inv6', 'inv7', 'inv8'],
+    hand: [], discard: [], playArea: [], downed: false, dead: false,
+    ...over,
+  };
+}
+
+function baseState(over: Partial<GameState> = {}): GameState {
+  const s: GameState = {
+    version: 1, seed: 1, rngState: 1, phase: 'main', activeSeat: 0, turnNumber: 1,
+    seats: [player(0), player(1)],
+    marketPiles: {
+      hg: { pileId: 'hg', cards: ['we-1#1'] },
+      kn: { pileId: 'kn', cards: ['we-2#1'] },
+    },
+    mansionDeck: ['ma-1#1', 'ma-1#2'], mansionBottom: [], removed: [],
+    cards: Object.fromEntries(['ch-1#0', 'ch-1#1', 'am-1#1', 'we-1#1', 'we-2#1', 'we-3#1', 'ac-1#1', 'it-1#1', 'ma-1#1', 'ma-1#2'].map(id => [id, { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } }])),
+    cardDefs: DEFS,
+    prompts: [], winners: [], endReason: undefined, log: [],
+    ...over,
+  };
+  return s;
+}
+
+// Manual argmax reimplementation: the test computes what the policy SHOULD pick
+// by simulating every legal action with the same functions the policy uses. This
+// pins the policy to true 1-ply greedy without hardcoding brittle scores.
+function manualArgmax(s: GameState, seat: number): Action {
+  const legal = enumerateLegalActions(s, seat);
+  let best = legal[0] as Action;
+  let bestScore = evaluateState(applyAction(s, legal[0] as Action), seat);
+  for (const a of legal.slice(1)) {
+    const score = evaluateState(applyAction(s, a), seat);
+    if (score > bestScore) { bestScore = score; best = a; }
+  }
+  return best;
+}
+
+describe('chooseGreedyAction', () => {
+  // 1. 'returns the manual 1-ply argmax'
+  test('returns the manual 1-ply argmax', () => {
+    const s = baseState({ seats: [player(0, { hand: ['we-1#1', 'we-2#1', 'am-1#1'] }), player(1)] });
+    expect(chooseGreedyAction(s, 0)).toEqual(manualArgmax(s, 0));
+  });
+
+  // 2. 'returns exactly one of the legal actions'
+  test('returns exactly one of the legal actions', () => {
+    const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'ac-1#1', 'it-1#1', 'we-1#1'] }), player(1)] });
+    const a = chooseGreedyAction(s, 0);
+    expect(enumerateLegalActions(s, 0)).toContainEqual(a);
+  });
+
+  // 3. 'deterministic on identical inputs'
+  test('deterministic on identical inputs', () => {
+    const s = baseState({ seats: [player(0, { hand: ['we-2#1', 'we-3#1'] }), player(1)] });
+    expect(chooseGreedyAction(s, 0)).toEqual(chooseGreedyAction(s, 0));
+  });
+
+  // 4. 'agrees with manual argmax on several hand compositions'
+  test('agrees with manual argmax on several hand compositions', () => {
+    const s1 = baseState({ seats: [player(0, { hand: ['we-3#1'] }), player(1)] });
+    expect(chooseGreedyAction(s1, 0)).toEqual(manualArgmax(s1, 0));
+
+    const s2 = baseState({ seats: [player(0, { hand: ['am-1#1', 'we-1#1', 'ac-1#1'] }), player(1)] });
+    expect(chooseGreedyAction(s2, 0)).toEqual(manualArgmax(s2, 0));
+
+    const s3 = baseState({ seats: [player(0, { hand: ['am-1#1'] }), player(1)] });
+    expect(chooseGreedyAction(s3, 0)).toEqual(manualArgmax(s3, 0));
+  });
+
+  // 5. 'picks the winning explore over endTurn when a kill is available'
+  test('picks the winning explore over endTurn when a kill is available', () => {
+    const s = baseState({ seats: [player(0, { hand: ['we-3#1'] }), player(1)], mansionDeck: ['ma-1#1', 'ma-1#2'] });
+    const a = chooseGreedyAction(s, 0);
+    expect(a.type).toBe('explore');
+    expect(a).toEqual(manualArgmax(s, 0));
+  });
+
+  // 6. 'bails out to endTurn for a seat with no legal moves'
+  test('bails out to endTurn for a seat with no legal moves', () => {
+    const s = baseState({ seats: [player(0), player(1)] });
+    expect(chooseGreedyAction(s, 1)).toEqual({ type: 'endTurn', seat: 1 });
+  });
+
+  // 7. 'fallback for an unknown seat id'
+  test('fallback for an unknown seat id', () => {
+    expect(chooseGreedyAction(baseState(), 99)).toEqual({ type: 'endTurn', seat: 99 });
+  });
+
+  // 8. 'dead active player ends turn'
+  test('dead active player ends turn', () => {
+    const s = baseState({ seats: [player(0, { dead: true }), player(1)] });
+    expect(chooseGreedyAction(s, 0)).toEqual({ type: 'endTurn', seat: 0 });
+  });
+
+  // 9. 'stable tie-break keeps the first best action'
+    test('stable tie-break keeps the first best action', () => {
+      // Empty hand + turnGold 0: both buys are validator-ILLEGAL (cost 20/5 > 0),
+      // so the only legal actions are the two no-op ability uses (ch-1 has 2
+      // generic abilities) and endTurn. The two useCharacterAbility actions both
+      // score EXACTLY 136 (verified by probe: 136, 136, endTurn 126) — the policy
+      // must keep the FIRST one in enumerate order (abilityIndex 0).
+      const s = baseState({ seats: [player(0, { hand: [] }), player(1)] });
+      const a = chooseGreedyAction(s, 0);
+
+      // Strict-greater tie-break: first candidate with the max score wins
+      expect(a).toEqual({ type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    });
+
+  // 10. 'does not mutate the state'
+  test('does not mutate the state', () => {
+    const s = baseState({ seats: [player(0, { hand: ['we-3#1'] }), player(1)] });
+    const before = JSON.stringify(s);
+    chooseGreedyAction(s, 0);
+    expect(JSON.stringify(s)).toBe(before);
+  });
+});
