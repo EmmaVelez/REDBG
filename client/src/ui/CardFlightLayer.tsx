@@ -104,12 +104,13 @@ function flyCard(flight: Flight, state: GameState, done: () => void): void {
   );
   document.body.appendChild(el);
   // Linear travel: straight translate from the source position to the target.
+  // 665ms = 380ms slowed by 75% — readable without dragging.
   el.animate(
     [
       { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1 },
       { transform: `translate(${path.dx}px, ${path.dy}px) rotate(0deg) scale(0.75)`, opacity: 0 },
     ],
-    { duration: 380, easing: 'linear' }
+    { duration: 665, easing: 'linear' }
   ).finished.then(() => {
     el.remove();
     done();
