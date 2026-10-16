@@ -44,11 +44,11 @@ export function CardView({ def, compact = false, decorations }: CardViewProps): 
 }
 
 function CharacterSkills({ def, decorations }: { def: CardDef; decorations: number }): JSX.Element {
-  // Level-0 model (user ruling): characters START at level 0 with nothing
-  // earned, so every tier — including the first — is greyed/locked until the
-  // character's decoration count reaches that tier's gate. Leaving level 0
-  // itself requires earning the first decoration, so even a gate of 0 reads
-  // as locked on a fresh character and opens with the first decoration earned.
+  // Level model (user ruling): characters start at Level 0 — the panel shows
+  // Lv{level − 1}. Each tier carries its own decoration gate: Level 1 at
+  // level1At (0 for most, so it is active and green from the start — e.g.
+  // Chris starts with his L1; Krauser's L1 gate is 1, so his stays greyed
+  // until the first decoration), Level 2 at level2At.
   const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
   const levels = def.levels ?? [];
@@ -58,12 +58,12 @@ function CharacterSkills({ def, decorations }: { def: CardDef; decorations: numb
   return (
     <div className="card-skills" data-decorations={decorations} data-level1-at={level1At} data-level2-at={level2At}>
       {levels.map(entry => {
+        // Each tier has its own decoration gate. Level 1 uses level1At — 0 for
+        // most characters (active from the start, e.g. Chris), 1 for Krauser —
+        // and Level 2 uses level2At. Greyed only while decorations are below
+        // that tier's gate.
         const gate = entry.level === 1 ? level1At : level2At;
-        // Level-0 model: everyone starts locked at level 0. Leaving level 0
-        // requires earning the first decoration, so even a gate of 0 reads
-        // as locked on a fresh character and opens with the first point.
-        const unlockAt = entry.level === 1 ? Math.max(gate, 1) : gate;
-        const need = Math.max(unlockAt - decorations, 0);
+        const need = Math.max(gate - decorations, 0);
         const unlocked = need === 0;
         return (
           <div
