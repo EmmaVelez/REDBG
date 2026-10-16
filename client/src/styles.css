@@ -267,6 +267,14 @@ h1, h2 { margin: 0 0 8px; }
 .player-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .player-hp { font-weight: 700; }
 .player-decorations { color: #ffd479; }
+.player-character-card {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.player-character-card .card { width: 132px; min-height: 82px; }
 
 /* ---- hand / zones ---- */
 .hand { display: flex; flex-wrap: wrap; gap: 8px; }

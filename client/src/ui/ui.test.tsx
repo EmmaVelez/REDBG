@@ -127,6 +127,27 @@ describe('PlayerPanel (T06)', () => {
     expect(html).toContain('player-dead');
     expect(html).toContain('(dead)');
   });
+
+  it('renders the character as a card beneath the player info', () => {
+    const state = twoPlayerState();
+    const player = state.seats[0];
+    expect(player).toBeDefined();
+    if (player === undefined) return;
+    const charDef = defForInstance(state, player.characterInstanceId);
+    expect(charDef).not.toBeNull();
+    if (charDef === null) return;
+    const html = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
+    // character card rendered inside the panel
+    expect(html).toContain('player-character-card');
+    expect(html).toContain(`data-card-id="${charDef.id}"`);
+    expect(html).toContain(charDef.name);
+    expect(html).toContain('CHARACTER');
+    // panel order: player info rows come before the character card
+    const infoIdx = html.indexOf('player-pools');
+    const charIdx = html.indexOf('player-character-card');
+    expect(infoIdx).toBeGreaterThan(-1);
+    expect(charIdx).toBeGreaterThan(infoIdx);
+  });
 });
 
 describe('Board (T05)', () => {

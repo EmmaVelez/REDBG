@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 import type { GameState, PlayerState } from '@re/game-core';
+import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { defForInstance } from './cards';
 
 /**
@@ -50,6 +52,13 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         <span title="Hand">Hand {player.hand.length}</span>
         <span title="Defeated infected attached">Attached {player.attached.length}</span>
       </div>
+      {charDef !== null && (
+        <div className="player-character-card" data-character-card>
+          <HoverCard def={charDef}>
+            <CardView def={charDef} compact />
+          </HoverCard>
+        </div>
+      )}
     </div>
   );
 }
