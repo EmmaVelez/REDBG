@@ -1,6 +1,6 @@
-import { requiredAmmo, computeDamage, resolveExplore, resolveMultiExplore } from './explore';
+import { requiredAmmo, computeDamage, resolveExplore, resolveMultiExplore, exploreDamage } from './explore';
 import type { MultiExploreTarget, ExploreWeapon } from './explore';
-import type { CardDef } from '../types';
+import type { CardDef, GameState } from '../types';
 
 test('requiredAmmo', () => {
   expect(requiredAmmo([{ damage: 10, ammoReq: 20 }, { damage: 20, ammoReq: 30 }])).toBe(50);
@@ -27,6 +27,37 @@ test('computeDamage Burst-Fire', () => {
 
 test('computeDamage ignores grantExplores', () => {
   expect(computeDamage({ weapons: [{ damage: 25, ammoReq: 40, weaponEffects: [{ kind: 'grantExplores', amount: 1 }] }], ammo: 0, bonusDamage: 0 })).toBe(25);
+});
+
+test('exploreDamage reads weapon damages + turn bonus from a full state', () => {
+  const state: GameState = {
+    version: 1, seed: 1, rngState: 1, phase: 'main', activeSeat: 0, turnNumber: 1,
+    seats: [{
+      seat: 0, name: 'P0', controller: 'human', characterInstanceId: 'ch-1#1',
+      hp: 100, maxHp: 100, decorations: 0, level: 0 as const, turnAmmo: 120, turnGold: 0,
+      actionsLeft: 1, buysLeft: 1, exploresLeft: 1, weaponDamageBonusThisTurn: 5,
+      attached: [], inventory: [], hand: [], discard: [], playArea: [], downed: false, dead: false,
+    }],
+    marketPiles: {}, mansionDeck: [], mansionBottom: [], removed: [],
+    cards: {
+      'w1': { instanceId: 'w1', cardId: 'we-full', location: { zone: 'hand', index: 0 } },
+      'w2': { instanceId: 'w2', cardId: 'we-plain', location: { zone: 'hand', index: 0 } },
+      'chc': { instanceId: 'chc', cardId: 'ch-1', location: { zone: 'hand', index: 0 } },
+    },
+    cardDefs: {
+      'we-full': { id: 'we-full', name: 'Full-Bore', type: 'weapon', set: 'premier', text: '', copies: 1, damage: 40, ammoReq: 70, weaponEffects: [{ kind: 'plusDamageIfAmmoAbove', threshold: 100, amount: 30 }] },
+      'we-plain': { id: 'we-plain', name: 'Handgun', type: 'weapon', set: 'premier', text: '', copies: 1, damage: 10, ammoReq: 20 },
+      'ch-1': { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: '', copies: 1, maxHp: 100 },
+    },
+    prompts: [], winners: [], log: [],
+  };
+  // Full-Bore (40, +30 ammo bonus at ammo 120) + Handgun 10 + turn bonus 5 = 85
+  expect(exploreDamage(state, 0, ['w1', 'w2'])).toBe(85);
+  // Not enough ammo for the Full-Bore threshold: 40 + 10 + 5 = 55
+  const lowAmmo = { ...state, seats: [{ ...state.seats[0] as NonNullable<GameState['seats'][number]>, turnAmmo: 90 }] };
+  expect(exploreDamage(lowAmmo, 0, ['w1', 'w2'])).toBe(55);
+  // Unknown ids contribute zero damage
+  expect(exploreDamage(state, 0, ['missing'])).toBe(5);
 });
 
 test('resolveExplore insufficient ammo', () => {

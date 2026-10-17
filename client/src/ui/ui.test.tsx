@@ -248,12 +248,14 @@ describe('MansionReveal', () => {
     expect(monster).toBeDefined();
     if (monster === undefined) return;
     const html = renderToStaticMarkup(
-      <MansionReveal def={monster} resultText="Defeated! +4 ★" onContinue={() => {}} />
+      <MansionReveal def={monster} resultText="Defeated! +4 ★" damage={35} onContinue={() => {}} />
     );
     expect(html).toContain('data-mansion-door');
     expect(html).toContain('The door creaks open');
     expect(html).toContain(monster.name);
     expect(html).toContain('Defeated! +4 ★');
+    expect(html).toContain('Your damage:');
+    expect(html).toContain('35');
     expect(html).toContain('Continue');
   });
 });

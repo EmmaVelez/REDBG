@@ -1,4 +1,4 @@
-import type { CardDef, WeaponEffect, InfectedEffect } from '../types';
+import type { CardDef, WeaponEffect, InfectedEffect, GameState } from '../types';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -35,6 +35,25 @@ export function computeDamage(params: DamageParams): number {
   }
 
   return damage;
+}
+
+/**
+ * Total attack damage a player's explore would deal, computed from the state
+ * exactly like resolveExplore does (weapon base damage + weapon effects +
+ * character turn bonus). `state` must be the PRE-explore state so the turn
+ * ammo pool and weaponDamageBonusThisTurn are still intact.
+ */
+export function exploreDamage(state: GameState, seat: number, weaponIds: readonly string[]): number {
+  const player = state.seats[seat];
+  if (player === undefined) return 0;
+  const weapons: ExploreWeapon[] = (weaponIds ?? []).map(id => {
+    const inst = state.cards[id];
+    if (inst === undefined) return { damage: 0, ammoReq: 0 };
+    const def = state.cardDefs[inst.cardId];
+    if (def === undefined) return { damage: 0, ammoReq: 0 };
+    return { damage: def.damage ?? 0, ammoReq: def.ammoReq ?? 0, weaponEffects: def.weaponEffects };
+  });
+  return computeDamage({ weapons, ammo: player.turnAmmo, bonusDamage: player.weaponDamageBonusThisTurn });
 }
 
 export type ExploreOutcome =

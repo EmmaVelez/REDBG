@@ -72,7 +72,7 @@ export function App(): JSX.Element {
   // seat's explore revealed an Infected, and hold the table on a readable
   // reveal until the player clicks Continue.
   const prevStateRef = useRef<GameState | null>(null);
-  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string } | null>(null);
+  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
   const state = view?.state ?? null;
   useEffect(() => {
@@ -95,7 +95,7 @@ export function App(): JSX.Element {
         : detected.outcomeZone === 'removed'
           ? `${def.name} was removed from the Mansion.`
           : `${def.name} escaped to the bottom of the Mansion.`;
-    setReveal({ def, resultText });
+    setReveal({ def, resultText, damage: detected.damage });
   }, [state, mySeat]);
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
@@ -153,7 +153,7 @@ export function App(): JSX.Element {
         </aside>
       </main>
       {reveal !== null && (
-        <MansionReveal def={reveal.def} resultText={reveal.resultText} onContinue={() => setReveal(null)} />
+        <MansionReveal def={reveal.def} resultText={reveal.resultText} damage={reveal.damage} onContinue={() => setReveal(null)} />
       )}
       {youDied !== null && (
         <YouDiedOverlay dead={youDied} onContinue={() => setYouDied(null)} />

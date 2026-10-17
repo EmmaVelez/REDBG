@@ -1,4 +1,5 @@
 import type { GameState } from '@re/game-core';
+import { exploreDamage } from '@re/game-core';
 
 /**
  * Card-flight animation support (M4 polish).
@@ -97,6 +98,8 @@ export interface Reveal {
   readonly instanceId: string;
   /** Zone the revealed card ended up in after the fight resolved. */
   readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed';
+  /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
+  readonly damage: number;
 }
 
 function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
@@ -124,7 +127,8 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
     if (prevLoc.zone !== 'mansion') continue;
     if (sameLoc(prevLoc, nextLoc)) continue;
     if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
-      return { instanceId, outcomeZone: nextLoc.zone };
+      const damage = action.type === 'explore' ? exploreDamage(prev, action.seat, action.weapons) : 0;
+      return { instanceId, outcomeZone: nextLoc.zone, damage };
     }
   }
   return null;

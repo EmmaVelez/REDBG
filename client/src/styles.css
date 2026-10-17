@@ -518,6 +518,17 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-door-card .card-name { font-size: 15px; }
 .mansion-door-card .card-text { font-size: 12px; }
 .mansion-door-card .card-emoji { font-size: 44px; }
+.mansion-door-damage {
+  color: #ffd9a0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(255, 160, 60, 0.45);
+}
+.mansion-door-damage strong {
+  color: #ffb347;
+  font-size: 24px;
+}
 .mansion-door-result {
   color: #cfd4dd;
   font-size: 13px;

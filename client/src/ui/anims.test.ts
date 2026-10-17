@@ -132,7 +132,7 @@ describe('diffCardMoves', () => {
 });
 
 describe('detectReveal', () => {
-  const exploreLog = [{ seq: 1, action: { type: 'explore' as const, seat: 0 } }];
+  const exploreLog = [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[] } }];
 
   it('detects a defeated Infected: mansion -> attached', () => {
     const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
@@ -142,7 +142,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0, attached: ['ma-001#7'] }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached' });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', damage: 0 });
   });
 
   it('detects an escaped Infected: mansion -> mansionBottom', () => {
@@ -154,7 +154,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom' });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', damage: 0 });
   });
 
   it('ignores another player exploring', () => {

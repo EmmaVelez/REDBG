@@ -12,15 +12,18 @@ import { CardView } from './CardView';
 export interface MansionRevealProps {
   readonly def: CardDef;
   readonly resultText: string;
+  /** Total damage the exploring player dealt with this attack. */
+  readonly damage: number;
   readonly onContinue: () => void;
 }
 
-export function MansionReveal({ def, resultText, onContinue }: MansionRevealProps): JSX.Element {
+export function MansionReveal({ def, resultText, damage, onContinue }: MansionRevealProps): JSX.Element {
   const isInfected = def.type === 'infected';
   return (
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
         <span className="mansion-door-title">{isInfected ? 'The door creaks open…' : 'You found something…'}</span>
+        <div className="mansion-door-damage">Your damage: <strong>{damage}</strong></div>
         <div className="mansion-door-card">
           <CardView def={def} />
         </div>
