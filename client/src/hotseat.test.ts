@@ -44,6 +44,17 @@ describe('createHotseatGame', () => {
     expect(pileIds).not.toContain('longbow');
   });
 
+  it('builds battleHardenedVeteran piles when requested', () => {
+    const s = createHotseatGame(['Chris', 'Jill'], 42, 'battleHardenedVeteran');
+    const pileIds = Object.keys(s.marketPiles);
+    expect(pileIds).toContain('merc');
+    expect(pileIds).toContain('longbow');
+    expect(pileIds).toContain('rf');
+    expect(pileIds).toContain('six');
+    expect(pileIds).not.toContain('grn');
+    expect(pileIds).not.toContain('spray');
+  });
+
   it('deals each player a character and a real opening hand', () => {
     const s = createHotseatGame(['Chris', 'Jill'], 42);
     for (const p of s.seats) {

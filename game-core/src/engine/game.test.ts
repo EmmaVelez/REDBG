@@ -154,12 +154,39 @@ test('setup with whaddyaBuyin piles offers The Merchant, Submission and rifles',
   expect(pileIds).toHaveLength(18);
 });
 
-test('SCENARIOS registry has exactly four scenarios, each with 18 piles', () => {
-  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin']);
+test('setup with battleHardenedVeteran piles offers Deadly Aim, Merchant and major weapons', () => {
+  const s = setup(
+    {
+      seed: 3,
+      players: [
+        { name: 'A', controller: 'human' },
+        { name: 'B', controller: 'human' },
+      ],
+    },
+    PREMIER_CARDS,
+    pilesForScenario('battleHardenedVeteran')
+  );
+  const pileIds = Object.keys(s.marketPiles);
+  expect(pileIds).toContain('aim');
+  expect(pileIds).toContain('foyer');
+  expect(pileIds).toContain('merc');
+  expect(pileIds).toContain('umb');
+  expect(pileIds).toContain('longbow');
+  expect(pileIds).toContain('rf');
+  expect(pileIds).toContain('six');
+  expect(pileIds).toContain('sub');
+  expect(pileIds).not.toContain('grn');
+  expect(pileIds).not.toContain('spray');
+  expect(pileIds).not.toContain('escape');
+  expect(pileIds).toHaveLength(18);
+});
+
+test('SCENARIOS registry has exactly five scenarios, each with 18 piles', () => {
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran']);
   for (const s of SCENARIOS) {
     expect(s.piles).toHaveLength(18);
   }
-  for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin'] as const) {
+  for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }
 });

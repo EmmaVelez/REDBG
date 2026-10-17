@@ -178,7 +178,33 @@ export const WHADDYA_BUYIN_PILES: ReadonlyArray<{ pileId: string; cardIds: reado
   { pileId: 'rf', cardIds: ['we-015', 'we-016'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin';
+/**
+ * Battle Hardened Veteran (Scenario Booklet v2, Premier Story Mode): pure
+ * survivor fare — Deadly Aim, Mansion Foyer, Reload, Shattered Memories, The
+ * Merchant, Umbrella Corporation, with every major weapon except Grenades.
+ */
+export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'aim', cardIds: ['ac-002'] },
+  { pileId: 'foyer', cardIds: ['ac-001'] },
+  { pileId: 'reload', cardIds: ['ac-005'] },
+  { pileId: 'smt', cardIds: ['ac-003'] },
+  { pileId: 'merc', cardIds: ['ac-006'] },
+  { pileId: 'umb', cardIds: ['ac-007'] },
+  { pileId: 'mg', cardIds: ['we-011', 'we-012'] },
+  { pileId: 'rf', cardIds: ['we-015', 'we-016'] },
+  { pileId: 'longbow', cardIds: ['we-002'] },
+  { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
+  { pileId: 'six', cardIds: ['we-006'] },
+  { pileId: 'sub', cardIds: ['we-003'] }
+];
+
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran';
 
 export interface ScenarioDef {
   readonly id: ScenarioId;
@@ -211,6 +237,12 @@ export const SCENARIOS: ReadonlyArray<ScenarioDef> = [
     name: 'Whaddya Buyin?',
     description: 'The Merchant appears — bargain-hunter economy with Reload, Master of Unlocking and the full rifle lineup.',
     piles: WHADDYA_BUYIN_PILES,
+  },
+  {
+    id: 'battleHardenedVeteran',
+    name: 'Battle Hardened Veteran',
+    description: 'A final surge of Infected — Deadly Aim, Merchant and Umbrella Corp with every major weapon.',
+    piles: BATTLE_HARDENED_VETERAN_PILES,
   },
 ];
 
