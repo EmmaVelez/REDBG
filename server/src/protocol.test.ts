@@ -6,7 +6,10 @@ describe('protocol round trips', () => {
   const cases: ReadonlyArray<{ readonly name: string; readonly msg: WireMessage }> = [
     { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' } },
     { name: 'createRoom classicHorror', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'classicHorror' } },
+    { name: 'createRoom spyGames', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'spyGames' } },
+    { name: 'createRoom whaddyaBuyin', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'whaddyaBuyin' } },
     { name: 'setScenario', msg: { kind: 'setScenario', scenario: 'classicHorror' } },
+    { name: 'setScenario whaddyaBuyin', msg: { kind: 'setScenario', scenario: 'whaddyaBuyin' } },
     { name: 'joinRoom', msg: { kind: 'joinRoom', roomCode: 'ABCDEF', playerName: 'Ada' } },
     { name: 'reconnect', msg: { kind: 'reconnect', token: 'tok-123' } },
     { name: 'spectate', msg: { kind: 'spectate', roomCode: 'ABCDEF' } },

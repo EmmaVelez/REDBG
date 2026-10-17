@@ -143,14 +143,14 @@ export function validateMessage(value: unknown): DecodeResult {
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
-    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames') {
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin') {
       return { ok: false, error: 'createRoom requires a valid scenario' };
     }
     return { ok: true, msg: value as WireMessage };
   }
   if (k === 'setScenario') {
     const m = value as { kind: string; scenario?: unknown };
-    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames') {
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin') {
       return { ok: false, error: 'setScenario requires a valid scenario' };
     }
     return { ok: true, msg: value as WireMessage };

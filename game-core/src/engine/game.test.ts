@@ -1,5 +1,5 @@
 import { setup, startTurn, checkWin } from './game';
-import { PREMIER_CARDS, FIRST_TIMER_PILES, pilesForScenario } from '../data/cards';
+import { PREMIER_CARDS, FIRST_TIMER_PILES, pilesForScenario, SCENARIOS } from '../data/cards';
 import type { GameSetup, GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function def(id: string, over: Partial<CardDef> = {}): CardDef {
@@ -122,10 +122,46 @@ test('setup with classicHorror piles offers Longbow, First Aid Spray and Item Ma
   expect(pileIds).toContain('longbow');
   expect(pileIds).toContain('spray');
   expect(pileIds).toContain('itemmgmt');
+  expect(pileIds).toContain('sub');
   expect(pileIds).not.toContain('merc');
   expect(pileIds).not.toContain('six');
   expect(pileIds).not.toContain('escape');
+  expect(pileIds).not.toContain('rf');
   expect(pileIds).toHaveLength(18);
+});
+
+test('setup with whaddyaBuyin piles offers The Merchant, Submission and rifles', () => {
+  const s = setup(
+    {
+      seed: 3,
+      players: [
+        { name: 'A', controller: 'human' },
+        { name: 'B', controller: 'human' },
+      ],
+    },
+    PREMIER_CARDS,
+    pilesForScenario('whaddyaBuyin')
+  );
+  const pileIds = Object.keys(s.marketPiles);
+  expect(pileIds).toContain('merc');
+  expect(pileIds).toContain('reload');
+  expect(pileIds).toContain('sub');
+  expect(pileIds).toContain('rf');
+  expect(pileIds).toContain('escape');
+  expect(pileIds).not.toContain('spray');
+  expect(pileIds).not.toContain('longbow');
+  expect(pileIds).not.toContain('umb');
+  expect(pileIds).toHaveLength(18);
+});
+
+test('SCENARIOS registry has exactly four scenarios, each with 18 piles', () => {
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin']);
+  for (const s of SCENARIOS) {
+    expect(s.piles).toHaveLength(18);
+  }
+  for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin'] as const) {
+    expect(pilesForScenario(id)).toHaveLength(18);
+  }
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {

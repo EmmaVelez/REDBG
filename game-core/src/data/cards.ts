@@ -151,7 +151,34 @@ export const SPY_GAMES_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly 
   { pileId: 'mg', cardIds: ['we-011', 'we-012'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames';
+/**
+ * Whaddya Buyin? (rulebook p.8): The Merchant makes his stand — Merchant,
+ * Ominous Battle, Reload, Deadly Aim, Escape from the Dead City, Master of
+ * Unlocking, Submission, Grenade, Six Shooter, shotguns, MGs and rifles on
+ * top of the 6 Basic piles.
+ */
+export const WHADDYA_BUYIN_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'merc', cardIds: ['ac-006'] },
+  { pileId: 'omin', cardIds: ['ac-010'] },
+  { pileId: 'reload', cardIds: ['ac-005'] },
+  { pileId: 'aim', cardIds: ['ac-002'] },
+  { pileId: 'escape', cardIds: ['ac-004'] },
+  { pileId: 'mou', cardIds: ['ac-011'] },
+  { pileId: 'sub', cardIds: ['we-003'] },
+  { pileId: 'grn', cardIds: ['we-001'] },
+  { pileId: 'six', cardIds: ['we-006'] },
+  { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
+  { pileId: 'mg', cardIds: ['we-011', 'we-012'] },
+  { pileId: 'rf', cardIds: ['we-015', 'we-016'] }
+];
+
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin';
 
 export interface ScenarioDef {
   readonly id: ScenarioId;
@@ -178,6 +205,12 @@ export const SCENARIOS: ReadonlyArray<ScenarioDef> = [
     name: 'Spy Games',
     description: 'Master of Unlocking lets you steal weapons from other survivors — plus Ominous Battle and Six Shooter.',
     piles: SPY_GAMES_PILES,
+  },
+  {
+    id: 'whaddyaBuyin',
+    name: 'Whaddya Buyin?',
+    description: 'The Merchant appears — bargain-hunter economy with Reload, Master of Unlocking and the full rifle lineup.',
+    piles: WHADDYA_BUYIN_PILES,
   },
 ];
 

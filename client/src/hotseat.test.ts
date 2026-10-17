@@ -34,6 +34,16 @@ describe('createHotseatGame', () => {
     expect(pileIds).not.toContain('six');
   });
 
+  it('builds whaddyaBuyin piles when requested', () => {
+    const s = createHotseatGame(['Chris', 'Jill'], 42, 'whaddyaBuyin');
+    const pileIds = Object.keys(s.marketPiles);
+    expect(pileIds).toContain('merc');
+    expect(pileIds).toContain('rf');
+    expect(pileIds).toContain('sub');
+    expect(pileIds).not.toContain('spray');
+    expect(pileIds).not.toContain('longbow');
+  });
+
   it('deals each player a character and a real opening hand', () => {
     const s = createHotseatGame(['Chris', 'Jill'], 42);
     for (const p of s.seats) {
