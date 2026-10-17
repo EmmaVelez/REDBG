@@ -1,6 +1,6 @@
-import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone } from '../types';
+import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
-import { draw } from './deck';
+import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { advanceTurn } from './turn';
 
@@ -23,7 +23,6 @@ function turnStartAbilityPrompts(
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
   if (charDef === undefined) return [];
   const abilities = abilitiesForLevel(charDef.abilities, player.level);
-  if (!abilities.some(a => a.kind === 'gainKnifeAtTurnStart')) return [];
 
   const isKnifeTop = (instanceId: string): boolean => {
     const inst = state.cards[instanceId];
@@ -32,24 +31,69 @@ function turnStartAbilityPrompts(
     return def?.type === 'weapon' && (def.weaponTags?.includes('knife') ?? false);
   };
 
-  const options: string[] = [];
-  for (const pile of Object.values(state.marketPiles)) {
-    const top = pile.cards[0];
-    if (top !== undefined && isKnifeTop(top)) {
-      options.push(top);
+  const prompts: Prompt[] = [];
+  const l1Text = charDef.levels?.find(l => l.level === 1)?.text ?? charDef.text;
+
+  if (abilities.some(a => a.kind === 'gainKnifeAtTurnStart')) {
+    const options: string[] = [];
+    for (const pile of Object.values(state.marketPiles)) {
+      const top = pile.cards[0];
+      if (top !== undefined && isKnifeTop(top)) {
+        options.push(top);
+      }
+    }
+    if (options.length > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: [...options, 'Decline'],
+        payload: { kind: 'gainKnifeAtTurnStart' },
+      });
     }
   }
-  if (options.length === 0) return []; // no knives available to gain
 
-  return [
-    {
+  // PR-002 Jill: skip this turn for a super next turn (once per turn; not
+  // while a skip reward is already pending).
+  if (
+    abilities.some(a => a.kind === 'skipTurnForSuperNextTurn') &&
+    player.skipRewardPending !== true
+  ) {
+    prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: charDef.levels?.find(l => l.level === 1)?.text ?? charDef.text,
-      options: [...options, 'Decline'],
-      payload: { kind: 'gainKnifeAtTurnStart' },
-    },
-  ];
+      text: l1Text,
+      options: ['Skip my turn', 'Decline'],
+      payload: { kind: 'skipTurn' },
+    });
+  }
+
+  // PR-009 Rebecca L1: another player +1 card; if so, a player +1 card.
+  if (abilities.some(a => a.kind === 'giveOneCardToPlayerThenMaybeAnother')) {
+    const others = state.seats.filter(s => s.seat !== player.seat && !s.dead);
+    if (others.length > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: [...others.map(s => String(s.seat)), 'Decline'],
+        payload: { kind: 'giveOneCardToPlayer' },
+      });
+    }
+  }
+
+  // PR-010 Hunk L1: reveal hand; 2+ different card types -> +10 damage this turn.
+  if (abilities.some(a => a.kind === 'revealHandForDamageIfTwoTypes') && player.hand.length > 0) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l1Text,
+      options: ['Reveal my hand', 'Decline'],
+      payload: { kind: 'revealHandTwoTypes' },
+    });
+  }
+
+  return prompts;
 }
 
 export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>): GameState {
@@ -266,6 +310,7 @@ export function startTurn(state: GameState): GameState {
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
       mustExplore: false,
+      skipRewardPending: false,
     };
 
     const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
@@ -305,16 +350,42 @@ export function startTurn(state: GameState): GameState {
     playArea: [],
   };
 
+  // PR-002 Jill super turn (designer ruling): the +5 cards are drawn at the
+  // beginning of the rewarded turn, on top of its normal 5 — 10 cards, and
+  // +1 Buy/Action/Explore on top of the turn's normal 1/1/1.
+  let turnPlayer: PlayerState = newPlayer;
+  let nextRng = state.rngState;
+  if (player.skipRewardPending === true) {
+    const d = drawWithReshuffle({
+      deck: newPlayer.inventory,
+      discard: newPlayer.discard,
+      count: 5,
+      rngState: state.rngState,
+    });
+    nextRng = d.rngState;
+    turnPlayer = {
+      ...newPlayer,
+      hand: [...newPlayer.hand, ...d.hand],
+      inventory: d.deck,
+      discard: d.discard,
+      actionsLeft: newPlayer.actionsLeft + 1,
+      buysLeft: newPlayer.buysLeft + 1,
+      exploresLeft: newPlayer.exploresLeft + 1,
+      skipRewardPending: false,
+    };
+  }
+
   // "At beginning of your turn, may ..." character abilities prompt here —
   // before anything else can be played (the prompt-immediate gate blocks
   // other actions while it is open).
   const newVersion = state.version + 1;
-  const abilityPrompts = turnStartAbilityPrompts(state, newPlayer, newVersion);
+  const abilityPrompts = turnStartAbilityPrompts(state, turnPlayer, newVersion);
 
   return {
     ...state,
     version: newVersion,
-    seats: state.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
+    rngState: nextRng,
+    seats: state.seats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
     prompts: abilityPrompts.length > 0 ? [...state.prompts, ...abilityPrompts] : state.prompts,
   };
 }

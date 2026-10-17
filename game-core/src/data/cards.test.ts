@@ -14,9 +14,9 @@ const pile = (pileId: string): { pileId: string; cardIds: readonly string[] } =>
 };
 
 test('database size and uniqueness', () => {
-  expect(PREMIER_CARDS.length).toBe(62);
+  expect(PREMIER_CARDS.length).toBe(65);
   const ids = PREMIER_CARDS.map(c => c.id);
-  expect(new Set(ids).size).toBe(62);
+  expect(new Set(ids).size).toBe(65);
 });
 
 test('all ids follow the printed numbering scheme', () => {
@@ -44,12 +44,12 @@ test('character data', () => {
     const levels = character.levels;
     const abilities = character.abilities;
     if (levels === undefined || abilities === undefined) throw new Error('missing levels/abilities: ' + character.id);
-    expect(levels).toHaveLength(2);
-    // Two abilities per level tier, except promo characters whose L2 packs
-    // two effects (PR-001: damage reduction + extra Explore) = 3 entries.
-    expect(abilities.length).toBeGreaterThanOrEqual(2);
+    // Promo characters may have a single level tier (PR-002 Jill: L1 only at
+    // 8 decorations) and L2 tiers that pack two effects (PR-001) = 3 entries.
+    expect(levels.length).toBeGreaterThanOrEqual(1);
+    expect(abilities.length).toBeGreaterThanOrEqual(1);
     expect(levels[0]?.level).toBe(1);
-    expect(levels[1]?.level).toBe(2);
+    if (levels.length > 1) expect(levels[1]?.level).toBe(2);
   }
 });
 

@@ -139,6 +139,42 @@ export function weaponDamageReduction(abilities: readonly CharacterAbility[]): n
   );
 }
 
+/**
+ * PR-009 Rebecca L2: while exploring, +amount damage per player (including
+ * herself — the card says "each Player") with more than `threshold` cards
+ * in hand.
+ */
+export function exploreBigHandBonus(
+  abilities: readonly CharacterAbility[],
+  seats: readonly { readonly hand: readonly string[]; readonly dead?: boolean }[]
+): number {
+  let bonus = 0;
+  for (const ability of abilities) {
+    if (ability.kind !== 'exploreDamagePerPlayerWithBigHand') continue;
+    const count = seats.filter(s => !s.dead && s.hand.length > ability.threshold).length;
+    bonus += ability.amount * count;
+  }
+  return bonus;
+}
+
+/**
+ * PR-010 Hunk L2: while exploring, +amount damage when the play area holds
+ * at least `minActions` Action cards.
+ */
+export function exploreActionsBonus(
+  abilities: readonly CharacterAbility[],
+  playAreaCardTypes: readonly string[],
+  isActionType: (cardType: string) => boolean
+): number {
+  let bonus = 0;
+  for (const ability of abilities) {
+    if (ability.kind !== 'exploreBonusIfActionsInPlayArea') continue;
+    const actions = playAreaCardTypes.filter(t => isActionType(t)).length;
+    if (actions >= ability.minActions) bonus += ability.amount;
+  }
+  return bonus;
+}
+
 /** Jill L2: explosive weapons go to discard instead of being trashed. */
 export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'explosivesGoToDiscardInsteadOfTrash');

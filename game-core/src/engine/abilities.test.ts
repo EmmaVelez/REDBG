@@ -520,3 +520,162 @@ describe('PR-001 Chris Redfield (promo)', () => {
     expect(s2.seats[0]?.maxHp).toBe(90);
   });
 });
+
+describe('promo characters PR-002 / PR-009 / PR-010', () => {
+  it('card data matches the official scans', () => {
+    const jill = PREMIER_CARDS.find(c => c.id === 'pr-002');
+    const nurse = PREMIER_CARDS.find(c => c.id === 'pr-009');
+    const hunk = PREMIER_CARDS.find(c => c.id === 'pr-010');
+    expect(jill).toBeDefined();
+    expect(nurse).toBeDefined();
+    expect(hunk).toBeDefined();
+    if (jill === undefined || nurse === undefined || hunk === undefined) return;
+    expect(jill.maxHp).toBe(80);
+    expect(jill.level1At).toBe(8);
+    expect(jill.level2At).toBeUndefined();
+    expect(jill.abilities?.map(a => a.kind)).toEqual(['skipTurnForSuperNextTurn']);
+    expect(nurse.maxHp).toBe(70);
+    expect(nurse.level1At).toBe(1);
+    expect(nurse.level2At).toBe(4);
+    expect(nurse.abilities?.map(a => a.kind)).toEqual(['giveOneCardToPlayerThenMaybeAnother', 'exploreDamagePerPlayerWithBigHand']);
+    expect(hunk.maxHp).toBe(90);
+    expect(hunk.level1At).toBe(2);
+    expect(hunk.level2At).toBe(5);
+    expect(hunk.abilities?.map(a => a.kind)).toEqual(['revealHandForDamageIfTwoTypes', 'exploreBonusIfActionsInPlayArea']);
+  });
+
+  it('PR-002 Jill: skip turn discards hand, ends turn, arms the super turn', () => {
+    const s = gameWith('pr-002');
+    const l1: GameState = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 8 } : p)) };
+    // turn-start prompt offered
+    const t = startTurnImpl(l1);
+    const skipPrompt = t.prompts.find(p => p.payload?.kind === 'skipTurn');
+    expect(skipPrompt).toBeDefined();
+    if (skipPrompt === undefined) return;
+    expect(skipPrompt.options).toEqual(['Skip my turn', 'Decline']);
+    const handBefore = t.seats[0]?.hand.length ?? 0;
+    expect(handBefore).toBeGreaterThan(0);
+    const skipped = applyAction(t, { type: 'chooseOption', seat: 0, promptId: skipPrompt.id, option: 0 });
+    // hand gone to discard, turn passed to seat 1, reward pending
+    expect(skipped.seats[0]?.hand).toEqual([]);
+    expect(skipped.seats[0]?.skipRewardPending).toBe(true);
+    expect(skipped.activeSeat).toBe(1);
+    // decline path: no skip
+    const t2 = startTurnImpl(l1);
+    const p2 = t2.prompts.find(p => p.payload?.kind === 'skipTurn');
+    expect(p2).toBeDefined();
+    if (p2 === undefined) return;
+    const declined = applyAction(t2, { type: 'chooseOption', seat: 0, promptId: p2.id, option: 1 });
+    expect(declined.activeSeat).toBe(0);
+    expect(declined.seats[0]?.skipRewardPending).toBeFalsy();
+  });
+
+  it('PR-002 Jill: super turn = 10 cards, 2 buys/actions/explores', () => {
+    const s = gameWith('pr-002');
+    const armed: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 8, skipRewardPending: true } : p)),
+    };
+    const t = startTurnImpl(armed);
+    const p = t.seats[0];
+    expect(p?.hand.length).toBe(10);
+    expect(p?.actionsLeft).toBe(2);
+    expect(p?.buysLeft).toBe(2);
+    expect(p?.exploresLeft).toBe(2);
+    expect(p?.skipRewardPending).toBe(false);
+    // The skip prompt IS offered again on the super turn — the card allows
+    // skipping any turn's beginning (validate caps it at once per turn).
+    expect(t.prompts.find(pr => pr.payload?.kind === 'skipTurn')).toBeDefined();
+  });
+
+  it('PR-009 Rebecca L1: give +1 card, then optionally a second', () => {
+    const s = gameWith('pr-009');
+    const t = startTurnImpl(s); // L1 gate is 1 decoration... level starts 0
+    // level 0: no prompt
+    expect(t.prompts.find(p => p.payload?.kind === 'giveOneCardToPlayer')).toBeUndefined();
+    const l1: GameState = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 1 } : p)) };
+    const t1 = startTurnImpl(l1);
+    const gift = t1.prompts.find(p => p.payload?.kind === 'giveOneCardToPlayer');
+    expect(gift).toBeDefined();
+    if (gift === undefined) return;
+    const handBefore = t1.seats[1]?.hand.length ?? 0;
+    const given = applyAction(t1, { type: 'chooseOption', seat: 0, promptId: gift.id, option: 0 });
+    expect(given.seats[1]?.hand.length).toBe(handBefore + 1);
+    // chain prompt for the second gift
+    const gift2 = given.prompts.find(p => p.payload?.kind === 'giveOneCardNoChain');
+    expect(gift2).toBeDefined();
+    if (gift2 === undefined) return;
+    const given2 = applyAction(given, { type: 'chooseOption', seat: 0, promptId: gift2.id, option: 0 });
+    expect(given2.seats[1]?.hand.length).toBe(handBefore + 2);
+  });
+
+  it('PR-009 Rebecca L2: +10 explore damage per player with >5 cards in hand', () => {
+    const s = gameWith('pr-009');
+    // give every seat a 6th card so all hands exceed the 5-card threshold
+    const big: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => ({ ...p, level: 2 as const, decorations: 4, hand: [...p.hand, `am-001#x${i}`] })),
+      cards: {
+        ...s.cards,
+        'am-001#x0': { instanceId: 'am-001#x0', cardId: 'am-001', location: { zone: 'hand', index: 9 } },
+        'am-001#x1': { instanceId: 'am-001#x1', cardId: 'am-001', location: { zone: 'hand', index: 9 } },
+      },
+    };
+    const hands = big.seats.map(p => p.hand.length);
+    expect(hands.every(h => h > 5)).toBe(true);
+    const withKnife: GameState = {
+      ...big,
+      seats: big.seats.map((p, i) => (i === 0 ? { ...p, hand: ['we-004#1', ...p.hand], turnAmmo: 90 } : p)),
+      cards: { ...big.cards, 'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 0 } } },
+    };
+    // 2 players with >5 cards -> +20 on top of knife's 5
+    expect(exploreDamage(withKnife, 0, ['we-004#1'])).toBe(25);
+    // level 1: no bonus
+    const l1: GameState = { ...withKnife, seats: withKnife.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const } : p)) };
+    expect(exploreDamage(l1, 0, ['we-004#1'])).toBe(5);
+  });
+
+  it('PR-010 Hunk L1: reveal hand with 2+ types grants +10 damage this turn', () => {
+    const s = gameWith('pr-010');
+    const l1: GameState = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 2 } : p)) };
+    const t = startTurnImpl(l1);
+    const reveal = t.prompts.find(p => p.payload?.kind === 'revealHandTwoTypes');
+    expect(reveal).toBeDefined();
+    if (reveal === undefined) return;
+    const revealed = applyAction(t, { type: 'chooseOption', seat: 0, promptId: reveal.id, option: 0 });
+    // starting hand = ammo + handgun + knives = 3 types -> +10
+    expect(revealed.seats[0]?.weaponDamageBonusThisTurn).toBe(10);
+    // decline: no bonus
+    const t2 = startTurnImpl(l1);
+    const r2 = t2.prompts.find(p => p.payload?.kind === 'revealHandTwoTypes');
+    expect(r2).toBeDefined();
+    if (r2 === undefined) return;
+    const declined = applyAction(t2, { type: 'chooseOption', seat: 0, promptId: r2.id, option: 1 });
+    expect(declined.seats[0]?.weaponDamageBonusThisTurn).toBe(0);
+  });
+
+  it('PR-010 Hunk L2: +20 explore damage with 4+ Actions in play area', () => {
+    const s = gameWith('pr-010');
+    const fourActions: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) =>
+        i === 0
+          ? { ...p, level: 2 as const, decorations: 5, playArea: ['ac-001#1', 'ac-001#2', 'ac-001#3', 'ac-001#4'], hand: ['we-004#1', ...p.hand], turnAmmo: 90 }
+          : p,
+      ),
+      cards: {
+        ...s.cards,
+        'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 0 } },
+        'ac-001#1': { instanceId: 'ac-001#1', cardId: 'ac-001', location: { zone: 'playArea', index: 0, seat: 0 } },
+        'ac-001#2': { instanceId: 'ac-001#2', cardId: 'ac-001', location: { zone: 'playArea', index: 1, seat: 0 } },
+        'ac-001#3': { instanceId: 'ac-001#3', cardId: 'ac-001', location: { zone: 'playArea', index: 2, seat: 0 } },
+        'ac-001#4': { instanceId: 'ac-001#4', cardId: 'ac-001', location: { zone: 'playArea', index: 3, seat: 0 } },
+      },
+    };
+    // knife 5 + 20
+    expect(exploreDamage(fourActions, 0, ['we-004#1'])).toBe(25);
+    // only 3 actions: no bonus
+    const three: GameState = { ...fourActions, seats: fourActions.seats.map((p, i) => (i === 0 ? { ...p, playArea: p.playArea.slice(0, 3) } : p)) };
+    expect(exploreDamage(three, 0, ['we-004#1'])).toBe(5);
+  });
+});

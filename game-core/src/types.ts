@@ -176,6 +176,11 @@ export type CharacterAbility =
   | { readonly kind: "infectedDamageReduction"; readonly amount: number; readonly level: 1 | 2 }             // PR-001 Chris L1: Infected deal -amount damage to him
   | { readonly kind: "weaponDamageReduction"; readonly amount: number; readonly level: 1 | 2 }               // PR-001 Chris L2: Weapons deal -amount damage to him (dormant until PvP exists)
   | { readonly kind: "extraExploreAtTurnStart"; readonly level: 1 | 2 }                                      // PR-001 Chris L2: +1 Explore at the beginning of the turn
+  | { readonly kind: "exploreDamagePerPlayerWithBigHand"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 }   // PR-009 Rebecca L2: +amount per player with >threshold cards in hand while exploring
+  | { readonly kind: "revealHandForDamageIfTwoTypes"; readonly amount: number; readonly level: 1 | 2 }       // PR-010 Hunk L1: reveal hand; if >=2 different types, +amount damage this turn
+  | { readonly kind: "exploreBonusIfActionsInPlayArea"; readonly amount: number; readonly minActions: number; readonly level: 1 | 2 }     // PR-010 Hunk L2: +amount explore damage with >=minActions actions in play area
+  | { readonly kind: "skipTurnForSuperNextTurn"; readonly level: 1 | 2 }                                     // PR-002 Jill: skip turn & discard hand -> next turn +5 cards/+1 Buy/Action/Explore
+  | { readonly kind: "giveOneCardToPlayerThenMaybeAnother"; readonly level: 1 | 2 }                          // PR-009 Rebecca L1: another player +1 card; if so, a player +1 card
     | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------
@@ -234,6 +239,9 @@ export interface PlayerState {
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;
+  /** PR-002 Jill: set when she skips a turn; her NEXT turn start grants the
+   *  super-turn bonuses (+5 cards, +1 Buy/Action/Explore) and clears it. */
+  readonly skipRewardPending?: boolean;
 
   /** Instance ids of defeated Infected attached under the Character (trophies). */
   readonly attached: readonly string[];

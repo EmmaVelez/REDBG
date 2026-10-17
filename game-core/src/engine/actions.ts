@@ -13,6 +13,8 @@ import {
   explosivesGoToDiscard,
   isExplosive,
   infectedDamageReduction,
+  exploreBigHandBonus,
+  exploreActionsBonus,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -360,7 +362,10 @@ export function applyAction(state: GameState, action: Action): GameState {
           // Passive damage abilities: Barry L2 magnums, Krauser L2 knives,
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
           // fights exploreCount Infected in one attack).
-          const abilityDamage = passiveDamageBonus(abilities, weaponDefs, exploreCount);
+          const abilityDamage =
+            passiveDamageBonus(abilities, weaponDefs, exploreCount) +
+            exploreBigHandBonus(abilities, state.seats) +
+            exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action');
           // Weapon effects like "plusDamageIfAmmoAbove" read the ammo the player
           // has available for this attack — the pool before it is spent.
           const ammoForEffects = player.turnAmmo;
@@ -625,6 +630,59 @@ export function applyAction(state: GameState, action: Action): GameState {
                 ),
               };
             }
+            case 'skipTurnForSuperNextTurn': {
+              // PR-002 Jill: Skip / Decline prompt.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Skip your current Turn and Discard your Hand for a super next Turn?',
+                    options: ['Skip my turn', 'Decline'],
+                    payload: { kind: 'skipTurn' },
+                  },
+                ],
+              };
+            }
+            case 'giveOneCardToPlayerThenMaybeAnother': {
+              // PR-009 Rebecca L1: choose another player (+1 card), then maybe
+              // a second gift.
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Choose a player to give +1 card.',
+                    options: [...others.map(s => String(s.seat)), 'Decline'],
+                    payload: { kind: 'giveOneCardToPlayer' },
+                  },
+                ],
+              };
+            }
+            case 'revealHandForDamageIfTwoTypes': {
+              // PR-010 Hunk L1: reveal hand for possible +10 damage.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Reveal your hand for +10 damage this turn (needs 2+ card types)?',
+                    options: ['Reveal my hand', 'Decline'],
+                    payload: { kind: 'revealHandTwoTypes' },
+                  },
+                ],
+              };
+            }
             case 'forceExploreOtherPlayer': {
               // Wesker L2: choose another player; they get +1 Explore and must
               // Explore on their next turn (choice resolved via prompt).
@@ -858,6 +916,138 @@ export function applyAction(state: GameState, action: Action): GameState {
             s.seat === targetSeat ? { ...s, discard: [...s.discard, trashedId] } : s,
           ),
           removed: state.removed.filter(id => id !== trashedId),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'skipTurn') {
+        // PR-002 Jill: option 0 = skip. Hand goes to discard, the turn ends
+        // immediately (advanceTurn), and skipRewardPending arms the super
+        // next turn. Option 1 = decline.
+        if (option !== 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const dh = discardHand({ hand: player.hand, discard: player.discard });
+        const ctx = advanceTurn({
+          seatCount: state.seats.length,
+          activeSeat: seat,
+          turnNumber: state.turnNumber,
+          aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
+        });
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? { ...player, hand: [], discard: dh.discard, skipRewardPending: true }
+              : s,
+          ),
+          activeSeat: ctx.activeSeat,
+          turnNumber: ctx.turnNumber,
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'giveOneCardToPlayer') {
+        // PR-009 Rebecca L1: give the chosen player +1 card from their
+        // inventory (reshuffling discard if needed); then offer a second
+        // gift ("If you do, you can have a Player get +1 card").
+        const targetOpt = prompt.options[option];
+        if (targetOpt === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(targetOpt);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const target = state.seats[targetSeat];
+        if (target === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const d = drawWithReshuffle({
+          deck: target.inventory,
+          discard: target.discard,
+          count: 1,
+          rngState: state.rngState,
+        });
+        const gifted: GameState = {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s =>
+            s.seat === targetSeat
+              ? { ...target, hand: [...target.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
+        // Second gift: same choices, chain prompt.
+        const others = gifted.seats.filter(s => s.seat !== seat && !s.dead);
+        return {
+          ...gifted,
+          prompts: [
+            ...gifted.prompts,
+            {
+              id: `gift2-${seat}-v${nextBase.version}`,
+              seat,
+              text: 'You gave a card. Give another player +1 card?',
+              options: [...others.map(s => String(s.seat)), 'Decline'],
+              payload: { kind: 'giveOneCardNoChain' },
+            },
+          ],
+        };
+      }
+
+      if (kind === 'giveOneCardNoChain') {
+        const targetOpt = prompt.options[option];
+        if (targetOpt === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(targetOpt);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const target = state.seats[targetSeat];
+        if (target === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const d = drawWithReshuffle({
+          deck: target.inventory,
+          discard: target.discard,
+          count: 1,
+          rngState: state.rngState,
+        });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s =>
+            s.seat === targetSeat
+              ? { ...target, hand: [...target.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'revealHandTwoTypes') {
+        // PR-010 Hunk L1: option 0 reveals; 2+ different card types in hand
+        // grants +10 damage this turn.
+        if (option !== 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const types = new Set(
+          player.hand.map(id => cardDef(state, id)?.type ?? 'unknown')
+        );
+        const bonus = types.size >= 2 ? 10 : 0;
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? { ...player, weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + bonus }
+              : s,
+          ),
           prompts: newPrompts,
         };
       }

@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus } from './abilities';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -57,7 +57,14 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     ammoReq: ammoReqForWeapon(abilities, def),
     weaponEffects: def?.weaponEffects,
   }));
-  const abilityDamage = passiveDamageBonus(abilities, defs, 1);
+  const abilityDamage =
+    passiveDamageBonus(abilities, defs, 1) +
+    exploreBigHandBonus(abilities, state.seats) +
+    exploreActionsBonus(
+      abilities,
+      player.playArea.map(id => state.cards[id]?.cardId).map(cid => state.cardDefs[cid ?? '']?.type ?? ''),
+      t => t === 'action'
+    );
   return computeDamage({
     weapons,
     ammo: player.turnAmmo,
