@@ -205,14 +205,60 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'useCharacterAbility: not your turn' };
       }
       const charInst = state.cards[player.characterInstanceId];
-      const charDef = charInst ? state.cardDefs[charInst.cardId] : undefined;
-      if (charDef === undefined || charDef.abilities === undefined) {
-        return { ok: false, reason: `useCharacterAbility: unknown character: ${player.characterInstanceId}` };
+            const charDef = charInst ? state.cardDefs[charInst.cardId] : undefined;
+            if (charDef === undefined || charDef.abilities === undefined) {
+              return { ok: false, reason: `useCharacterAbility: unknown character: ${player.characterInstanceId}` };
+            }
+            if (action.abilityIndex < 0 || action.abilityIndex >= charDef.abilities.length) {
+              return { ok: false, reason: `useCharacterAbility: bad ability index: ${action.abilityIndex}` };
+            }
+            const ability = charDef.abilities[action.abilityIndex];
+            if (ability === undefined) {
+              return { ok: false, reason: `useCharacterAbility: bad ability index: ${action.abilityIndex}` };
+            }
+            // Abilities must be unlocked at the character's current level.
+                  if (ability.level > player.level) {
+                    return { ok: false, reason: 'useCharacterAbility: ability not unlocked' };
+                  }
+      switch (ability.kind) {
+        case 'plusDamageThisTurn':
+        case 'exchangeHandWithInventoryTop':
+        case 'revealMansionTopNoEffect':
+        case 'trashFromHandAtWill': {
+          // Manual triggers are once per turn. Barry's bonus stacks (unlimited
+          // would break the game); Sheva's exchange could ping-pong the same
+          // two cards and Ada's peek is repeatable-identical — both would
+          // stall a greedy bot. Rebecca still trashes any number of cards via
+          // the DONE chain within her one activation. Scan the log back to
+          // this seat's last endTurn for a prior use of the same ability.
+          for (let i = state.log.length - 1; i >= 0; i--) {
+            const logged = state.log[i]?.action;
+            if (logged === undefined) continue;
+            if (logged.type === 'endTurn' && logged.seat === action.seat) break;
+            if (
+              logged.type === 'useCharacterAbility' &&
+              logged.seat === action.seat &&
+              logged.abilityIndex === action.abilityIndex
+            ) {
+              return { ok: false, reason: 'useCharacterAbility: already used this turn' };
+            }
+          }
+          if (ability.kind === 'exchangeHandWithInventoryTop') {
+            if (player.hand.length === 0 || player.inventory.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: needs a card in hand and Inventory' };
+            }
+          }
+          if (ability.kind === 'revealMansionTopNoEffect' && state.mansionDeck.length === 0) {
+            return { ok: false, reason: 'useCharacterAbility: Mansion is empty' };
+          }
+          if (ability.kind === 'trashFromHandAtWill' && player.hand.length === 0) {
+            return { ok: false, reason: 'useCharacterAbility: hand is empty' };
+          }
+          return { ok: true };
+        }
+        default:
+          return { ok: true };
       }
-      if (action.abilityIndex < 0 || action.abilityIndex >= charDef.abilities.length) {
-        return { ok: false, reason: `useCharacterAbility: bad ability index: ${action.abilityIndex}` };
-      }
-      return { ok: true };
 
     case 'endTurn':
       if (state.phase !== 'main') {

@@ -128,6 +128,16 @@ describe('enumerateLegalActions', () => {
     const acts = enumerateLegalActions(s, 0);
     const abilityActions = acts.filter(a => a.type === 'useCharacterAbility');
     const abilityIndices = abilityActions.map(a => a.abilityIndex).sort((a, b) => a - b);
+    // The fixture player is level 1: only the L1 ability (index 0) is legal —
+    // the L2 ability (index 1) is level-locked.
+    expect(abilityIndices).toEqual([0]);
+  });
+
+  test('level 2 unlocks both ability indices', () => {
+    const s0 = baseState();
+    const s = { ...s0, seats: s0.seats.map(p => (p.seat === 0 ? { ...p, level: 2 as const } : p)) };
+    const acts = enumerateLegalActions(s, 0);
+    const abilityIndices = acts.filter(a => a.type === 'useCharacterAbility').map(a => a.abilityIndex).sort((a, b) => a - b);
     expect(abilityIndices).toEqual([0, 1]);
   });
 

@@ -31,6 +31,17 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
   const bestExplore = explores.length > 0
     ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
     : undefined;
+  // Character abilities the engine says are legal right now (unlocked level,
+  // targets available, not already used this turn). Label from the character
+  // card's level text when resolvable.
+  const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
+  const player = state.seats[seat];
+  const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
+  const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+  const abilityLabel = (abilityIndex: number): string => {
+    const levelText = charDef?.levels?.find(l => l.level === (charDef.abilities?.[abilityIndex]?.level ?? 1))?.text;
+    return levelText ?? 'Use ability';
+  };
   const prompt = state.prompts.find(p => p.seat === seat);
   // Prompt options are instance ids (or 'DONE' for multi-choice chains);
   // render readable names when the id resolves to a card def.
@@ -66,13 +77,26 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
       )}
 
       <div className="action-buttons">
-        <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s)` : undefined}>
-          Explore{bestExplore !== undefined ? ` (${bestExplore.weapons.length} weapon${bestExplore.weapons.length === 1 ? '' : 's'})` : ''}
-        </button>
-        <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
-          End turn
-        </button>
-      </div>
+              <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s)` : undefined}>
+                Explore{bestExplore !== undefined ? ` (${bestExplore.weapons.length} weapon${bestExplore.weapons.length === 1 ? '' : 's'})` : ''}
+              </button>
+              {abilities.map(a => (
+                <button
+                  key={`ability-${a.abilityIndex}`}
+                  type="button"
+                  className="ability-button"
+                  data-ability-index={a.abilityIndex}
+                  onClick={() => onAction(a)}
+                  disabled={disabled}
+                  title={abilityLabel(a.abilityIndex)}
+                >
+                  Ability: {abilityLabel(a.abilityIndex)}
+                </button>
+              ))}
+              <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
+                End turn
+              </button>
+            </div>
     </div>
   );
 }

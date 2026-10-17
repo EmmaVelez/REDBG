@@ -330,6 +330,30 @@ describe('ActionBar (T07)', () => {
     const html = renderToStaticMarkup(<ActionBar state={otherTurn} seat={0} onAction={() => {}} />);
     expect(html).toContain('Waiting for');
   });
+
+  it('offers a manual character-ability button once the level unlocks it', () => {
+    // Barry (ch-005) L1 = plusDamageThisTurn; force level 1 (2 decorations).
+    const s = startTurn(
+      setup(
+        { seed: 11, players: [{ name: 'Barry', controller: 'human', characterCardId: 'ch-005' }, { name: 'Bot', controller: 'bot' }] },
+        PREMIER_CARDS,
+        FIRST_TIMER_PILES,
+      ),
+    );
+    // level 0: no ability button
+    const html0 = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html0).not.toContain('ability-button');
+    // level 1: the ability button appears with the card text
+    const leveled = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 2 } : p)),
+    };
+    const html1 = renderToStaticMarkup(<ActionBar state={leveled} seat={0} onAction={() => {}} />);
+    expect(html1).toContain('ability-button');
+    expect(html1).toContain('data-ability-index="0"');
+    expect(html1).toContain('Ability:');
+    expect(html1).toContain('+5 damage');
+  });
 });
 
 describe('Lobby (T08)', () => {

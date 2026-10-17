@@ -59,7 +59,9 @@ describe('chooseBotAction', () => {
   test('hard bot plays the greedy policy', () => {
     // Assert enumerate order first
     const order = enumerateLegalActions(s, seat).map(a => a.type);
-    expect(order).toEqual(['playActionCard', 'playAmmo', 'explore', 'explore', 'explore', 'useCharacterAbility', 'useCharacterAbility', 'endTurn']);
+    // The fixture player is level 1 with generic L1+L2 abilities: only the L1
+    // ability (index 0) passes validation, so exactly one useCharacterAbility.
+    expect(order).toEqual(['playActionCard', 'playAmmo', 'explore', 'explore', 'explore', 'useCharacterAbility', 'endTurn']);
 
     // Check greedy action
     expect(chooseBotAction(s, seat, 'hard', () => 0.1)).toEqual(chooseGreedyAction(s, seat));
@@ -72,7 +74,7 @@ describe('chooseBotAction', () => {
 
   // Test 3: easy bot with r=0 uses the first legal action
   test('easy bot with r=0 uses the first legal action', () => {
-    // r=0 < 0.5 noisy; idx = floor(0/0.5*8) = 0 -> first legal action
+    // r=0 < 0.5 noisy; idx = floor(0/0.5*7) = 0 -> first legal action
     expect(chooseBotAction(s, seat, 'easy', () => 0)).toEqual({ type: 'playActionCard', seat: 0, instanceId: 'ac-1#1' });
   });
 
@@ -92,11 +94,12 @@ describe('chooseBotAction', () => {
 
   // Test 6: normal bot noise is 20%
   test('normal bot noise is 20%', () => {
-    // Case 1: r=0.001 < 0.2 noisy. idx = floor(0.001/0.2*8) = 0 -> playActionCard
+    // Case 1: r=0.001 < 0.2 noisy. idx = floor(0.001/0.2*7) = 0 -> playActionCard
     expect(chooseBotAction(s, seat, 'normal', () => 0.001)).toEqual({ type: 'playActionCard', seat: 0, instanceId: 'ac-1#1' });
 
-    // Case 2: r=0.1 < 0.2 noisy. idx = floor(0.1/0.2*8) = 4 -> the we-2+we-3 pair explore
-        expect(chooseBotAction(s, seat, 'normal', () => 0.1)).toEqual({ type: 'explore', seat: 0, weapons: ['we-2#1', 'we-3#1'], exploreCount: 1 });
+    // Case 2: r=0.1 < 0.2 noisy. 7 legal actions (the L2 ability is level-locked):
+    // idx = floor(0.1/0.2*7) = 3 -> the solo we-3 explore
+        expect(chooseBotAction(s, seat, 'normal', () => 0.1)).toEqual({ type: 'explore', seat: 0, weapons: ['we-3#1'], exploreCount: 1 });
 
     // Case 3: r=0.999 >= 0.2 -> greedy
     expect(chooseBotAction(s, seat, 'normal', () => 0.999)).toEqual(chooseGreedyAction(s, seat));

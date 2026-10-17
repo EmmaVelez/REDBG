@@ -444,13 +444,88 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
 
     case 'useCharacterAbility': {
-      const { seat } = action;
-      return {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? { ...s } : s)),
-      };
-    }
+          const { seat, abilityIndex } = action;
+          const player = state.seats[seat] as PlayerState;
+          const charInst = state.cards[player.characterInstanceId];
+          const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+          const ability = charDef?.abilities?.[abilityIndex];
+          if (charDef === undefined || ability === undefined) {
+            // validate already guaranteed these exist; guard for the type system.
+            return { ...state, ...nextBase };
+          }
+          const promptId = `ability-${seat}-v${nextBase.version}-${abilityIndex}`;
+          switch (ability.kind) {
+            case 'plusDamageThisTurn': {
+              // Barry L1: one of Barry's weapons gets +amount damage this turn
+              // (once per turn — enforced by validate's log scan).
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat
+                    ? { ...player, weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.amount }
+                    : s,
+                ),
+              };
+            }
+            case 'exchangeHandWithInventoryTop': {
+              // Sheva L1: choose a hand card; it swaps with the top of Inventory.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Exchange 1 card in hand with the top card of your Inventory.',
+                    options: [...player.hand],
+                    payload: { kind: 'exchangeHandWithInventoryTop' },
+                  },
+                ],
+              };
+            }
+            case 'revealMansionTopNoEffect': {
+              // Ada L1: look at the Mansion top without engaging; it stays put.
+              const topId = state.mansionDeck[0];
+              const topDef = topId === undefined ? undefined : cardDef(state, topId);
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: `You peek at the Mansion: ${topDef?.name ?? 'an unknown card'} (${topDef?.hp ?? '?'} HP). It stays on top.`,
+                    options: ['OK'],
+                    payload: { kind: 'lookAtMansionTop' },
+                  },
+                ],
+              };
+            }
+            case 'trashFromHandAtWill': {
+              // Rebecca L2: trash any number of cards from hand (DONE ends).
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Trash any number of cards from your hand.',
+                    options: [...player.hand, 'DONE'],
+                    payload: { kind: 'trashFromHandAtWill' },
+                  },
+                ],
+              };
+            }
+            default:
+              // Passive/text-only abilities (generic, weaponTagBonus, ...): no-op.
+              return { ...state, ...nextBase };
+          }
+        }
 
     case 'endTurn': {
           const { seat } = action;
@@ -720,6 +795,62 @@ export function applyAction(state: GameState, action: Action): GameState {
                 prompts: newPrompts,
               };
             }
+
+      if (kind === 'exchangeHandWithInventoryTop') {
+        // Sheva L1: the chosen hand card swaps with the top of Inventory.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || !player.hand.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const top = player.inventory[0];
+        if (top === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? {
+                  ...player,
+                  hand: player.hand.map(id => (id === chosen ? top : id)),
+                  inventory: [chosen, ...player.inventory.slice(1)],
+                }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'trashFromHandAtWill') {
+        // Rebecca L2: trash cards from hand, any number; DONE ends the chain.
+        const chosen = prompt.options[option];
+        if (chosen === 'DONE' || chosen === undefined || !player.hand.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const remaining = player.hand.filter(id => id !== chosen);
+        const newPlayer = { ...player, hand: remaining };
+        let prompts = newPrompts;
+        if (remaining.length > 0) {
+          prompts = [
+            ...prompts,
+            {
+              id: `${prompt.id}:t${state.log.length}`,
+              seat,
+              text: prompt.text,
+              options: [...remaining, 'DONE'],
+              payload: { kind: 'trashFromHandAtWill' },
+            },
+          ];
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          removed: [...state.removed, chosen],
+          prompts,
+        };
+      }
 
       // lookAtMansionTop + unknown payload: informational, no state change
       return {

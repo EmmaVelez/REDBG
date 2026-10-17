@@ -757,3 +757,21 @@ h1, h2 { margin: 0 0 8px; }
 .lobby-scenario-edit { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; max-width: 420px; }
 .passandplay { width: 100%; align-self: stretch; }
 .lobby-entry { width: 100%; }
+
+/* ---- character ability buttons ---- */
+.ability-button {
+  background: linear-gradient(180deg, #2c2340 0%, #1a1428 100%);
+  border: 1px solid #6b5a9e;
+  color: #d8ccf0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ability-button:hover:not(:disabled) { border-color: #a58ce0; background: linear-gradient(180deg, #3a2f56 0%, #241b36 100%); }
+.ability-button:disabled { opacity: 0.5; cursor: default; }

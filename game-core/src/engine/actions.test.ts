@@ -5,8 +5,8 @@ import type { GameState, CardInstance, CardDef, PlayerState } from '../types';
 function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
   return {
     seat: s, name: 'P' + s, controller: 'human',
-    characterInstanceId: 'c' + s, hp: over.hp ?? 100, maxHp: over.maxHp ?? 100,
-    decorations: over.decorations ?? 0, level: 1,
+    characterInstanceId: over.characterInstanceId ?? ('c' + s), hp: over.hp ?? 100, maxHp: over.maxHp ?? 100,
+    decorations: over.decorations ?? 0, level: over.level ?? 1,
     turnAmmo: over.turnAmmo ?? 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
     buysLeft: over.buysLeft ?? 1, exploresLeft: over.exploresLeft ?? 1,
     weaponDamageBonusThisTurn: over.weaponDamageBonusThisTurn ?? 0, attached: [],
@@ -37,6 +37,10 @@ const DEFS: Record<string, CardDef> = {
   'ma-1': { id: 'ma-1', name: 'Majini', type: 'infected', set: 'premier', text: 'Majini', copies: 3, hp: 20, attack: 20, decorations: 1 },
   'ma-10': { id: 'ma-10', name: 'Uroboros Aheri', type: 'infected', set: 'premier', text: 'Uroboros', copies: 1, hp: 90, attack: 70, decorations: 8, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] },
   'ch-1': { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: 'Chris', copies: 1, maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] },
+  'ch-sheva': { id: 'ch-sheva', name: 'Sheva', type: 'character', set: 'premier', text: 'Sheva', copies: 1, maxHp: 80, level1At: 2, level2At: 4, abilities: [{ kind: 'exchangeHandWithInventoryTop', level: 1 }, { kind: 'weaponTagBonus', tag: 'rifle', amount: 20, level: 2 }] },
+  'ch-barry': { id: 'ch-barry', name: 'Barry', type: 'character', set: 'premier', text: 'Barry', copies: 1, maxHp: 90, level1At: 2, level2At: 7, abilities: [{ kind: 'plusDamageThisTurn', amount: 5, level: 1 }, { kind: 'weaponTagBonus', tag: 'magnum', amount: 20, level: 2 }] },
+  'ch-ada': { id: 'ch-ada', name: 'Ada', type: 'character', set: 'premier', text: 'Ada', copies: 1, maxHp: 80, level1At: 4, level2At: 8, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'actionBonus', amount: 40, level: 2 }] },
+  'ch-becky': { id: 'ch-becky', name: 'Rebecca', type: 'character', set: 'premier', text: 'Rebecca', copies: 1, maxHp: 70, level1At: 2, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'trashFromHandAtWill', level: 2 }] },
 };
 
 function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; seat1?: Partial<PlayerState> } = {}): GameState {
@@ -55,6 +59,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -398,6 +403,83 @@ test('Krauser L1: Decline leaves the market untouched', () => {
   expect(p0(s1).discard).toEqual([]);
   expect(s1.marketPiles['hg']?.cards).toEqual(['mkr1']);
   expect(s1.prompts.length).toBe(0);
+});
+
+
+test('Sheva L1: exchange hand card with top of Inventory', () => {
+  // Sheva at level 1, hand [am1], inventory top w1
+  const base = baseState({ seat0: { characterInstanceId: 'cs', level: 1 as const, hand: ['am1'], inventory: ['w1', 'am2'] } });
+  const s0 = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+  expect(s0.prompts.length).toBe(1);
+  expect(pr(s0).payload?.kind).toBe('exchangeHandWithInventoryTop');
+  expect(pr(s0).options).toEqual(['am1']);
+  const s1 = applyAction(s0, { type: 'chooseOption', seat: 0, promptId: pr(s0).id, option: 0 });
+  expect(p0(s1).hand).toEqual(['w1']);
+  expect(p0(s1).inventory).toEqual(['am1', 'am2']);
+  expect(s1.prompts.length).toBe(0);
+});
+
+test('Sheva L1: rejected below level 1 and with empty zones', () => {
+  const lvl0 = baseState({ seat0: { characterInstanceId: 'cs', level: 0 as const, hand: ['am1'], inventory: ['w1'] } });
+  expect(validateAction(lvl0, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: false, reason: 'useCharacterAbility: ability not unlocked' });
+  const empty = baseState({ seat0: { characterInstanceId: 'cs', level: 1 as const, hand: [], inventory: ['w1'] } });
+  expect(validateAction(empty, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }).ok).toBe(false);
+});
+
+test('Barry L1: +5 damage this turn, once per turn', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cb', level: 1 as const } });
+  const s1 = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+  expect(p0(s1).weaponDamageBonusThisTurn).toBe(5);
+  // second use this turn is rejected (log shows the first use)
+  expect(validateAction(s1, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: false, reason: 'useCharacterAbility: already used this turn' });
+});
+
+test('Barry L1: usable again next turn (log scan stops at endTurn)', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cb', level: 1 as const } });
+  const s1 = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+  const s2 = applyAction(s1, { type: 'endTurn', seat: 0 });
+  // seat 1 now; bring it back to seat 0 for the fixture's sake
+  const s3 = { ...s2, activeSeat: 0, seats: s2.seats.map(s => (s.seat === 0 ? { ...s, weaponDamageBonusThisTurn: 0 } : s)) };
+  expect(validateAction(s3, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: true });
+});
+
+test('Ada L1: peek Mansion top without engaging', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'ca', level: 1 as const } });
+  const s1 = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+  expect(s1.prompts.length).toBe(1);
+  expect(pr(s1).payload?.kind).toBe('lookAtMansionTop');
+  expect(pr(s1).text).toContain('Majini'); // fixture mansionDeck top = inf1 (ma-1)
+  // the card stays on top of the Mansion; nothing attached/removed
+  expect(s1.mansionDeck).toEqual(base.mansionDeck);
+  expect(s1.removed).toEqual([]);
+  const s2 = applyAction(s1, { type: 'chooseOption', seat: 0, promptId: pr(s1).id, option: 0 });
+  expect(s2.prompts.length).toBe(0);
+  expect(s2.mansionDeck).toEqual(base.mansionDeck);
+});
+
+test('Rebecca L2: trash any number of cards from hand (DONE chain)', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cr', level: 2 as const, hand: ['am1', 'am2', 'w1'] } });
+  const s1 = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+  expect(s1.prompts.length).toBe(1);
+  expect(pr(s1).payload?.kind).toBe('trashFromHandAtWill');
+  expect(pr(s1).options).toEqual(['am1', 'am2', 'w1', 'DONE']);
+  // trash one, chain continues with the rest
+  const s2 = applyAction(s1, { type: 'chooseOption', seat: 0, promptId: pr(s1).id, option: 0 });
+  expect(s2.removed).toEqual(['am1']);
+  expect(p0(s2).hand).toEqual(['am2', 'w1']);
+  expect(s2.prompts.length).toBe(1);
+  expect(pr(s2).options).toEqual(['am2', 'w1', 'DONE']);
+  // DONE ends it
+  const s3 = applyAction(s2, { type: 'chooseOption', seat: 0, promptId: pr(s2).id, option: 2 });
+  expect(s3.removed).toEqual(['am1']);
+  expect(s3.prompts.length).toBe(0);
+});
+
+test('Rebecca L2 is level-locked at level 1 (index 1)', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cr', level: 1 as const, hand: ['am1'] } });
+  expect(validateAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 })).toEqual({ ok: false, reason: 'useCharacterAbility: ability not unlocked' });
+  // index 0 (generic L1) stays legal-but-noop
+  expect(validateAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: true });
 });
 
 test('invalid action throws', () => {
