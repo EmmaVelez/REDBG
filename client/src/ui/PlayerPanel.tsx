@@ -3,6 +3,7 @@ import type { GameState, PlayerState } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { CharacterSkills } from './CharacterSkills';
+import { HealthRing } from './HealthRing';
 import { defForInstance } from './cards';
 
 /**
@@ -36,8 +37,8 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         {isMe && <span className="player-me">YOU</span>}
         {charDef !== null && <span className="player-character">{charDef.name} · Lv{player.level}</span>}
       </div>
-      <div className="player-row">
-        <span className="player-hp">HP {player.hp}/{player.maxHp}</span>
+      <div className="player-row player-hp-row">
+        <HealthRing hp={player.hp} maxHp={player.maxHp} />
         <span className="player-decorations">★ {player.decorations}</span>
       </div>
       <div className="player-row player-pools">

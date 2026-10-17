@@ -267,6 +267,15 @@ h1, h2 { margin: 0 0 8px; }
 .player-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .player-hp { font-weight: 700; }
 .player-decorations { color: #ffd479; }
+.player-hp-row {
+  align-items: center;
+  gap: 8px;
+}
+.health-ring { display: block; flex-shrink: 0; }
+.health-ring-label { font-weight: 700; font-family: inherit; }
+.health-empty { transition: stroke 0.25s; }
+.health-filled { transition: stroke 0.25s; }
+.player-downed .health-filled { stroke: #ef4444; }
 .player-character-card {
   display: flex;
   justify-content: center;

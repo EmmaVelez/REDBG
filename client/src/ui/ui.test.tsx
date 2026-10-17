@@ -186,7 +186,9 @@ describe('PlayerPanel (T06)', () => {
     if (player === undefined) return;
     const html = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
     expect(html).toContain(player.name);
-    expect(html).toContain(`HP ${player.hp}/${player.maxHp}`);
+    // HP is now the segmented HealthRing (center label + data attrs)
+    expect(html).toContain('health-ring');
+    expect(html).toContain(`aria-label="Health ${player.hp} of ${player.maxHp}"`);
     expect(html).toContain(`★ ${player.decorations}`);
     expect(html).toContain(`Ammo ${player.turnAmmo}`);
     expect(html).toContain(`Gold ${player.turnGold}`);
