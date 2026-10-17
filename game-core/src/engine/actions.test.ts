@@ -361,6 +361,45 @@ test('Master of Unlocking: non-weapon top cards reveal nothing offerable (no pro
   expect(s0.prompts.length).toBe(0);
 });
 
+test('Krauser L1: choosing the market knife gains it to discard and pops the pile', () => {
+  // 'mkr1' (we-1 weapon) tops the fixture 'hg' pile; simulate the turn-start
+  // ability prompt offering it + Decline.
+  const withPrompt: GameState = {
+    ...baseState(),
+    prompts: [{
+      id: 'ability-0-v2',
+      seat: 0,
+      text: 'At beginning of your turn, may gain 1 Knife weapon.',
+      options: ['mkr1', 'Decline'],
+      payload: { kind: 'gainKnifeAtTurnStart' },
+    }],
+  };
+  const s1 = applyAction(withPrompt, { type: 'chooseOption', seat: 0, promptId: 'ability-0-v2', option: 0 });
+  expect(p0(s1).discard).toEqual(['mkr1']);
+  expect(s1.marketPiles['hg']?.cards).toEqual([]);
+  expect(s1.prompts.length).toBe(0);
+  // no Gold or Buy was spent — this is a gain, not a purchase
+  expect(p0(s1).turnGold).toBe(50);
+  expect(p0(s1).buysLeft).toBe(1);
+});
+
+test('Krauser L1: Decline leaves the market untouched', () => {
+  const withPrompt: GameState = {
+    ...baseState(),
+    prompts: [{
+      id: 'ability-0-v2',
+      seat: 0,
+      text: 'At beginning of your turn, may gain 1 Knife weapon.',
+      options: ['mkr1', 'Decline'],
+      payload: { kind: 'gainKnifeAtTurnStart' },
+    }],
+  };
+  const s1 = applyAction(withPrompt, { type: 'chooseOption', seat: 0, promptId: 'ability-0-v2', option: 1 });
+  expect(p0(s1).discard).toEqual([]);
+  expect(s1.marketPiles['hg']?.cards).toEqual(['mkr1']);
+  expect(s1.prompts.length).toBe(0);
+});
+
 test('invalid action throws', () => {
   expect(() => applyAction(baseState({ seat0: { hand: ['zzz'] } }), { type: 'playActionCard', seat: 0, instanceId: 'zzz' })).toThrow('applyAction: playActionCard: unknown card: zzz');
   expect(() => applyAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toThrow('applyAction: explore: no weapons');

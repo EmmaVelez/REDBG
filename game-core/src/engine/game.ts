@@ -1,8 +1,56 @@
 import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw } from './deck';
-import { revive } from './characters';
+import { revive, abilitiesForLevel } from './characters';
 import { advanceTurn } from './turn';
+
+/**
+ * Turn-start character-ability prompts ("At beginning of your turn, may ...").
+ * Returns [] when the starting player has no triggerable ability this turn.
+ *
+ * Krauser L1 (gainKnifeAtTurnStart): may gain 1 Knife weapon. "Gain" (rules
+ * glossary) moves a card from the Resource Area to the player's Discard Pile,
+ * so each option is the TOP card of a market pile holding a Knife-tagged
+ * weapon, plus "Decline". Multiple knife piles -> multiple options (choice
+ * resolution across cards).
+ */
+function turnStartAbilityPrompts(
+  state: GameState,
+  player: PlayerState,
+  newVersion: number
+): GameState['prompts'] {
+  const charInst = state.cards[player.characterInstanceId];
+  const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+  if (charDef === undefined) return [];
+  const abilities = abilitiesForLevel(charDef.abilities, player.level);
+  if (!abilities.some(a => a.kind === 'gainKnifeAtTurnStart')) return [];
+
+  const isKnifeTop = (instanceId: string): boolean => {
+    const inst = state.cards[instanceId];
+    if (inst === undefined) return false;
+    const def = state.cardDefs[inst.cardId];
+    return def?.type === 'weapon' && (def.weaponTags?.includes('knife') ?? false);
+  };
+
+  const options: string[] = [];
+  for (const pile of Object.values(state.marketPiles)) {
+    const top = pile.cards[0];
+    if (top !== undefined && isKnifeTop(top)) {
+      options.push(top);
+    }
+  }
+  if (options.length === 0) return []; // no knives available to gain
+
+  return [
+    {
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: charDef.levels?.find(l => l.level === 1)?.text ?? charDef.text,
+      options: [...options, 'Decline'],
+      payload: { kind: 'gainKnifeAtTurnStart' },
+    },
+  ];
+}
 
 export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>): GameState {
   const defsById = new Map(cards.map(c => [c.id, c]));
@@ -243,10 +291,17 @@ export function startTurn(state: GameState): GameState {
     playArea: [],
   };
 
+  // "At beginning of your turn, may ..." character abilities prompt here —
+  // before anything else can be played (the prompt-immediate gate blocks
+  // other actions while it is open).
+  const newVersion = state.version + 1;
+  const abilityPrompts = turnStartAbilityPrompts(state, newPlayer, newVersion);
+
   return {
     ...state,
-    version: state.version + 1,
+    version: newVersion,
     seats: state.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
+    prompts: abilityPrompts.length > 0 ? [...state.prompts, ...abilityPrompts] : state.prompts,
   };
 }
 

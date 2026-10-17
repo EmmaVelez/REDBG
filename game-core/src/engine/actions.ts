@@ -668,26 +668,58 @@ export function applyAction(state: GameState, action: Action): GameState {
             }
 
       if (kind === 'takeOrBottom') {
-        const instanceId = prompt.payload?.instanceId as string | undefined;
-        if (option === 0 && instanceId !== undefined) {
-          return {
-            ...state,
-            ...nextBase,
-            seats: state.seats.map(s =>
-              s.seat === seat ? { ...player, discard: [...player.discard, instanceId] } : s,
-            ),
-            prompts: newPrompts,
-          };
-        }
-        if (option === 1 && instanceId !== undefined) {
-          return {
-            ...state,
-            ...nextBase,
-            mansionBottom: [...state.mansionBottom, instanceId],
-            prompts: newPrompts,
-          };
-        }
-      }
+              const instanceId = prompt.payload?.instanceId as string | undefined;
+              if (option === 0 && instanceId !== undefined) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s =>
+                    s.seat === seat ? { ...player, discard: [...player.discard, instanceId] } : s,
+                  ),
+                  prompts: newPrompts,
+                };
+              }
+              if (option === 1 && instanceId !== undefined) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  mansionBottom: [...state.mansionBottom, instanceId],
+                  prompts: newPrompts,
+                };
+              }
+            }
+
+            if (kind === 'gainKnifeAtTurnStart') {
+              // Krauser L1: the chosen option is the instance id of a market pile's
+              // TOP knife card ('Decline' ends it). Gain = Resource Area -> the
+              // player's Discard Pile (rules glossary), mirroring buy's bookkeeping
+              // minus the Gold/Buy cost.
+              const gainedId = prompt.options[option];
+              if (gainedId === undefined || gainedId === 'Decline') {
+                return { ...state, ...nextBase, prompts: newPrompts };
+              }
+              // Find the pile whose top card is the chosen knife.
+              const pileEntry = Object.entries(state.marketPiles).find(
+                ([, pile]) => pile.cards[0] === gainedId
+              );
+              if (pileEntry === undefined) {
+                // Top card changed underneath us (defensive) — drop the prompt.
+                return { ...state, ...nextBase, prompts: newPrompts };
+              }
+              const [pileId, pile] = pileEntry;
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat ? { ...player, discard: [...player.discard, gainedId] } : s,
+                ),
+                marketPiles: {
+                  ...state.marketPiles,
+                  [pileId]: { pileId, cards: pile.cards.slice(1) },
+                },
+                prompts: newPrompts,
+              };
+            }
 
       // lookAtMansionTop + unknown payload: informational, no state change
       return {

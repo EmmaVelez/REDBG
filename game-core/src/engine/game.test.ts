@@ -9,9 +9,10 @@ function def(id: string, over: Partial<CardDef> = {}): CardDef {
 const CARDS: ReadonlyArray<CardDef> = [
   def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] }),
   def('ch-2', { type: 'character', maxHp: 80, level2At: 3 }),
+  def('ch-3', { type: 'character', maxHp: 80, level1At: 1, level2At: 7, abilities: [{ kind: 'gainKnifeAtTurnStart', level: 1 }, { kind: 'weaponTagBonus', tag: 'knife', amount: 5, level: 2 }], levels: [{ level: 1, text: 'At beginning of your turn, may gain 1 Knife weapon.' }] }),
   def('am-1', { type: 'ammunition', copies: 28, bonuses: { ammo: 10, gold: 10 } }),
   def('we-1', { type: 'weapon', copies: 9, cost: 20, ammoReq: 20, damage: 10 }),
-  def('we-4', { type: 'weapon', copies: 11, cost: 0, ammoReq: 0, damage: 5 }),
+  def('we-4', { type: 'weapon', copies: 11, cost: 0, ammoReq: 0, damage: 5, weaponTags: ['melee', 'knife'] }),
   def('ma-1', { type: 'infected', copies: 3, hp: 20, attack: 20, decorations: 1 }),
   def('ma-10', { type: 'infected', copies: 2, hp: 90, attack: 70, decorations: 8, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] }),
   def('tk-1', { type: 'token', copies: 2, tokenEffects: [{ kind: 'gainWeaponAndTrashToken', weaponCardId: 'we-1' }] }),
@@ -268,6 +269,49 @@ test('startTurn resets pools', () => {
   expect(t.activeSeat).toBe(0);
   expect(t.turnNumber).toBe(1);
   expect(t.version).toBe(2);
+});
+
+test('startTurn offers Krauser L1 the market knife pile top + Decline', () => {
+  // ch-3 = Krauser-shaped (gainKnifeAtTurnStart L1); level 1 unlocks it.
+  const s = setup2(1, [{ name: 'K', characterCardId: 'ch-3' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const leveled = seatMap(s, (p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 1 } : p));
+  const t = startTurn(leveled);
+  expect(t.prompts).toHaveLength(1);
+  const prompt = t.prompts[0];
+  expect(prompt?.seat).toBe(0);
+  expect(prompt?.payload?.kind).toBe('gainKnifeAtTurnStart');
+  expect(prompt?.text).toContain('Knife');
+  // The knife pile ('kn', we-4 cards) top + Decline.
+  const knifeTop = t.marketPiles['kn']?.cards[0];
+  expect(knifeTop).toBeDefined();
+  expect(prompt?.options).toEqual([knifeTop, 'Decline']);
+});
+
+test('startTurn gives no ability prompt below Krauser L1 (level 0)', () => {
+  const s = setup2(1, [{ name: 'K', characterCardId: 'ch-3' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const t = startTurn(s); // fresh characters start at level 0
+  expect(t.prompts).toHaveLength(0);
+});
+
+test('startTurn gives no ability prompt when no knife is available', () => {
+  const s = setup2(1, [{ name: 'K', characterCardId: 'ch-3' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const leveled = seatMap(s, (p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 1 } : p));
+  const emptied = { ...leveled, marketPiles: { ...leveled.marketPiles, kn: { pileId: 'kn', cards: [] } } };
+  const t = startTurn(emptied);
+  expect(t.prompts).toHaveLength(0);
+});
+
+test('startTurn ability prompt fires for the STARTING seat only', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'ch-1' }, { name: 'K', characterCardId: 'ch-3' }]);
+  // seat 1 is Krauser at level 1 but seat 0 starts; no prompt for seat 1 yet.
+  const leveled = seatMap(s, (p, i) => (i === 1 ? { ...p, level: 1 as const, decorations: 1 } : p));
+  const t = startTurn(leveled);
+  expect(t.prompts).toHaveLength(0);
+  // After seat 0 ends and the turn advances to seat 1, startTurn(seat 1) prompts.
+  const advanced = { ...t, activeSeat: 1 };
+  const t2 = startTurn(advanced);
+  expect(t2.prompts).toHaveLength(1);
+  expect(t2.prompts[0]?.seat).toBe(1);
 });
 
 test('startTurn skips downed player', () => {
