@@ -1,4 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState } from '../types';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus } from './abilities';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -46,14 +47,22 @@ export function computeDamage(params: DamageParams): number {
 export function exploreDamage(state: GameState, seat: number, weaponIds: readonly string[]): number {
   const player = state.seats[seat];
   if (player === undefined) return 0;
-  const weapons: ExploreWeapon[] = (weaponIds ?? []).map(id => {
+  const abilities = characterAbilities(state, seat);
+  const defs = (weaponIds ?? []).map(id => {
     const inst = state.cards[id];
-    if (inst === undefined) return { damage: 0, ammoReq: 0 };
-    const def = state.cardDefs[inst.cardId];
-    if (def === undefined) return { damage: 0, ammoReq: 0 };
-    return { damage: def.damage ?? 0, ammoReq: def.ammoReq ?? 0, weaponEffects: def.weaponEffects };
+    return inst === undefined ? undefined : state.cardDefs[inst.cardId];
   });
-  return computeDamage({ weapons, ammo: player.turnAmmo, bonusDamage: player.weaponDamageBonusThisTurn });
+  const weapons: ExploreWeapon[] = defs.map(def => ({
+    damage: def?.damage ?? 0,
+    ammoReq: ammoReqForWeapon(abilities, def),
+    weaponEffects: def?.weaponEffects,
+  }));
+  const abilityDamage = passiveDamageBonus(abilities, defs, 1);
+  return computeDamage({
+    weapons,
+    ammo: player.turnAmmo,
+    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
+  });
 }
 
 export type ExploreOutcome =

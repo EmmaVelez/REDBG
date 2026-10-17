@@ -4,6 +4,15 @@ import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
 import { resolveExplore } from './explore';
 import { flipDown, levelForDecorations } from './characters';
+import {
+  characterAbilities,
+  ammoReqForWeapon,
+  passiveDamageBonus,
+  exploreGoldBonus,
+  ammunitionCardBonus,
+  explosivesGoToDiscard,
+  isExplosive,
+} from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
 import { makeRng, shuffle } from '../util/rng';
@@ -253,10 +262,21 @@ export function applyAction(state: GameState, action: Action): GameState {
               state.rngState,
             );
 
+            // Claire: ammunition cards give extra Ammo (L1) / Gold (L2).
+            const extra = ammunitionCardBonus(characterAbilities(state, seat), def);
+            const playerAfterBonus: PlayerState =
+              extra.ammo === 0 && extra.gold === 0
+                ? played.player
+                : {
+                    ...played.player,
+                    turnAmmo: played.player.turnAmmo + extra.ammo,
+                    turnGold: played.player.turnGold + extra.gold,
+                  };
+
             return {
               ...state,
               ...nextBase,
-              seats: state.seats.map(s => (s.seat === seat ? played.player : s)),
+              seats: state.seats.map(s => (s.seat === seat ? playerAfterBonus : s)),
               rngState: played.rngState,
             };
           }
@@ -266,23 +286,51 @@ export function applyAction(state: GameState, action: Action): GameState {
           const player = state.seats[seat] as PlayerState;
 
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
+          // Passive abilities can reduce the cost (Leon L1 pistols, Sheva L2 rifles).
+          const abilities = characterAbilities(state, seat);
           const requiredAmmo = weapons.reduce((sum, weaponId) => {
-            const w = cardDef(state, weaponId);
-            return sum + (w?.ammoReq ?? 0);
+            return sum + ammoReqForWeapon(abilities, cardDef(state, weaponId));
           }, 0);
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
           const handAfter = player.hand.filter(id => !weapons.includes(id));
-          const playAreaAfter = [...player.playArea, ...weapons];
+          // Explosive weapons are trashed after use (all-explosives rule);
+          // Jill L2 sends them to her discard pile instead. Non-explosives
+          // stay in the play area until end-of-turn cleanup.
+          const toDiscardExplosives = explosivesGoToDiscard(abilities);
+          const explosiveIds: string[] = [];
+          const playedWeaponIds: string[] = [];
+          for (const id of weapons) {
+            if (isExplosive(cardDef(state, id))) {
+              explosiveIds.push(id);
+            } else {
+              playedWeaponIds.push(id);
+            }
+          }
+          const playAreaAfter = [...player.playArea, ...playedWeaponIds];
+          const removedAfter = toDiscardExplosives
+            ? state.removed
+            : [...state.removed, ...explosiveIds];
+          const discardAfterExplosives = toDiscardExplosives
+            ? [...player.discard, ...explosiveIds]
+            : player.discard;
           const exploresLeft = player.exploresLeft - exploreCount;
 
-          const exploreWeapons = weapons.map(id => {
-            const w = cardDef(state, id);
-            return { damage: w?.damage ?? 0, ammoReq: w?.ammoReq ?? 0, weaponEffects: w?.weaponEffects };
-          });
+          const weaponDefs = weapons.map(id => cardDef(state, id));
+          const exploreWeapons = weaponDefs.map(w => ({
+            damage: w?.damage ?? 0,
+            ammoReq: ammoReqForWeapon(abilities, w),
+            weaponEffects: w?.weaponEffects,
+          }));
+          // Passive damage abilities: Barry L2 magnums, Krauser L2 knives,
+          // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
+          // fights exploreCount Infected in one attack).
+          const abilityDamage = passiveDamageBonus(abilities, weaponDefs, exploreCount);
           // Weapon effects like "plusDamageIfAmmoAbove" read the ammo the player
           // has available for this attack — the pool before it is spent.
           const ammoForEffects = player.turnAmmo;
+          // Wesker L1: exploring grants +Gold for the turn.
+          const turnGoldAfter = player.turnGold + exploreGoldBonus(abilities);
 
       const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
@@ -311,7 +359,8 @@ export function applyAction(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, exploresLeft, turnAmmo: turnAmmoAfter } : s)),
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter } : s)),
+          removed: removedAfter,
           mansionDeck,
           mansionBottom,
           prompts,
@@ -321,7 +370,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
               revealed: revealedDef,
             });
 
@@ -337,8 +386,10 @@ export function applyAction(state: GameState, action: Action): GameState {
                   ...player,
                   hand: handAfter,
                   playArea: playAreaAfter,
+                  discard: discardAfterExplosives,
                   exploresLeft,
                   turnAmmo: turnAmmoAfter,
+                  turnGold: turnGoldAfter,
                   decorations,
                   level,
                   attached: [...player.attached, revealedInstanceId],
@@ -347,6 +398,7 @@ export function applyAction(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          removed: removedAfter,
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
@@ -361,7 +413,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const newHp = Math.max(player.hp - outcome.damageTaken, 0);
       let downed = false;
       let hand: readonly string[] = handAfter;
-      let discard: readonly string[] = player.discard;
+      let discard: readonly string[] = discardAfterExplosives;
       let inventory: readonly string[] = player.inventory;
 
       if (newHp === 0) {
@@ -374,7 +426,7 @@ export function applyAction(state: GameState, action: Action): GameState {
             downed: false,
             dead: false,
             hand: handAfter,
-            discard: player.discard,
+            discard: discardAfterExplosives,
             inventory: player.inventory,
           },
           rngShuffle,
@@ -403,6 +455,7 @@ export function applyAction(state: GameState, action: Action): GameState {
               inventory,
               exploresLeft,
               turnAmmo: turnAmmoAfter,
+              turnGold: turnGoldAfter,
               hp: newHp,
               downed,
             };
@@ -411,6 +464,7 @@ export function applyAction(state: GameState, action: Action): GameState {
         ...state,
         ...nextBase,
         seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+        removed: removedAfter,
         mansionDeck,
         mansionBottom,
         rngState: currentRng,

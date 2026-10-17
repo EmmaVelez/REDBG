@@ -1,4 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
+import { requiredAmmoForWeapons } from './abilities';
 
 function cardDef(state: GameState, instanceId: string): CardDef | undefined {
   const inst = state.cards[instanceId];
@@ -143,10 +144,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                 return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
               }
             }
-            const requiredAmmo = action.weapons.reduce((sum, weaponId) => {
-              const weaponCardDef = cardDef(state, weaponId);
-              return sum + (weaponCardDef?.ammoReq ?? 0);
-            }, 0);
+            // Ability-aware ammo cost (Leon L1 pistols -10, Sheva L2 rifles -20).
+            const requiredAmmo = requiredAmmoForWeapons(state, action.seat, action.weapons, id => cardDef(state, id));
             if (player.turnAmmo < requiredAmmo) {
               return { ok: false, reason: 'explore: insufficient ammo' };
             }

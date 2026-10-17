@@ -351,14 +351,19 @@ function actionBonusValue(abilities: readonly CharacterAbility[]): number {
 
 /**
  * Extra value this character gets from holding/buying a weapon, from
- * weaponTagBonus ("Leon L2 pistols", "Barry L2 magnums", "Sheva L2 rifles",
- * "Krauser L2 knives") and Jill L1 explosivesPlusDamage ("explosives").
+ * weaponTagPlusDamage ("Barry L2 magnums", "Krauser L2 knives"),
+ * ammoReqReduction ("Leon L1 pistols", "Sheva L2 rifles" — cheaper ammo
+ * cost is worth roughly half its number in scoring terms) and Jill L1
+ * explosivesPlusDamage ("explosives").
  */
 function weaponAffinityBonus(abilities: readonly CharacterAbility[], def: CardDef): number {
   let bonus = 0;
   for (const ability of abilities) {
-    if (ability.kind === 'weaponTagBonus' && def.weaponTags?.includes(ability.tag)) {
+    if (ability.kind === 'weaponTagPlusDamage' && def.weaponTags?.includes(ability.tag)) {
       bonus += ability.amount;
+    }
+    if (ability.kind === 'ammoReqReduction' && def.weaponTags?.includes(ability.tag)) {
+      bonus += ability.amount / 2;
     }
     if (ability.kind === 'explosivesPlusDamage' && def.weaponTags?.includes('explosive')) {
       bonus += ability.amount;

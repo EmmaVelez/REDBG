@@ -158,7 +158,8 @@ export type CharacterAbility =
   | { readonly kind: "noHealingNoNonInfectedAttach"; readonly level: 1 | 2 }                              // Chris restriction
   | { readonly kind: "explosivesGoToDiscardInsteadOfTrash"; readonly level: 1 | 2 }                       // Jill L2
   | { readonly kind: "explosivesPlusDamage"; readonly amount: number; readonly level: 1 | 2 }             // Jill L1: +amount per Explosive weapon used
-  | { readonly kind: "weaponTagBonus"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // Leon L2 pistols (double use), Barry L2 magnums, Sheva L2 rifles, Krauser L2 knives
+  | { readonly kind: "weaponTagPlusDamage"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // Barry L2 magnums +20 dmg, Krauser L2 knives +5 dmg
+  | { readonly kind: "ammoReqReduction"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 }     // Leon L1 pistols -10 ammoReq, Sheva L2 rifles -20 ammoReq
   | { readonly kind: "ammunitionBonus"; readonly ammoAmount: number; readonly goldAmount: number; readonly level: 1 | 2 } // Claire: +10 Ammo (L1) / +10 Gold (L2) per Ammo card
   | { readonly kind: "exploreGoldBonus"; readonly amount: number; readonly level: 1 | 2 }                 // Wesker L1: +Gold that turn whenever he Explores
   | { readonly kind: "actionBonus"; readonly amount: number; readonly level: 1 | 2 }                       // Ada L2: buys -> actions, action cards worth more

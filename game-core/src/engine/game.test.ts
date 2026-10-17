@@ -9,7 +9,7 @@ function def(id: string, over: Partial<CardDef> = {}): CardDef {
 const CARDS: ReadonlyArray<CardDef> = [
   def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] }),
   def('ch-2', { type: 'character', maxHp: 80, level2At: 3 }),
-  def('ch-3', { type: 'character', maxHp: 80, level1At: 1, level2At: 7, abilities: [{ kind: 'gainKnifeAtTurnStart', level: 1 }, { kind: 'weaponTagBonus', tag: 'knife', amount: 5, level: 2 }], levels: [{ level: 1, text: 'At beginning of your turn, may gain 1 Knife weapon.' }] }),
+  def('ch-3', { type: 'character', maxHp: 80, level1At: 1, level2At: 7, abilities: [{ kind: 'gainKnifeAtTurnStart', level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'knife', amount: 5, level: 2 }], levels: [{ level: 1, text: 'At beginning of your turn, may gain 1 Knife weapon.' }] }),
   def('am-1', { type: 'ammunition', copies: 28, bonuses: { ammo: 10, gold: 10 } }),
   def('we-1', { type: 'weapon', copies: 9, cost: 20, ammoReq: 20, damage: 10 }),
   def('we-4', { type: 'weapon', copies: 11, cost: 0, ammoReq: 0, damage: 5, weaponTags: ['melee', 'knife'] }),

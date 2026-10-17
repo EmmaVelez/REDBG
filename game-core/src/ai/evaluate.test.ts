@@ -158,7 +158,7 @@ describe('evaluateState', () => {
     test('character ability: Leon pistol affinity raises handgun value in hand', () => {
       const s = baseState({
         seats: [
-          // ch-002 = Leon with weaponTagBonus pistol 10 at level 1
+          // ch-002 = Leon with ammoReqReduction pistol 10 at level 1
           player(0, { characterInstanceId: 'ch-002#0', hand: ['we-9#1'] }),
           player(1),
         ],
@@ -170,13 +170,13 @@ describe('evaluateState', () => {
         ),
         cardDefs: {
           ...DEFS,
-          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponTagBonus', tag: 'pistol', amount: 10, level: 1 }, { kind: 'weaponTagBonus', tag: 'pistol', amount: 20, level: 2 }] }),
+          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'ammoReqReduction', tag: 'pistol', amount: 10, level: 1 }, { kind: 'generic', level: 2 }] }),
           'we-9': def('we-9', { type: 'weapon', cost: 20, ammoReq: 20, damage: 10, weaponTags: ['gun', 'pistol'] as const }),
         },
       });
-      // Without any affinity this hand would score 136 + 12 (we-9 dmg 10 -> 10 + 10/5) = 148;
-      // Leon's pistol bonus 10 makes the handgun worth 22 -> 158.
-      expect(evaluateState(s, 0)).toBe(128);
+      // Leon's pistol ammoReqReduction (10) scores at half value (+5 affinity)
+      // in the evaluator: 128 was with +10; now 123.
+      expect(evaluateState(s, 0)).toBe(123);
     });
 
     // 17. 'character ability: non-matching weapon tag gets no bonus'
@@ -191,7 +191,7 @@ describe('evaluateState', () => {
         ),
         cardDefs: {
           ...DEFS,
-          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponTagBonus', tag: 'pistol', amount: 10, level: 1 }, { kind: 'weaponTagBonus', tag: 'pistol', amount: 20, level: 2 }] }),
+          'ch-002': def('ch-002', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'ammoReqReduction', tag: 'pistol', amount: 10, level: 1 }, { kind: 'generic', level: 2 }] }),
         },
       });
       // we-2 (damage 8, NO pistol tag): 136 + (10 + 8/5=1 -> 11) = 147. No affinity bonus.
@@ -202,7 +202,7 @@ describe('evaluateState', () => {
     test('character ability: level-gated affinity only at the unlocked level', () => {
       const s = baseState({
         seats: [
-          // Barry ch-005: weaponTagBonus magnum 20 only at level 2 — at level 1 no bonus
+          // Barry ch-005: weaponTagPlusDamage magnum 20 only at level 2 — at level 1 no bonus
           player(0, { characterInstanceId: 'ch-005#0', level: 1 as const, hand: ['we-6#1'] }),
           player(1),
         ],
@@ -214,7 +214,7 @@ describe('evaluateState', () => {
         ),
         cardDefs: {
           ...DEFS,
-          'ch-005': def('ch-005', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'weaponTagBonus', tag: 'magnum', amount: 20, level: 2 }] }),
+          'ch-005': def('ch-005', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'magnum', amount: 20, level: 2 }] }),
           'we-6': def('we-6', { type: 'weapon', cost: 90, ammoReq: 50, damage: 50, weaponTags: ['gun', 'magnum'] as const }),
         },
       });
