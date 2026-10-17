@@ -78,12 +78,19 @@ def build_user_prompt(task: dict, feedback: str | None) -> str:
     return "\n".join(parts)
 
 
-def call_ollama(model: str, system: str, user: str, num_ctx: int) -> dict:
+def call_ollama(model: str, system: str, user: str, num_ctx: int,
+                num_gpu: int | None = None) -> dict:
+    options: dict = {"temperature": 0.1, "num_ctx": num_ctx, "num_predict": 16384}
+    # num_gpu pins how many layers offload to the GPU; 0 forces CPU-only.
+    # Only sent when the task spec sets it (a large model that cannot fit in
+    # VRAM OOMs on Ollama's default auto-offload and needs num_gpu: 0).
+    if num_gpu is not None:
+        options["num_gpu"] = num_gpu
     body = json.dumps({
         "model": model,
         "stream": False,
         "keep_alive": "15m",
-        "options": {"temperature": 0.1, "num_ctx": num_ctx, "num_predict": 16384},
+        "options": options,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
     }).encode()
@@ -138,13 +145,20 @@ def main() -> int:
 
     model = task.get("model", DEFAULT_MODEL)
     num_ctx = task.get("num_ctx", 32768)
+    num_gpu = task.get("num_gpu")  # optional: 0 = CPU-only (large models vs VRAM)
     user = build_user_prompt(task, feedback)
 
     if dry:
         print("=== SYSTEM ===\n" + SYSTEM_PROMPT + "\n=== USER ===\n" + user)
         return 0
 
-    resp = call_ollama(model, SYSTEM_PROMPT, user, num_ctx)
+    resp = call_ollama(model, SYSTEM_PROMPT, user, num_ctx, num_gpu)
+    # Ollama can return HTTP 200 with an in-body error (e.g. std::bad_alloc on
+    # oversized num_ctx) and empty content — fail loudly instead of writing
+    # zero-byte artifacts.
+    if resp.get("error"):
+        print(f"OLLAMA ERROR: {resp['error'][:500]}")
+        return 1
     content = resp.get("message", {}).get("content", "")
     CACHE.mkdir(exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
