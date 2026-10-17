@@ -231,6 +231,8 @@ export function startTurn(state: GameState): GameState {
   }
 
   const player = state.seats[state.activeSeat] as PlayerState;
+  const charInst = state.cards[player.characterInstanceId];
+  const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
 
   if (player.downed) {
     const ch = revive({
@@ -291,7 +293,14 @@ export function startTurn(state: GameState): GameState {
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
-    exploresLeft: player.mustExplore === true ? 2 : 1,
+    // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).
+    exploresLeft:
+      (player.mustExplore === true ? 2 : 1) +
+      (abilitiesForLevel(charDef?.abilities, player.level).some(
+        a => a.kind === 'extraExploreAtTurnStart'
+      )
+        ? 1
+        : 0),
     weaponDamageBonusThisTurn: 0,
     playArea: [],
   };

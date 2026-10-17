@@ -12,6 +12,7 @@ import {
   ammunitionCardBonus,
   explosivesGoToDiscard,
   isExplosive,
+  infectedDamageReduction,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -406,6 +407,7 @@ export function applyAction(state: GameState, action: Action): GameState {
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
               revealed: revealedDef,
+              damageReduction: infectedDamageReduction(abilities),
             });
 
       if (outcome.kind === 'insufficientAmmo') {

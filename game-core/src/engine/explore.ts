@@ -71,7 +71,7 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef }): ExploreOutcome {
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number }): ExploreOutcome {
   const { weapons, ammo, bonusDamage, revealed } = params;
   const required = requiredAmmo(weapons);
 
@@ -98,7 +98,9 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
     return { kind: 'defeated', decorations: revealed.decorations ?? 0 };
   } else {
     const shuffleBack = revealed.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated') ?? false;
-    return { kind: 'notDefeated', damageTaken: revealed.attack ?? 0, shuffleBack };
+    // PR-001 Chris L1: Infected deal reduced damage to him (never below 0).
+    const raw = revealed.attack ?? 0;
+    return { kind: 'notDefeated', damageTaken: Math.max(raw - (params.damageReduction ?? 0), 0), shuffleBack };
   }
 }
 

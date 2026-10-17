@@ -14,20 +14,20 @@ const pile = (pileId: string): { pileId: string; cardIds: readonly string[] } =>
 };
 
 test('database size and uniqueness', () => {
-  expect(PREMIER_CARDS.length).toBe(61);
+  expect(PREMIER_CARDS.length).toBe(62);
   const ids = PREMIER_CARDS.map(c => c.id);
-  expect(new Set(ids).size).toBe(61);
+  expect(new Set(ids).size).toBe(62);
 });
 
 test('all ids follow the printed numbering scheme', () => {
   for (const card of PREMIER_CARDS) {
-    expect(card.id).toMatch(/^(we|am|ac|it|ch|ma)-\d{3}$/);
+    expect(card.id).toMatch(/^(we|am|ac|it|ch|ma|pr)-\d{3}$/);
   }
 });
 
 test('every card has required base fields', () => {
   for (const card of PREMIER_CARDS) {
-    expect(card.set).toBe('premier');
+    expect(['premier', 'promo']).toContain(card.set);
     expect(['character', 'weapon', 'ammunition', 'action', 'item', 'infected', 'token']).toContain(card.type);
     expect(card.copies).toBeGreaterThanOrEqual(1);
     expect(card.text).not.toBe('');
@@ -45,7 +45,9 @@ test('character data', () => {
     const abilities = character.abilities;
     if (levels === undefined || abilities === undefined) throw new Error('missing levels/abilities: ' + character.id);
     expect(levels).toHaveLength(2);
-    expect(abilities).toHaveLength(2);
+    // Two abilities per level tier, except promo characters whose L2 packs
+    // two effects (PR-001: damage reduction + extra Explore) = 3 entries.
+    expect(abilities.length).toBeGreaterThanOrEqual(2);
     expect(levels[0]?.level).toBe(1);
     expect(levels[1]?.level).toBe(2);
   }

@@ -115,6 +115,30 @@ export function ammunitionCardBonus(
   return { ammo, gold };
 }
 
+/**
+ * Damage reduction vs Infected attacks for this seat (PR-001 Chris L1: -10).
+ * Applied to damageTaken when an explore fails to defeat the Infected.
+ */
+export function infectedDamageReduction(abilities: readonly CharacterAbility[]): number {
+  return abilities.reduce(
+    (sum, a) => (a.kind === 'infectedDamageReduction' ? sum + a.amount : sum),
+    0
+  );
+}
+
+/**
+ * Damage reduction vs Weapon attacks for this seat (PR-001 Chris L2: -10).
+ * No PvP weapon-attack action exists in the engine yet, so this is encoded
+ * for completeness and stays dormant until character-vs-character attacks
+ * are implemented.
+ */
+export function weaponDamageReduction(abilities: readonly CharacterAbility[]): number {
+  return abilities.reduce(
+    (sum, a) => (a.kind === 'weaponDamageReduction' ? sum + a.amount : sum),
+    0
+  );
+}
+
 /** Jill L2: explosive weapons go to discard instead of being trashed. */
 export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'explosivesGoToDiscardInsteadOfTrash');

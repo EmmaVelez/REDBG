@@ -437,3 +437,86 @@ describe('batch-2 exotic passives through applyAction', () => {
     expect(granted).toBeDefined();
   });
 });
+
+describe('PR-001 Chris Redfield (promo)', () => {
+  it('card data: 90 HP, L1 at 4, L2 at 8, three abilities', () => {
+    const def = PREMIER_CARDS.find(c => c.id === 'pr-001');
+    expect(def).toBeDefined();
+    if (def === undefined) return;
+    expect(def.maxHp).toBe(90);
+    expect(def.level1At).toBe(4);
+    expect(def.level2At).toBe(8);
+    expect(def.set).toBe('promo');
+    expect(def.abilities?.map(a => a.kind)).toEqual([
+      'infectedDamageReduction',
+      'weaponDamageReduction',
+      'extraExploreAtTurnStart',
+    ]);
+  });
+
+  it('L1: Infected deal 10 less damage (Zombie attack 10 -> 0)', () => {
+    const s = gameWith('pr-001');
+    const withZombie: GameState = {
+      ...tune(s, { turnAmmo: 0, hand: ['we-004#1', ...(s.seats[0]?.hand ?? [])] }),
+      mansionDeck: ['ma-002#1', ...(s.mansionDeck ?? [])],
+      cards: {
+        ...s.cards,
+        'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 0 } },
+        'ma-002#1': { instanceId: 'ma-002#1', cardId: 'ma-002', location: { zone: 'mansionDeck', index: 0 } },
+      },
+    };
+    // level 0: takes the full 10
+    const l0 = applyAction(withZombie, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    expect(l0.seats[0]?.hp).toBe(90 - 10);
+    // level 1: damage reduced to 0
+    const l1state: GameState = { ...withZombie, seats: withZombie.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 4 } : p)) };
+    const l1 = applyAction(l1state, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    expect(l1.seats[0]?.hp).toBe(90);
+    // Butcher (attack 20) still hurts: 20 - 10 = 10
+    const butcher: GameState = {
+      ...l1state,
+      mansionDeck: ['ma-004#1', ...(l1state.mansionDeck ?? [])],
+      cards: {
+        ...l1state.cards,
+        'ma-004#1': { instanceId: 'ma-004#1', cardId: 'ma-004', location: { zone: 'mansionDeck', index: 0 } },
+      },
+    };
+    const b = applyAction(butcher, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    expect(b.seats[0]?.hp).toBe(80);
+  });
+
+  it('L2: +1 Explore at the beginning of the turn', () => {
+    const s = gameWith('pr-001');
+    const l2 = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 2 as const, decorations: 8 } : p)),
+    };
+    const t = startTurnImpl(l2);
+    expect(t.seats[0]?.exploresLeft).toBe(2);
+    // level 1: no extra explore
+    const l1 = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 4 } : p)),
+    };
+    expect(startTurnImpl(l1).seats[0]?.exploresLeft).toBe(1);
+  });
+
+  it('is dealt like any character (unique pool)', () => {
+    // 4 players from the 11-character pool, no duplicates
+    const s = setup(
+      { seed: 11, players: [ { name: 'a', controller: 'human' }, { name: 'b', controller: 'human' }, { name: 'c', controller: 'human' }, { name: 'd', controller: 'human' } ] },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES
+    );
+    const chars = s.seats.map(p => s.cards[p.characterInstanceId]?.cardId);
+    expect(new Set(chars).size).toBe(4);
+    // explicit pick works
+    const s2 = setup(
+      { seed: 11, players: [ { name: 'a', controller: 'human', characterCardId: 'pr-001' }, { name: 'b', controller: 'human' } ] },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES
+    );
+    expect(s2.cards[s2.seats[0]?.characterInstanceId ?? '']?.cardId).toBe('pr-001');
+    expect(s2.seats[0]?.maxHp).toBe(90);
+  });
+});
