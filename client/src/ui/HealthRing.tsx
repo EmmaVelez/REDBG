@@ -20,6 +20,13 @@ export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRing
   const dashLen = segArc - gap;
   const fontSize = Math.round(size / 3.4);
 
+  // Health-tier coloring: red at or below 1/3 max HP, orange at or below 1/2,
+  // green above. Integer comparisons (hp*3 <= maxHp) avoid float rounding.
+  const critical = hp * 3 <= maxHp;
+  const warning = hp * 2 <= maxHp;
+  const tier = critical ? 'critical' : warning ? 'warn' : 'ok';
+  const fillColor = tier === 'critical' ? '#ef4444' : tier === 'warn' ? '#fb923c' : '#4ade80';
+
   const segmentCircles: JSX.Element[] = [];
   for (let i = 0; i < segments; i++) {
     const isFilled = i < filled;
@@ -31,7 +38,7 @@ export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRing
         cy={c}
         r={radius}
         fill="none"
-        stroke={isFilled ? '#4ade80' : 'rgba(255,255,255,0.12)'}
+        stroke={isFilled ? fillColor : 'rgba(255,255,255,0.12)'}
         strokeWidth={strokeWidth}
         strokeDasharray={`${dashLen} ${circumference - dashLen}`}
         strokeDashoffset={-segArc * i}
@@ -49,6 +56,7 @@ export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRing
       data-max-hp={maxHp}
       data-segments={segments}
       data-filled={filled}
+      data-tier={tier}
       role="img"
       aria-label={`Health ${hp} of ${maxHp}`}
     >

@@ -75,3 +75,49 @@ describe('HealthRing', () => {
     expect(html1).toBe(html2);
   });
 });
+
+describe('HealthRing tiers', () => {
+  it('full health: green segments, tier ok', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={90} maxHp={90} />);
+    expect(html).toContain('data-tier="ok"');
+    expect(countOf(html, 'stroke="#4ade80"')).toBe(9);
+  });
+
+  it('exactly half health: orange, tier warn', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={45} maxHp={90} />);
+    expect(html).toContain('data-tier="warn"');
+    expect(html).toContain('stroke="#fb923c"');
+    expect(html).not.toContain('stroke="#4ade80"');
+    expect(countOf(html, 'stroke="#fb923c"')).toBe(5);
+  });
+
+  it('just above half: green, tier ok', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={46} maxHp={90} />);
+    expect(html).toContain('data-tier="ok"');
+    expect(html).toContain('stroke="#4ade80"');
+  });
+
+  it('exactly one third: red, tier critical', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={30} maxHp={90} />);
+    expect(html).toContain('data-tier="critical"');
+    expect(html).toContain('stroke="#ef4444"');
+    expect(html).not.toContain('stroke="#fb923c"');
+    expect(html).not.toContain('stroke="#4ade80"');
+  });
+
+  it('just above one third: orange, tier warn', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={31} maxHp={90} />);
+    expect(html).toContain('data-tier="warn"');
+  });
+
+  it('zero health: red', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={0} maxHp={80} />);
+    expect(html).toContain('data-tier="critical"');
+    expect(html).not.toContain('stroke="#ef4444"');
+  });
+
+  it('empty segments stay grey at every tier', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={30} maxHp={90} />);
+    expect(countOf(html, 'stroke="rgba(255,255,255,0.12)"')).toBe(6);
+  });
+});

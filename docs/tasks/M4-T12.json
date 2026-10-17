@@ -1,0 +1,25 @@
+{
+  "id": "M4-T12",
+  "title": "HealthRing tier colors (green/orange/red) + tests",
+  "model": "qwen2.5-coder:14b",
+  "num_ctx": 12288,
+  "instructions": "MODIFY the existing `HealthRing` component and its test file (both are provided as context files). One behavior change: the FILLED segment color now depends on the character's health ratio. Everything else about the component (segment math, layout, props, center label, data attributes) stays EXACTLY as it is.\n\n## FILES TO EMIT (exactly these two paths — complete rewrites of the context files)\n\n1. `client/src/ui/HealthRing.tsx`\n2. `client/src/ui/HealthRing.test.tsx`\n\n## Component change — HealthRing.tsx\n\nAdd, right after the existing `const fontSize = ...` line and before the `segmentCircles` loop:\n\n```tsx\n// Health-tier coloring: red at or below 1/3 max HP, orange at or below 1/2,\n// green above. Integer comparisons (hp*3 <= maxHp) avoid float rounding.\nconst critical = hp * 3 <= maxHp;\nconst warning = hp * 2 <= maxHp;\nconst tier = critical ? 'critical' : warning ? 'warn' : 'ok';\nconst fillColor = tier === 'critical' ? '#ef4444' : tier === 'warn' ? '#fb923c' : '#4ade80';\n```\n\nIn the svg root element, add one attribute next to the existing data-* attributes:\n\n```tsx\ndata-tier={tier}\n```\n\nIn the segment circle loop, change the stroke line from:\n\n```tsx\nstroke={isFilled ? '#4ade80' : 'rgba(255,255,255,0.12)'}\n```\n\nto:\n\n```tsx\nstroke={isFilled ? fillColor : 'rgba(255,255,255,0.12)'}\n```\n\nEmpty segments keep the same grey `rgba(255,255,255,0.12)` at every tier. Do not change anything else: same imports, same props interface (hp, maxHp, size?, strokeWidth?), same math lines, same JSX structure, same class names (`health-ring`, `health-ring-label`, `health-segment`, `health-filled`, `health-empty`), same aria-label. No classes, no default exports, no mutation.\n\n## Test change — HealthRing.test.tsx\n\nKeep ALL existing tests unchanged (they assert data-segments/data-filled/class counts and still hold). Then ADD a new describe block `describe('HealthRing tiers', () => { ... });` with these cases (same imports; the `countOf` helper already exists in the file):\n\n1. it('full health: green segments, tier ok'):\n   `const html = renderToStaticMarkup(<HealthRing hp={90} maxHp={90} />);`\n   - expect html to contain `data-tier=\"ok\"`\n   - expect `countOf(html, 'stroke=\"#4ade80\"')` to be 9\n\n2. it('exactly half health: orange, tier warn'):\n   `const html = renderToStaticMarkup(<HealthRing hp={45} maxHp={90} />);`\n   - expect html to contain `data-tier=\"warn\"`\n   - expect html to contain `stroke=\"#fb923c\"`\n   - expect html NOT to contain `stroke=\"#4ade80\"`\n   - expect `countOf(html, 'stroke=\"#fb923c\"')` to be 5 (filled segments: Math.round(4.5) = 5... use `Math.round(45/10)` semantics — 45/10 = 4.5 rounds to 5, but JS Math.round(4.5) is 5)\n\n3. it('just above half: green, tier ok'):\n   `const html = renderToStaticMarkup(<HealthRing hp={46} maxHp={90} />);`\n   - expect html to contain `data-tier=\"ok\"`\n   - expect html to contain `stroke=\"#4ade80\"`\n\n4. it('exactly one third: red, tier critical'):\n   `const html = renderToStaticMarkup(<HealthRing hp={30} maxHp={90} />);`\n   - expect html to contain `data-tier=\"critical\"`\n   - expect html to contain `stroke=\"#ef4444\"`\n   - expect html NOT to contain `stroke=\"#fb923c\"`\n   - expect html NOT to contain `stroke=\"#4ade80\"`\n\n5. it('just above one third: orange, tier warn'):\n   `const html = renderToStaticMarkup(<HealthRing hp={31} maxHp={90} />);`\n   - expect html to contain `data-tier=\"warn\"`\n\n6. it('zero health: red'):\n   `const html = renderToStaticMarkup(<HealthRing hp={0} maxHp={80} />);`\n   - expect html to contain `data-tier=\"critical\"`\n   - no filled segments, so expect html NOT to contain `stroke=\"#ef4444\"` — the tier attribute still reports critical\n\n7. it('empty segments stay grey at every tier'):\n   `const html = renderToStaticMarkup(<HealthRing hp={30} maxHp={90} />);`\n   - expect `countOf(html, 'stroke=\"rgba(255,255,255,0.12)\"')` to be 6 (3 filled red, 6 empty grey of 9 segments)\n\nSerializer facts: React renders the stroke attribute verbatim (`stroke=\"#fb923c\"`), including inside the rgba string. `data-tier={tier}` serializes to `data-tier=\"ok\"` / `data-tier=\"warn\"` / `data-tier=\"critical\"`.\n\nNOTE on case 2's expected count: filled = Math.min(segments, Math.max(0, Math.round(hp / 10))). For hp 45: Math.round(4.5) = 5 in JavaScript (half rounds up), so 5 filled segments each carry the orange stroke. For case 7 (hp 30, maxHp 90): Math.round(3) = 3 filled, 9 - 3 = 6 empty.\n\n## VALIDATION (both must pass)\n\n- in `client/`: `npx tsc --noEmit`\n- in `client/`: `npx vitest run` (the FULL client suite)\n",
+  "context_files": [
+    "client/src/ui/HealthRing.tsx",
+    "client/src/ui/HealthRing.test.tsx"
+  ],
+  "expected_files": [
+    "client/src/ui/HealthRing.tsx",
+    "client/src/ui/HealthRing.test.tsx"
+  ],
+  "validate": [
+    {
+      "cwd": "client",
+      "cmd": "npx tsc --noEmit"
+    },
+    {
+      "cwd": "client",
+      "cmd": "npx vitest run"
+    }
+  ]
+}
