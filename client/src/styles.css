@@ -320,6 +320,23 @@ h1, h2 { margin: 0 0 8px; }
 }
 .skill-locked .skill-level { color: var(--muted); }
 
+/* ---- character-skills panel (PlayerPanel) ---- */
+.character-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.skill-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.skill-decorations { color: #ffd479; font-weight: 700; }
+.skill-next { color: var(--muted); }
+
 /* ---- hand / zones ---- */
 .hand { display: flex; flex-wrap: wrap; gap: 8px; }
 .hand-card {

@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import type { GameState, PlayerState } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
+import { CharacterSkills } from './CharacterSkills';
 import { defForInstance } from './cards';
 
 /**
@@ -59,6 +60,7 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
           </HoverCard>
         </div>
       )}
+      {charDef !== null && <CharacterSkills state={state} seat={seat} />}
     </div>
   );
 }
