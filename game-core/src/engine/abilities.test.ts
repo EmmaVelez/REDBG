@@ -11,7 +11,7 @@ import {
 import { exploreDamage } from './explore';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
-import { setup } from './game';
+import { setup, startTurn as startTurnImpl } from './game';
 import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
 import type { GameState, CardDef, PlayerState, CharacterAbility } from '../types';
 
@@ -264,7 +264,176 @@ describe('passive abilities through applyAction (level-gated)', () => {
     const l1 = { ...leon, seats: leon.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const } : p)) };
     expect(characterAbilities(l1, 0).map(a => a.kind)).toEqual(['ammoReqReduction']);
     const l2 = { ...leon, seats: leon.seats.map((p, i) => (i === 0 ? { ...p, level: 2 as const } : p)) };
-    // L2 keeps L1: ammoReqReduction + generic (double-use not encoded yet).
-    expect(characterAbilities(l2, 0).map(a => a.kind).sort()).toEqual(['ammoReqReduction', 'generic']);
+    // L2 keeps L1: ammoReqReduction + pistolsTwicePerTurn.
+    expect(characterAbilities(l2, 0).map(a => a.kind).sort()).toEqual(['ammoReqReduction', 'pistolsTwicePerTurn']);
+  });
+});
+describe('batch-2 exotic passives through applyAction', () => {
+  it('Chris L1: healing items are rejected', () => {
+    const s = gameWith('ch-008'); // Chris L1 gate = 0 -> starts with L1
+    const herb = findHand(s, 'item');
+    // ensure a green herb instance exists in hand
+    const withHerb: GameState = {
+      ...tune(s, { hand: ['it-001#1', ...(s.seats[0]?.hand ?? [])] }),
+      cards: {
+        ...s.cards,
+        'it-001#1': { instanceId: 'it-001#1', cardId: 'it-001', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    void herb;
+    const res = validateAction(withHerb, { type: 'playItem', seat: 0, instanceId: 'it-001#1' });
+    expect(res).toEqual({ ok: false, reason: 'playItem: Chris cannot be healed' });
+    // Another character CAN play the same herb
+    const jill = gameWith('ch-009');
+    const jillHerb: GameState = {
+      ...tune(jill, { hand: ['it-001#1', ...(jill.seats[0]?.hand ?? [])] }),
+      cards: {
+        ...jill.cards,
+        'it-001#1': { instanceId: 'it-001#1', cardId: 'it-001', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    expect(validateAction(jillHerb, { type: 'playItem', seat: 0, instanceId: 'it-001#1' }).ok).toBe(true);
+  });
+
+  it('Ada L2: exchange a Buy for an Action (repeatable per Buy)', () => {
+    const s = gameWith('ch-006');
+    const l2 = tune(s, { level: 2 as const, decorations: 8, buysLeft: 2, actionsLeft: 1 });
+    const a1 = applyAction(l2, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    expect(a1.seats[0]?.buysLeft).toBe(1);
+    expect(a1.seats[0]?.actionsLeft).toBe(2);
+    const a2 = applyAction(a1, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    expect(a2.seats[0]?.buysLeft).toBe(0);
+    expect(a2.seats[0]?.actionsLeft).toBe(3);
+    // third exchange rejected: no Buy left
+    expect(validateAction(a2, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 })).toEqual({ ok: false, reason: 'useCharacterAbility: no Buy left to exchange' });
+  });
+
+  it('Wesker L2: target a player -> mustExplore; their endTurn blocked until they explore', () => {
+    const s = gameWith('ch-001');
+    const l2 = tune(s, { level: 2 as const, decorations: 9 });
+    const a1 = applyAction(l2, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    expect(a1.prompts.length).toBe(1);
+    expect(a1.prompts[0]?.payload?.kind).toBe('forceExploreOtherPlayer');
+    expect(a1.prompts[0]?.options).toEqual(['1']); // the only other seat
+    const a2 = applyAction(a1, { type: 'chooseOption', seat: 0, promptId: a1.prompts[0]?.id ?? '', option: 0 });
+    expect(a2.seats[1]?.mustExplore).toBe(true);
+    expect(a2.seats[0]?.mustExplore).toBeFalsy();
+    // seat 1's turn: endTurn is blocked (they hold weapons in hand after setup draw)
+    const theirTurn = { ...a2, activeSeat: 1 };
+    const canEnd = validateAction(theirTurn, { type: 'endTurn', seat: 1 });
+    if ((theirTurn.seats[1]?.hand ?? []).some(id => theirTurn.cards[id]?.cardId.startsWith('we-'))) {
+      expect(canEnd).toEqual({ ok: false, reason: 'endTurn: must Explore first (Wesker ability)' });
+    } else {
+      // weaponless: deadlock guard lets them end the turn
+      expect(canEnd.ok).toBe(true);
+    }
+  });
+
+  it('Wesker L2 target gets 2 Explores at their turn start', () => {
+    const s = gameWith('ch-001');
+    const forced = {
+      ...s,
+      activeSeat: 1,
+      seats: s.seats.map((p, i) => (i === 1 ? { ...p, mustExplore: true } : p)),
+    };
+    const t = startTurnImpl(forced);
+    expect(t.seats[1]?.exploresLeft).toBe(2);
+  });
+
+  it('Rebecca L1: effect-trashing offers a redirect prompt; redirect moves to target discard', () => {
+    // Ominous Battle (ac-010) trashes 1 card from hand via effect.
+    const s0 = gameWith('ch-010');
+    const tuned: GameState = {
+      ...tune(s0, { level: 1 as const, decorations: 2, hand: ['ac-010#1', 'am-001#1', ...(s0.seats[0]?.hand ?? [])] }),
+      cards: {
+        ...s0.cards,
+        'ac-010#1': { instanceId: 'ac-010#1', cardId: 'ac-010', location: { zone: 'hand', index: 0 } },
+        'am-001#1': { instanceId: 'am-001#1', cardId: 'am-001', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    const played = applyAction(tuned, { type: 'playActionCard', seat: 0, instanceId: 'ac-010#1' });
+    const trashPrompt = played.prompts.find(p => p.payload?.kind === 'trashHandCard');
+    expect(trashPrompt).toBeDefined();
+    if (trashPrompt === undefined) return;
+    const trashed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: trashPrompt.id, option: 0 });
+    // the redirect prompt follows (Rebecca L1)
+    const redirect = trashed.prompts.find(p => p.payload?.kind === 'trashRedirect');
+    expect(redirect).toBeDefined();
+    if (redirect === undefined) return;
+    expect(redirect.options[0]).toBe('Leave in trash');
+    expect(redirect.options).toContain('1');
+    // send it to seat 1's discard
+    const sent = applyAction(trashed, { type: 'chooseOption', seat: 0, promptId: redirect.id, option: 1 });
+    expect(sent.seats[1]?.discard.length).toBe((trashed.seats[1]?.discard.length ?? 0) + 1);
+    expect(sent.removed.length).toBe(trashed.removed.length - 1);
+    // alternatively, leaving it in trash keeps removed as-is
+    const kept = applyAction(trashed, { type: 'chooseOption', seat: 0, promptId: redirect.id, option: 0 });
+    expect(kept.removed).toEqual(trashed.removed);
+    expect(kept.seats[1]?.discard).toEqual(trashed.seats[1]?.discard);
+  });
+
+  it('non-Rebecca characters get no redirect prompt', () => {
+    const s0 = gameWith('ch-002'); // Leon
+    const tuned: GameState = {
+      ...tune(s0, { hand: ['ac-010#1', 'am-001#1', ...(s0.seats[0]?.hand ?? [])] }),
+      cards: {
+        ...s0.cards,
+        'ac-010#1': { instanceId: 'ac-010#1', cardId: 'ac-010', location: { zone: 'hand', index: 0 } },
+        'am-001#1': { instanceId: 'am-001#1', cardId: 'am-001', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    const played = applyAction(tuned, { type: 'playActionCard', seat: 0, instanceId: 'ac-010#1' });
+    const trashPrompt = played.prompts.find(p => p.payload?.kind === 'trashHandCard');
+    expect(trashPrompt).toBeDefined();
+    if (trashPrompt === undefined) return;
+    const trashed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: trashPrompt.id, option: 0 });
+    expect(trashed.prompts.find(p => p.payload?.kind === 'trashRedirect')).toBeUndefined();
+  });
+
+  it('Leon L2: a pistol can be used a second time from the play area (third rejected)', () => {
+    const s0 = gameWith('ch-002');
+    const withPistol: GameState = {
+      ...tune(s0, { level: 2 as const, decorations: 6, hand: ['we-009#1', ...(s0.seats[0]?.hand ?? [])], turnAmmo: 200, exploresLeft: 3 }),
+      cards: {
+        ...s0.cards,
+        'we-009#1': { instanceId: 'we-009#1', cardId: 'we-009', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    // first use from hand
+    const e1 = applyAction(withPistol, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(e1.seats[0]?.playArea).toContain('we-009#1');
+    // second use from play area (L2)
+    expect(validateAction(e1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 }).ok).toBe(true);
+    const e2 = applyAction(e1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    // third use rejected (cap 2)
+    expect(validateAction(e2, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon not in hand: we-009#1' });
+    // Below L2 the second use is illegal
+    const l1 = { ...withPistol, seats: withPistol.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const } : p)) };
+    const f1 = applyAction(l1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(validateAction(f1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 }).ok).toBe(false);
+  });
+
+  it('Rocket Launcher Case: Take grants the Rocket Launcher and trashes the token', () => {
+    // Reveal the token via explore (mansion top forced to ma-012#1)
+    const s0 = gameWith('ch-008');
+    const rigged: GameState = {
+      ...tune(s0, { hand: ['we-004#1', ...(s0.seats[0]?.hand ?? [])], turnAmmo: 90 }),
+      mansionDeck: ['ma-012#1', ...(s0.mansionDeck ?? [])],
+      cards: {
+        ...s0.cards,
+        'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 0 } },
+        'ma-012#1': { instanceId: 'ma-012#1', cardId: 'ma-012', location: { zone: 'mansionDeck', index: 0 } },
+      },
+    };
+    const explored = applyAction(rigged, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    expect(prompt).toBeDefined();
+    if (prompt === undefined) return;
+    const taken = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    // the token is trashed, a Rocket Launcher instance gained to discard
+    expect(taken.removed).toContain('ma-012#1');
+    expect(taken.seats[0]?.discard).not.toContain('ma-012#1');
+    const granted = (taken.seats[0]?.discard ?? []).find(id => taken.cards[id]?.cardId === 'we-008');
+    expect(granted).toBeDefined();
   });
 });

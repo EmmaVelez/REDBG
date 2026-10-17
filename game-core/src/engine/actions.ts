@@ -32,6 +32,37 @@ function isGreenHerb(state: GameState, instanceId: string): boolean {
   );
 }
 
+/**
+ * Rebecca L1: "Cards you trash via effects may go to other players' discard
+ * piles instead." After an effect trashes a card, offer a redirect prompt
+ * (option 0 = leave it in the trash). Only fires for Rebecca at L1+ with
+ * living opponents.
+ */
+function trashRedirectPrompt(
+  state: GameState,
+  seat: number,
+  trashedId: string,
+  prompts: GameState['prompts'],
+  version: number
+): GameState['prompts'] {
+  if (!characterAbilities(state, seat).some(a => a.kind === 'trashRedirectToPlayerDiscard')) {
+    return prompts;
+  }
+  const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+  if (others.length === 0) return prompts;
+  const def = cardDef(state, trashedId);
+  return [
+    ...prompts,
+    {
+      id: `redirect-${trashedId}-v${version}`,
+      seat,
+      text: `${def?.name ?? trashedId} was trashed. Send it to a player's discard pile instead?`,
+      options: ['Leave in trash', ...others.map(s => String(s.seat))],
+      payload: { kind: 'trashRedirect', instanceId: trashedId },
+    },
+  ];
+}
+
 function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number): { player: PlayerState; rngState: number } {
   const bonuses = sumBonuses([def]);
   const pools = applyBonusPools(
@@ -294,13 +325,16 @@ export function applyAction(state: GameState, action: Action): GameState {
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
           const handAfter = player.hand.filter(id => !weapons.includes(id));
+          // Leon L2 pistol reuse: a pistol already in the play area stays there
+          // (it was not just moved from hand); only fresh weapons get added below.
+          const freshWeapons = weapons.filter(id => !player.playArea.includes(id));
           // Explosive weapons are trashed after use (all-explosives rule);
           // Jill L2 sends them to her discard pile instead. Non-explosives
           // stay in the play area until end-of-turn cleanup.
           const toDiscardExplosives = explosivesGoToDiscard(abilities);
           const explosiveIds: string[] = [];
           const playedWeaponIds: string[] = [];
-          for (const id of weapons) {
+          for (const id of freshWeapons) {
             if (isExplosive(cardDef(state, id))) {
               explosiveIds.push(id);
             } else {
@@ -359,7 +393,7 @@ export function applyAction(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter } : s)),
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
           removed: removedAfter,
           mansionDeck,
           mansionBottom,
@@ -390,6 +424,7 @@ export function applyAction(state: GameState, action: Action): GameState {
                   exploresLeft,
                   turnAmmo: turnAmmoAfter,
                   turnGold: turnGoldAfter,
+                  mustExplore: false,
                   decorations,
                   level,
                   attached: [...player.attached, revealedInstanceId],
@@ -456,6 +491,7 @@ export function applyAction(state: GameState, action: Action): GameState {
               exploresLeft,
               turnAmmo: turnAmmoAfter,
               turnGold: turnGoldAfter,
+              mustExplore: false,
               hp: newHp,
               downed,
             };
@@ -575,6 +611,37 @@ export function applyAction(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'exchangeBuyForAction': {
+              // Ada L2: spend the Buy for an extra Action.
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s =>
+                  s.seat === seat
+                    ? { ...player, buysLeft: player.buysLeft - 1, actionsLeft: player.actionsLeft + 1 }
+                    : s,
+                ),
+              };
+            }
+            case 'forceExploreOtherPlayer': {
+              // Wesker L2: choose another player; they get +1 Explore and must
+              // Explore on their next turn (choice resolved via prompt).
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Choose a player: they get +1 Explore and must Explore on their next turn.',
+                    options: others.map(s => String(s.seat)),
+                    payload: { kind: 'forceExploreOtherPlayer' },
+                  },
+                ],
+              };
+            }
             default:
               // Passive/text-only abilities (generic, weaponTagBonus, ...): no-op.
               return { ...state, ...nextBase };
@@ -658,7 +725,7 @@ export function applyAction(state: GameState, action: Action): GameState {
                   s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
                 ),
                 removed: [...state.removed, chosenId],
-                prompts: newPrompts,
+                prompts: trashRedirectPrompt(state, seat, chosenId, newPrompts, nextBase.version),
               };
             }
 
@@ -699,7 +766,7 @@ export function applyAction(state: GameState, action: Action): GameState {
                   s.seat === seat ? { ...player, discard: player.discard.filter(id => id !== chosenId) } : s,
                 ),
                 removed: [...state.removed, chosenId],
-                prompts,
+                prompts: trashRedirectPrompt(state, seat, chosenId, prompts, nextBase.version),
               };
             }
 
@@ -755,6 +822,44 @@ export function applyAction(state: GameState, action: Action): GameState {
               };
             }
 
+      if (kind === 'forceExploreOtherPlayer') {
+        // Wesker L2: the chosen player must Explore on their next turn
+        // (startTurn grants +1 Explore; validate blocks their endTurn until
+        // they do; exploring clears the obligation).
+        const targetSeat = Number(prompt.options[option]);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'trashRedirect') {
+        // Rebecca L1: option 0 leaves the card in the trash; any other option
+        // is a seat number whose discard pile receives it (removed from trash).
+        const trashedId = prompt.payload?.instanceId as string | undefined;
+        if (trashedId === undefined || option === 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(prompt.options[option]);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === targetSeat ? { ...s, discard: [...s.discard, trashedId] } : s,
+          ),
+          removed: state.removed.filter(id => id !== trashedId),
+          prompts: newPrompts,
+        };
+      }
+
       if (kind === 'healGreenHerb') {
               if (option === 0) {
                 return {
@@ -799,6 +904,33 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (kind === 'takeOrBottom') {
               const instanceId = prompt.payload?.instanceId as string | undefined;
               if (option === 0 && instanceId !== undefined) {
+                // Token cards (Rocket Launcher Case, Gatling Gun Case): gain the
+                // weapon, trash the token. The weapon instance is created on the
+                // fly (token-only weapons are not registered at setup).
+                const takenDef = cardDef(state, instanceId);
+                const grantEffect = (takenDef?.tokenEffects ?? []).find(
+                  e => e.kind === 'gainWeaponAndTrashToken'
+                );
+                if (grantEffect !== undefined && grantEffect.kind === 'gainWeaponAndTrashToken') {
+                  const grantedId = `${grantEffect.weaponCardId}#g${nextBase.version}-${seat}`;
+                  return {
+                    ...state,
+                    ...nextBase,
+                    seats: state.seats.map(s =>
+                      s.seat === seat ? { ...player, discard: [...player.discard, grantedId] } : s,
+                    ),
+                    cards: {
+                      ...state.cards,
+                      [grantedId]: {
+                        instanceId: grantedId,
+                        cardId: grantEffect.weaponCardId,
+                        location: { zone: 'discard' as const, index: 0, seat },
+                      },
+                    },
+                    removed: [...state.removed, instanceId],
+                    prompts: newPrompts,
+                  };
+                }
                 return {
                   ...state,
                   ...nextBase,

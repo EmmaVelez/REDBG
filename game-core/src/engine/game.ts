@@ -1,7 +1,7 @@
 import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw } from './deck';
-import { revive, abilitiesForLevel } from './characters';
+import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { advanceTurn } from './turn';
 
 /**
@@ -151,7 +151,9 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       hp: maxHp,
       maxHp,
       decorations: 0,
-      level: 0 as const,
+      // Chris (and any level1At: 0 character) starts with their L1 ability
+      // active; everyone else starts at level 0 until their first decoration.
+      level: levelForDecorations(def?.level1At, def?.level2At, 0),
       turnAmmo: 0,
       turnGold: 0,
       actionsLeft: 1,
@@ -261,6 +263,7 @@ export function startTurn(state: GameState): GameState {
       buysLeft: 1,
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
+      mustExplore: false,
     };
 
     const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
@@ -286,7 +289,9 @@ export function startTurn(state: GameState): GameState {
     turnGold: 0,
     actionsLeft: 1,
     buysLeft: 1,
-    exploresLeft: 1,
+    // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
+    // (validate blocks endTurn until then; exploring clears the obligation).
+    exploresLeft: player.mustExplore === true ? 2 : 1,
     weaponDamageBonusThisTurn: 0,
     playArea: [],
   };

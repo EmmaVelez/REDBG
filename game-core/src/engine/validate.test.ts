@@ -25,7 +25,7 @@ const DEFS: Record<string, CardDef> = {
   'we-1':  { id: 'we-1', name: 'Handgun', type: 'weapon', set: 'premier', text: '', copies: 9, cost: 20, ammoReq: 20, damage: 10 },
   'we-2':  { id: 'we-2', name: 'AMG', type: 'weapon', set: 'premier', text: '', copies: 4, cost: 30, ammoReq: 40, damage: 20 },
   'ma-1':  { id: 'ma-1', name: 'Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 20, attack: 20, decorations: 1 },
-  'ch-1':  { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: '', copies: 1, maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] },
+  'ch-1':  { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: '', copies: 1, maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }, { kind: 'plusDamageThisTurn', amount: 5, level: 1 }] },
 };
 
 function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState> } = {}): GameState {
@@ -138,8 +138,12 @@ describe('validateAction', () => {
     expect(validateAction(baseState({ marketPiles: { hg: { pileId: 'hg', cards: [] } } }), { type: 'buy', seat: 0, pileId: 'hg' })).toEqual({ ok: false, reason: 'buy: empty pile: hg' });
   });
 
-  it('useCharacterAbility ok', () => {
-    expect(validateAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: true });
+  it('useCharacterAbility ok (manual trigger)', () => {
+    expect(validateAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 })).toEqual({ ok: true });
+  });
+
+  it('useCharacterAbility rejects passive abilities', () => {
+    expect(validateAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: false, reason: 'useCharacterAbility: passive ability' });
   });
 
   it('useCharacterAbility bad index', () => {

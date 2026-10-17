@@ -1,5 +1,41 @@
-import type { GameState, Action, CardDef, ValidationResult } from '../types';
-import { requiredAmmoForWeapons } from './abilities';
+import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
+import { requiredAmmoForWeapons, characterAbilities } from './abilities';
+
+/** True when the seat's character has the given ability kind (level-gated). */
+function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
+  return characterAbilities(state, seat).some(a => a.kind === kind);
+}
+
+/** Chris L1 restriction flag. */
+function hasNoHealingAbility(state: GameState, seat: number): boolean {
+  return hasAbilityKind(state, seat, 'noHealingNoNonInfectedAttach');
+}
+
+/**
+ * True when the player holds at least one weapon in hand — used so Wesker's
+ * forced-Explore obligation can never deadlock a weaponless player (their
+ * endTurn is allowed and clears the flag).
+ */
+function canExploreAtAll(state: GameState, player: { readonly hand: readonly string[] }): boolean {
+  return player.hand.some(id => cardDef(state, id)?.type === 'weapon');
+}
+
+/**
+ * How many times a pistol has already been used in an explore THIS turn
+ * (log scan back to the seat's last endTurn) — Leon L2 caps at 2.
+ */
+function pistolUsesThisTurn(state: GameState, seat: number, weaponId: string): number {
+  let uses = 0;
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const logged = state.log[i]?.action;
+    if (logged === undefined) continue;
+    if (logged.type === 'endTurn' && logged.seat === seat) break;
+    if (logged.type === 'explore' && logged.seat === seat && logged.weapons.includes(weaponId)) {
+      uses += 1;
+    }
+  }
+  return uses;
+}
 
 function cardDef(state: GameState, instanceId: string): CardDef | undefined {
   const inst = state.cards[instanceId];
@@ -75,6 +111,16 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (!player.hand.includes(action.instanceId)) {
         return { ok: false, reason: `playItem: card not in hand: ${action.instanceId}` };
       }
+      // Chris L1: cannot be healed — healing items are not playable by him.
+      {
+        const itemDef = cardDef(state, action.instanceId);
+        const heals = (itemDef?.itemEffects ?? []).some(
+          e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60'
+        );
+        if (heals && hasNoHealingAbility(state, action.seat)) {
+          return { ok: false, reason: 'playItem: Chris cannot be healed' };
+        }
+      }
       const itemCardDef = cardDef(state, action.instanceId);
       if (itemCardDef === undefined) {
         return { ok: false, reason: `playItem: unknown card: ${action.instanceId}` };
@@ -133,8 +179,20 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: `explore: duplicate weapon: ${action.weapons.find((id, index) => action.weapons.indexOf(id) !== index)}` };
       }
       for (const weaponId of action.weapons) {
+              // Leon L2: pistol weapons can be used twice per turn — the second
+              // use comes from the play area, capped by this turn's log.
               if (!player.hand.includes(weaponId)) {
-                return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
+                const inPlay = player.playArea.includes(weaponId);
+                const wDef = cardDef(state, weaponId);
+                const isPistol = (wDef?.weaponTags ?? []).includes('pistol');
+                const allowed =
+                  inPlay &&
+                  isPistol &&
+                  hasAbilityKind(state, action.seat, 'pistolsTwicePerTurn') &&
+                  pistolUsesThisTurn(state, action.seat, weaponId) < 2;
+                if (!allowed) {
+                  return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
+                }
               }
               const weaponCardDef = cardDef(state, weaponId);
               if (weaponCardDef === undefined) {
@@ -223,7 +281,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'plusDamageThisTurn':
         case 'exchangeHandWithInventoryTop':
         case 'revealMansionTopNoEffect':
-        case 'trashFromHandAtWill': {
+        case 'trashFromHandAtWill':
+        case 'forceExploreOtherPlayer': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -253,10 +312,24 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           if (ability.kind === 'trashFromHandAtWill' && player.hand.length === 0) {
             return { ok: false, reason: 'useCharacterAbility: hand is empty' };
           }
+          if (ability.kind === 'forceExploreOtherPlayer') {
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
+            if (others.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: no other players' };
+            }
+          }
           return { ok: true };
         }
-        default:
+        case 'exchangeBuyForAction':
+          // Ada L2: repeatable — each exchange consumes one Buy.
+          if (player.buysLeft < 1) {
+            return { ok: false, reason: 'useCharacterAbility: no Buy left to exchange' };
+          }
           return { ok: true };
+        default:
+          // Passive abilities are not manually triggerable — reject so the
+          // client never renders a no-op button and bots never waste a slot.
+          return { ok: false, reason: 'useCharacterAbility: passive ability' };
       }
 
     case 'endTurn':
@@ -268,6 +341,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'endTurn: not your turn' };
+      }
+      if (player.mustExplore === true && canExploreAtAll(state, player)) {
+        return { ok: false, reason: 'endTurn: must Explore first (Wesker ability)' };
       }
       return { ok: true };
 

@@ -271,12 +271,9 @@ test('endTurn', () => {
   expect(p0(s).hp).toBe(100);
 });
 
-test('useCharacterAbility no-op', () => {
-  const s = applyAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
-  expect(s.version).toBe(2);
-  expect(s.log.length).toBe(1);
-  expect(p0(s).hp).toBe(100);
-  expect(p0(s).decorations).toBe(0);
+test('useCharacterAbility on a passive throws (validate rejects it)', () => {
+  expect(() => applyAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }))
+    .toThrow('useCharacterAbility: passive ability');
 });
 
 test('Shattered Memories (trashUpToTwoFromDiscard) prompts with discard options', () => {
@@ -478,8 +475,8 @@ test('Rebecca L2: trash any number of cards from hand (DONE chain)', () => {
 test('Rebecca L2 is level-locked at level 1 (index 1)', () => {
   const base = baseState({ seat0: { characterInstanceId: 'cr', level: 1 as const, hand: ['am1'] } });
   expect(validateAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 })).toEqual({ ok: false, reason: 'useCharacterAbility: ability not unlocked' });
-  // index 0 (generic L1) stays legal-but-noop
-  expect(validateAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: true });
+  // index 0 is Rebecca's L1 redirect passive — not manually triggerable
+  expect(validateAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 })).toEqual({ ok: false, reason: 'useCharacterAbility: passive ability' });
 });
 
 test('invalid action throws', () => {

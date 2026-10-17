@@ -43,10 +43,15 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
     return levelText ?? 'Use ability';
   };
   const prompt = state.prompts.find(p => p.seat === seat);
-  // Prompt options are instance ids (or 'DONE' for multi-choice chains);
-  // render readable names when the id resolves to a card def.
+  // Prompt options are instance ids, 'DONE' for multi-choice chains, or seat
+  // numbers for player-choice prompts (Wesker L2 target, Rebecca L1 redirect);
+  // render readable labels for each.
   const optionLabel = (opt: string): string => {
     if (opt === 'DONE') return 'Done';
+    if (/^\d+$/.test(opt)) {
+      const target = state.seats[Number(opt)];
+      return target !== undefined ? `${target.name} (seat ${target.seat})` : opt;
+    }
     const def = defForInstance(state, opt);
     return def !== null ? def.name : opt;
   };

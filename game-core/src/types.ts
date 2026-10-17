@@ -169,6 +169,10 @@ export type CharacterAbility =
     | { readonly kind: "plusDamageThisTurn"; readonly amount: number; readonly level: 1 | 2 }                // Barry L1: one weapon +5 damage this turn (once per turn)
     | { readonly kind: "revealMansionTopNoEffect"; readonly level: 1 | 2 }                                   // Ada L1: peek the Mansion top without engaging
     | { readonly kind: "trashFromHandAtWill"; readonly level: 1 | 2 }                                        // Rebecca L2: trash a card from hand whenever you please
+  | { readonly kind: "pistolsTwicePerTurn"; readonly level: 1 | 2 }                                          // Leon L2: pistol weapons can be used twice per turn
+  | { readonly kind: "exchangeBuyForAction"; readonly level: 1 | 2 }                                         // Ada L2: exchange your Buy for an additional Action
+  | { readonly kind: "forceExploreOtherPlayer"; readonly level: 1 | 2 }                                      // Wesker L2: choose a player; +1 Explore and must Explore next turn
+  | { readonly kind: "trashRedirectToPlayerDiscard"; readonly level: 1 | 2 }                                 // Rebecca L1: cards you trash via effects may go to other players' discard piles
     | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------
@@ -224,6 +228,9 @@ export interface PlayerState {
   readonly exploresLeft: number;
   /** Temporary per-turn combat bonus (Deadly Aim etc.). */
   readonly weaponDamageBonusThisTurn: number;
+  /** Wesker L2: this player must Explore on their current turn (grants +1
+   *  Explore at turn start; blocks endTurn until at least one explore). */
+  readonly mustExplore?: boolean;
 
   /** Instance ids of defeated Infected attached under the Character (trophies). */
   readonly attached: readonly string[];

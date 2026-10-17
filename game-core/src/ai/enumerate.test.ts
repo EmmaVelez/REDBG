@@ -8,7 +8,7 @@ function def(id: string, over: Partial<CardDef> = {}): CardDef {
 }
 
 const DEFS: Record<string, CardDef> = {
-  'ch-1': def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'generic', level: 2 }] }),
+  'ch-1': def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'plusDamageThisTurn', amount: 5, level: 2 }] }),
   'am-1': def('am-1', { type: 'ammunition', copies: 28, bonuses: { ammo: 10, gold: 10 } }),
   'am-2': def('am-2', { type: 'ammunition', copies: 28, bonuses: { ammo: 30, gold: 20 } }),
   'we-1': def('we-1', { type: 'weapon', cost: 20, ammoReq: 20, damage: 10 }),
