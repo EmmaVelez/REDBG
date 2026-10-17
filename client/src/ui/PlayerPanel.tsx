@@ -37,8 +37,8 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         {isMe && <span className="player-me">YOU</span>}
         {charDef !== null && <span className="player-character">{charDef.name} · Lv{player.level}</span>}
       </div>
-      <div className="player-row player-hp-row">
-        <HealthRing hp={player.hp} maxHp={player.maxHp} />
+      <div className="player-row">
+        <span className="player-hp">HP {player.hp}/{player.maxHp}</span>
         <span className="player-decorations">★ {player.decorations}</span>
       </div>
       <div className="player-row player-pools">
@@ -59,6 +59,7 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
           <HoverCard def={charDef} decorations={player.decorations}>
             <CardView def={charDef} compact decorations={player.decorations} />
           </HoverCard>
+          <HealthRing hp={player.hp} maxHp={player.maxHp} size={40} strokeWidth={5} />
         </div>
       )}
       {charDef !== null && <CharacterSkills state={state} seat={seat} />}

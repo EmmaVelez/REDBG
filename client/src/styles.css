@@ -267,16 +267,17 @@ h1, h2 { margin: 0 0 8px; }
 .player-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .player-hp { font-weight: 700; }
 .player-decorations { color: #ffd479; }
-.player-hp-row {
-  align-items: center;
-  gap: 8px;
+.health-ring {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  z-index: 2;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
 }
-.health-ring { display: block; flex-shrink: 0; }
 .health-ring-label { font-weight: 700; font-family: inherit; }
-.health-empty { transition: stroke 0.25s; }
-.health-filled { transition: stroke 0.25s; }
-.player-downed .health-filled { stroke: #ef4444; }
+.health-segment { transition: stroke 0.25s; }
 .player-character-card {
+  position: relative;
   display: flex;
   justify-content: center;
   margin-top: 4px;
