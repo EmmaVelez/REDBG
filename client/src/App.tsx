@@ -74,18 +74,25 @@ export function App(): JSX.Element {
   const prevStateRef = useRef<GameState | null>(null);
   const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
+  // When the fatal explore ALSO revealed a card, the reveal plays first and
+  // the death screen is queued until the player dismisses it — they should
+  // see what emptied their health pool before "YOU DIED".
+  const pendingDeathRef = useRef<'downed' | 'dead' | null>(null);
   const state = view?.state ?? null;
   useEffect(() => {
     const prev = prevStateRef.current;
     prevStateRef.current = state;
     if (prev === null || state === null || prev.version === state.version) return;
-    // Downed/death wins over the mansion reveal (both on the same step).
     const downed = detectPlayerDowned(prev, state, mySeat);
-    if (downed !== null) {
+    const detected = detectReveal(prev, state, mySeat);
+    if (downed !== null && detected !== null) {
+      // Both on the same step: show the reveal first, then YOU DIED.
+      pendingDeathRef.current = downed;
+    } else if (downed !== null) {
       setYouDied(downed === 'dead');
+      pendingDeathRef.current = null;
       return;
     }
-    const detected = detectReveal(prev, state, mySeat);
     if (detected === null) return;
     const def = defForInstance(state, detected.instanceId);
     if (def === null) return;
@@ -106,6 +113,7 @@ export function App(): JSX.Element {
 
   if (view === null || (room === null && hotseat === null)) {
     prevStateRef.current = null; // reset across lobby/game switches
+    pendingDeathRef.current = null;
     return (
       <Lobby
         room={room}
@@ -153,7 +161,19 @@ export function App(): JSX.Element {
         </aside>
       </main>
       {reveal !== null && (
-        <MansionReveal def={reveal.def} resultText={reveal.resultText} damage={reveal.damage} onContinue={() => setReveal(null)} />
+        <MansionReveal
+          def={reveal.def}
+          resultText={reveal.resultText}
+          damage={reveal.damage}
+          onContinue={() => {
+            setReveal(null);
+            const queued = pendingDeathRef.current;
+            pendingDeathRef.current = null;
+            if (queued !== null) {
+              setYouDied(queued === 'dead');
+            }
+          }}
+        />
       )}
       {youDied !== null && (
         <YouDiedOverlay dead={youDied} onContinue={() => setYouDied(null)} />
