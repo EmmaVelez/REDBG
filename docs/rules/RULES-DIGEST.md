@@ -119,5 +119,11 @@ Each turn you get: **1 Action, 1 Buy, 1 Explore**.
 
 ## Out of scope for v1
 Mercenary Mode (combos, turns, teams), Versus Mode (PvP, no mansion), difficulty variants,
-custom scenarios/inventories, expansions (Alliance, Outbreak, Nightmare, Mercenaries).
+custom scenarios/inventories, Nightmare/Mercenaries expansions.
 Engine must keep modes addable (setup config, win-condition strategy) but Story Mode only.
+Alliance expansion (Set 2): fully specced in `ALLIANCE-ENGINE-SPEC.md` — Partner
+Modification mode (second character, attach-to-partner, leader choice) + 51 cards
+(characters CH-011..020, weapons WE-017..025, actions AC-013..022, infected/events
+MA-022..040, Red Herb). Official manual preserved at `alliance_rulebook.txt`.
+Implementation planned in 6 phases (data → partner state → explore-with-partner →
+events/plaga/X-weapons/reactions → ability batch → Mercenary/Versus later).
