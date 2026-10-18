@@ -137,7 +137,7 @@ export type InfectedEffect =
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
   | { readonly kind: "healToFull" }                                          // First Aid Spray
-  | { readonly kind: "plusMaxHp20" };                                        // Yellow Herb (Mansion only)
+  | { readonly kind: "plusMaxHp"; readonly amount: number }                  // Yellow Herb (Mansion only): +amount max HP
 
 export type ActionEffect =
   | { readonly kind: "allWeaponsPlusDamageThisTurn"; readonly amount: number } // Deadly Aim: +10
@@ -239,6 +239,9 @@ export interface PlayerState {
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;
+  /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
+   *  NEXT real turn (fallen from a herb attached via Explore gain). */
+  readonly pendingHerbHeal?: number;
   /** PR-002 Jill: set when she skips a turn; her NEXT turn start grants the
    *  super-turn bonuses (+5 cards, +1 Buy/Action/Explore) and clears it. */
   readonly skipRewardPending?: boolean;

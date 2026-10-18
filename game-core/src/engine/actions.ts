@@ -247,8 +247,8 @@ export function applyAction(state: GameState, action: Action): GameState {
                 for (const e of def.itemEffects ?? []) {
                         if (e.kind === 'healToFull') {
                           hp = played.player.maxHp;
-                        } else if (e.kind === 'plusMaxHp20') {
-                          maxHp = played.player.maxHp + 20;
+                        } else if (e.kind === 'plusMaxHp') {
+                          maxHp = played.player.maxHp + e.amount;
                         } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
                           promptKind = 'healGreenHerb';
                         }
@@ -1120,6 +1120,27 @@ export function applyAction(state: GameState, action: Action): GameState {
                       },
                     },
                     removed: [...state.removed, instanceId],
+                    prompts: newPrompts,
+                  };
+                }
+                // Yellow Herb (plusMaxHp item): attaching to the character when
+                // gained via Explore — NOT to the discard pile. Raises max HP
+                // immediately and owes a heal at the start of the NEXT turn.
+                const herbEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'plusMaxHp');
+                if (herbEffect !== undefined && herbEffect.kind === 'plusMaxHp') {
+                  return {
+                    ...state,
+                    ...nextBase,
+                    seats: state.seats.map(s =>
+                      s.seat === seat
+                        ? {
+                            ...player,
+                            attached: [...player.attached, instanceId],
+                            maxHp: player.maxHp + herbEffect.amount,
+                            pendingHerbHeal: (player.pendingHerbHeal ?? 0) + herbEffect.amount,
+                          }
+                        : s,
+                    ),
                     prompts: newPrompts,
                   };
                 }

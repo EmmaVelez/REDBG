@@ -111,7 +111,7 @@ test('gatling gun majini effect', () => {
 });
 
 test('yellow herb is mansion-only', () => {
-  expect(card('it-002')).toEqual(expect.objectContaining({ copies: 3, itemEffects: [{ kind: 'plusMaxHp20' }] }));
+  expect(card('it-002')).toEqual(expect.objectContaining({ copies: 3, itemEffects: [{ kind: 'plusMaxHp', amount: 10 }] }));
   expect(card('it-001')).toEqual(expect.objectContaining({ cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] }));
   expect(card('it-003')).toEqual(expect.objectContaining({ cost: 60, itemEffects: [{ kind: 'healToFull' }] }));
 });

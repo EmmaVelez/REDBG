@@ -16,7 +16,7 @@ const CARDS: ReadonlyArray<CardDef> = [
   def('ma-1', { type: 'infected', copies: 3, hp: 20, attack: 20, decorations: 1 }),
   def('ma-10', { type: 'infected', copies: 2, hp: 90, attack: 70, decorations: 8, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] }),
   def('tk-1', { type: 'token', copies: 2, tokenEffects: [{ kind: 'gainWeaponAndTrashToken', weaponCardId: 'we-1' }] }),
-  def('it-3', { type: 'item', copies: 3, itemEffects: [{ kind: 'plusMaxHp20' }] }),
+  def('it-3', { type: 'item', copies: 3, itemEffects: [{ kind: 'plusMaxHp', amount: 10 }] }),
 ];
 
 const PILES = [

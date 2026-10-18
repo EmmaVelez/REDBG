@@ -679,3 +679,88 @@ describe('promo characters PR-002 / PR-009 / PR-010', () => {
     expect(exploreDamage(three, 0, ['we-004#1'])).toBe(5);
   });
 });
+
+describe('Yellow Herb (it-002): attach + max HP + owed heal', () => {
+  function herbGame(): GameState {
+    const s = gameWith('ch-008'); // Chris, maxHp 120
+    return {
+      ...tune(s, { turnAmmo: 50, hand: ['we-004#1', ...(s.seats[0]?.hand ?? [])] }),
+      mansionDeck: ['it-002#1', ...(s.mansionDeck ?? [])],
+      cards: {
+        ...s.cards,
+        'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 0 } },
+        'it-002#1': { instanceId: 'it-002#1', cardId: 'it-002', location: { zone: 'mansionDeck', index: 0 } },
+      },
+    };
+  }
+
+  it('take attaches the herb to the character and raises max HP by 10', () => {
+    const explored = applyAction(herbGame(), { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    expect(prompt).toBeDefined();
+    if (prompt === undefined) return;
+    const taken = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    const p0 = taken.seats[0];
+    expect(p0?.maxHp).toBe(130);            // 120 + 10
+    expect(p0?.hp).toBe(120);                // current HP unchanged on gain
+    expect(p0?.attached).toContain('it-002#1'); // attached to the character, NOT discard
+    expect(p0?.discard).not.toContain('it-002#1');
+    expect(taken.removed).not.toContain('it-002#1');
+    expect(p0?.pendingHerbHeal).toBe(10);    // heal owed next turn
+  });
+
+  it('the owed heal applies at the START of the next turn and clears the debt', () => {
+    const explored = applyAction(herbGame(), { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    if (prompt === undefined) return;
+    const taken = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    // damage Chris to below 130 so the heal has room to land
+    const hurt = { ...taken, seats: taken.seats.map((p, i) => (i === 0 ? { ...p, hp: 70 } : p)) };
+    const nextTurn = startTurnImpl(hurt);
+    expect(nextTurn.seats[0]?.hp).toBe(80);             // 70 + 10
+    expect(nextTurn.seats[0]?.pendingHerbHeal).toBe(0); // debt cleared
+    expect(nextTurn.seats[0]?.maxHp).toBe(130);         // max is permanent
+    expect(nextTurn.seats[0]?.attached).toContain('it-002#1');
+  });
+
+  it('the heal never exceeds max HP', () => {
+    const explored = applyAction(herbGame(), { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    if (prompt === undefined) return;
+    const taken = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    const nextTurn = startTurnImpl(taken); // hp already 120 == max? no: max now 130, hp 120 -> heals to 130
+    expect(nextTurn.seats[0]?.hp).toBe(130);
+  });
+
+  it('send-to-bottom does NOT attach (herb returns to the mansion)', () => {
+    const explored = applyAction(herbGame(), { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    if (prompt === undefined) return;
+    const declined = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 1 });
+    expect(declined.seats[0]?.maxHp).toBe(120);
+    expect(declined.seats[0]?.attached).not.toContain('it-002#1');
+    expect(declined.mansionBottom).toContain('it-002#1');
+  });
+
+  it('two herbs stack: +20 max HP, +20 owed heal', () => {
+    const base = herbGame();
+    const withTwo: GameState = {
+      ...base,
+      mansionDeck: ['it-002#1', 'it-002#2', ...(base.mansionDeck ?? [])],
+      cards: {
+        ...base.cards,
+        'it-002#2': { instanceId: 'it-002#2', cardId: 'it-002', location: { zone: 'mansionDeck' as const, index: 1 } },
+      },
+    };
+    const explored = applyAction(withTwo, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const p1 = explored.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    if (p1 === undefined) return;
+    const t1 = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: p1.id, option: 0 });
+    const p2 = t1.prompts.find(p => p.payload?.kind === 'takeOrBottom');
+    if (p2 === undefined) return;
+    const t2 = applyAction(t1, { type: 'chooseOption', seat: 0, promptId: p2.id, option: 0 });
+    expect(t2.seats[0]?.maxHp).toBe(140);
+    expect(t2.seats[0]?.pendingHerbHeal).toBe(20);
+    expect(t2.seats[0]?.attached).toEqual(expect.arrayContaining(['it-002#1', 'it-002#2']));
+  });
+});

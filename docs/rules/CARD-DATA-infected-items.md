@@ -37,15 +37,17 @@ cards (33 total)")
 - it-001 Green Herb ×6 — cost 20 — trash to heal 20, OR trash this + another Green Herb
   from hand to heal 60 (rulebook scan exact text)
 - it-002 Yellow Herb ×3 — MANSION ONLY (not purchasable) — when gained via Explore:
-  attach to Character; +10 max Health; following turn heal 10 (wiki) — VERIFY exact text
+  ATTACH to Character (not discard); +10 max Health immediately; heal 10 at the start
+  of your NEXT turn (implements wiki/rulebook; verified card scan says +10)
 - it-003 First Aid Spray ×5 — cost 60 — trash to heal Character to full
 
 ## Corrections to RULES-DIGEST (apply)
 - Executioner: skip-a-player effect triggers ON DEFEAT (not on non-defeat).
 - Zombie (Female): on defeat — chosen player cannot play Actions next turn (NEW effect,
   add InfectedEffect kind "noActionsNextTurnOfAPlayerOnDefeat" to types union).
-- Yellow Herb: attach + maxHp+10 + heal 10 next turn (not just plusMaxHp20 — wiki says 10;
-  rulebook item analysis says Yellow Herb "increases Maximum Health" — VERIFY 10 vs 20).
+- Yellow Herb: implement as attach + maxHp+10 + heal 10 next turn (DONE — was plusMaxHp20,
+  corrected to plusMaxHp amount 10 per wiki + card scan; gain attaches to character, debt
+  heals at next real turn start, survives downed turns).
 
 ## Tokens (Mansion, 2 total)
 - ma-012 Rocket Launcher Case ×1 — gain 1 Rocket Launcher (we-008); trash token after

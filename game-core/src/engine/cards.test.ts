@@ -77,7 +77,7 @@ test('promptsFor First Aid Spray', () => {
 });
 
 test('promptsFor Yellow Herb', () => {
-  const card: CardDef = { id: 'it-003', name: 'Yellow Herb', type: 'item', set: 'premier', text: '', copies: 1, itemEffects: [{ kind: 'plusMaxHp20' }] };
+  const card: CardDef = { id: 'it-003', name: 'Yellow Herb', type: 'item', set: 'premier', text: '', copies: 1, itemEffects: [{ kind: 'plusMaxHp', amount: 10 }] };
   expect(promptsFor(card)).toEqual([]);
 });
 

@@ -222,7 +222,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   // Mansion: infected + token + Yellow Herb (plusMaxHp20 item — id-independent)
   const mansionIds: string[] = [];
   for (const c of cards) {
-    if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp20'))) {
+    if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp'))) {
       for (let j = 0; j < c.copies; j++) {
         const id = `${c.id}#${j + 1}`;
         mansionIds.push(id);
@@ -311,6 +311,8 @@ export function startTurn(state: GameState): GameState {
       weaponDamageBonusThisTurn: 0,
       mustExplore: false,
       skipRewardPending: false,
+      // pendingHerbHeal intentionally preserved: a skipped (downed) turn does
+      // not consume the Yellow Herb heal debt.
     };
 
     const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
@@ -330,8 +332,14 @@ export function startTurn(state: GameState): GameState {
     };
   }
 
+  // Yellow Herb: heal owed from a herb attached on a previous turn applies at
+  // the start of this (real) turn. Capped at max HP, then the debt is cleared.
+  const herbHeal = player.pendingHerbHeal ?? 0;
+
   const newPlayer: PlayerState = {
     ...player,
+    hp: Math.min(player.hp + herbHeal, player.maxHp),
+    pendingHerbHeal: 0,
     turnAmmo: 0,
     turnGold: 0,
     actionsLeft: 1,

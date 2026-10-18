@@ -56,7 +56,7 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
 
   // Items
   { id: 'it-001', name: 'Green Herb', type: 'item', set: 'premier', text: 'Trash: heal 20, or trash with another Green Herb to heal 60.', copies: 6, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
-  { id: 'it-002', name: 'Yellow Herb', type: 'item', set: 'premier', text: '+20 max Health.', copies: 3, itemEffects: [{ kind: 'plusMaxHp20' }] },
+  { id: 'it-002', name: 'Yellow Herb', type: 'item', set: 'premier', text: 'Gain: attach to this character, +10 max Health. Heal 10 at the start of your next Turn.', copies: 3, itemEffects: [{ kind: 'plusMaxHp', amount: 10 }] },
   { id: 'it-003', name: 'First Aid Spray', type: 'item', set: 'premier', text: 'Heal your Character to full Health.', copies: 5, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
 
   // Infected
