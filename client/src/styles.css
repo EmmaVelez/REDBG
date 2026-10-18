@@ -268,11 +268,9 @@ h1, h2 { margin: 0 0 8px; }
 .player-hp { font-weight: 700; }
 .player-decorations { color: #ffd479; }
 .health-ring {
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  z-index: 2;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 .health-ring-label { font-weight: 700; font-family: inherit; }
 .health-segment { transition: stroke 0.25s; }

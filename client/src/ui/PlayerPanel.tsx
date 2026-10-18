@@ -56,10 +56,9 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
       </div>
       {charDef !== null && (
         <div className="player-character-card" data-character-card data-anim-zone="attached">
-          <HoverCard def={charDef} decorations={player.decorations}>
-            <CardView def={charDef} compact decorations={player.decorations} />
+          <HoverCard def={charDef} decorations={player.decorations} hp={player.hp} maxHp={player.maxHp}>
+            <CardView def={charDef} compact decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} />
           </HoverCard>
-          <HealthRing hp={player.hp} maxHp={player.maxHp} size={40} strokeWidth={5} />
         </div>
       )}
       {charDef !== null && <CharacterSkills state={state} seat={seat} />}

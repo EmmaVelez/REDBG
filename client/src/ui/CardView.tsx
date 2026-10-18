@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { CardDef } from '@re/game-core';
 import { typeLabel, typeClass, statLine, bonusLine, costText } from './cards';
+import { HealthRing } from './HealthRing';
 
 /**
  * M4-T03/T11: CardView — a placeholder card frame. No Bandai artwork; the
@@ -18,16 +19,24 @@ export interface CardViewProps {
   readonly compact?: boolean;
   /** Player's current decorations — enables the character skill list. */
   readonly decorations?: number;
+  /** Current/max HP — character cards swap their cost badge for the HP ring. */
+  readonly hp?: number;
+  readonly maxHp?: number;
 }
 
-export function CardView({ def, compact = false, decorations }: CardViewProps): JSX.Element {
+export function CardView({ def, compact = false, decorations, hp, maxHp }: CardViewProps): JSX.Element {
   const stats = statLine(def);
   const bonus = bonusLine(def);
+  const showRing = def.type === 'character' && hp !== undefined && maxHp !== undefined;
   return (
     <div className={`card ${typeClass(def.type)}`} data-card-id={def.id} data-card-type={def.type}>
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
-        <span className="card-cost" data-card-cost>{costText(def)}</span>
+        {showRing ? (
+          <HealthRing hp={hp} maxHp={maxHp} size={34} strokeWidth={5} />
+        ) : (
+          <span className="card-cost" data-card-cost>{costText(def)}</span>
+        )}
       </div>
       <div className="card-name">{def.name}</div>
       {def.type === 'character' && decorations !== undefined ? (

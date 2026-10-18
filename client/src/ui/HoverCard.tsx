@@ -16,6 +16,9 @@ export interface HoverCardProps {
   readonly children: ReactNode;
   /** Player decorations — forwarded to the popup CardView (character skills). */
   readonly decorations?: number;
+  /** HP ring data — forwarded to the popup CardView for characters. */
+  readonly hp?: number;
+  readonly maxHp?: number;
 }
 
 interface PopupPos {
@@ -24,7 +27,7 @@ interface PopupPos {
   readonly above: boolean;
 }
 
-export function HoverCard({ def, children, decorations }: HoverCardProps): JSX.Element {
+export function HoverCard({ def, children, decorations, hp, maxHp }: HoverCardProps): JSX.Element {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<PopupPos | null>(null);
 
@@ -53,7 +56,7 @@ export function HoverCard({ def, children, decorations }: HoverCardProps): JSX.E
           style={{ left: pos.x, top: pos.y }}
           aria-hidden="true"
         >
-          <CardView def={def} decorations={decorations} />
+          <CardView def={def} decorations={decorations} hp={hp} maxHp={maxHp} />
         </span>
       )}
     </span>
