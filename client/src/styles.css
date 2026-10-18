@@ -270,7 +270,7 @@ h1, h2 { margin: 0 0 8px; }
 .health-ring {
   position: absolute;
   top: -10px;
-  left: -10px;
+  right: -10px;
   z-index: 2;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
 }
