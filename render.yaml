@@ -1,0 +1,24 @@
+# Render blueprint — RE Deck Builder (REDBG) single-web-service deployment.
+#
+# One Web Service serves both the built client (static SPA) and the game
+# WebSocket on the same origin/port, so the client's production wss:// page-host
+# default just works. No database, no second service.
+#
+# Usage: push to GitHub (auto-deploy on master) — remote already wired:
+#   https://github.com/EmmaVelez/REDBG
+services:
+  - type: web
+    name: redbg
+    runtime: node
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /healthz
+    buildCommand: npm ci && npm rebuild esbuild && npm run build --workspace client
+    startCommand: npm run start --workspace server
+    envVars:
+      - key: NODE_VERSION
+        value: 22.10.0
+      - key: STATIC_DIR
+        value: /opt/render/project/src/client/dist
+      - key: NODE_ENV
+        value: production

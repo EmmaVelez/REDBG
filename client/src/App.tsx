@@ -24,12 +24,19 @@ import { defForInstance } from './ui/cards';
  */
 
 const DEFAULT_URL = (): string => {
-  // same-host dev: the Vite dev server proxies nothing, so default to the
-  // server's port; override with ?server=ws://host:port or VITE_WS_URL.
+  // explicit overrides always win: ?server=ws://host:port or VITE_WS_URL.
   const fromQuery = new URLSearchParams(window.location.search).get('server');
   if (fromQuery !== null && fromQuery !== '') return fromQuery;
   const fromEnv = import.meta.env.VITE_WS_URL as string | undefined;
-  return fromEnv ?? 'ws://localhost:1724';
+  if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
+  if (import.meta.env.PROD) {
+    // Production single-service (Render): the ws server also serves the
+    // client build, so the WebSocket rides the page's own origin.
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${window.location.host}`;
+  }
+  // Dev: Vite (5173) and the game server (1724) are separate processes.
+  return 'ws://localhost:1724';
 };
 
 let socketBound = false;

@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import type { Server as HttpServer } from 'node:http';
 import { encodeMessage, decodeMessage } from './protocol';
 import type { ClientMessage, ServerMessage } from './protocol';
 import { createHost } from './host';
@@ -24,6 +25,10 @@ import type { RoomStore } from './rooms';
 
 export interface GameServerOptions {
   readonly port?: number;
+  /** Optional pre-existing HTTP server to attach the WebSocket endpoint to
+   *  (Render single-service mode: one server serves both the client build and
+   *  the game). When omitted, the WebSocketServer creates its own listener. */
+  readonly httpServer?: HttpServer;
   readonly heartbeatMs?: number;
   readonly seedFn?: () => number;
   /** Injectable token factory for deterministic reconnect tests. */
@@ -48,7 +53,10 @@ interface Session {
 export function createGameServer(options: GameServerOptions = {}): GameServer {
   const newToken = options.tokenFn ?? (() => Math.random().toString(36).slice(2, 10));
   const random = options.rand ?? Math.random;
-  const wss = new WebSocketServer({ port: options.port ?? 0 });
+  const wss =
+    options.httpServer !== undefined
+      ? new WebSocketServer({ server: options.httpServer })
+      : new WebSocketServer({ port: options.port ?? 0 });
   const roomStore: RoomStore = createRoomStore();
   const hosts = new Map<string, GameHost>();
   const sessions = new Map<WebSocket, Session>();
