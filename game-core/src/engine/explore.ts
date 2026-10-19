@@ -1,16 +1,21 @@
-import type { CardDef, WeaponEffect, InfectedEffect, GameState } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus } from './abilities';
+import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag } from '../types';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn } from './abilities';
 
 export interface ExploreWeapon {
   readonly damage: number;
   readonly ammoReq: number;
   readonly weaponEffects?: readonly WeaponEffect[];
+  /** Weapon type tags (melee/knife/pistol/...) for tag-scoped effects. */
+  readonly tags?: readonly WeaponTag[];
 }
 
 export interface DamageParams {
   readonly weapons: readonly ExploreWeapon[];
   readonly ammo: number;
   readonly bonusDamage: number;
+  /** Knife-tagged weapons this seat already used in EARLIER explores this
+   *  turn (Survival Knife counts "every other Knife Weapon used this turn"). */
+  readonly knifeUsesEarlierThisTurn?: number;
 }
 
 export function requiredAmmo(weapons: readonly ExploreWeapon[]): number {
@@ -21,7 +26,9 @@ export function computeDamage(params: DamageParams): number {
   const { weapons, ammo, bonusDamage } = params;
   let damage = weapons.reduce((sum, weapon) => sum + weapon.damage, 0) + bonusDamage;
 
-  for (const weapon of weapons) {
+  for (let weaponIndex = 0; weaponIndex < weapons.length; weaponIndex++) {
+    const weapon = weapons[weaponIndex];
+    if (weapon === undefined) continue;
     if (weapon.weaponEffects) {
       for (const effect of weapon.weaponEffects) {
         if (effect.kind === 'plusDamagePerExtraWeapon' && weapons.length > 1) {
@@ -30,6 +37,14 @@ export function computeDamage(params: DamageParams): number {
         }
         if (effect.kind === 'plusDamageIfAmmoAbove' && ammo > effect.threshold) {
           damage += effect.amount;
+        }
+        if (effect.kind === 'plusDamagePerKnifeUsed') {
+          // "every OTHER Knife Weapon used this turn": knives in THIS attack
+          // except this weapon itself, plus knives from earlier explores.
+          const otherKnivesHere = weapons.filter(
+            (w, idx) => idx !== weaponIndex && (w.tags ?? []).includes('knife'),
+          ).length;
+          damage += effect.amount * (otherKnivesHere + (params.knifeUsesEarlierThisTurn ?? 0));
         }
       }
     }
@@ -56,6 +71,7 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     damage: def?.damage ?? 0,
     ammoReq: ammoReqForWeapon(abilities, def),
     weaponEffects: def?.weaponEffects,
+    tags: def?.weaponTags,
   }));
   const abilityDamage =
     passiveDamageBonus(abilities, defs, 1) +
@@ -68,6 +84,7 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
   return computeDamage({
     weapons,
     ammo: player.turnAmmo,
+    knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
     bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
   });
 }
@@ -78,15 +95,15 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number }): ExploreOutcome {
-  const { weapons, ammo, bonusDamage, revealed } = params;
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number }): ExploreOutcome {
+  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn } = params;
   const required = requiredAmmo(weapons);
 
   if (ammo < required) {
     return { kind: 'insufficientAmmo', required, available: ammo };
   }
 
-  const damage = computeDamage({ weapons, ammo, bonusDamage });
+  const damage = computeDamage({ weapons, ammo, bonusDamage, knifeUsesEarlierThisTurn });
 
   if (revealed.type !== 'infected') {
     return { kind: 'nonInfected', cardId: revealed.id };

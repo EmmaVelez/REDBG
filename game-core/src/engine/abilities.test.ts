@@ -7,8 +7,9 @@ import {
   exploreGoldBonus,
   ammunitionCardBonus,
   explosivesGoToDiscard,
+  knifeWeaponsUsedThisTurn,
 } from './abilities';
-import { exploreDamage } from './explore';
+import { exploreDamage , resolveExplore } from './explore';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
 import { setup, startTurn as startTurnImpl } from './game';
@@ -762,5 +763,82 @@ describe('Yellow Herb (it-002): attach + max HP + owed heal', () => {
     expect(t2.seats[0]?.maxHp).toBe(140);
     expect(t2.seats[0]?.pendingHerbHeal).toBe(20);
     expect(t2.seats[0]?.attached).toEqual(expect.arrayContaining(['it-002#1', 'it-002#2']));
+  });
+});
+
+function cardDefOf(state: GameState, cardId: string): CardDef {
+  const def = state.cardDefs[cardId];
+  if (def === undefined) throw new Error('missing def ' + cardId);
+  return def;
+}
+
+describe('Survival Knife (we-005): +5 per other Knife used this turn', () => {
+  function knifeGame(): GameState {
+    const s = gameWith('ch-008');
+    return {
+      ...s,
+      seats: s.seats.map((p, i) =>
+        i === 0
+          ? { ...p, hand: ['we-005#1', 'we-004#1', 'we-004#2', 'we-009#1'], turnAmmo: 0, exploresLeft: 3 }
+          : p,
+      ),
+      mansionDeck: ['ma-001#1', 'ma-001#2', 'ma-001#3', ...(s.mansionDeck ?? [])],
+      cards: {
+        ...s.cards,
+        'we-005#1': { instanceId: 'we-005#1', cardId: 'we-005', location: { zone: 'hand', index: 0 } },
+        'we-004#1': { instanceId: 'we-004#1', cardId: 'we-004', location: { zone: 'hand', index: 1 } },
+        'we-004#2': { instanceId: 'we-004#2', cardId: 'we-004', location: { zone: 'hand', index: 2 } },
+        'we-009#1': { instanceId: 'we-009#1', cardId: 'we-009', location: { zone: 'hand', index: 3 } },
+        'ma-001#1': { instanceId: 'ma-001#1', cardId: 'ma-001', location: { zone: 'mansionDeck', index: 0 } },
+        'ma-001#2': { instanceId: 'ma-001#2', cardId: 'ma-001', location: { zone: 'mansionDeck', index: 1 } },
+        'ma-001#3': { instanceId: 'ma-001#3', cardId: 'ma-001', location: { zone: 'mansionDeck', index: 2 } },
+      },
+    };
+  }
+
+  it('alone: base 10, no knife bonus (no OTHER knives)', () => {
+    expect(exploreDamage(knifeGame(), 0, ['we-005#1'])).toBe(10);
+  });
+
+  it('with 2 combat knives in the same attack: base 10+5+5 plus +5 per other knife (2) = 30', () => {
+    expect(exploreDamage(knifeGame(), 0, ['we-005#1', 'we-004#1', 'we-004#2'])).toBe(30);
+  });
+
+  it('knives from an EARLIER explore this turn also count', () => {
+    const s = knifeGame();
+    // first explore: two combat knives (no survival knife) -> 5+5 = 10 dmg
+    const after1 = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-004#1', 'we-004#2'], exploreCount: 1 });
+    expect(after1.log[after1.log.length - 1]?.action.type).toBe('explore');
+    // second explore: survival knife alone now sees 2 earlier knives -> 10 + 10
+    expect(exploreDamage(after1, 0, ['we-005#1'])).toBe(20);
+  });
+
+  it('knife uses do NOT leak across turns (endTurn resets the count)', () => {
+    const s = knifeGame();
+    const after1 = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-004#1', 'we-004#2'], exploreCount: 1 });
+    const ended = applyAction(after1, { type: 'endTurn', seat: 0 });
+    // seat 1's turn now; give seat 0 the knife on a later turn via log scan:
+    // knifeWeaponsUsedThisTurn stops at seat 0's endTurn, so count is 0.
+    expect(knifeWeaponsUsedThisTurn(ended, 0)).toBe(0);
+  });
+
+  it('non-knife weapons in the attack do not trigger the bonus', () => {
+    // survival knife (10) + handgun (10, not a knife): no bonus -> 20
+    expect(exploreDamage(knifeGame(), 0, ['we-005#1', 'we-009#1'])).toBe(20);
+  });
+
+  it('resolveExplore applies the bonus in the real attack path', () => {
+    const s = knifeGame();
+    const outcome = resolveExplore({
+      weapons: [
+        { damage: 10, ammoReq: 0, weaponEffects: [{ kind: 'plusDamagePerKnifeUsed', amount: 5 }], tags: ['melee', 'knife'] },
+        { damage: 5, ammoReq: 0, tags: ['melee', 'knife'] },
+      ],
+      ammo: 0,
+      bonusDamage: 0,
+      revealed: cardDefOf(s, 'ma-001'),
+    });
+    // 10 + 5 + 5 (one other knife) = 20 >= hp 20 -> defeated
+    expect(outcome.kind).toBe('defeated');
   });
 });

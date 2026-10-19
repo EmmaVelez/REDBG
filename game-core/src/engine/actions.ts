@@ -15,6 +15,7 @@ import {
   infectedDamageReduction,
   exploreBigHandBonus,
   exploreActionsBonus,
+  knifeWeaponsUsedThisTurn,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -358,6 +359,7 @@ export function applyAction(state: GameState, action: Action): GameState {
             damage: w?.damage ?? 0,
             ammoReq: ammoReqForWeapon(abilities, w),
             weaponEffects: w?.weaponEffects,
+            tags: w?.weaponTags,
           }));
           // Passive damage abilities: Barry L2 magnums, Krauser L2 knives,
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
@@ -413,6 +415,7 @@ export function applyAction(state: GameState, action: Action): GameState {
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
+              knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
             });
 
       if (outcome.kind === 'insufficientAmmo') {

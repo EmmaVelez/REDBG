@@ -13,8 +13,10 @@ Stats marked ? = verify from card photo / BGG master list before data entry.
   +5 dmg if user has 80+ Health (Story/Merc)
 - we-004 Combat Knife ×11 — cost 0 / ammoReq 0 / dmg 5 — Knife — no effect
 - we-005 Survival Knife ×1 — cost 50 / ammoReq 0 / dmg 10 — Knife —
-  +5 dmg for every Knife weapon player uses same attack? (wiki: "adds +5 damage to itself
-  for every Knife type weapon the player..." — VERIFY exact wording)
+  VERIFIED via card scan (we005-survival-knife.jpg): "This Weapon gets +5 Damage for
+  every other 'Knife' Weapon used this turn." Engine: plusDamagePerKnifeUsed — counts
+  OTHER knives in the same attack PLUS knives used in earlier explores this turn
+  (log scan to last endTurn). Implemented + tested 2026-10-18.
   NOTE: rulebook says knife pile = Combat Knife + Survival Knife combined; wiki says
   Survival Knife sits at the BOTTOM of the knife pile — verify which (combined shuffle vs
   fixed bottom). Rulebook Ch IV explicitly says combined+shuffled → follow rulebook.

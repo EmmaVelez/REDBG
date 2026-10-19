@@ -126,7 +126,7 @@ export type WeaponEffect =
   | { readonly kind: "plusDamageIfSelfHpAtLeast"; readonly hp: number; readonly amount: number } // Submission: +5 if user has 80+ HP
   | { readonly kind: "damageEqualsCurrentAmmo" }                            // Gatling Gun: X = player's current Ammo
   | { readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number } // Bolt-Action Rifle: reveal top card of Inventory; if its Gold cost >= N, +amount dmg
-  | { readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number };   // Survival Knife: +5 per Knife-type weapon used this attack
+  | { readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number };   // Survival Knife: +5 per OTHER Knife weapon used this turn (this attack + earlier explores)
 
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri

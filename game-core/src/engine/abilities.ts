@@ -176,6 +176,30 @@ export function exploreActionsBonus(
 }
 
 /** Jill L2: explosive weapons go to discard instead of being trashed. */
+/**
+ * Survival Knife (WE-005): "This Weapon gets +5 Damage for every other
+ * 'Knife' Weapon used this turn." Counts Knife-tagged weapons the seat has
+ * already used in EARLIER explores this turn (log scan back to the seat's
+ * last endTurn; the in-flight explore is not in the log yet). Knives in the
+ * current attack are counted separately by computeDamage.
+ */
+export function knifeWeaponsUsedThisTurn(state: GameState, seat: number): number {
+  let count = 0;
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const logged = state.log[i]?.action;
+    if (logged === undefined) continue;
+    if (logged.type === 'endTurn' && logged.seat === seat) break;
+    if (logged.type === 'explore' && logged.seat === seat) {
+      for (const weaponId of logged.weapons) {
+        const inst = state.cards[weaponId];
+        const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+        if ((def?.weaponTags ?? []).includes('knife')) count += 1;
+      }
+    }
+  }
+  return count;
+}
+
 export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'explosivesGoToDiscardInsteadOfTrash');
 }
