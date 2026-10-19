@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
+import { ActionBarStats } from './ActionBarStats';
 import { defForInstance } from './cards';
 
 /**
@@ -62,6 +63,16 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
 
   return (
     <div className="action-bar" data-seat={seat}>
+      {player !== undefined && (
+        <ActionBarStats
+          hp={player.hp}
+          maxHp={player.maxHp}
+          gold={player.turnGold}
+          ammo={player.turnAmmo}
+          actions={player.actionsLeft}
+          buys={player.buysLeft}
+        />
+      )}
       {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
 
       {prompt !== undefined && (

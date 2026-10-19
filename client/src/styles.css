@@ -678,15 +678,60 @@ h1, h2 { margin: 0 0 8px; }
 .you-died-continue:hover { background: linear-gradient(180deg, #571421 0%, #2c070c 100%); }
 
 /* ---- action bar / log ---- */
-.action-bar {
-  border: 1px solid var(--border);
-  border-radius: 6px;
+/* ---- bottom action dock ---- */
+.app-action-dock {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
   background: var(--panel);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 8px 16px;
 }
+.app-action-dock .action-bar {
+  border: none;
+  background: transparent;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.app-action-dock .action-buttons { flex-shrink: 0; }
+.app-action-dock .action-prompt {
+  border-top: none;
+  padding-top: 0;
+  flex: 1;
+  min-width: 260px;
+}
+.action-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.action-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.action-stat strong {
+  font-size: 14px;
+  letter-spacing: 0;
+  color: #e8e2d4;
+}
+.action-stat-hp strong { color: #4ade80; }
+.action-stat-gold strong { color: #ffd479; }
+.action-stat-ammo strong { color: #9ecbff; }
+.action-stat-actions strong { color: #f0abfc; }
+.action-stat-buys strong { color: #fdba74; }
 .action-buttons { display: flex; gap: 8px; }
 .action-note { color: var(--muted); }
 .action-prompt { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }

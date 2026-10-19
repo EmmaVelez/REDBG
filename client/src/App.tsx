@@ -162,15 +162,17 @@ export function App(): JSX.Element {
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         <aside className="app-side">
-          <ActionBar
-            state={gameState}
-            seat={mySeat}
-            onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
-            disabled={disabled}
-          />
           <GameLog state={gameState} chat={chat} lastError={lastError} seatNames={seatNames} />
         </aside>
       </main>
+      <footer className="app-action-dock">
+        <ActionBar
+          state={gameState}
+          seat={mySeat}
+          onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
+          disabled={disabled}
+        />
+      </footer>
       {reveal !== null && (
         <MansionReveal
           def={reveal.def}
