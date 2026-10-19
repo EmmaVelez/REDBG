@@ -732,6 +732,15 @@ h1, h2 { margin: 0 0 8px; }
 .action-stat-ammo strong { color: #9ecbff; }
 .action-stat-actions strong { color: #f0abfc; }
 .action-stat-buys strong { color: #fdba74; }
+.action-error {
+  flex: 1 0 100%;
+  color: #ff8f8f;
+  background: rgba(120, 30, 30, 0.25);
+  border: 1px solid #6b3030;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
 .action-buttons { display: flex; gap: 8px; }
 .action-note { color: var(--muted); }
 .action-prompt { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }

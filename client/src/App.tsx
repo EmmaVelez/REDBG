@@ -83,6 +83,12 @@ export function App(): JSX.Element {
   const [youDied, setYouDied] = useState<boolean | null>(null);
   /** Log sidebar visibility — closed frees the whole sidebar width for the board. */
   const [logOpen, setLogOpen] = useState<boolean>(true);
+  // Auto-dismiss the action-bar error toast so stale rejections don't linger.
+  useEffect(() => {
+    if (lastError === null) return;
+    const t = setTimeout(() => useGameStore.setState({ lastError: null }), 5000);
+    return () => clearTimeout(t);
+  }, [lastError]);
   // When the fatal explore ALSO revealed a card, the reveal plays first and
   // the death screen is queued until the player dismisses it — they should
   // see what emptied their health pool before "YOU DIED".
@@ -175,6 +181,7 @@ export function App(): JSX.Element {
           seat={mySeat}
           onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
           disabled={disabled}
+          lastError={lastError}
           onOpenLog={() => setLogOpen(o => !o)}
           logOpen={logOpen}
         />

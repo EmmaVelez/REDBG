@@ -22,13 +22,16 @@ export interface ActionBarProps {
   readonly onAction: (action: Action) => void;
   /** Disable all controls (e.g. not my turn / game over). */
   readonly disabled?: boolean;
+  /** Last server rejection/error — surfaced as a toast so it is visible even
+   *  when the game log sidebar is closed. */
+  readonly lastError?: string | null;
   /** When provided, render a Log button that calls this (opens the log sidebar). */
   readonly onOpenLog?: () => void;
   /** Whether the log sidebar is currently open (button shows active state). */
   readonly logOpen?: boolean;
 }
 
-export function ActionBar({ state, seat, onAction, disabled = false, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
+export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
@@ -78,6 +81,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, onOpenLog, 
         />
       )}
       {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
+      {lastError !== undefined && lastError !== null && lastError !== '' && (
+        <div className="action-error" data-action-error role="alert">{lastError}</div>
+      )}
 
       {prompt !== undefined && (
         <div className="action-prompt" data-prompt={prompt.id}>

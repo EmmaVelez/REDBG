@@ -342,6 +342,19 @@ describe('ActionBar (T07)', () => {
     expect(without).not.toContain('data-log-button');
   });
 
+  it('shows the lastError toast in the action bar', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} lastError="playItem: Chris cannot be healed" />);
+    expect(html).toContain('data-action-error');
+    expect(html).toContain('Chris cannot be healed');
+  });
+
+  it('hides the error toast when lastError is null', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} lastError={null} />);
+    expect(html).not.toContain('data-action-error');
+  });
+
   it('marks the log button as open when logOpen is set', () => {
     const state = twoPlayerState();
     const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} onOpenLog={() => {}} logOpen />);
