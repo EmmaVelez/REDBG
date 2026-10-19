@@ -51,6 +51,17 @@ function baseState(over: Partial<GameState> = {}): GameState {
 
 const act = (a: Action): Action => a;
 
+  // Register extra weapon instances in the state's cards map (baseState only
+  // knows one instance per def).
+  function stateWithWeapons(seat0: Partial<PlayerState>, extraIds: string[]): GameState {
+    const base = baseState();
+    const extra = Object.fromEntries(
+      extraIds.map(id => [id, { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } }]),
+    );
+    return { ...base, cards: { ...base.cards, ...extra }, seats: [player(0, seat0), player(1)] };
+  }
+
+
 describe('enumerateLegalActions', () => {
   // 1. 'no legal actions for an unknown seat'
   test('no legal actions for an unknown seat', () => {
@@ -184,6 +195,35 @@ describe('enumerateLegalActions', () => {
     const acts = enumerateLegalActions(s, 0);
     const explores = acts.filter(a => a.type === 'explore');
     expect(explores.length).toBe(0);
+  });
+
+  // 10b. REGRESSION (user report): hand of 3 knives (2x Combat Knife +
+  // Survival Knife equivalents, we-2 x3, all ammoReq 0) must offer the full
+  // 3-weapon explore — previously only singles and pairs were enumerated.
+  test('three zero-ammo knives enumerate all 7 non-empty subsets including the 3-weapon explore', () => {
+    const s = stateWithWeapons({ hand: ['we-2#1', 'we-2#2', 'we-2#3'] }, ['we-2#2', 'we-2#3']);
+    const acts = enumerateLegalActions(s, 0);
+    const explores = acts.filter(a => a.type === 'explore');
+    // 2^3 - 1 = 7 subsets, all ammo-free so all legal
+    expect(explores.length).toBe(7);
+    const triple = explores.find(a => a.weapons.length === 3);
+    expect(triple).toBeDefined();
+    expect(triple?.weapons).toEqual(expect.arrayContaining(['we-2#1', 'we-2#2', 'we-2#3']));
+    expect(validateAction(s, triple!).ok).toBe(true);
+  });
+
+  // 10c. ammo caps combos: we-1 costs 20 ammo; with turnAmmo 20, only one
+  // we-1 combo passes validation (pairs/triples including two we-1s fail).
+  test('explore subsets exceeding the ammo pool are filtered out', () => {
+    const s = stateWithWeapons({ hand: ['we-1#1', 'we-1#2', 'we-2#1'], turnAmmo: 20 }, ['we-1#2']);
+    const acts = enumerateLegalActions(s, 0);
+    const explores = acts.filter(a => a.type === 'explore');
+    // both we-1 ammoReq 20: any combo with 2 we-1 needs 40 > 20, filtered
+    const bothRifles = explores.filter(a => a.weapons.includes('we-1#1') && a.weapons.includes('we-1#2'));
+    expect(bothRifles.length).toBe(0);
+    // single we-1#1 + we-2#1 (knife, 0 ammo) is legal
+    const mixed = explores.find(a => a.weapons.length === 2 && a.weapons.includes('we-1#1') && a.weapons.includes('we-2#1'));
+    expect(mixed).toBeDefined();
   });
 
   // 11. 'dead player still gets endTurn for cleanup'

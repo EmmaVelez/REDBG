@@ -55,31 +55,27 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       return false;
     });
 
-    // 4b. Generate candidates: Singles
-    for (const weaponInstanceId of weaponsInHand) {
+    // 4b. Generate candidates: every non-empty subset of weaponsInHand.
+    // The rules place no cap on weapons per explore (each weapon used once,
+    // ammo from the cumulative pool), so a 3-knife hand must offer the
+    // 3-weapon explore. Subsets are bitmask-enumerated; hands are small
+    // (<=10 cards typical), and validate filters ammo-illegal combos.
+    const maxSubsetWeapons = Math.min(weaponsInHand.length, 10);
+    for (let mask = 1; mask < (1 << maxSubsetWeapons); mask++) {
+      const combo: string[] = [];
+      for (let bit = 0; bit < maxSubsetWeapons; bit++) {
+        if ((mask & (1 << bit)) !== 0) {
+          const weapon = weaponsInHand[bit];
+          if (weapon !== undefined) combo.push(weapon);
+        }
+      }
       generatedActions.push({
         type: 'explore',
         seat,
-        weapons: [weaponInstanceId],
+        weapons: combo,
         exploreCount: 1,
       });
     }
-
-    // 4c. Generate candidates: Pairs (i < j)
-      for (let i = 0; i < weaponsInHand.length; i++) {
-        const weapon1 = weaponsInHand[i];
-        if (weapon1 === undefined) continue;
-        for (let j = i + 1; j < weaponsInHand.length; j++) {
-          const weapon2 = weaponsInHand[j];
-          if (weapon2 === undefined) continue;
-          generatedActions.push({
-            type: 'explore',
-            seat,
-            weapons: [weapon1, weapon2],
-            exploreCount: 1,
-          });
-        }
-      }
 
   // --- 5. buy ---
   // Object.keys preserves insertion order in modern JS environments
