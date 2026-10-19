@@ -271,6 +271,27 @@ test('endTurn', () => {
   expect(p0(s).hp).toBe(100);
 });
 
+test('endTurn while downed skips the end-of-turn draw and loses no cards', () => {
+  // Regression: the downed player's endTurn used to draw 5 cards that the
+  // revive branch of startTurn then silently dropped (hand: d.hand overwrote
+  // them) — 5 cards vanished per death cycle.
+  const total = (p: PlayerState): number => p.hand.length + p.inventory.length + p.discard.length + p.playArea.length;
+  const before = baseState({
+    seat0: { downed: true, hp: 0, hand: [], inventory: ['inv1', 'inv2', 'inv3', 'inv4', 'inv5', 'inv6', 'inv7', 'inv8'], discard: ['w1'], playArea: ['w2'] },
+  });
+  const s = applyAction(before, { type: 'endTurn', seat: 0 });
+  const p = p0(s);
+  expect(p.downed).toBe(true);
+  expect(p.hand).toEqual([]);
+  expect(p.playArea).toEqual([]);
+  // playArea cards go to discard (they were still on the table when downed)
+  expect(p.discard).toEqual(['w2', 'w1']);
+  expect(p.inventory.length).toBe(8);
+  // no card is created or destroyed
+  expect(total(p)).toBe(total(p0(before)));
+  expect(s.activeSeat).toBe(1);
+});
+
 test('useCharacterAbility on a passive throws (validate rejects it)', () => {
   expect(() => applyAction(baseState(), { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }))
     .toThrow('useCharacterAbility: passive ability');

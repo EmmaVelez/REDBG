@@ -717,9 +717,6 @@ export function applyAction(state: GameState, action: Action): GameState {
 
           const dh = discardHand({ hand: player.hand, discard: player.discard });
           const dh2 = discardHand({ hand: player.playArea, discard: dh.discard });
-          // "End of turn: discard Play Area (non-attached) + hand, draw 5
-          // (reshuffle discard into inventory if needed)" — rulebook.
-          const d = drawWithReshuffle({ deck: player.inventory, discard: dh2.discard, count: 5, rngState: state.rngState });
 
           const ctx = advanceTurn({
             seatCount: state.seats.length,
@@ -727,6 +724,30 @@ export function applyAction(state: GameState, action: Action): GameState {
             turnNumber: state.turnNumber,
             aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
           });
+
+          // Downed players skip their turn: flipDown already merged
+          // hand+discard into the inventory. Do NOT draw the end-of-turn 5 —
+          // the revive branch of startTurn redraws and would silently drop
+          // them (deck shrinkage bug: -5 cards per death).
+          if (player.downed) {
+            const downedPlayer: PlayerState = {
+              ...player,
+              hand: [],
+              discard: dh2.discard,
+              playArea: [],
+            };
+            return {
+              ...state,
+              ...nextBase,
+              seats: state.seats.map(s => (s.seat === seat ? downedPlayer : s)),
+              activeSeat: ctx.activeSeat,
+              turnNumber: ctx.turnNumber,
+            };
+          }
+
+          // "End of turn: discard Play Area (non-attached) + hand, draw 5
+          // (reshuffle discard into inventory if needed)" — rulebook.
+          const d = drawWithReshuffle({ deck: player.inventory, discard: dh2.discard, count: 5, rngState: state.rngState });
 
           const newPlayer: PlayerState = {
             ...player,
