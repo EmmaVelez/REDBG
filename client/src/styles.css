@@ -64,7 +64,10 @@ h1, h2 { margin: 0 0 8px; }
 .app-status { margin-left: auto; color: var(--muted); font-size: 12px; }
 .app-status-connected { color: #7bd88f; }
 .app-main { display: flex; gap: 16px; padding: 16px; flex: 1; min-height: 0; }
-.app-side { width: 340px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+.app-side { width: 340px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; transition: width 0.2s ease; }
+/* when the log is collapsed, shrink the sidebar to the header's width so the board gets the space */
+.app-side:has(.game-log[data-collapsed="true"]) { width: auto; }
+.app-side:has(.game-log[data-collapsed="true"]) .log-header { flex-direction: column; align-items: flex-start; gap: 6px; }
 
 /* ---- cards (RE DBG frame) ---- */
 .card {
