@@ -81,6 +81,8 @@ export function App(): JSX.Element {
   const prevStateRef = useRef<GameState | null>(null);
   const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[] } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
+  /** Log sidebar visibility — closed frees the whole sidebar width for the board. */
+  const [logOpen, setLogOpen] = useState<boolean>(true);
   // When the fatal explore ALSO revealed a card, the reveal plays first and
   // the death screen is queued until the player dismisses it — they should
   // see what emptied their health pool before "YOU DIED".
@@ -161,9 +163,11 @@ export function App(): JSX.Element {
       </header>
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
-        <aside className="app-side">
-          <GameLog state={gameState} chat={chat} lastError={lastError} seatNames={seatNames} />
-        </aside>
+        {logOpen && (
+          <aside className="app-side">
+            <GameLog state={gameState} chat={chat} lastError={lastError} seatNames={seatNames} onClose={() => setLogOpen(false)} />
+          </aside>
+        )}
       </main>
       <footer className="app-action-dock">
         <ActionBar
@@ -171,6 +175,8 @@ export function App(): JSX.Element {
           seat={mySeat}
           onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
           disabled={disabled}
+          onOpenLog={() => setLogOpen(o => !o)}
+          logOpen={logOpen}
         />
       </footer>
       {reveal !== null && (

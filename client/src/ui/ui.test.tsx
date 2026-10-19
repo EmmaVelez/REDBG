@@ -332,6 +332,22 @@ describe('SeatSwap (M4-T10)', () => {
 });
 
 describe('ActionBar (T07)', () => {
+  it('renders the log button when onOpenLog is provided, not otherwise', () => {
+    const state = twoPlayerState();
+    const withLog = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} onOpenLog={() => {}} logOpen={false} />);
+    expect(withLog).toContain('data-log-button');
+    expect(withLog).toContain('data-log-open="false"');
+    expect(withLog).toContain('Log');
+    const without = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    expect(without).not.toContain('data-log-button');
+  });
+
+  it('marks the log button as open when logOpen is set', () => {
+    const state = twoPlayerState();
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} onOpenLog={() => {}} logOpen />);
+    expect(html).toContain('data-log-open="true"');
+  });
+
   it('offers end turn on my turn and disables explore with no legal combo', () => {
     const state = twoPlayerState();
     const player = state.seats[0];

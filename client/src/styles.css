@@ -64,10 +64,7 @@ h1, h2 { margin: 0 0 8px; }
 .app-status { margin-left: auto; color: var(--muted); font-size: 12px; }
 .app-status-connected { color: #7bd88f; }
 .app-main { display: flex; gap: 16px; padding: 16px; flex: 1; min-height: 0; }
-.app-side { width: 340px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; transition: width 0.2s ease; }
-/* when the log is collapsed, shrink the sidebar to the header's width so the board gets the space */
-.app-side:has(.game-log[data-collapsed="true"]) { width: auto; }
-.app-side:has(.game-log[data-collapsed="true"]) .log-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+.app-side { width: 340px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
 
 /* ---- cards (RE DBG frame) ---- */
 .card {
@@ -766,18 +763,21 @@ h1, h2 { margin: 0 0 8px; }
   text-transform: uppercase;
   color: var(--muted);
 }
-.log-collapse-toggle {
+.log-close {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 2px 8px;
+  line-height: 1;
+  padding: 3px 7px;
   cursor: pointer;
 }
-.log-collapse-toggle:hover { color: #e8e2d4; border-color: #554d3a; }
-.game-log[data-collapsed="true"] { flex: 0 0 auto; min-height: 0; }
+.log-close:hover { color: #ff6b6b; border-color: #6b3030; }
+/* log toggle button in the action dock */
+.log-button { white-space: nowrap; }
+.log-button[data-log-open="true"] { border-color: #554d3a; color: #ffd479; }
 .log-turn { display: flex; gap: 10px; align-items: baseline; }
 .turn-number { font-weight: 700; }
 .turn-active { color: var(--muted); }

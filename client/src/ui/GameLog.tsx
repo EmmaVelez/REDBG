@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import type { GameState } from '@re/game-core';
 import type { ChatEntry } from '../store';
@@ -14,11 +14,11 @@ export interface GameLogProps {
   readonly chat: readonly ChatEntry[];
   readonly lastError: string | null;
   readonly seatNames: readonly string[];
-  readonly defaultCollapsed?: boolean;
+  /** Close the log panel (App unmounts the whole sidebar). No close button when absent. */
+  readonly onClose?: () => void;
 }
 
-export function GameLog({ state, chat, lastError, seatNames, defaultCollapsed = false }: GameLogProps): JSX.Element {
-  const [collapsed, setCollapsed] = useState<boolean>(defaultCollapsed);
+export function GameLog({ state, chat, lastError, seatNames, onClose }: GameLogProps): JSX.Element {
   const historyRef = useRef<HTMLDivElement>(null);
   const history = state !== null ? formatTurnHistory(state) : [];
   const logLength = history.length;
@@ -33,22 +33,22 @@ export function GameLog({ state, chat, lastError, seatNames, defaultCollapsed = 
 
   const activeName = state !== null ? seatNames[state.activeSeat] ?? `Seat ${state.activeSeat}` : '—';
   return (
-    <div className="game-log" data-collapsed={collapsed}>
+    <div className="game-log">
       <div className="log-header">
         <span className="log-title">Game Log</span>
-        <button
-          type="button"
-          className="log-collapse-toggle"
-          data-log-toggle
-          data-collapsed={collapsed}
-          aria-expanded={!collapsed}
-          onClick={() => setCollapsed(c => !c)}
-        >
-          {collapsed ? '▸ Show' : '▾ Hide'}
-        </button>
+        {onClose !== undefined && (
+          <button
+            type="button"
+            className="log-close"
+            data-log-close
+            aria-label="Close log"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        )}
       </div>
-      {!collapsed && (
-        <>
+      <>
           <div className="log-turn">
             <span className="turn-number" data-turn={state?.turnNumber ?? 0}>Turn {state?.turnNumber ?? 0}</span>
             <span className="turn-active" data-active-seat={state?.activeSeat ?? -1}>Active: {activeName}</span>
@@ -83,8 +83,7 @@ export function GameLog({ state, chat, lastError, seatNames, defaultCollapsed = 
               {chat.length === 0 && <li className="log-empty">No messages yet</li>}
             </ul>
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 }

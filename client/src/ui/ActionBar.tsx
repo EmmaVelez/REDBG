@@ -22,9 +22,13 @@ export interface ActionBarProps {
   readonly onAction: (action: Action) => void;
   /** Disable all controls (e.g. not my turn / game over). */
   readonly disabled?: boolean;
+  /** When provided, render a Log button that calls this (opens the log sidebar). */
+  readonly onOpenLog?: () => void;
+  /** Whether the log sidebar is currently open (button shows active state). */
+  readonly logOpen?: boolean;
 }
 
-export function ActionBar({ state, seat, onAction, disabled = false }: ActionBarProps): JSX.Element {
+export function ActionBar({ state, seat, onAction, disabled = false, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
@@ -93,6 +97,18 @@ export function ActionBar({ state, seat, onAction, disabled = false }: ActionBar
       )}
 
       <div className="action-buttons">
+              {onOpenLog !== undefined && (
+                <button
+                  type="button"
+                  className="log-button"
+                  data-log-button
+                  data-log-open={logOpen}
+                  onClick={onOpenLog}
+                  title="Toggle game log"
+                >
+                  📜 Log
+                </button>
+              )}
               <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s)` : undefined}>
                 Explore{bestExplore !== undefined ? ` (${bestExplore.weapons.length} weapon${bestExplore.weapons.length === 1 ? '' : 's'})` : ''}
               </button>
