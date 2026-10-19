@@ -330,6 +330,44 @@ describe('batch-2 exotic passives through applyAction', () => {
     }
   });
 
+  it('mustExplore: weapon-but-no-ammo is not an explore option (endTurn allowed, no deadlock)', () => {
+    // Regression: canExploreAtAll only checked "holds a weapon". A Handgun
+    // (ammoReq 20) with turnAmmo 0 cannot legally be explored, so blocking
+    // endTurn deadlocked the player (bots threw 'must Explore first' in sim).
+    const s0 = gameWith('ch-001');
+    const handgun = 'we-009#x1';
+    const rigged: GameState = {
+      ...s0,
+      phase: 'main',
+      activeSeat: 0,
+      seats: s0.seats.map((p, i) => (i === 0 ? { ...p, hand: [handgun], turnAmmo: 0, exploresLeft: 1, mustExplore: true } : p)),
+      cards: {
+        ...s0.cards,
+        [handgun]: { instanceId: handgun, cardId: 'we-009', location: { zone: 'hand', index: 0 } },
+      },
+    };
+    // no ammo: the handgun explore is illegal, so endTurn must be allowed
+    expect(validateAction(rigged, { type: 'endTurn', seat: 0 })).toEqual({ ok: true });
+    expect(validateAction(rigged, { type: 'explore', seat: 0, weapons: [handgun], exploreCount: 1 }).ok).toBe(false);
+    // with enough ammo: the explore IS available, so endTurn stays blocked
+    const withAmmo: GameState = {
+      ...rigged,
+      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, turnAmmo: 20 } : p)),
+    };
+    expect(validateAction(withAmmo, { type: 'endTurn', seat: 0 })).toEqual({ ok: false, reason: 'endTurn: must Explore first (Wesker ability)' });
+    // melee knife with no ammo is also an explore option -> endTurn blocked
+    const knife = 'we-004#x1';
+    const withKnife: GameState = {
+      ...rigged,
+      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, hand: [handgun, knife] } : p)),
+      cards: {
+        ...rigged.cards,
+        [knife]: { instanceId: knife, cardId: 'we-004', location: { zone: 'hand', index: 1 } },
+      },
+    };
+    expect(validateAction(withKnife, { type: 'endTurn', seat: 0 }).ok).toBe(false);
+  });
+
   it('Wesker L2 target gets 2 Explores at their turn start', () => {
     const s = gameWith('ch-001');
     const forced = {

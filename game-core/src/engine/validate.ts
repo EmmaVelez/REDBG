@@ -12,12 +12,24 @@ function hasNoHealingAbility(state: GameState, seat: number): boolean {
 }
 
 /**
- * True when the player holds at least one weapon in hand — used so Wesker's
- * forced-Explore obligation can never deadlock a weaponless player (their
- * endTurn is allowed and clears the flag).
+ * True when at least one LEGAL explore exists for this player right now:
+ * explores remain, and some weapon in hand is affordable from the turn ammo
+ * pool. Used so Wesker's forced-Explore obligation can never deadlock the
+ * target (weaponless OR weapon-but-no-ammo players may endTurn, which clears
+ * the flag). A hand weapon that cannot be paid for is not an explore option.
  */
-function canExploreAtAll(state: GameState, player: { readonly hand: readonly string[] }): boolean {
-  return player.hand.some(id => cardDef(state, id)?.type === 'weapon');
+function canExploreLegally(
+  state: GameState,
+  seat: number,
+  player: { readonly hand: readonly string[]; readonly exploresLeft: number; readonly turnAmmo: number },
+): boolean {
+  if (player.exploresLeft < 1) return false;
+  return player.hand.some(id => {
+    const def = cardDef(state, id);
+    if (def === undefined || def.type !== 'weapon') return false;
+    const req = requiredAmmoForWeapons(state, seat, [id], wid => cardDef(state, wid));
+    return req <= player.turnAmmo;
+  });
 }
 
 /**
@@ -345,7 +357,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'endTurn: not your turn' };
       }
-      if (player.mustExplore === true && canExploreAtAll(state, player)) {
+      if (player.mustExplore === true && canExploreLegally(state, action.seat, player)) {
         return { ok: false, reason: 'endTurn: must Explore first (Wesker ability)' };
       }
       return { ok: true };

@@ -1,5 +1,5 @@
 
-import { chooseGreedyAction } from './policy';
+import { chooseGreedyAction, EXPLORE_BIAS } from './policy';
 import { enumerateLegalActions } from './enumerate';
 import { evaluateState } from './evaluate';
 import { applyAction } from '../engine/actions';
@@ -51,17 +51,38 @@ function baseState(over: Partial<GameState> = {}): GameState {
 }
 
 // Manual argmax reimplementation: the test computes what the policy SHOULD pick
-// by simulating every legal action with the same functions the policy uses. This
-// pins the policy to true 1-ply greedy without hardcoding brittle scores.
+// by simulating every legal action with the same functions the policy uses
+// (including the explore bias and the no-op skip). This pins the policy to
+// true 1-ply greedy without hardcoding brittle scores.
 function manualArgmax(s: GameState, seat: number): Action {
   const legal = enumerateLegalActions(s, seat);
-  let best = legal[0] as Action;
-  let bestScore = evaluateState(applyAction(s, legal[0] as Action), seat);
-  for (const a of legal.slice(1)) {
-    const score = evaluateState(applyAction(s, a), seat);
-    if (score > bestScore) { bestScore = score; best = a; }
+  let best: Action | undefined = undefined;
+  let bestScore = 0;
+  for (const a of legal) {
+    const next = applyAction(s, a);
+    if (JSON.stringify(next.seats) === JSON.stringify(s.seats) &&
+        JSON.stringify(next.mansionDeck) === JSON.stringify(s.mansionDeck) &&
+        JSON.stringify(next.prompts) === JSON.stringify(s.prompts) &&
+        next.phase === s.phase && next.activeSeat === s.activeSeat && next.turnNumber === s.turnNumber) {
+      continue; // no-op
+    }
+    const score = a.type === 'endTurn'
+      ? evaluateState(
+          {
+            ...next,
+            seats: next.seats.map(s =>
+              s.seat === seat
+                ? { ...s, turnGold: 0, turnAmmo: 0, actionsLeft: 0, buysLeft: 0, exploresLeft: 0, weaponDamageBonusThisTurn: 0 }
+                : s,
+            ),
+          },
+          seat,
+          { clampDiscardToHeld: true },
+        )
+      : evaluateState(next, seat) + (a.type === 'explore' ? EXPLORE_BIAS : 0);
+    if (best === undefined || score > bestScore) { bestScore = score; best = a; }
   }
-  return best;
+  return best ?? ({ type: 'endTurn', seat } as Action);
 }
 
 describe('chooseGreedyAction', () => {

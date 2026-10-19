@@ -5,6 +5,21 @@ import { evaluateState } from './evaluate';
 import { applyAction } from '../engine/actions';
 
 /**
+ * Flat score bonus applied to explore candidates (all difficulties).
+ *
+ * Why: the evaluator is position-based and 1-ply greedy. Exploring only pays
+ * off WHEN the fight is won (decorations/attach/level-ups) — an explore the
+ * bot cannot win scores as pure damage, so without a bias the bot hoards
+ * (endless playAmmo/buy loops, measured 0.05 explores per turn and 300+
+ * turn games). Fighting is how the game is played: decorations win, the
+ * mansion must be thinned to reach Uroboros, and reveals can be loot. The
+ * bias cannot override catastrophe — a lethal explore still scores downed
+ * (-4000) — so the bot stays shy at low HP but trades chip damage for
+ * progress when healthy.
+ */
+export const EXPLORE_BIAS = 80;
+
+/**
  * True when applying the action changed nothing meaningful (only version/log
  * counters moved). No-op candidates (e.g. useCharacterAbility on a generic
  * ability is a pass-through in the apply layer) must NEVER win: they score at
@@ -75,10 +90,12 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     // b. Score the resulting state — with honest end-turn carry-over: endTurn
         // keeps the seat's turn pools in the raw post-state, but the game loop's
         // startTurn zeroes them; the dumped hand must also score at held value
-        // (no arbitrage). Non-endTurn actions score normally.
-        const score = action.type === 'endTurn'
+        // (no arbitrage). Non-endTurn actions score normally. Explores get the
+        // flat fighting bias (see EXPLORE_BIAS).
+        const raw = action.type === 'endTurn'
           ? evaluateState(withSpentTurnPoolsZeroed(next, seat), seat, { clampDiscardToHeld: true })
           : evaluateState(next, seat);
+        const score = action.type === 'explore' ? raw + EXPLORE_BIAS : raw;
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).

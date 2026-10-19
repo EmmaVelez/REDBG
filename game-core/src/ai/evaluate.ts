@@ -8,6 +8,9 @@ import { abilitiesForLevel } from '../engine/characters';
  */
 const GOLD_PER_POINT = 1;
 const AMMO_PER_POINT = 3;
+/** Ammo beyond the heaviest weapon requirement has no marginal value. */
+const AMMO_USEFUL_CAP = 40;
+const AMMO_EXCESS_PER_POINT = 0.1;
 const POOL_PER_BONUS = 40; // buys / actions / explores each top out at 40/point
 /** Value of drawing one card (a fresh draw is worth about an average card). */
 const CARD_DRAW_VALUE = 12;
@@ -18,6 +21,8 @@ const HOLD_FACTOR = 0.5;
 const BLOAT_THRESHOLD = 18;
 const TRASH_BLOAT_PER_CARD = 4;
 const TRASH_BLOAT_MAX = 24;
+/** Market pull for healing items (Green Herb / First Aid Spray). */
+const HEAL_ITEM_PULL = 15;
 /** A card whose owned value is below this floor is "junk" when the deck bloats. */
 const JUNK_FLOOR = 12;
 const JUNK_BLOAT_PENALTY = 4;
@@ -74,9 +79,13 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
 
   // 2. Compute total score
 
-  // 2.1. Downed status
+  // 2.1. Downed status — being downed costs 20 max HP + one skipped turn,
+  // then the player revives at the new full HP. It is NOT death (-10000
+  // below). The old -4000 froze low-HP bots out of exploring entirely
+  // (certain-downed explore scored -3880 vs +40 ammo farming), producing
+  // 500+ turn games that only ended when Uroboros chanced into a kill.
   if (player.downed) {
-    total -= 4000;
+    total -= 400;
   }
 
   // 2.2. Health
@@ -90,8 +99,12 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     total += 200;
   }
 
-  // 2.5. Turn Ammo
-  total += player.turnAmmo * AMMO_PER_POINT;
+  // 2.5. Turn Ammo — CAPPED. Ammo is only worth what weapons can spend; past
+  // the biggest ammo requirement it is dead weight. Uncapped, playAmmo was a
+  // +40 arbitrage the bot farmed all turn instead of exploring (measured:
+  // 1000+ playAmmo per game, 0.05 explores/turn).
+  total += Math.min(player.turnAmmo, AMMO_USEFUL_CAP) * AMMO_PER_POINT
+    + Math.max(0, player.turnAmmo - AMMO_USEFUL_CAP) * AMMO_EXCESS_PER_POINT;
 
   // 2.6. Turn Gold — transient: resets at turn end, only matters for buying now.
   total += player.turnGold * GOLD_PER_POINT;
@@ -103,9 +116,10 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
   total += player.buysLeft * POOL_PER_BONUS;
 
   // 2.9. Explores Left — transient: resets to 1 every turn, so an unused explore
-  // is not a hoardable asset (same logic as gold). Weighted low; the BOT must
-  // actually spend explores to win. Plus Wesker-style exploreGoldBonus.
-  total += player.exploresLeft * (10 + exploreGoldValue(abilities));
+  // is NOT an asset: keeping it must not score (weight 0) or the bot hoards
+  // explores and never fights (measured: 0.05 explores/turn, 300+ turn games).
+  // Wesker-style exploreGoldBonus still counts — that gold is real on explore.
+  total += player.exploresLeft * exploreGoldValue(abilities);
 
   // 2.10. Hand cards, scored by their real held value (type-featured).
   // Hand AND playArea cards are scored the same way: playArea cards were just
@@ -137,19 +151,20 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
       : cardOwnedValue(cardDef, abilities, state, bloat);
   }
 
-  // 2.12. Inventory size is mild structure credit; junk in inventory (cards
-  // below the value floor) gets penalized when the deck is bloated, so the bot
-  // wants to thin those out of its deck.
-  total += player.inventory.length * 2;
-  if (bloat > 0) {
-    for (const instanceId of player.inventory) {
-      const cardInstance = state.cards[instanceId];
-      if (!cardInstance) continue;
-      const cardDef = state.cardDefs[cardInstance.cardId];
-      if (!cardDef) continue;
-      if (cardHeldValue(cardDef, abilities, state, 0) < JUNK_FLOOR) {
-        total -= Math.min(bloat, 6) * JUNK_BLOAT_PENALTY;
-      }
+  // 2.12. Inventory (the draw deck) is OWNED value — the same as discard.
+  // It used to be a flat 2/card, which created a huge endTurn arbitrage:
+  // drawing 5 ammo cards revalued them 2 -> held (~24+ each), so endTurn
+  // outscored everything (+169 measured) and the bot hoarded instead of
+  // fighting. Valuing inventory like discard makes draws score-neutral.
+  // Junk in inventory still gets penalized when the deck is bloated.
+  for (const instanceId of player.inventory) {
+    const cardInstance = state.cards[instanceId];
+    if (!cardInstance) continue;
+    const cardDef = state.cardDefs[cardInstance.cardId];
+    if (!cardDef) continue;
+    total += cardOwnedValue(cardDef, abilities, state, bloat);
+    if (bloat > 0 && cardHeldValue(cardDef, abilities, state, 0) < JUNK_FLOOR) {
+      total -= Math.min(bloat, 6) * JUNK_BLOAT_PENALTY;
     }
   }
 
@@ -215,7 +230,9 @@ function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[],
     return base + weaponAffinityBonus(abilities, cardDef);
   }
   if (cardDef.type === 'ammunition') {
-    return Math.floor(ammoYieldValue(cardDef) * HOLD_FACTOR) + ammunitionValue(abilities);
+    // Ammo is NOT action-gated (every ammo card can be played each turn), so
+    // the hold discount does not apply — held == owned for ammo.
+    return ammoYieldValue(cardDef) + ammunitionValue(abilities);
   }
   if (cardDef.type === 'action') {
     let v = Math.floor(actionTextValue(cardDef, abilities) * HOLD_FACTOR);
@@ -258,6 +275,14 @@ function marketPull(cardDef: CardDef, abilities: readonly CharacterAbility[], bl
   if (cardDef.type === 'action') {
     const pull = actionBonusValue(abilities);
     return pull + (bloat > 0 && hasTrashEffect(cardDef) ? trashBloatValue(bloat) : 0);
+  }
+  if (cardDef.type === 'item') {
+    // Healing items keep the bot alive so it can keep exploring (low-HP freeze:
+    // at ~10 hp every explore scores 'downed' and the bot stopped fighting).
+    const heals = (cardDef.itemEffects ?? []).some(
+      e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60',
+    );
+    return heals ? HEAL_ITEM_PULL : 0;
   }
   return 0;
 }

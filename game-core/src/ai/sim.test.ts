@@ -149,4 +149,24 @@ describe('Bot Game Simulation (M2-T05)', () => {
     // The test's value is that 4 * 3000-action full games run without throwing.
     expect(true).toBe(true);
   });
+
+  // 8. Regression: hard bots must actually EXPLORE (was 0.05 explores/turn —
+  // endTurn draw arbitrage + ammo farming + a -4000 downed freeze made games
+  // drag to 500+ turns). With the fixed evaluator + EXPLORE_BIAS the rate is
+  // ~0.28/turn and games end naturally; assert a conservative floor so a
+  // future evaluator change can't silently re-freeze the bots.
+  test('hard bots explore at a healthy rate and games end naturally', () => {
+    let totalExplores = 0;
+    let totalTurns = 0;
+    let gameOverCount = 0;
+    for (let seed = 1; seed <= 8; seed++) {
+      const r = playBotGame({ seed, difficulties: ['hard', 'hard'], maxActions: 6000 });
+      totalExplores += r.state.log.filter(e => e.action.type === 'explore').length;
+      totalTurns += r.state.log.filter(e => e.action.type === 'endTurn').length;
+      if (r.ended === 'gameOver') gameOverCount++;
+    }
+    const perTurn = totalExplores / Math.max(totalTurns, 1);
+    expect(perTurn).toBeGreaterThan(0.15);       // was 0.05 before the fix
+    expect(gameOverCount).toBeGreaterThanOrEqual(5); // most games finish, not cap out
+  });
 });
