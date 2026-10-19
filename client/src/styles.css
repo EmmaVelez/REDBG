@@ -560,6 +560,36 @@ h1, h2 { margin: 0 0 8px; }
   line-height: 1.4;
   max-width: 280px;
 }
+.mansion-door-weapons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.mansion-door-weapons-label {
+  color: #9aa1ad;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.mansion-door-weapons-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.mansion-door-weapon .card {
+  width: 84px;
+  min-height: 0;
+  padding: 6px 6px;
+  gap: 2px;
+  font-size: 10px;
+}
+.mansion-door-weapon .card::before { height: 22px; }
+.mansion-door-weapon .card-cost { min-width: 18px; height: 18px; line-height: 16px; font-size: 10px; }
+.mansion-door-weapon .card-name { font-size: 10px; }
+.mansion-door-weapon .card-emoji { font-size: 22px; }
 
 /* ---- you died overlay (RE-style) ---- */
 .you-died-backdrop {

@@ -14,16 +14,30 @@ export interface MansionRevealProps {
   readonly resultText: string;
   /** Total damage the exploring player dealt with this attack. */
   readonly damage: number;
+  /** Weapon definitions the exploring player used for this attack. */
+  readonly weapons?: readonly CardDef[];
   readonly onContinue: () => void;
 }
 
-export function MansionReveal({ def, resultText, damage, onContinue }: MansionRevealProps): JSX.Element {
+export function MansionReveal({ def, resultText, damage, weapons, onContinue }: MansionRevealProps): JSX.Element {
   const isInfected = def.type === 'infected';
   return (
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
         <span className="mansion-door-title">{isInfected ? 'The door creaks open…' : 'You found something…'}</span>
         <div className="mansion-door-damage">Your damage: <strong>{damage}</strong></div>
+        {weapons !== undefined && weapons.length > 0 && (
+          <div className="mansion-door-weapons" data-reveal-weapons>
+            <span className="mansion-door-weapons-label">Weapons used:</span>
+            <div className="mansion-door-weapons-row">
+              {weapons.map((w, i) => (
+                <div className="mansion-door-weapon" key={`${w.id}-${i}`}>
+                  <CardView def={w} compact />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mansion-door-card">
           <CardView def={def} />
         </div>

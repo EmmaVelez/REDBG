@@ -142,7 +142,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0, attached: ['ma-001#7'] }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', damage: 0 });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', damage: 0, weapons: [] });
   });
 
   it('detects an escaped Infected: mansion -> mansionBottom', () => {
@@ -154,7 +154,19 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', damage: 0 });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', damage: 0, weapons: [] });
+  });
+
+  it('captures the weapon ids used for the explore', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0, attached: ['ma-001#7'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: ['we-004#1', 'we-005#1'] as readonly string[] } }],
+    });
+    const reveal = detectReveal(prev, next, 0);
+    expect(reveal?.weapons).toEqual(['we-004#1', 'we-005#1']);
   });
 
   it('ignores another player exploring', () => {

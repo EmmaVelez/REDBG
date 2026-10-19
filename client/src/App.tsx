@@ -79,7 +79,7 @@ export function App(): JSX.Element {
   // seat's explore revealed an Infected, and hold the table on a readable
   // reveal until the player clicks Continue.
   const prevStateRef = useRef<GameState | null>(null);
-  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number } | null>(null);
+  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[] } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
   // When the fatal explore ALSO revealed a card, the reveal plays first and
   // the death screen is queued until the player dismisses it — they should
@@ -109,7 +109,11 @@ export function App(): JSX.Element {
         : detected.outcomeZone === 'removed'
           ? `${def.name} was removed from the Mansion.`
           : `${def.name} escaped to the bottom of the Mansion.`;
-    setReveal({ def, resultText, damage: detected.damage });
+    // Resolve the explore's weapon instances to defs for the reveal panel.
+    const weaponDefs = detected.weapons
+      .map(id => defForInstance(state, id))
+      .filter((d): d is CardDef => d !== null);
+    setReveal({ def, resultText, damage: detected.damage, weapons: weaponDefs });
   }, [state, mySeat]);
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
@@ -172,6 +176,7 @@ export function App(): JSX.Element {
           def={reveal.def}
           resultText={reveal.resultText}
           damage={reveal.damage}
+          weapons={reveal.weapons}
           onContinue={() => {
             setReveal(null);
             const queued = pendingDeathRef.current;

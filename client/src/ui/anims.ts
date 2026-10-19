@@ -100,6 +100,8 @@ export interface Reveal {
   readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed';
   /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
   readonly damage: number;
+  /** Weapon instance ids the exploring player used for this attack. */
+  readonly weapons: readonly string[];
 }
 
 function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
@@ -128,7 +130,8 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
     if (sameLoc(prevLoc, nextLoc)) continue;
     if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
       const damage = action.type === 'explore' ? exploreDamage(prev, action.seat, action.weapons) : 0;
-      return { instanceId, outcomeZone: nextLoc.zone, damage };
+      const weapons = action.type === 'explore' ? action.weapons : [];
+      return { instanceId, outcomeZone: nextLoc.zone, damage, weapons };
     }
   }
   return null;

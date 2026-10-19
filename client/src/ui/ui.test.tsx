@@ -260,6 +260,31 @@ describe('MansionReveal', () => {
     expect(html).toContain('35');
     expect(html).toContain('Continue');
   });
+
+  it('renders the weapons used when provided', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    const knife = PREMIER_CARDS.find(c => c.id === 'we-004');
+    const shotgun = PREMIER_CARDS.find(c => c.id === 'we-011');
+    expect(monster).toBeDefined();
+    expect(knife).toBeDefined();
+    if (monster === undefined || knife === undefined || shotgun === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} weapons={[knife, shotgun]} onContinue={() => {}} />
+    );
+    expect(html).toContain('data-reveal-weapons');
+    expect(html).toContain('Weapons used:');
+    expect(html).toContain('Combat Knife');
+    expect(html).toContain(shotgun.name);
+  });
+
+  it('omits the weapons row when no weapons were used', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} weapons={[]} onContinue={() => {}} />
+    );
+    expect(html).not.toContain('data-reveal-weapons');
+  });
 });
 
 describe('YouDiedOverlay', () => {
