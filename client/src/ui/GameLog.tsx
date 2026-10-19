@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { GameState } from '@re/game-core';
 import type { ChatEntry } from '../store';
@@ -14,9 +14,11 @@ export interface GameLogProps {
   readonly chat: readonly ChatEntry[];
   readonly lastError: string | null;
   readonly seatNames: readonly string[];
+  readonly defaultCollapsed?: boolean;
 }
 
-export function GameLog({ state, chat, lastError, seatNames }: GameLogProps): JSX.Element {
+export function GameLog({ state, chat, lastError, seatNames, defaultCollapsed = false }: GameLogProps): JSX.Element {
+  const [collapsed, setCollapsed] = useState<boolean>(defaultCollapsed);
   const historyRef = useRef<HTMLDivElement>(null);
   const history = state !== null ? formatTurnHistory(state) : [];
   const logLength = history.length;
@@ -31,41 +33,58 @@ export function GameLog({ state, chat, lastError, seatNames }: GameLogProps): JS
 
   const activeName = state !== null ? seatNames[state.activeSeat] ?? `Seat ${state.activeSeat}` : '—';
   return (
-    <div className="game-log">
-      <div className="log-turn">
-        <span className="turn-number" data-turn={state?.turnNumber ?? 0}>Turn {state?.turnNumber ?? 0}</span>
-        <span className="turn-active" data-active-seat={state?.activeSeat ?? -1}>Active: {activeName}</span>
-        {state !== null && state.phase === 'turnEnd' && <span className="phase-note">— resolving turn end —</span>}
-        {state !== null && state.phase === 'gameOver' && <span className="phase-note">— GAME OVER —</span>}
+    <div className="game-log" data-collapsed={collapsed}>
+      <div className="log-header">
+        <span className="log-title">Game Log</span>
+        <button
+          type="button"
+          className="log-collapse-toggle"
+          data-log-toggle
+          data-collapsed={collapsed}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed(c => !c)}
+        >
+          {collapsed ? '▸ Show' : '▾ Hide'}
+        </button>
       </div>
-      {lastError !== null && <div className="log-error" data-kind="error">{lastError}</div>}
+      {!collapsed && (
+        <>
+          <div className="log-turn">
+            <span className="turn-number" data-turn={state?.turnNumber ?? 0}>Turn {state?.turnNumber ?? 0}</span>
+            <span className="turn-active" data-active-seat={state?.activeSeat ?? -1}>Active: {activeName}</span>
+            {state !== null && state.phase === 'turnEnd' && <span className="phase-note">— resolving turn end —</span>}
+            {state !== null && state.phase === 'gameOver' && <span className="phase-note">— GAME OVER —</span>}
+          </div>
+          {lastError !== null && <div className="log-error" data-kind="error">{lastError}</div>}
 
-      <div className="log-history">
-        <span className="log-section">Turn history</span>
-        <div className="log-history-scroll" ref={historyRef} data-kind="history">
-          {history.map(line => (
-            <div key={line.seq} className="history-line" data-history>
-              <span className="history-turn">T{line.turn}</span>
-              <span className="history-seat">{line.seatName}:</span>
-              <span className="history-text">{line.text}</span>
+          <div className="log-history">
+            <span className="log-section">Turn history</span>
+            <div className="log-history-scroll" ref={historyRef} data-kind="history">
+              {history.map(line => (
+                <div key={line.seq} className="history-line" data-history>
+                  <span className="history-turn">T{line.turn}</span>
+                  <span className="history-seat">{line.seatName}:</span>
+                  <span className="history-text">{line.text}</span>
+                </div>
+              ))}
+              {history.length === 0 && <div className="log-empty">No actions yet</div>}
             </div>
-          ))}
-          {history.length === 0 && <div className="log-empty">No actions yet</div>}
-        </div>
-      </div>
+          </div>
 
-      <div className="log-chat-block">
-        <span className="log-section">Chat</span>
-        <ul className="log-chat">
-          {chat.map((c, i) => (
-            <li key={i} className="log-line">
-              <span className="log-seat">[{seatNames[c.seat] ?? `Seat ${c.seat}`}]</span>
-              <span className="log-text">{c.text}</span>
-            </li>
-          ))}
-          {chat.length === 0 && <li className="log-empty">No messages yet</li>}
-        </ul>
-      </div>
+          <div className="log-chat-block">
+            <span className="log-section">Chat</span>
+            <ul className="log-chat">
+              {chat.map((c, i) => (
+                <li key={i} className="log-line">
+                  <span className="log-seat">[{seatNames[c.seat] ?? `Seat ${c.seat}`}]</span>
+                  <span className="log-text">{c.text}</span>
+                </li>
+              ))}
+              {chat.length === 0 && <li className="log-empty">No messages yet</li>}
+            </ul>
+          </div>
+        </>
+      )}
     </div>
   );
 }
