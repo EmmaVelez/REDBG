@@ -26,7 +26,7 @@ import type { Room } from './rooms';
  */
 
 export type HostResult =
-  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[] }
+  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[]; readonly endReason?: 'uroborosDefeated' | 'allPlayersDead' }
   | { readonly ok: false; readonly reason: string };
 
 export interface GameHost {
@@ -88,6 +88,11 @@ export function createHost(room: Room): GameHost {
       if (state === undefined) {
         return { ok: false, reason: 'game not started' };
       }
+      // Game over is final: further actions (including endTurn, which would
+      // hand the turn to a bot that can never act) are rejected.
+      if (checkWin(state).gameOver) {
+        return { ok: false, reason: 'game over' };
+      }
       const human = findHuman(clientId);
       if (human === undefined) {
         return { ok: false, reason: 'unknown or unseated player' };
@@ -105,11 +110,16 @@ export function createHost(room: Room): GameHost {
       }
       state = next;
       const win = checkWin(state);
-      return { ok: true, state, gameOver: win.gameOver, winners: win.winners };
+      return { ok: true, state, gameOver: win.gameOver, winners: win.winners, endReason: win.endReason };
     },
 
     stepBot(seed: number, difficulty: BotDifficulty = 'hard'): HostResult | undefined {
       if (state === undefined) {
+        return undefined;
+      }
+      // A finished game must never advance: stepping a bot here leaves the
+      // active seat mid-turn with no gameOver broadcast (the freeze bug).
+      if (checkWin(state).gameOver) {
         return undefined;
       }
       const active = state.seats[state.activeSeat];
@@ -125,7 +135,7 @@ export function createHost(room: Room): GameHost {
       }
       state = next;
       const win = checkWin(state);
-      return { ok: true, state, gameOver: win.gameOver, winners: win.winners };
+      return { ok: true, state, gameOver: win.gameOver, winners: win.winners, endReason: win.endReason };
     },
 
     /**

@@ -3,7 +3,7 @@ import type { Server as HttpServer } from 'node:http';
 import { encodeMessage, decodeMessage } from './protocol';
 import type { ClientMessage, ServerMessage } from './protocol';
 import { createHost } from './host';
-import type { GameHost } from './host';
+import type { GameHost, HostResult } from './host';
 import { createRoomStore } from './rooms';
 import type { RoomStore } from './rooms';
 
@@ -128,21 +128,23 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
    * After a human move, keep advancing the active bot seats until a human is
    * active again (or the game is over). Bounded so a bug can't spin forever.
    */
-  const advanceBots = (roomCode: string): void => {
+  const advanceBots = (roomCode: string): HostResult | undefined => {
     const host = hosts.get(roomCode);
-    if (host === undefined || host.state === undefined) return;
+    if (host === undefined || host.state === undefined) return undefined;
     for (let guard = 0; guard < 2000; guard++) {
       const state = host.state;
-      if (state === undefined) return;
+      if (state === undefined) return undefined;
       const room = roomStore.getRoom(roomCode);
-      if (room === undefined) return;
+      if (room === undefined) return undefined;
       const activeSeat = state.seats[state.activeSeat]?.seat;
-      if (activeSeat === undefined) return;
+      if (activeSeat === undefined) return undefined;
       const sitter = room.players.find(p => p.seat === activeSeat);
-      if (sitter === undefined || !sitter.isBot) return; // human or no one: stop
+      if (sitter === undefined || !sitter.isBot) return undefined; // human or no one: stop
       const result = host.stepBot(Math.floor(random() * 2 ** 31), 'hard');
-      if (result === undefined || !result.ok || result.gameOver) return;
+      if (result === undefined || !result.ok) return undefined;
+      if (result.gameOver) return result; // ok + over: the caller must broadcast gameOver
     }
+    return undefined;
   };
 
   const disconnectPlayer = (clientId: string, roomCode: string): void => {
@@ -307,7 +309,13 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           host.start(Math.floor(random() * 2 ** 31));
           hosts.set(session.roomCode, host);
           broadcastToRoom(session.roomCode, { kind: 'gameStarted' });
+          // If seat 0 is a bot, kick the bot loop immediately — otherwise the
+          // game sits on 'Waiting for Bot 1…' before anyone can act.
+          const botResult = advanceBots(session.roomCode);
           broadcastGameViews(session.roomCode);
+          if (botResult !== undefined && botResult.ok && botResult.gameOver) {
+            broadcastToRoom(session.roomCode, { kind: 'gameOver', winners: botResult.winners, endReason: botResult.endReason });
+          }
         } catch (e) {
           send(ws, { kind: 'error', message: (e as Error).message });
         }
@@ -330,10 +338,14 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           send(ws, { kind: 'actionRejected', reason: result.reason });
           return;
         }
-        advanceBots(roomCode);
+        // A bot stepping after the human's action can ALSO end the game
+        // (e.g. a bot defeats Uroboros) — that ending must be broadcast too,
+        // or every client sits on 'Waiting for Bot N…' forever.
+        const botResult = advanceBots(roomCode);
         broadcastGameViews(roomCode);
-        if (result.gameOver) {
-          broadcastToRoom(roomCode, { kind: 'gameOver', winners: result.winners, endReason: result.state.seats.every(s => s.dead) ? 'allPlayersDead' : undefined });
+        const ended = result.gameOver ? result : botResult;
+        if (ended !== undefined && ended.ok && ended.gameOver) {
+          broadcastToRoom(roomCode, { kind: 'gameOver', winners: ended.winners, endReason: ended.endReason });
         }
         return;
       }

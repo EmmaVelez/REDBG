@@ -55,6 +55,8 @@ export interface GameStore extends GameStoreState {
   /** The new holder taps the pass screen: reveal their hand, unpause. */
   readonly continuePass: () => void;
   readonly quitHotseat: () => void;
+  /** Server room: leave to the lobby after game over (clears room/view/gameOver). */
+  readonly leaveToLobby: () => void;
 }
 
 const initial = (): GameStoreState => ({
@@ -184,5 +186,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   quitHotseat: () => {
     set({ hotseat: null, view: null, mySeat: -1, gameOver: null, lastError: null });
+  },
+  leaveToLobby: () => {
+    get().dispatch({ kind: 'leaveRoom' }, { silent: true });
+    set({ room: null, view: null, mySeat: -1, gameOver: null, lastError: null, chat: [] });
   },
 }));

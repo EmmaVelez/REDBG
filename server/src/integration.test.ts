@@ -19,8 +19,8 @@ import type { ServerMessage } from './protocol';
 
 const servers: GameServer[] = [];
 
-function startServer(): GameServer {
-  const server = createGameServer({ port: 0, heartbeatMs: 0 });
+function startServer(opts: { rand?: () => number } = {}): GameServer {
+  const server = createGameServer({ port: 0, heartbeatMs: 0, ...(opts.rand !== undefined ? { rand: opts.rand } : {}) });
   servers.push(server);
   return server;
 }
@@ -288,4 +288,59 @@ describe('M3-T05 integration: scripted 2-client game over real WebSockets', () =
     reconnector.ws.close();
     watcher.ws.close();
   }, 30000);
+
+  // Regression (user report: 'game froze — Waiting for Bot 3 after HUNK
+  // explored with 9 stars'): the game can END on a bot's action inside
+  // advanceBots (bot defeats Uroboros / last human dies). The old code only
+  // checked the HUMAN action's result for gameOver, so the ending was never
+  // broadcast — every client sat on 'Waiting for Bot N…' forever. Seed 109
+  // reproduces: with the human always endTurn-ing, the game ends on a bot
+  // step at turn ~131 with uroborosDefeated.
+  it('broadcasts gameOver when the game ends during a bot step', async () => {
+    // pin the engine seed: host.start(Math.floor(random() * 2 ** 31))
+    const server = startServer({ rand: () => 109 / 2 ** 31 });
+
+    const host = connect(server);
+    await open(host);
+    await host.next(); // welcome
+
+    host.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    const roomMsg = await waitFor(host, isRoomState, 10000, 'createRoom');
+    const roomCode = roomMsg.room.roomCode;
+
+    host.send({ kind: 'addBot', seat: 1 });
+    await waitFor(host, isRoomState, 10000, 'bot1');
+    host.send({ kind: 'addBot', seat: 2 });
+    await waitFor(host, isRoomState, 10000, 'bot2');
+    host.send({ kind: 'addBot', seat: 3 });
+    await waitFor(host, isRoomState, 10000, 'bot3');
+
+    host.send({ kind: 'startGame' });
+    await waitFor(host, isGameStarted, 10000, 'gameStarted');
+
+    // human seat 0: always endTurn; bots play between our turns
+    const isMyTurn = (m: ServerMessage): m is Extract<ServerMessage, { kind: 'stateSync' }> =>
+      m.kind === 'stateSync' && m.view.state.activeSeat === 0;
+    const isGameOver = (m: ServerMessage): m is Extract<ServerMessage, { kind: 'gameOver' }> =>
+      m.kind === 'gameOver';
+
+    let over: Extract<ServerMessage, { kind: 'gameOver' }> | null = null;
+    for (let turn = 0; turn < 400 && over === null; turn++) {
+      // race: either it's our turn again, or the game ended on a bot step
+      const view = await waitFor(host, m => isMyTurn(m) || isGameOver(m), 20000, 'myTurnOrOver');
+      if (view.kind === 'gameOver') { over = view; break; }
+      host.send({ kind: 'sendAction', action: { type: 'endTurn', seat: 0 } });
+    }
+
+    expect(over).not.toBeNull();
+    expect(over?.endReason).toBe('uroborosDefeated');
+    expect(Array.isArray(over?.winners)).toBe(true);
+
+    // after game over, further actions are rejected (no silent wedging)
+    host.send({ kind: 'sendAction', action: { type: 'endTurn', seat: 0 } });
+    const rejected = await waitFor(host, (m): m is Extract<ServerMessage, { kind: 'actionRejected' }> => m.kind === 'actionRejected', 10000, 'post-over rejection');
+    expect(rejected.reason).toBe('game over');
+
+    host.ws.close();
+  }, 120000);
 });

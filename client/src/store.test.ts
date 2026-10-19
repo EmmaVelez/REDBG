@@ -109,6 +109,24 @@ describe('store (M4-T02)', () => {
     st.handleServerMessage({ kind: 'hostChanged', seat: 1 });
     expect(useGameStore.getState().lastError).toBe('room not found'); // unchanged
   });
+
+  it('leaveToLobby clears room/view/gameOver after a server-room game over', () => {
+    const s = useGameStore.getState();
+    // simulate an in-game server room that just ended
+    s.handleServerMessage(roomState());
+    s.handleServerMessage({ kind: 'gameStarted' } as ServerMessage);
+    s.handleServerMessage({ kind: 'stateSync', view: makeView() } as ServerMessage);
+    s.handleServerMessage({ kind: 'gameOver', winners: [0] } as ServerMessage);
+    const mid = useGameStore.getState();
+    expect(mid.room).not.toBeNull();
+    expect(mid.gameOver).not.toBeNull();
+    mid.leaveToLobby();
+    const after = useGameStore.getState();
+    expect(after.room).toBeNull();
+    expect(after.view).toBeNull();
+    expect(after.gameOver).toBeNull();
+    expect(after.mySeat).toBe(-1);
+  });
 });
 
 describe('store dispatch/bind (M4-T02)', () => {

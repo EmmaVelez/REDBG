@@ -128,7 +128,9 @@ export function App(): JSX.Element {
   const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
 
   const passPending = hotseat !== null && hotseat.passPending && gameOver === null;
-  const showGameOverOverlay = hotseat !== null && gameOver !== null;
+  // Game over overlay: hotseat OR server room (before, a server-room game over
+  // left everyone staring at 'Waiting for Bot N…' forever).
+  const showGameOverOverlay = (hotseat !== null || room !== null) && gameOver !== null;
 
   if (view === null || (room === null && hotseat === null)) {
     prevStateRef.current = null; // reset across lobby/game switches
@@ -216,8 +218,12 @@ export function App(): JSX.Element {
         <SeatSwap
           mode="gameOver"
           winners={gameOver?.winners}
-          playerNames={hotseat?.names}
-          onContinue={() => useGameStore.getState().quitHotseat()}
+          playerNames={seatNames}
+          onContinue={() =>
+            hotseat !== null
+              ? useGameStore.getState().quitHotseat()
+              : useGameStore.getState().leaveToLobby()
+          }
         />
       )}
     </div>
