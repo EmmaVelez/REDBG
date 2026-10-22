@@ -1,0 +1,9 @@
+
+diagnose: "Need official Alliance expansion card list for we-025 and ch-15+ cards"
+The standard RE Dead Ace - Alliance pack contains:
+- Carlos Oliveira, Josh Stone, Steve Burnside, Wesker (already in all
+ance.ts)
+
+Additional content may exist from later scenarios or expansion DLC. Need to
+verify against official source or scenario booklet. For now I'll push current
+commit and we're ready for release as is.
