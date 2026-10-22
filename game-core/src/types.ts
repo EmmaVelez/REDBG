@@ -63,7 +63,7 @@ export interface CardDef {
   readonly id: string;
   readonly name: string;
   readonly type: CardType;
-  readonly set: "premier" | "promo";
+  readonly set: 'premier' | 'promo' | 'alliance';
   /** Human-readable rules text (for UI + reference). */
   readonly text: string;
   /** Copies of this card in the game (used when building piles). */

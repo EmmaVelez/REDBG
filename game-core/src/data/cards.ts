@@ -208,9 +208,34 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
   { pileId: 'sub', cardIds: ['we-003'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran';
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance';
 
-export interface ScenarioDef {
+export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am5', cardIds: ['am-004'] },       // Alliance Ammo x5
+  
+  { pileId: 'pistol', cardIds: ['we-018'] },    // Pistol (Alliance)
+  { pileId: 'knife-all', cardIds: ['we-019'] }, // Combat Knife Alliance
+  { pileId: 'shotgun-lowcost', cardIds: ['we-020'] }, // Sawed-Off Shotgun
+  { pileId: 'rgt', cardIds: ['we-021'] },       // Full Auto Rifle (+8/action)
+  { pileId: 'mg-heavy', cardIds: ['we-022'] },  // Heavy Machine Gun (+90 ammo buff)
+  { pileId: 'shotgun-highcost', cardIds: ['we-023', 'we-024'] }, // Super + Riot Shotgun
+  
+  { pileId: 'longbow-action', cardIds: ['ac-013'] },   // Longbow (Ammo-based, +2 cards)
+  { pileId: 'grenade-buy', cardIds: ['ac-014'] },      // Grenade Action (+5 actions, +20 gold)
+  { pileId: 'reload-discard', cardIds: ['ac-015'] },   // Back to Back (recover weapon from discard)
+  { pileId: 'buy-all', cardIds: ['ac-016'] }            // Reload Action (+2 buys)
+];
+
+/** Alliance scenario definition */
+export const ALLIANCE_SCENARIO_DEF = {
+  id: 'alliance' as ScenarioId,
+  name: 'Alliance',
+  description: 'Stand-alone expansion scenario — Basic Resources + all Alliance card piles.',
+  piles: ALLIANCE_PILES,
+};
+
+/** Add Alliance scenario to the SCENARIOS array */
+SCENARIOS.push(ALLIANCE_SCENARIO_DEF);
   readonly id: ScenarioId;
   readonly name: string;
   readonly description: string;
