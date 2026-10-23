@@ -110,6 +110,9 @@ function onPlayFromHand(state: GameState, seat: number, instanceId: string, onAc
     case 'ammunition':
       onAction({ type: 'playAmmo', seat, instanceId });
       return;
+    case 'weapon':
+      onAction({ type: 'playWeapon', seat, instanceId });
+      return;
     default:
       return; // weapons are used via Explore, characters/others have no play action
   }
