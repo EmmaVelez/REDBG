@@ -327,12 +327,13 @@ export interface LoggedAction {
 // Actions
 // ---------------------------------------------------------------------------
 
-export type Action =
+export interface Action =
   | { readonly type: "startGame"; readonly setup: GameSetup }
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number }
+  | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }
   | { readonly type: "endTurn"; readonly seat: number }
