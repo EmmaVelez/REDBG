@@ -226,7 +226,6 @@ export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly s
   { pileId: 'buy-all', cardIds: ['ac-016'] }            // Reload Action (+2 buys)
 ];
 
-/** Alliance scenario definition */
 export const ALLIANCE_SCENARIO_DEF = {
   id: 'alliance' as ScenarioId,
   name: 'Alliance',
@@ -234,15 +233,16 @@ export const ALLIANCE_SCENARIO_DEF = {
   piles: ALLIANCE_PILES,
 };
 
-/** Add Alliance scenario to the SCENARIOS array */
-SCENARIOS.push(ALLIANCE_SCENARIO_DEF);
-  readonly id: ScenarioId;
+/** Scenario definition interface for type exports */
+export interface ScenarioDef {
+  readonly id: ReadonlyArray<ScenarioId>[0];
   readonly name: string;
   readonly description: string;
   readonly piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
 }
 
-export const SCENARIOS: ReadonlyArray<ScenarioDef> = [
+
+export const SCENARIOS = [
   {
     id: 'firstTimer',
     name: 'First Timer',

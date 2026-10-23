@@ -181,7 +181,9 @@ export type CharacterAbility =
   | { readonly kind: "exploreBonusIfActionsInPlayArea"; readonly amount: number; readonly minActions: number; readonly level: 1 | 2 }     // PR-010 Hunk L2: +amount explore damage with >=minActions actions in play area
   | { readonly kind: "skipTurnForSuperNextTurn"; readonly level: 1 | 2 }                                     // PR-002 Jill: skip turn & discard hand -> next turn +5 cards/+1 Buy/Action/Explore
   | { readonly kind: "giveOneCardToPlayerThenMaybeAnother"; readonly level: 1 | 2 }                          // PR-009 Rebecca L1: another player +1 card; if so, a player +1 card
-    | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
+  | { readonly kind: "giveOneCardToPlayerThenMaybeAnother"; readonly level: 1 | 2 }                               // PR-009 Rebecca L1: another player +1 card; if so, a player +1 card
+    | { readonly kind: "singleWeaponLimiter"; readonly level: 1 | 2 }                                   // Jack L1: can only attack with 1 weapon while the limitation is active
+      | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
 
 // ---------------------------------------------------------------------------
 // Card instances

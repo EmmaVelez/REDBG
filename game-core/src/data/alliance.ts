@@ -5,7 +5,7 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ch-011', name: 'Carlos Oliveira', type: 'character', set: 'alliance', text: 'When Carlos explores, look at the top card of the Mansion; if it is a Weapon, you may take it. During your turn, attach up to 2 additional cards under your Character.', copies: 1, level1At: 4, level2At: 9, maxHp: 85, levels: [{ level: 1, text: 'When Carlos explores, look at the top card of the Mansion; if it is a Weapon, you may take it.' }, { level: 2, text: 'During your turn, attach up to 2 additional cards under your Character.' }], abilities: [] },
   { id: 'ch-012', name: 'Josh Stone', type: 'character', set: 'alliance', text: 'You only begin the game with a Knife and an Action card. Level 1 (3): When you attack, you may attach up to 2 additional cards under your Character. Level 2 (8): Your partner may attach up to 2 additional cards.', copies: 1, level1At: 3, level2At: 8, maxHp: 75, levels: [{ level: 1, text: 'You only begin the game with a Knife and an Action card.' }, { level: 2, text: 'When you attack, you may attach up to 2 additional cards under your Character.' }], abilities: [] },
   { id: 'ch-013', name: 'Steve Burnside', type: 'character', set: 'alliance', text: 'You only begin the game with an Explosive weapon. Level 1 (5): All of Steve\'s Magnum weapons gain +20 damage.', copies: 1, level1At: 5, level2At: 7, maxHp: 95, levels: [{ level: 1, text: 'You only begin the game with an Explosive weapon.' }, { level: 2, text: 'All of Steve\'s Magnum weapons gain +20 damage.' }], abilities: [] },
-    { id: 'ch-014', name: 'Albert Wesker (Alliance)', type: 'character', set: 'alliance', text: 'Wesker attacks a person or explores, then +20 Gold.', copies: 1, level1At: 6, level2At: 8, maxHp: 105, levels: [{ level: 1, text: 'When Wesker attacks a Character or Explores, +20 Gold that turn.' }, { level: 2, text: 'During your turn choose a Player; that Player gets +1 Explore and must Explore at least once on their next turn.' }], abilities: [{ kind: 'exploreGoldBonus', amount: 20, level: 1 }, { kind: 'forceExploreOtherPlayer', level: 2 }] },
+    { id: 'ch-014', name: 'Jack Krauser (Alliance)', type: 'character', set: 'alliance', text: 'Jack cannot use more than 1 Weapon. During your turn, Jack deals an additional X damage during your turn where X = the number of cards in your Hand times 10.', copies: 1, level1At: 0, level2At: 6, maxHp: 90, levels: [{ level: 1, text: 'Jack can only use more than 1 weapon.' }, { level: 2, text: 'During your turn, Jack deals an additional X damage during your turn where X = the number of cards in your Hand times 10.' }], abilities: [{ kind: 'singleWeaponLimiter', level: 1 }, { kind: 'generic', level: 2 }] },
   
   // Weapons (Alliance-exclusive)
   { id: 'we-017', name: 'Grenade Launcher', type: 'weapon', set: 'alliance', text: 'Deals 60 damage. Trashed after use.', copies: 5, cost: 35, ammoReq: 0, damage: 60, weaponTags: ['explosive'] },
@@ -53,7 +53,7 @@ export const ALLIANCE_CHARACTERS = [
   'ch-011', // Carlos Oliveira (partner)
   'ch-012', // Josh Stone (knife start)
   'ch-013', // Steve Burnside (explosive start)
-  'ch-014'  // Wesker Alliance variant
+  'ch-014'  // Jack Krauser (single weapon limiter)
 ];
 
 export const ALLIANCE_WEAPOON_IDS = [
