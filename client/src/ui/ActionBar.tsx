@@ -35,10 +35,6 @@ export interface ActionBarProps {
 export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
-  
-  // Enumerate all legal explore combos based on hand cards in this turn state
-  // Each combo shows weapon count, damage total, and ammo requirements
-  
   // Get the current best (full) combo for fallback auto-select
   const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
   const bestExplore = explores.length > 0
@@ -124,13 +120,15 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           </button>
         )}
         
-        {/* Explore with weapon selector */}
+        {/* Explore with weapon combo selector - enumerates all legal combos */}
         <div className="explore-control">
           <select 
             className="explore-select"
             onChange={(e): void => {
               const selected = e.target.value as string;
-              if (selected && selected.startsWith('[')) {
+              
+              // Parse selected combination from dropdown value
+              if (selected.startsWith('[')) {
                 try {
                   const comboIds: readonly string[] = JSON.parse(selected);
                   if (comboIds.length > 0) {
@@ -138,21 +136,12 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                       type: 'explore', 
                       seat, 
                       weapons: comboIds,
-                      exploreCount: 1 // single explore action
+                      exploreCount: 1 
                     });
                   }
                 } catch (_) {}
-              } else if (selected === '' && bestExplore !== undefined) {
-                // Fallback to auto-select if no combo chosen
-                const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
-                onAction({ 
-                  type: 'explore', 
-                  seat, 
-                  weapons: best,
-                  exploreCount: 1 
-                });
               } else if (selected === '') {
-                // Empty selection - will handle auto-select or show error later
+                // Empty selection - show "no legal explore combos" or auto-select best if available
                 const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
                 onAction({ 
                   type: 'explore', 
@@ -162,11 +151,29 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                 });
               }
             }}
-            disabled={disabled}
-            defaultValue={bestExplore !== undefined ? JSON.stringify(bestExplore.weapons) : ''}
+            disabled={disabled && !explores.length} // only enable when explores are legal
+            defaultValue="auto" // Start with auto selection (fullest combo)
           >
-            <option value="">Auto-select (fullest combo)</option>
+            <option value="auto">Auto-select (fullest legal combo)</option>
+            {explores.map((combo, i) => {
+              const damage = Array.isArray(combo.weapons) 
+                ? combo.weapons.reduce((sum, w): number => sum + w.damage, 0)
+                : 0;
+              
+              return (
+                <option 
+                  key={i} 
+                  value={`[${JSON.stringify(Array.isArray(combo.weapons) ? combo.weapons : [])}]`}
+                >
+                  Explore ({Array.isArray(combo.weapons) ? combo.weapons.length : 1} weapon): 
+                  {damage} damage (ammo: ${Array.isArray(combo.weapons) ? String((combo as any).totalAmmoReq ?? '—') : ''})
+                </option>
+              );
+            })}
           </select>
+          {bestExplore === undefined && explores.length > 0 && (
+            <div className="explore-warning">No legal explore combos available for your weapon loadout.</div>
+          )}
         </div>
         
         {abilities.map(a => (
