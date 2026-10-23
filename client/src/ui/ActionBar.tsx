@@ -3,6 +3,7 @@ import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import { ActionBarStats } from './ActionBarStats';
 import { defForInstance } from './cards';
+import { ExploreSelector } from './ExploreSelector';
 
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
@@ -34,11 +35,18 @@ export interface ActionBarProps {
 export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
+  
+  // Enumerate all legal explore combos based on hand cards in this turn state
+  // Each combo shows weapon count, damage total, and ammo requirements
+  
+  // Get the current best (full) combo for fallback auto-select
   const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
-  // fullest legal explore = most weapons (ammo comes from the cumulative pool)
   const bestExplore = explores.length > 0
     ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
     : undefined;
+  
+  // Character abilities
+  const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   // Character abilities the engine says are legal right now (unlocked level,
   // targets available, not already used this turn). Label from the character
   // card's level text when resolvable.
@@ -103,22 +111,65 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
       )}
 
       <div className="action-buttons">
-              {onOpenLog !== undefined && (
-                <button
-                  type="button"
-                  className="log-button"
-                  data-log-button
-                  data-log-open={logOpen}
-                  onClick={onOpenLog}
-                  title="Toggle game log"
-                >
-                  📜 Log
-                </button>
-              )}
-              <button type="button" onClick={() => bestExplore !== undefined && onAction(bestExplore)} disabled={disabled || bestExplore === undefined} title={bestExplore !== undefined ? `Use ${bestExplore.weapons.length} weapon(s)` : undefined}>
-                Explore{bestExplore !== undefined ? ` (${bestExplore.weapons.length} weapon${bestExplore.weapons.length === 1 ? '' : 's'})` : ''}
-              </button>
-              {abilities.map(a => (
+        {onOpenLog !== undefined && (
+          <button
+            type="button"
+            className="log-button"
+            data-log-button
+            data-log-open={logOpen}
+            onClick={onOpenLog}
+            title="Toggle game log"
+          >
+            📜 Log
+          </button>
+        )}
+        
+        {/* Explore with weapon selector */}
+        <div className="explore-control">
+          <select 
+            className="explore-select"
+            onChange={(e): void => {
+              const selected = e.target.value as string;
+              if (selected && selected.startsWith('[')) {
+                try {
+                  const comboIds: readonly string[] = JSON.parse(selected);
+                  if (comboIds.length > 0) {
+                    onAction({ 
+                      type: 'explore', 
+                      seat, 
+                      weapons: comboIds,
+                      exploreCount: 1 // single explore action
+                    });
+                  }
+                } catch (_) {}
+              } else if (selected === '' && bestExplore !== undefined) {
+                // Fallback to auto-select if no combo chosen
+                const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
+                onAction({ 
+                  type: 'explore', 
+                  seat, 
+                  weapons: best,
+                  exploreCount: 1 
+                });
+              } else if (selected === '') {
+                // Empty selection - will handle auto-select or show error later
+                const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
+                onAction({ 
+                  type: 'explore', 
+                  seat, 
+                  weapons: best,
+                  exploreCount: 1 
+                });
+              }
+            }}
+            disabled={disabled}
+            defaultValue={bestExplore !== undefined ? JSON.stringify(bestExplore.weapons) : ''}
+          >
+            <option value="">Auto-select (fullest combo)</option>
+          </select>
+        </div>
+        
+        {abilities.map(a => (
                 <button
                   key={`ability-${a.abilityIndex}`}
                   type="button"
