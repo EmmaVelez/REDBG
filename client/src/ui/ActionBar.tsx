@@ -3,7 +3,6 @@ import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import { ActionBarStats } from './ActionBarStats';
 import { defForInstance } from './cards';
-import { ExploreSelector } from './ExploreSelector';
 
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
@@ -41,10 +40,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
     : undefined;
   
-  // Character abilities
-  const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   // Character abilities the engine says are legal right now (unlocked level,
   // targets available, not already used this turn). Label from the character
+  // card's level text when resolvable.
   // card's level text when resolvable.
   const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   const player = state.seats[seat];
