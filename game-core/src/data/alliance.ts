@@ -53,7 +53,7 @@ export const ALLIANCE_CHARACTERS = [
   'ch-011', // Carlos Oliveira (partner)
   'ch-012', // Josh Stone (knife start)
   'ch-013', // Steve Burnside (explosive start)
-  'ch-014'  // Jack Krauser (single weapon limiter)
+  'ch-014'  // Jack Krauser (single weapon limiter + hand-size damage)
 ];
 
 export const ALLIANCE_WEAPOON_IDS = [
