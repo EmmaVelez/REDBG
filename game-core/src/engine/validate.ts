@@ -167,6 +167,31 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       return { ok: true };
 
+    case 'playWeapon':
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'playWeapon: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `playWeapon: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'playWeapon: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'playWeapon: not your turn' };
+      }
+      if (!player.hand.includes(action.instanceId)) {
+        return { ok: false, reason: `playWeapon: card not in hand: ${action.instanceId}` };
+      }
+      const weaponCardDef = cardDef(state, action.instanceId);
+      if (weaponCardDef === undefined) {
+        return { ok: false, reason: `playWeapon: unknown card: ${action.instanceId}` };
+      }
+      if (weaponCardDef.type !== 'weapon') {
+        return { ok: false, reason: `playWeapon: not a weapon card: ${action.instanceId}` };
+      }
+      return { ok: true };
+
     case 'explore':
       if (state.phase !== 'main') {
         return { ok: false, reason: 'explore: not in main phase' };
