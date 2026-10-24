@@ -23,6 +23,7 @@ const VERBS: Record<Action['type'], string> = {
   playActionCard: 'played action',
   playItem: 'used item',
   playAmmo: 'played ammo',
+  playWeapon: 'equipped weapon for exploring',
   explore: 'explored the Mansion',
   buy: 'bought',
   useCharacterAbility: 'used an ability',
