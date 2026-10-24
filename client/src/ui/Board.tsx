@@ -111,9 +111,11 @@ function onPlayFromHand(state: GameState, seat: number, instanceId: string, onAc
       onAction({ type: 'playAmmo', seat, instanceId });
       return;
     case 'weapon':
-      onAction({ type: 'playWeapon', seat, instanceId });
+      // Weapons are card-type items that play into the hand → play area pipeline.
+      // use playActionCard for all cards (weapons, actions) — explore handles using them.
+      onAction({ type: 'playActionCard', seat, instanceId });
       return;
     default:
-      return; // weapons are used via Explore, characters/others have no play action
+      return; // characters/others have no play action from hand
   }
 }
