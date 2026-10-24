@@ -327,7 +327,7 @@ export interface LoggedAction {
 // Actions
 // ---------------------------------------------------------------------------
 
-export interface Action = 
+export type Action = 
   | { readonly type: "startGame"; readonly setup: GameSetup } 
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string } 
