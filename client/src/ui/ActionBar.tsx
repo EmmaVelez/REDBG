@@ -119,6 +119,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         )}
         
         {/* Explore with weapon combo selector - enumerates all legal combos */}
+                {/* explore select - shows "Explore" when legal */}
         <div className="explore-control">
           <select 
             className="explore-select"
@@ -147,12 +148,14 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                   weapons: best,
                   exploreCount: 1 
                 });
+              } else {
+                // Auto-select from empty state
               }
             }}
             disabled={disabled && !explores.length} // only enable when explores are legal
             defaultValue="auto" // Start with auto selection (fullest combo)
           >
-            <option value="auto">Auto-select (fullest legal combo)</option>
+            <option value="">Auto-select (fullest legal combo)</option>
             {explores.map((combo, i) => {
               const damage = Array.isArray(combo.weapons) 
                 ? combo.weapons.reduce((sum, w): number => sum + w.damage, 0)
