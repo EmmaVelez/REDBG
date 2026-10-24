@@ -193,19 +193,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
               <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
                 End turn
               </button>
-              {explores.length > 0 && (
-                <button 
-                  type="button"
-                  className="explore-button"
-                  data-explore-enabled
-                  onClick={() => {
-                    const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
-                    onAction({ type: 'explore', seat, weapons: best || [], exploreCount: 1 });
-                  }}
-                >
-                  Explore (best weaponry)
-                </button>
-              )}
             </div>
     </div>
   );
