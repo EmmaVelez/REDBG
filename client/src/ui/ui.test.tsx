@@ -370,13 +370,13 @@ describe('ActionBar (T07)', () => {
     const noExplore = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, exploresLeft: 0 } : s)) };
     const html = renderToStaticMarkup(<ActionBar state={noExplore} seat={0} onAction={() => {}} />);
     expect(html).toContain('End turn');
-    expect(html).toContain('disabled=""'); // explore button (has no legal action)
+    expect(html).not.toContain("explore-button"); // no legal explore action
   });
 
   it('offers explore when weapons make it legal', () => {
     const state = twoPlayerState();
     const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
-    expect(html).toContain('Explore');
+    expect(html).toContain("explore-button");
   });
 
   it('shows a waiting note off turn', () => {

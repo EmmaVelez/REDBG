@@ -1,3 +1,13 @@
+
+        {explores.length > 0 && !prompt && (
+          <button type=button className=explore-button onClick={() => { const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : []; onAction({ type: 'explore', seat, weapons: best, exploreCount: 1 }); }>
+            Explore ({explores.length} legal combo(s))
+          </button>
+        )
+
+        {bestExplore === undefined && explores.length > 0 && (
+          <div className="explore-warning">No legal explore combos available for your weapon loadout.</div>
+        )
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
@@ -120,63 +130,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         
         {/* Explore with weapon combo selector - enumerates all legal combos */}
                 {/* explore select - shows "Explore" when legal */}
-        <div className="explore-control">
-          <select 
-            className="explore-select"
-            onChange={(e): void => {
-              const selected = e.target.value as string;
-              
-              // Parse selected combination from dropdown value
-              if (selected.startsWith('[')) {
-                try {
-                  const comboIds: readonly string[] = JSON.parse(selected);
-                  if (comboIds.length > 0) {
-                    onAction({ 
-                      type: 'explore', 
-                      seat, 
-                      weapons: comboIds,
-                      exploreCount: 1 
-                    });
-                  }
-                } catch (_) {}
-              } else if (selected === '') {
-                // Empty selection - show "no legal explore combos" or auto-select best if available
-                const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : [];
-                onAction({ 
-                  type: 'explore', 
-                  seat, 
-                  weapons: best,
-                  exploreCount: 1 
-                });
-              } else {
-                // Auto-select from empty state
-              }
-            }}
-            disabled={disabled && !explores.length} // only enable when explores are legal
-            defaultValue="auto" // Start with auto selection (fullest combo)
-          >
-            <option value="">Auto-select (fullest legal combo)</option>
-            {explores.map((combo, i) => {
-              const damage = Array.isArray(combo.weapons) 
-                ? combo.weapons.reduce((sum, w): number => sum + w.damage, 0)
-                : 0;
-              
-              return (
-                <option 
-                  key={i} 
-                  value={`[${JSON.stringify(Array.isArray(combo.weapons) ? combo.weapons : [])}]`}
-                >
-                  Explore ({Array.isArray(combo.weapons) ? combo.weapons.length : 1} weapon): 
-                  {damage} damage (ammo: ${Array.isArray(combo.weapons) ? String((combo as any).totalAmmoReq ?? '—') : ''})
-                </option>
-              );
-            })}
-          </select>
-          {bestExplore === undefined && explores.length > 0 && (
-            <div className="explore-warning">No legal explore combos available for your weapon loadout.</div>
-          )}
-        </div>
-        
         {abilities.map(a => (
                 <button
                   key={`ability-${a.abilityIndex}`}
