@@ -1,6 +1,6 @@
 
         {explores.length > 0 && !prompt && (
-          <button type=button className=explore-button onClick={() => { const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : []; onAction({ type: 'explore', seat, weapons: best, exploreCount: 1 }); }>
+          <button type="button" className="explore-button" onClick={() => { const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : []; onAction({ type: 'explore', seat, weapons: best, exploreCount: 1 }); }>
             Explore ({explores.length} legal combo(s))
           </button>
         )
