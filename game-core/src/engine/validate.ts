@@ -1,5 +1,6 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { requiredAmmoForWeapons, characterAbilities } from './abilities';
+import { canReuseWeapon, explorableWeapons } from './weaponReuse';
 
 /** True when the seat's character has the given ability kind (level-gated). */
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
@@ -13,10 +14,11 @@ function hasNoHealingAbility(state: GameState, seat: number): boolean {
 
 /**
  * True when at least one LEGAL explore exists for this player right now:
- * explores remain, and some weapon in hand is affordable from the turn ammo
- * pool. Used so Wesker's forced-Explore obligation can never deadlock the
- * target (weaponless OR weapon-but-no-ammo players may endTurn, which clears
- * the flag). A hand weapon that cannot be paid for is not an explore option.
+ * explores remain, and some usable weapon (hand OR reusable play-area) is
+ * affordable from the turn ammo pool. Used so Wesker's forced-Explore
+ * obligation can never deadlock the target (weaponless OR weapon-but-no-ammo
+ * players may endTurn, which clears the flag). A weapon that cannot be paid
+ * for is not an explore option.
  */
 function canExploreLegally(
   state: GameState,
@@ -24,29 +26,12 @@ function canExploreLegally(
   player: { readonly hand: readonly string[]; readonly exploresLeft: number; readonly turnAmmo: number },
 ): boolean {
   if (player.exploresLeft < 1) return false;
-  return player.hand.some(id => {
+  return explorableWeapons(state, seat).some(id => {
     const def = cardDef(state, id);
     if (def === undefined || def.type !== 'weapon') return false;
     const req = requiredAmmoForWeapons(state, seat, [id], wid => cardDef(state, wid));
     return req <= player.turnAmmo;
   });
-}
-
-/**
- * How many times a pistol has already been used in an explore THIS turn
- * (log scan back to the seat's last endTurn) — Leon L2 caps at 2.
- */
-function pistolUsesThisTurn(state: GameState, seat: number, weaponId: string): number {
-  let uses = 0;
-  for (let i = state.log.length - 1; i >= 0; i--) {
-    const logged = state.log[i]?.action;
-    if (logged === undefined) continue;
-    if (logged.type === 'endTurn' && logged.seat === seat) break;
-    if (logged.type === 'explore' && logged.seat === seat && logged.weapons.includes(weaponId)) {
-      uses += 1;
-    }
-  }
-  return uses;
 }
 
 function cardDef(state: GameState, instanceId: string): CardDef | undefined {
@@ -216,20 +201,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: `explore: duplicate weapon: ${action.weapons.find((id, index) => action.weapons.indexOf(id) !== index)}` };
       }
       for (const weaponId of action.weapons) {
-              // Leon L2: pistol weapons can be used twice per turn — the second
-              // use comes from the play area, capped by this turn's log.
-              if (!player.hand.includes(weaponId)) {
-                const inPlay = player.playArea.includes(weaponId);
-                const wDef = cardDef(state, weaponId);
-                const isPistol = (wDef?.weaponTags ?? []).includes('pistol');
-                const allowed =
-                  inPlay &&
-                  isPistol &&
-                  hasAbilityKind(state, action.seat, 'pistolsTwicePerTurn') &&
-                  pistolUsesThisTurn(state, action.seat, weaponId) < 2;
-                if (!allowed) {
-                  return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
-                }
+              // Weapon-reuse abilities (Leon L2 pistolsTwicePerTurn): a weapon
+              // already in the play area may be used again this turn. Shared
+              // rule — see engine/weaponReuse.ts.
+              if (!player.hand.includes(weaponId) && !canReuseWeapon(state, action.seat, weaponId)) {
+                return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
               }
               const weaponCardDef = cardDef(state, weaponId);
               if (weaponCardDef === undefined) {

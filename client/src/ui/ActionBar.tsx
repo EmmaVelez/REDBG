@@ -1,8 +1,15 @@
+import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import { ActionBarStats } from './ActionBarStats';
 import { defForInstance } from './cards';
+import {
+  bestExploreCombo,
+  evaluateExploreCombo,
+  exploreWeaponOptions,
+  legalExplores,
+} from './explorePicker';
 
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
@@ -10,8 +17,10 @@ import { defForInstance } from './cards';
  * this is a convenience layer, not an authority).
  *
  * - End Turn, when legal
- * - Explore, when at least one explore action is legal (plays the fullest
- *   legal combination of hand weapons/ammo)
+ * - Explore, when at least one explore action is legal. The player can fire
+ *   the fullest legal combo in one click, or open the picker to choose which
+ *   weapons to use — including weapons an ability lets them use again this
+ *   turn (Leon L2 pistols), which sit in the play area.
  * - Prompt resolution (chooseOption) when a prompt awaits this seat
  * - Card-level play/buy remain click-driven (Hand / Board market piles)
  */
@@ -31,38 +40,37 @@ export interface ActionBarProps {
   readonly logOpen?: boolean;
 }
 
-type ExploreAction = Extract<Action, { type: 'explore' }>;
-
 export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
-  const explores = legal.filter((a): a is ExploreAction => a.type === 'explore' && a.seat === seat);
+  const explores = legalExplores(state, seat);
+  const prompt = state.prompts.find(p => p.seat === seat);
 
-  const comboDamage = (weapons: readonly string[]): number =>
-    weapons.reduce((sum, id) => {
-      const def = defForInstance(state, id);
-      return sum + (def !== null && def.type === 'weapon' ? def.damage ?? 0 : 0);
-    }, 0);
-  const comboAmmo = (weapons: readonly string[]): number =>
-    weapons.reduce((sum, id) => {
-      const def = defForInstance(state, id);
-      return sum + (def !== null && def.type === 'weapon' ? def.ammoReq ?? 0 : 0);
-    }, 0);
+  // Weapons usable in an explore: hand weapons plus any play-area weapon an
+  // ability lets this seat use again (Leon L2 pistolsTwicePerTurn).
+  const weaponOptions = exploreWeaponOptions(state, seat);
+  const best = bestExploreCombo(state, seat);
 
-  // Fullest legal combo for the one-click Explore button: most weapons, then
-  // most damage, then least ammo requirement. Only computed when at least one
-  // explore is legal, so the array is never empty here.
-  const bestExplore: ExploreAction | null = explores.length > 0
-    ? explores.reduce<ExploreAction>((best, a) => {
-        const w = a.weapons.length;
-        const bw = best.weapons.length;
-        if (w !== bw) return w > bw ? a : best;
-        const d = comboDamage(a.weapons);
-        const bd = comboDamage(best.weapons);
-        if (d !== bd) return d > bd ? a : best;
-        return comboAmmo(a.weapons) < comboAmmo(best.weapons) ? a : best;
-      }, explores[0]!)
-    : null;
+  const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Re-pick the default combo when the available weapons change (an explore
+  // moves a weapon to the play area; end of turn clears it) or when the best
+  // combo itself changes (ammo spent). The player's manual edits survive any
+  // state change that leaves both untouched.
+  const availableKey = weaponOptions.map(o => o.instanceId).join(',');
+  const bestKey = best === null ? '' : [...best].sort().join(',');
+  useEffect(() => {
+    setSelected(best ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableKey, bestKey]);
+
+  const combo = evaluateExploreCombo(state, seat, selected);
+  const canExplore = explores.length > 0 && prompt === undefined;
+
+  const toggleWeapon = (instanceId: string): void => {
+    setSelected(prev => (prev.includes(instanceId) ? prev.filter(id => id !== instanceId) : [...prev, instanceId]));
+  };
 
   // Character abilities the engine says are legal right now (unlocked level,
   // targets available, not already used this turn). Label from the character
@@ -75,7 +83,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     const levelText = charDef?.levels?.find(l => l.level === (charDef.abilities?.[abilityIndex]?.level ?? 1))?.text;
     return levelText ?? 'Use ability';
   };
-  const prompt = state.prompts.find(p => p.seat === seat);
   // Prompt options are instance ids, 'DONE' for multi-choice chains, or seat
   // numbers for player-choice prompts (Wesker L2 target, Rebecca L1 redirect);
   // render readable labels for each.
@@ -127,6 +134,47 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         </div>
       )}
 
+      {pickerOpen && canExplore && (
+        <div className="explore-picker" data-explore-picker>
+          <div className="explore-picker-list">
+            {weaponOptions.map(opt => (
+              <label key={opt.instanceId} className="explore-option" data-explore-option={opt.instanceId}>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.instanceId)}
+                  disabled={disabled}
+                  onChange={() => toggleWeapon(opt.instanceId)}
+                />
+                <span className="explore-option-name">{opt.name}</span>
+                <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
+                {opt.reusable && (
+                  <span
+                    className="explore-option-reuse"
+                    title="This weapon is in your play area and an ability lets you use it again this turn."
+                  >
+                    use again ({opt.remainingUses} left)
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="explore-picker-total" data-explore-total>
+            {combo.damage} damage · {combo.ammo} ammo
+          </div>
+          {combo.reason !== null && (
+            <div className="explore-picker-reason" data-explore-reason>{combo.reason}</div>
+          )}
+          <div className="explore-picker-actions">
+            <button type="button" disabled={disabled} onClick={() => setSelected(weaponOptions.map(o => o.instanceId))}>
+              Select all
+            </button>
+            <button type="button" disabled={disabled} onClick={() => setSelected([])}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="action-buttons">
         {onOpenLog !== undefined && (
           <button
@@ -141,19 +189,33 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           </button>
         )}
 
-        {bestExplore !== null && prompt === undefined && (
-          <button
-            type="button"
-            className="explore-button"
-            data-explore-button
-            data-combos={explores.length}
-            data-weapons={bestExplore.weapons.length}
-            disabled={disabled}
-            title={`Explore with ${bestExplore.weapons.length} weapon(s): ${comboDamage(bestExplore.weapons)} damage, ${comboAmmo(bestExplore.weapons)} ammo`}
-            onClick={() => onAction(bestExplore)}
-          >
-            Explore
-          </button>
+        {canExplore && (
+          <>
+            <button
+              type="button"
+              className="explore-button"
+              data-explore-button
+              data-combos={explores.length}
+              data-weapons={selected.length}
+              disabled={disabled || !combo.legal}
+              title={combo.legal ? `${combo.damage} damage, ${combo.ammo} ammo` : (combo.reason ?? undefined)}
+              onClick={() => onAction({ type: 'explore', seat, weapons: selected, exploreCount: 1 })}
+            >
+              {pickerOpen ? 'Explore selected' : 'Explore'}
+            </button>
+            {weaponOptions.length > 1 && (
+              <button
+                type="button"
+                className="explore-choose-button"
+                data-explore-choose
+                aria-expanded={pickerOpen}
+                disabled={disabled}
+                onClick={() => setPickerOpen(open => !open)}
+              >
+                {pickerOpen ? 'Hide weapons' : 'Choose weapons'}
+              </button>
+            )}
+          </>
         )}
 
         {abilities.map(a => (

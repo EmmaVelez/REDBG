@@ -1,6 +1,7 @@
 
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
+import { explorableWeapons } from '../engine/weaponReuse';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -45,27 +46,22 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
   }
 
   // --- 4. explore ---
-    // 4a. Build weaponsInHand
-    const weaponsInHand: readonly string[] = player.hand.filter((instanceId) => {
-      const cardData = state.cards[instanceId];
-      if (cardData) {
-        const cardDef = state.cardDefs[cardData.cardId];
-        return cardDef?.type === 'weapon';
-      }
-      return false;
-    });
+    // 4a. Build the usable weapon pool: hand weapons PLUS any play-area weapon
+    // an ability lets this seat use again (Leon L2 pistolsTwicePerTurn). The
+    // pool must match explore validation exactly, or legal explores go missing.
+    const weaponsAvailable = explorableWeapons(state, seat);
 
-    // 4b. Generate candidates: every non-empty subset of weaponsInHand.
+    // 4b. Generate candidates: every non-empty subset of the pool.
     // The rules place no cap on weapons per explore (each weapon used once,
     // ammo from the cumulative pool), so a 3-knife hand must offer the
     // 3-weapon explore. Subsets are bitmask-enumerated; hands are small
     // (<=10 cards typical), and validate filters ammo-illegal combos.
-    const maxSubsetWeapons = Math.min(weaponsInHand.length, 10);
+    const maxSubsetWeapons = Math.min(weaponsAvailable.length, 10);
     for (let mask = 1; mask < (1 << maxSubsetWeapons); mask++) {
       const combo: string[] = [];
       for (let bit = 0; bit < maxSubsetWeapons; bit++) {
         if ((mask & (1 << bit)) !== 0) {
-          const weapon = weaponsInHand[bit];
+          const weapon = weaponsAvailable[bit];
           if (weapon !== undefined) combo.push(weapon);
         }
       }

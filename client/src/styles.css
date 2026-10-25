@@ -930,3 +930,42 @@ h1, h2 { margin: 0 0 8px; }
   background: linear-gradient(180deg, #1d5029 0%, #123319 100%);
 }
 .explore-button:disabled { opacity: 0.5; cursor: default; }
+.explore-choose-button { white-space: nowrap; font-size: 12px; }
+
+/* ---- explore weapon picker ---- */
+.explore-picker {
+  flex: 1 0 100%;
+  border: 1px solid #2f6b3f;
+  border-radius: 6px;
+  background: rgba(20, 56, 31, 0.25);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.explore-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.explore-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.explore-option input { margin: 0; }
+.explore-option-name { font-weight: 700; }
+.explore-option-stats { color: var(--muted); white-space: nowrap; }
+.explore-option-reuse {
+  color: #ffd479;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.explore-picker-total { font-size: 12px; font-weight: 700; }
+.explore-picker-reason {
+  color: #ff8f8f;
+  font-size: 12px;
+}
+.explore-picker-actions { display: flex; gap: 6px; }

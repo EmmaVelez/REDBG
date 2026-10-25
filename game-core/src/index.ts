@@ -3,6 +3,14 @@ export { setup, startTurn, checkWin } from "./engine/game";
 export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { exploreDamage } from "./engine/explore";
+export { requiredAmmoForWeapons, ammoReqForWeapon } from "./engine/abilities";
+export {
+  explorableWeapons,
+  canReuseWeapon,
+  remainingWeaponUses,
+  maxWeaponUses,
+  weaponUsesThisTurn,
+} from "./engine/weaponReuse";
 export { sanitize, viewForSeat } from "./engine/view";
 export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SPY_GAMES_PILES, WHADDYA_BUYIN_PILES, BATTLE_HARDENED_VETERAN_PILES, SCENARIOS, pilesForScenario } from "./data/cards";
 export type { ScenarioId, ScenarioDef } from "./data/cards";
