@@ -912,3 +912,21 @@ h1, h2 { margin: 0 0 8px; }
 }
 .ability-button:hover:not(:disabled) { border-color: #a58ce0; background: linear-gradient(180deg, #3a2f56 0%, #241b36 100%); }
 .ability-button:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- explore button ---- */
+.explore-button {
+  background: linear-gradient(180deg, #14381f 0%, #0c2413 100%);
+  border: 1px solid #2f6b3f;
+  color: #b9f0c0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.explore-button:hover:not(:disabled) {
+  border-color: #4ade80;
+  background: linear-gradient(180deg, #1d5029 0%, #123319 100%);
+}
+.explore-button:disabled { opacity: 0.5; cursor: default; }

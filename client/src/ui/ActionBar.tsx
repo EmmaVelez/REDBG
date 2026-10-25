@@ -1,13 +1,3 @@
-
-        {explores.length > 0 && !prompt && (
-          <button type="button" className="explore-button" onClick={() => { const best = Array.isArray(bestExplore?.weapons) ? bestExplore.weapons : []; onAction({ type: 'explore', seat, weapons: best, exploreCount: 1 }); }>
-            Explore ({explores.length} legal combo(s))
-          </button>
-        )
-
-        {bestExplore === undefined && explores.length > 0 && (
-          <div className="explore-warning">No legal explore combos available for your weapon loadout.</div>
-        )
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
@@ -41,18 +31,41 @@ export interface ActionBarProps {
   readonly logOpen?: boolean;
 }
 
+type ExploreAction = Extract<Action, { type: 'explore' }>;
+
 export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
-  // Get the current best (full) combo for fallback auto-select
-  const explores = legal.filter((a): a is Extract<Action, { type: 'explore' }> => a.type === 'explore' && a.seat === seat);
-  const bestExplore = explores.length > 0
-    ? explores.reduce((best, a) => (a.weapons.length > best.weapons.length ? a : best))
-    : undefined;
-  
+  const explores = legal.filter((a): a is ExploreAction => a.type === 'explore' && a.seat === seat);
+
+  const comboDamage = (weapons: readonly string[]): number =>
+    weapons.reduce((sum, id) => {
+      const def = defForInstance(state, id);
+      return sum + (def !== null && def.type === 'weapon' ? def.damage ?? 0 : 0);
+    }, 0);
+  const comboAmmo = (weapons: readonly string[]): number =>
+    weapons.reduce((sum, id) => {
+      const def = defForInstance(state, id);
+      return sum + (def !== null && def.type === 'weapon' ? def.ammoReq ?? 0 : 0);
+    }, 0);
+
+  // Fullest legal combo for the one-click Explore button: most weapons, then
+  // most damage, then least ammo requirement. Only computed when at least one
+  // explore is legal, so the array is never empty here.
+  const bestExplore: ExploreAction | null = explores.length > 0
+    ? explores.reduce<ExploreAction>((best, a) => {
+        const w = a.weapons.length;
+        const bw = best.weapons.length;
+        if (w !== bw) return w > bw ? a : best;
+        const d = comboDamage(a.weapons);
+        const bd = comboDamage(best.weapons);
+        if (d !== bd) return d > bd ? a : best;
+        return comboAmmo(a.weapons) < comboAmmo(best.weapons) ? a : best;
+      }, explores[0]!)
+    : null;
+
   // Character abilities the engine says are legal right now (unlocked level,
   // targets available, not already used this turn). Label from the character
-  // card's level text when resolvable.
   // card's level text when resolvable.
   const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   const player = state.seats[seat];
@@ -102,14 +115,14 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           <span className="prompt-text">{prompt.text}</span>
           <div className="prompt-options">
             {prompt.options.map((opt, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => onAction({ type: 'chooseOption', seat, promptId: prompt.id, option: i })}
-                          >
-                            {optionLabel(opt)}
-                          </button>
-                        ))}
+              <button
+                key={i}
+                type="button"
+                onClick={() => onAction({ type: 'chooseOption', seat, promptId: prompt.id, option: i })}
+              >
+                {optionLabel(opt)}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -127,26 +140,40 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             📜 Log
           </button>
         )}
-        
-        {/* Explore with weapon combo selector - enumerates all legal combos */}
-                {/* explore select - shows "Explore" when legal */}
+
+        {bestExplore !== null && prompt === undefined && (
+          <button
+            type="button"
+            className="explore-button"
+            data-explore-button
+            data-combos={explores.length}
+            data-weapons={bestExplore.weapons.length}
+            disabled={disabled}
+            title={`Explore with ${bestExplore.weapons.length} weapon(s): ${comboDamage(bestExplore.weapons)} damage, ${comboAmmo(bestExplore.weapons)} ammo`}
+            onClick={() => onAction(bestExplore)}
+          >
+            Explore
+          </button>
+        )}
+
         {abilities.map(a => (
-                <button
-                  key={`ability-${a.abilityIndex}`}
-                  type="button"
-                  className="ability-button"
-                  data-ability-index={a.abilityIndex}
-                  onClick={() => onAction(a)}
-                  disabled={disabled}
-                  title={abilityLabel(a.abilityIndex)}
-                >
-                  Ability: {abilityLabel(a.abilityIndex)}
-                </button>
-              ))}
-              <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
-                End turn
-              </button>
-            </div>
+          <button
+            key={`ability-${a.abilityIndex}`}
+            type="button"
+            className="ability-button"
+            data-ability-index={a.abilityIndex}
+            onClick={() => onAction(a)}
+            disabled={disabled}
+            title={abilityLabel(a.abilityIndex)}
+          >
+            Ability: {abilityLabel(a.abilityIndex)}
+          </button>
+        ))}
+
+        <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
+          End turn
+        </button>
+      </div>
     </div>
   );
 }

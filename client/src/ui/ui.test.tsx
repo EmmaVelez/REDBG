@@ -42,6 +42,27 @@ function firstWeaponDef(state: GameState): { instanceId: string; def: NonNullabl
   throw new Error('no weapon in starting hand');
 }
 
+/**
+ * Depth-first search over a React element tree (no DOM needed) for the first
+ * element whose props satisfy `pred`. Lets tests invoke a rendered handler
+ * directly — renderToStaticMarkup only yields a string.
+ */
+function findElement(
+  node: JSX.Element | string | number | null | undefined,
+  pred: (props: Record<string, unknown>) => boolean,
+): JSX.Element | null {
+  if (node === null || node === undefined || typeof node !== 'object') return null;
+  const el = node as JSX.Element;
+  const props = (el.props ?? {}) as Record<string, unknown>;
+  if (pred(props)) return el;
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElement(child as JSX.Element, pred);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 describe('cards helper', () => {
   it('resolves instance ids through the state index', () => {
     const state = twoPlayerState();
@@ -375,8 +396,40 @@ describe('ActionBar (T07)', () => {
 
   it('offers explore when weapons make it legal', () => {
     const state = twoPlayerState();
-    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    // turnAmmo is 0 until an Ammo card is played, so the raw fixture has no
+    // legal explore — arm the pool (as playing Ammo x10 would) to make the
+    // Handgun explore legal.
+    const armed = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 30 } : s)) };
+    const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
     expect(html).toContain("explore-button");
+    expect(html).toContain('data-weapons="1"');
+  });
+
+  it('explore click dispatches the fullest legal weapon combo', () => {
+    const state = twoPlayerState();
+    // Handgun (10 dmg, 20 ammo) + Survival Knife (5 dmg, 0 ammo): with 30 ammo
+    // in the pool every non-empty subset is legal, so the fullest combo (both
+    // weapons) is the one the button must send.
+    const knifeInst = 'we-004#99';
+    const armed = {
+      ...state,
+      cards: { ...state.cards, [knifeInst]: { instanceId: knifeInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
+      seats: state.seats.map((s, i) =>
+        i === 0 ? { ...s, hand: [...s.hand, knifeInst], turnAmmo: 30 } : s,
+      ),
+    };
+    const sent: unknown[] = [];
+    const el = ActionBar({ state: armed, seat: 0, onAction: (a: unknown) => sent.push(a) });
+    const btn = findElement(el, p => p.className === 'explore-button');
+    expect(btn).not.toBeNull();
+    (btn!.props.onClick as () => void)();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: 'explore',
+      seat: 0,
+      exploreCount: 1,
+      weapons: ['we-009#1', knifeInst],
+    });
   });
 
   it('shows a waiting note off turn', () => {
