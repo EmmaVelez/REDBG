@@ -1,4 +1,5 @@
 import type { CardDef, CardBonuses } from '../types';
+import { ALLIANCE_CARDS } from './alliance';
 
 export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   // Characters
@@ -211,19 +212,89 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
 export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance';
 
 export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  // Basic Resources (Alliance rulebook ch. V)
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'herb', cardIds: ['it-004'] },      // Green Herb
   { pileId: 'am5', cardIds: ['am-004'] },       // Alliance Ammo x5
-  
-  { pileId: 'pistol', cardIds: ['we-018'] },    // Pistol (Alliance)
-  { pileId: 'knife-all', cardIds: ['we-019'] }, // Combat Knife Alliance
-  { pileId: 'shotgun-lowcost', cardIds: ['we-020'] }, // Sawed-Off Shotgun
-  { pileId: 'rgt', cardIds: ['we-021'] },       // Full Auto Rifle (+8/action)
-  { pileId: 'mg-heavy', cardIds: ['we-022'] },  // Heavy Machine Gun (+90 ammo buff)
-  { pileId: 'shotgun-highcost', cardIds: ['we-023', 'we-024'] }, // Super + Riot Shotgun
-  
-  { pileId: 'longbow-action', cardIds: ['ac-013'] },   // Longbow (Ammo-based, +2 cards)
-  { pileId: 'grenade-buy', cardIds: ['ac-014'] },      // Grenade Action (+5 actions, +20 gold)
-  { pileId: 'reload-discard', cardIds: ['ac-015'] },   // Back to Back (recover weapon from discard)
-  { pileId: 'buy-all', cardIds: ['ac-016'] }            // Reload Action (+2 buys)
+
+  // Weapons - Knives
+  { pileId: 'knife-plain', cardIds: ['we-004'] },
+  { pileId: 'knife-survival', cardIds: ['we-005'] },
+
+  // Weapons - Pistols
+  { pileId: 'pistol', cardIds: ['we-018'] },
+  { pileId: 'pistol-burst', cardIds: ['we-010'] },
+  { pileId: 'pistol-blowback', cardIds: ['we-025'] },
+  { pileId: 'pistol-samurai', cardIds: ['we-027'] },
+
+  // Weapons - Shotguns
+  { pileId: 'shotgun-sawed', cardIds: ['we-020'] },
+  { pileId: 'shotgun-trio', cardIds: ['we-021'] },
+  { pileId: 'shotgun-pump', cardIds: ['we-013'] },
+  { pileId: 'shotgun-auto', cardIds: ['we-014'] },
+  { pileId: 'shotgun-custom', cardIds: ['we-044'] },
+
+  // Weapons - Rifles
+  { pileId: 'rifle-scope', cardIds: ['we-019'] },
+  { pileId: 'rifle-bolt', cardIds: ['we-015'] },
+  { pileId: 'rifle-semi', cardIds: ['we-016'] },
+  { pileId: 'rifle-single', cardIds: ['we-036'] },
+  { pileId: 'rifle-specops', cardIds: ['we-037'] },
+  { pileId: 'rifle-custom', cardIds: ['we-047'] },
+
+  // Weapons - Machine Guns
+  { pileId: 'mg-assault', cardIds: ['we-011'] },
+  { pileId: 'mg-full', cardIds: ['we-012'] },
+  { pileId: 'mg-pistol', cardIds: ['we-038'] },
+  { pileId: 'mg-gangster', cardIds: ['we-039'] },
+  { pileId: 'mg-russian', cardIds: ['we-022'] },
+  { pileId: 'mg-signature', cardIds: ['we-023'] },
+
+  // Weapons - Magnum
+  { pileId: 'magnum-six', cardIds: ['we-006'] },
+  { pileId: 'magnum-lightning', cardIds: ['we-030'] },
+  { pileId: 'magnum-hawk', cardIds: ['we-029'] },
+  { pileId: 'magnum-broken', cardIds: ['we-035'] },
+  { pileId: 'magnum-custom', cardIds: ['we-046'] },
+
+  // Weapons - Explosive
+  { pileId: 'explosive-flash', cardIds: ['we-017'] },
+  { pileId: 'explosive-rocket', cardIds: ['we-008'] },
+  { pileId: 'explosive-grenade-launcher', cardIds: ['we-018g'] },
+  { pileId: 'explosive-flashbang', cardIds: ['we-040'] },
+  { pileId: 'explosive-he', cardIds: ['we-041'] },
+  { pileId: 'explosive-incendiary', cardIds: ['we-042'] },
+  { pileId: 'explosive-night', cardIds: ['we-031'] },
+  { pileId: 'explosive-mine', cardIds: ['we-034'] },
+
+  // Weapons - Bow
+  { pileId: 'bow-longbow', cardIds: ['we-002'] },
+  { pileId: 'bow-hunting', cardIds: ['we-048'] },
+
+  // Weapons - Melee/Special
+  { pileId: 'melee-submission', cardIds: ['we-003'] },
+  { pileId: 'melee-combat', cardIds: ['we-004'] },  // already in knife-plain
+  { pileId: 'gun-grenade', cardIds: ['we-001'] },
+  { pileId: 'gun-gatling', cardIds: ['we-007'] },
+  { pileId: 'gun-flame', cardIds: ['we-024'] },
+  { pileId: 'gun-heavy', cardIds: ['we-045'] },
+
+  // Actions
+  { pileId: 'action-longbow', cardIds: ['ac-013'] },
+  { pileId: 'action-grenade', cardIds: ['ac-014'] },
+  { pileId: 'action-back-to-back', cardIds: ['ac-015'] },
+  { pileId: 'action-reload', cardIds: ['ac-016'] },
+  { pileId: 'action-single-shot', cardIds: ['ac-017'] },
+  { pileId: 'action-specops', cardIds: ['ac-018'] },
+  { pileId: 'action-high-cal', cardIds: ['ac-020'] },
+  { pileId: 'action-quick-reload', cardIds: ['ac-021'] },
+  { pileId: 'action-adrenaline', cardIds: ['ac-022'] },
+  { pileId: 'action-silver', cardIds: ['ac-032'] },
+  { pileId: 'action-punisher', cardIds: ['ac-033'] },
+  { pileId: 'action-flashbang', cardIds: ['ac-040'] },
+  { pileId: 'action-merc', cardIds: ['ac-050'] },
 ];
 
 export const ALLIANCE_SCENARIO_DEF = {
@@ -273,6 +344,7 @@ export const SCENARIOS = [
     description: 'A final surge of Infected — Deadly Aim, Merchant and Umbrella Corp with every major weapon.',
     piles: BATTLE_HARDENED_VETERAN_PILES,
   },
+  ALLIANCE_SCENARIO_DEF,
 ];
 
 export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
@@ -288,6 +360,19 @@ export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
   { cardId: 'we-009', count: 1 },
   { cardId: 'we-004', count: 2 }
 ];
+
+/**
+ * The full card database for a game: Premier + promos (PREMIER_CARDS) plus the
+ * Alliance expansion. Passed to `setup()` by both the server host and the
+ * pass-and-play client so expansion cards are actually in play — without this,
+ * Alliance piles silently resolve to nothing (setup skips unknown card ids).
+ *
+ * PREMIER_CARDS is deliberately listed FIRST: setup derives the starting deck
+ * by matching card stats, and the first match wins, so the Premier Combat
+ * Knife (we-004) must be found before the Alliance one (we-019), which shares
+ * cost 0 / ammoReq 0 / damage 5.
+ */
+export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS];
 
 export const MANSION_EXTRA_ITEM_IDS: readonly string[] = ['it-002'];
 

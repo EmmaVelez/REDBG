@@ -118,16 +118,17 @@ export interface CardDef {
 export type WeaponTag = "explosive" | "melee" | "gun" | "pistol" | "magnum" | "rifle" | "knife" | "shotgun" | "machineGun";
 
 export type WeaponEffect =
-  | { readonly kind: "plusDamagePerExtraWeapon"; readonly amount: number }   // Burst-Fire Handgun: +20 when attacking with >1 weapon
-  | { readonly kind: "plusDamageIfAmmoAbove"; readonly threshold: number; readonly amount: number } // Full-Bore MG: +30 if ammo > 100
-  | { readonly kind: "grantExplores"; readonly amount: number }             // Pump-Action Shotgun: +1 Explore
-  | { readonly kind: "instantKillAtOrBelowHp"; readonly hp: number }        // Automatic Shotgun: instantly defeats Infected with HP <= N
-  | { readonly kind: "plusDamagePerActionPlayedThisTurn"; readonly amount: number } // Semi-Automatic Rifle: +10 per Action card played this turn
-  | { readonly kind: "plusDamageIfSelfHpAtLeast"; readonly hp: number; readonly amount: number } // Submission: +5 if user has 80+ HP
-  | { readonly kind: "damageEqualsCurrentAmmo" }                            // Gatling Gun: X = player's current Ammo
-  | { readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number } // Bolt-Action Rifle: reveal top card of Inventory; if its Gold cost >= N, +amount dmg
-  | { readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number };   // Survival Knife: +5 per OTHER Knife weapon used this turn (this attack + earlier explores)
-
+  | {readonly kind: "plusDamagePerExtraWeapon"; readonly amount: number}   // Burst-Fire Handgun: +X when using multiple weapons
+  | {readonly kind: "plusDamageIfAmmoAbove"; readonly threshold: number; readonly amount: number} // Full-Bore MG: +X if ammo > N
+  | {readonly kind: "grantExplores"; readonly amount: number}             // Pump-Action/Trio Shotguns
+  | {readonly kind: "instantKillAtOrBelowHp"; readonly hp: number}        // Automatic/Auto Shotguns  
+  | {readonly kind: "plusDamagePerActionPlayedThisTurn"; readonly amount: number} // Semi-Automatic Rifle
+  | {readonly kind: "plusDamageIfSelfHpAtLeast"; readonly hp: number; readonly amount: number} // Submission
+  | {readonly kind: "damageEqualsCurrentAmmo"}                            // Gatling Gun: X = current Ammo
+  | {readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number} // Bolt-Action Rifle
+  | {readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number}    // Survival Knife
+  | {readonly kind: "plusDamageWhenUsingMultipleWeapons"; readonly amount: number} // Burst-Fire Handgun Alliance
+  | {readonly kind: "plusDamagePerOtherKnifeUsedThisTurn"; readonly amount: number}; // Survival Knife Alliance
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn

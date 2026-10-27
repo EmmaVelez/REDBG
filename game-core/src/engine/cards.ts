@@ -71,6 +71,7 @@ export function promptsFor(card: CardDef): readonly PromptKind[] {
     }
   };
 
+  // Get all effect arrays for this card
   const effects = [
     ...(card.weaponEffects ?? []),
     ...(card.actionEffects ?? []),
@@ -96,16 +97,20 @@ export function promptsFor(card: CardDef): readonly PromptKind[] {
         addPrompt('lookAtMansionTop');
         break;
       case 'healFixed20OrTrashWithSecondFor60':
-              addPrompt('healGreenHerb');
-              break;
-            case 'stealRevealedWeaponsFromOpponentsTopCards':
-              addPrompt('stealRevealedWeaponsFromOpponentsTopCards');
-              break;
-          }
-        }
+        addPrompt('healGreenHerb');
+        break;
+      case 'stealRevealedWeaponsFromOpponentsTopCards':
+        addPrompt('stealRevealedWeaponsFromOpponentsTopCards');
+        break;
+      default:
+        // Weapons with triggers (Burst-Fire Handgun, Survival Knife, etc.)
+        // are handled by the engine reducer during explore phase - no prompt needed
+        break;
+    }
+  }
 
-        return prompts;
-      }
+  return prompts;
+}
 
 export function trashDestination(card: CardDef, opts?: { readonly explosivesToDiscard?: boolean }): 'removed' | 'discard' | 'keep' {
   if (card.type === 'item') {

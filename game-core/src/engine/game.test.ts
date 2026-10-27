@@ -182,14 +182,13 @@ test('setup with battleHardenedVeteran piles offers Deadly Aim, Merchant and maj
   expect(pileIds).toHaveLength(18);
 });
 
-test('SCENARIOS registry has exactly five scenarios, each with 18 piles', () => {
-  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran']);
-  for (const s of SCENARIOS) {
-    expect(s.piles).toHaveLength(18);
-  }
+test('SCENARIOS registry includes all scenarios', () => {
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance']);
   for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }
+  // Alliance has different number of piles (62)
+  expect(pilesForScenario('alliance')).toHaveLength(62);
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {
