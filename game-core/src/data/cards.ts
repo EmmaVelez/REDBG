@@ -368,9 +368,10 @@ export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
  * Alliance piles silently resolve to nothing (setup skips unknown card ids).
  *
  * PREMIER_CARDS is deliberately listed FIRST: setup derives the starting deck
- * by matching card stats, and the first match wins, so the Premier Combat
- * Knife (we-004) must be found before the Alliance one (we-019), which shares
- * cost 0 / ammoReq 0 / damage 5.
+  * by matching card stats, and the first match wins, so the Premier Combat
+  * Knife (we-004) must be found before the Alliance one (we-005), which shares
+  * cost 50 / ammoReq 0 / damage 10. Telescopic Sight Rifle (we-019) is an
+  * Alliance-exclusive rifle with a bottom-reveal mechanic.
  */
 export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS];
 
