@@ -37,6 +37,8 @@ export interface RoomSnapshot {
   readonly maxSeats: number;
   readonly scenario: ScenarioId;
   readonly players: readonly PlayerInfo[];
+  /** Enable Partner Modification rules (Alliance expansion feature). */
+  readonly partnerMode: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -57,6 +59,8 @@ export type ClientMessage =
   | { readonly kind: 'removeBot'; readonly seat: number }
   /** Host control: change the scenario while still in the lobby. */
   | { readonly kind: 'setScenario'; readonly scenario: ScenarioId }
+  /** Host control: enable/disable partner mode (Alliance expansion). */
+  | { readonly kind: 'setPartnerMode'; readonly partnerMode: boolean }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
   /** Send a game action to the authoritative server engine. */
@@ -139,19 +143,29 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
-    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin' && m.scenario !== 'battleHardenedVeteran') {
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin' && m.scenario !== 'battleHardenedVeteran' && m.scenario !== 'alliance') {
       return { ok: false, error: 'createRoom requires a valid scenario' };
+    }
+    if (typeof m.partnerMode !== 'boolean') {
+      return { ok: false, error: 'createRoom requires a partnerMode boolean' };
     }
     return { ok: true, msg: value as WireMessage };
   }
   if (k === 'setScenario') {
     const m = value as { kind: string; scenario?: unknown };
-    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin' && m.scenario !== 'battleHardenedVeteran') {
+    if (m.scenario !== 'firstTimer' && m.scenario !== 'classicHorror' && m.scenario !== 'spyGames' && m.scenario !== 'whaddyaBuyin' && m.scenario !== 'battleHardenedVeteran' && m.scenario !== 'alliance') {
       return { ok: false, error: 'setScenario requires a valid scenario' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setPartnerMode') {
+    const m = value as { kind: string; partnerMode?: unknown };
+    if (typeof m.partnerMode !== 'boolean') {
+      return { ok: false, error: 'setPartnerMode requires a partnerMode boolean' };
     }
     return { ok: true, msg: value as WireMessage };
   }

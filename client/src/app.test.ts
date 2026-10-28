@@ -63,7 +63,7 @@ describe('app wiring (socket <-> store)', () => {
   it('createRoom through the store reaches the server and comes back as room state', async () => {
     const server = startServer();
     const socket = bindRealSocket(server);
-    expect(useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' })).toBe(true);
+    expect(useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false })).toBe(true);
     await waitFor(() => useGameStore.getState().room !== null, 'roomState');
     const room = useGameStore.getState().room;
     expect(room?.roomCode).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
@@ -76,7 +76,7 @@ describe('app wiring (socket <-> store)', () => {
   it('a server-rejected action surfaces in the store as lastError', async () => {
     const server = startServer();
     const socket = bindRealSocket(server);
-    useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     await waitFor(() => useGameStore.getState().room !== null, 'roomState');
     // send an action before the game started -> server rejects it
     useGameStore.getState().dispatch({ kind: 'sendAction', action: { type: 'endTurn', seat: 0 } });
@@ -88,7 +88,7 @@ describe('app wiring (socket <-> store)', () => {
   it('chat sent from the store appears in the store chat log', async () => {
     const server = startServer();
     const socket = bindRealSocket(server);
-    useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    useGameStore.getState().dispatch({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     await waitFor(() => useGameStore.getState().room !== null, 'roomState');
     useGameStore.getState().dispatch({ kind: 'sendChat', text: 'glhf' });
     await waitFor(() => useGameStore.getState().chat.length === 1, 'chat echo');

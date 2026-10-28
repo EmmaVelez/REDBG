@@ -18,12 +18,13 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
   readonly onRemoveBot: (seat: number) => void;
   readonly onSetScenario: (scenario: ScenarioId) => void;
+  readonly onSetPartnerMode: (partnerMode: boolean) => void;
   readonly onStart: () => void;
   readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId) => void;
 }
@@ -124,6 +125,7 @@ export function Lobby({
   onAddBot,
   onRemoveBot,
   onSetScenario,
+  onSetPartnerMode,
   onStart,
   onStartHotseat,
 }: LobbyProps): JSX.Element {
@@ -138,7 +140,7 @@ export function Lobby({
 
       {room === null ? (
         <div className="lobby-modes">
-          <RoomEntry onCreateRoom={onCreateRoom} onJoinRoom={onJoinRoom} />
+          <RoomEntry onCreateRoom={onCreateRoom} onJoinRoom={onJoinRoom} onSetPartnerMode={onSetPartnerMode} />
           <div className="lobby-divider">— or pass &amp; play —</div>
           <PassAndPlay onStart={onStartHotseat} />
         </div>
@@ -152,9 +154,21 @@ export function Lobby({
           </p>
 
           {isHost && room.phase === 'lobby' && (
-            <div className="lobby-scenario-edit">
-              <ScenarioDropdown value={room.scenario} onChange={onSetScenario} />
-            </div>
+            <>
+              <div className="lobby-scenario-edit">
+                <ScenarioDropdown value={room.scenario} onChange={onSetScenario} />
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.partnerMode}
+                    onChange={e => onSetPartnerMode(e.target.checked)}
+                  />
+                  {' '}Partner Mode (Alliance expansion rules)
+                </label>
+              </div>
+            </>
           )}
 
           <div className="lobby-seats">
@@ -205,15 +219,17 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
+  readonly onSetPartnerMode: (partnerMode: boolean) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
+  const [partnerMode, setPartnerMode] = useState(false);
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario);
+      props.onCreateRoom(name.trim(), scenario, partnerMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -233,6 +249,14 @@ function RoomEntry(props: {
       </form>
       <div className="lobby-entry-scenario">
         <ScenarioDropdown value={scenario} onChange={setScenario} />
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={partnerMode}
+            onChange={e => setPartnerMode(e.target.checked)}
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
+        </label>
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

@@ -180,7 +180,7 @@ describe('M3-T05 integration: scripted 2-client game over real WebSockets', () =
     await open(host);
     await host.next(); // welcome
 
-    host.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    host.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     const hostRoomMsg = await waitFor(host, isRoomState, 10000, "host createRoom");
     const roomCode = hostRoomMsg.room.roomCode;
 
@@ -260,7 +260,7 @@ describe('M3-T05 integration: scripted 2-client game over real WebSockets', () =
     await open(secondHost);
     const welcome2 = await waitFor(secondHost, isWelcome, 10000, "secondHost welcome");
     const tok2 = welcome2.reconnectToken;
-    secondHost.send({ kind: 'createRoom', playerName: 'ReconnectTest', scenario: 'firstTimer' });
+    secondHost.send({ kind: 'createRoom', playerName: 'ReconnectTest', scenario: 'firstTimer', partnerMode: false });
     await waitFor(secondHost, isRoomState, 10000, "secondHost roomState");
     secondHost.ws.close();
 
@@ -304,7 +304,7 @@ describe('M3-T05 integration: scripted 2-client game over real WebSockets', () =
     await open(host);
     await host.next(); // welcome
 
-    host.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    host.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     const roomMsg = await waitFor(host, isRoomState, 10000, 'createRoom');
     const roomCode = roomMsg.room.roomCode;
 

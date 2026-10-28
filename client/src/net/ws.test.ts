@@ -91,7 +91,7 @@ describe('game socket (M4-T01) against real server', () => {
     const { socket, received } = makeSocket(server);
     socket.connect();
     await open(socket);
-    socket.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    socket.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     const rs = await waitFor(received, isRoomState);
     expect(rs.room.roomCode).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
     expect(rs.room.players[0]?.name).toBe('Manny');
@@ -104,7 +104,7 @@ describe('game socket (M4-T01) against real server', () => {
     const server = startServer();
     const { socket, received } = makeSocket(server);
     // send while offline — must be queued, not lost
-    expect(socket.send({ kind: 'createRoom', playerName: 'Queued', scenario: 'firstTimer' })).toBe(true);
+    expect(socket.send({ kind: 'createRoom', playerName: 'Queued', scenario: 'firstTimer', partnerMode: false })).toBe(true);
     socket.connect();
     await open(socket);
     const rs = await waitFor(received, isRoomState);
@@ -117,7 +117,7 @@ describe('game socket (M4-T01) against real server', () => {
     const first = makeSocket(server);
     first.socket.connect();
     const welcome = await waitFor(first.received, isWelcome);
-    first.socket.send({ kind: 'createRoom', playerName: 'Traveler', scenario: 'firstTimer' });
+    first.socket.send({ kind: 'createRoom', playerName: 'Traveler', scenario: 'firstTimer', partnerMode: false });
     await waitFor(first.received, isRoomState);
     first.socket.close();
 

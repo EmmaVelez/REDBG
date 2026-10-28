@@ -76,7 +76,7 @@ describe('game server over WebSocket', () => {
     const c = connect(server);
     await open(c);
     await c.next(); // welcome
-    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' });
+    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false });
     const roomState = await c.next();
     expect(roomState.kind).toBe('roomState');
     if (roomState.kind === 'roomState') {
@@ -92,7 +92,7 @@ describe('game server over WebSocket', () => {
     const host = connect(server);
     await open(host);
     await host.next(); // welcome
-    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer', partnerMode: false });
     const hostRoom = await host.next();
     const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
 
@@ -115,7 +115,7 @@ describe('game server over WebSocket', () => {
     const host = connect(server);
     await open(host);
     await host.next(); // welcome
-    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer', partnerMode: false });
     const hostRoom = await host.next();
     const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
 
@@ -145,7 +145,7 @@ describe('game server over WebSocket', () => {
     await open(c1);
     const welcome = await c1.next();
     const token = welcome.kind === 'welcome' ? welcome.reconnectToken : '';
-    c1.send({ kind: 'createRoom', playerName: 'Traveler', scenario: 'firstTimer' });
+    c1.send({ kind: 'createRoom', playerName: 'Traveler', scenario: 'firstTimer', partnerMode: false });
     await c1.next();
     c1.ws.close();
 
@@ -176,7 +176,7 @@ describe('game server over WebSocket', () => {
     const host = connect(server);
     await open(host);
     await host.next();
-    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer' });
+    host.send({ kind: 'createRoom', playerName: 'Host', scenario: 'firstTimer', partnerMode: false });
     const hostRoom = await host.next();
     const roomCode = hostRoom.kind === 'roomState' ? hostRoom.room.roomCode : '';
     host.send({ kind: 'startGame' });
@@ -210,7 +210,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer', partnerMode: false });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -260,7 +260,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer', partnerMode: false });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -299,7 +299,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer', partnerMode: false });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 
@@ -323,7 +323,7 @@ describe('game server over WebSocket', () => {
     const p1 = connect(server);
     await open(p1);
     await p1.next();
-    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer' });
+    p1.send({ kind: 'createRoom', playerName: 'P1', scenario: 'firstTimer', partnerMode: false });
     const p1Room = await p1.next();
     const roomCode = p1Room.kind === 'roomState' ? p1Room.room.roomCode : '';
 

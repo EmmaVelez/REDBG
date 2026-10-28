@@ -17,12 +17,14 @@ export interface Room {
   readonly scenario: ScenarioId;
   /** All players, in join order (bots are players with isBot: true). */
   readonly players: readonly PlayerInfo[];
+  /** Enable Partner Modification rules (Alliance expansion feature). */
+  readonly partnerMode: boolean;
 }
 
 export interface RoomStore {
   readonly rooms: ReadonlyMap<string, Room>;
-  /** Create a room; the creator becomes host seated at 0. */
-  createRoom(clientId: string, name: string, scenario?: ScenarioId): Room;
+  /** Create a room; the creator becomes host seated at 0. Returns the new room. */
+  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean): Room;
   /** Add an unseated player (seat -1) to a lobby room. */
   joinRoom(roomCode: string, clientId: string, name: string): Room;
   /** Remove a player; host leaves -> lowest-seat remaining becomes host;
@@ -36,6 +38,8 @@ export interface RoomStore {
   removeBot(roomCode: string, hostClientId: string, seat: number): Room;
   /** Host only, lobby only: change the scenario. */
   setScenario(roomCode: string, hostClientId: string, scenario: ScenarioId): Room;
+  /** Host only, lobby only: set partner mode. */
+  setPartnerMode(roomCode: string, hostClientId: string, partnerMode: boolean): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
   startGame(roomCode: string, hostClientId: string): Room;
   /** Mark a player's connection state (used on ws open/close + reconnect). */
@@ -110,7 +114,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
   return {
     rooms,
 
-    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer'): Room {
+    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false): Room {
       const roomCode = allocateCode();
       const room: Room = {
         roomCode,
@@ -118,6 +122,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         maxSeats: MAX_SEATS,
         scenario,
         players: [{ clientId, name, seat: 0, isBot: false, connected: true }],
+        partnerMode,
       };
       save(roomCode, room);
       hosts.set(roomCode, clientId);
@@ -250,6 +255,13 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       return save(roomCode, { ...room, scenario });
     },
 
+    setPartnerMode(roomCode: string, hostClientId: string, partnerMode: boolean): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      return save(roomCode, { ...room, partnerMode });
+    },
+
     startGame(roomCode: string, hostClientId: string): Room {
       const room = requireRoom(roomCode);
       requireLobby(room);
@@ -281,6 +293,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         maxSeats: room.maxSeats,
         scenario: room.scenario,
         players: room.players,
+        partnerMode: room.partnerMode,
       };
     },
   };

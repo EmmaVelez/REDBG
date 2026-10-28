@@ -4,14 +4,17 @@ import type { WireMessage } from './protocol';
 
 describe('protocol round trips', () => {
   const cases: ReadonlyArray<{ readonly name: string; readonly msg: WireMessage }> = [
-    { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer' } },
-    { name: 'createRoom classicHorror', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'classicHorror' } },
-    { name: 'createRoom spyGames', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'spyGames' } },
-    { name: 'createRoom whaddyaBuyin', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'whaddyaBuyin' } },
-    { name: 'createRoom battleHardenedVeteran', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'battleHardenedVeteran' } },
+    { name: 'createRoom', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false } },
+    { name: 'createRoom classicHorror', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'classicHorror', partnerMode: false } },
+    { name: 'createRoom spyGames', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'spyGames', partnerMode: false } },
+    { name: 'createRoom whaddyaBuyin', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'whaddyaBuyin', partnerMode: false } },
+    { name: 'createRoom battleHardenedVeteran', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'battleHardenedVeteran', partnerMode: false } },
+    { name: 'createRoom alliance', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'alliance', partnerMode: false } },
     { name: 'setScenario', msg: { kind: 'setScenario', scenario: 'classicHorror' } },
     { name: 'setScenario whaddyaBuyin', msg: { kind: 'setScenario', scenario: 'whaddyaBuyin' } },
     { name: 'setScenario battleHardenedVeteran', msg: { kind: 'setScenario', scenario: 'battleHardenedVeteran' } },
+    { name: 'setScenario alliance', msg: { kind: 'setScenario', scenario: 'alliance' } },
+    { name: 'setPartnerMode', msg: { kind: 'setPartnerMode', partnerMode: true } },
     { name: 'joinRoom', msg: { kind: 'joinRoom', roomCode: 'ABCDEF', playerName: 'Ada' } },
     { name: 'reconnect', msg: { kind: 'reconnect', token: 'tok-123' } },
     { name: 'spectate', msg: { kind: 'spectate', roomCode: 'ABCDEF' } },
@@ -27,7 +30,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }] } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false } },
     },
     {
       name: 'stateSync',
@@ -127,7 +130,7 @@ describe('protocol validation', () => {
   });
 
   it('keeps extra fields when structurally valid (forward-compatible)', () => {
-    const r = validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', futureField: 7 });
+    const r = validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, futureField: 7 });
     expect(r.ok).toBe(true);
   });
 });

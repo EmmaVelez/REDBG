@@ -140,12 +140,13 @@ export function App(): JSX.Element {
         room={room}
         clientId={clientId}
         status={status}
-        onCreateRoom={(name, scenario) => dispatchClient({ kind: 'createRoom', playerName: name, scenario })}
+        onCreateRoom={(name, scenario, partnerMode) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode })}
         onJoinRoom={(code, name) => dispatchClient({ kind: 'joinRoom', roomCode: code, playerName: name })}
         onSelectSeat={seat => dispatchClient({ kind: 'selectSeat', seat })}
         onAddBot={seat => dispatchClient({ kind: 'addBot', seat })}
         onRemoveBot={seat => dispatchClient({ kind: 'removeBot', seat })}
         onSetScenario={scenario => dispatchClient({ kind: 'setScenario', scenario })}
+        onSetPartnerMode={partnerMode => dispatchClient({ kind: 'setPartnerMode', partnerMode })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
         onStartHotseat={(names, scenario) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario)}
       />

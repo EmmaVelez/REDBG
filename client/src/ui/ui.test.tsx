@@ -544,6 +544,7 @@ describe('Lobby (T08)', () => {
     onAddBot: () => {},
     onRemoveBot: () => {},
     onSetScenario: () => {},
+    onSetPartnerMode: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
     ...over,
@@ -573,6 +574,7 @@ describe('Lobby (T08)', () => {
         { clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true },
         { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
       ],
+      partnerMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');

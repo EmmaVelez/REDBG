@@ -186,6 +186,7 @@ describe('createRoomStore', () => {
       maxSeats: 4,
       scenario: 'firstTimer',
       players: room.players,
+      partnerMode: false,
     });
   });
 
