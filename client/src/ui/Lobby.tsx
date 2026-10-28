@@ -9,8 +9,9 @@ import { SCENARIOS } from '@re/game-core';
  * and start. Bare-bones forms driven by the store's dispatch.
  * M4-T10: a Pass & Play section starts an in-browser hot-seat game with
  * 2-4 named players on this device (no server).
- * Scenarios: a <select> dropdown picks First Timer, Classic Horror or Spy
- * Games for Pass & Play, create-room, and host pre-start.
+ * Scenarios: a <select> dropdown picks First Timer, Classic Horror, Spy
+ * Games, Whaddya Buyin?, Battle Hardened Veteran, or Alliance for Pass & Play,
+ * create-room, and host pre-start.
  */
 
 export interface LobbyProps {
