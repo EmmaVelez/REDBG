@@ -12,9 +12,9 @@ Character ability kinds defined in `game-core/src/types.ts` (`CharacterAbility` 
 | 6 | `ammoReqReduction` | 0 | 0 | 2 | 0 | 0 | Implemented (abilities.ts) |
 | 7 | `ammunitionBonus` | 0 | 0 | 1 | 0 | 0 | Implemented (abilities.ts) |
 | 8 | `exploreGoldBonus` | 0 | 2 | 2 | 0 | 0 | Implemented (abilities.ts) |
-| 9 | `actionBonus` | 0 | 0 | 0 | 0 | 0 | Missing / stubbed (generic?) |
-| 10 | `trashEffectBonus` | 0 | 0 | 0 | 0 | 0 | Missing / stubbed (generic?) |
-| 11 | `gainKnifeAtTurnStart` | 0 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
+| 9 | `actionBonus` | 0 | 2 | 3 | 0 | 0 | Implemented (abilities.ts) |
+| 10 | `trashEffectBonus` | 0 | 2 | 2 | 0 | 0 | Implemented (abilities.ts) |
+| 11 | `gainKnifeAtTurnStart` | 0 | 1 | 0 | 0 | 1 | Partial (engine refs but no abilities.ts logic) |
 | 12 | `exchangeHandWithInventoryTop` | 2 | 3 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
 | 13 | `plusDamageThisTurn` | 1 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
 | 14 | `revealMansionTopNoEffect` | 2 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
@@ -25,21 +25,19 @@ Character ability kinds defined in `game-core/src/types.ts` (`CharacterAbility` 
 | 19 | `trashRedirectToPlayerDiscard` | 0 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
 | 20 | `infectedDamageReduction` | 0 | 2 | 2 | 0 | 0 | Implemented (abilities.ts) |
 | 21 | `weaponDamageReduction` | 0 | 0 | 2 | 0 | 0 | Implemented (abilities.ts) |
-| 22 | `extraExploreAtTurnStart` | 0 | 0 | 0 | 0 | 0 | Missing / stubbed (generic?) |
+| 22 | `extraExploreAtTurnStart` | 0 | 0 | 0 | 0 | 0 | Missing (no engine references anywhere) |
 | 23 | `exploreDamagePerPlayerWithBigHand` | 0 | 0 | 1 | 0 | 0 | Implemented (abilities.ts) |
 | 24 | `revealHandForDamageIfTwoTypes` | 1 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
 | 25 | `exploreBonusIfActionsInPlayArea` | 0 | 0 | 1 | 0 | 0 | Implemented (abilities.ts) |
 | 26 | `skipTurnForSuperNextTurn` | 0 | 1 | 0 | 0 | 1 | Partial (engine refs but no abilities.ts logic) |
 | 27 | `giveOneCardToPlayerThenMaybeAnother` | 1 | 1 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
-| 28 | `damageRedirectToPartner` | 0 | 0 | 0 | 0 | 0 | Missing / stubbed (generic?) |
-| 29 | `singleWeaponLimiter` | 0 | 0 | 0 | 0 | 0 | Missing / stubbed (generic?) |
+| 28 | `damageRedirectToPartner` | 0 | 2 | 0 | 0 | 0 | Partial (engine refs but no abilities.ts logic) |
+| 29 | `singleWeaponLimiter` | 0 | 0 | 0 | 0 | 0 | Missing (no engine references anywhere) |
 | 30 | `generic` | 0 | 1 | 0 | 0 | 0 | No-op fallback (by design) |
 
 ## Missing (no engine references anywhere)
 
-- `actionBonus`
-- `trashEffectBonus`
-- `damageRedirectToPartner`
+- `extraExploreAtTurnStart`
 - `singleWeaponLimiter`
 
 ## Partial (engine refs but no abilities.ts logic)
@@ -57,7 +55,8 @@ Character ability kinds defined in `game-core/src/types.ts` (`CharacterAbility` 
 - `revealHandForDamageIfTwoTypes`
 - `skipTurnForSuperNextTurn`
 - `giveOneCardToPlayerThenMaybeAnother`
+- `damageRedirectToPartner`
 
 ## Tests
 
-All game-core tests pass: 24 files, 430 tests (`npm run test --workspace=game-core`).
+Run `npm run test --workspace=game-core`.
