@@ -154,7 +154,13 @@ export function applyAction(state: GameState, action: Action): GameState {
             if ((def.id === 'ac-013' || def.id === 'ac-014') && player.partnerInstanceId && partnerAttached.length < 2) {
               partnerAttached = [...partnerAttached, instanceId];
             }
-            const newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
+            let newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
+            let ac015Rng = played.rngState;
+            if (def.id === 'ac-015' && !player.partnerInstanceId) {
+              const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 2, rngState: ac015Rng });
+              newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+              ac015Rng = d.rngState;
+            }
 
       let prompts = state.prompts;
       let promptKind: string | undefined;
@@ -240,14 +246,14 @@ export function applyAction(state: GameState, action: Action): GameState {
               ...nextBase,
               seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
               prompts,
-              rngState: played.rngState,
+              rngState: ac015Rng,
             };
           }
 
           case 'playItem': {
-                const { seat, instanceId } = action;
-                const player = state.seats[seat] as PlayerState;
-                const def = cardDef(state, instanceId) as CardDef;
+                 const { seat, instanceId } = action;
+                 const player = state.seats[seat] as PlayerState;
+                 const def = cardDef(state, instanceId) as CardDef;
 
                 const played = withBonusesAndDraws(
                         { ...player, hand: player.hand.filter(id => id !== instanceId) },
