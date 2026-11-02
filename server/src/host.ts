@@ -62,7 +62,7 @@ export function createHost(room: Room): GameHost {
       .map(p => ({
         name: p.name,
         controller: (p.isBot ? 'bot' : 'human') as 'bot' | 'human',
-        characterCardId: p.mainCharacterId,
+        characterCardId: p.mainCharacterId || undefined,
         ...(room.partnerMode ? { partnerCharacterId: p.partnerCharacterId } : {}),
       }));
 

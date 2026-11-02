@@ -127,7 +127,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   const remainingCharacters = [...characterIds];
 
   const seats: PlayerState[] = setup.players.map((p, i) => {
-    let characterCardId = p.characterCardId;
+    let characterCardId = p.characterCardId || undefined;
     if (characterCardId === undefined) {
       if (remainingCharacters.length === 0) {
         throw new Error(`not enough unique characters for ${setup.players.length} players`);
@@ -154,9 +154,9 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     // Partner (Alliance): assign a partner character to this seat when
     // partnerMode is on or an explicit partnerCharacterId is provided.
     let partnerInstanceId: string | undefined;
-    const wantPartner = setup.partnerMode === true || p.partnerCharacterId !== undefined;
+    const wantPartner = setup.partnerMode === true || !!p.partnerCharacterId;
     if (wantPartner) {
-      let partnerCardId = p.partnerCharacterId;
+      let partnerCardId = p.partnerCharacterId || undefined;
       if (partnerCardId === undefined) {
         if (remainingCharacters.length === 0) {
           throw new Error(`not enough unique characters for partner of seat ${i}`);
