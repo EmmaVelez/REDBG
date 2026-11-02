@@ -63,6 +63,7 @@ export type ClientMessage =
   | { readonly kind: 'setScenario'; readonly scenario: ScenarioId }
   /** Host control: enable/disable partner mode (Alliance expansion). */
   | { readonly kind: 'setPartnerMode'; readonly partnerMode: boolean }
+  | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
   /** Send a game action to the authoritative server engine. */
@@ -169,6 +170,9 @@ export function validateMessage(value: unknown): DecodeResult {
     if (typeof m.partnerMode !== 'boolean') {
       return { ok: false, error: 'setPartnerMode requires a partnerMode boolean' };
     }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setCharacterSelection') {
     return { ok: true, msg: value as WireMessage };
   }
   if (k === 'leaveRoom' || k === 'startGame') {

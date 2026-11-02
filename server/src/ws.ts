@@ -310,6 +310,17 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         return;
       }
 
+      case 'setCharacterSelection': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setCharacterSelection(session.roomCode, session.clientId, msg.mainCharacterId, msg.partnerCharacterId);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
       case 'startGame': {
         if (session.roomCode === null || session.clientId === null) return;
         try {

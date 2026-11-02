@@ -25,6 +25,7 @@ export interface LobbyProps {
   readonly onRemoveBot: (seat: number) => void;
   readonly onSetScenario: (scenario: ScenarioId) => void;
   readonly onSetPartnerMode: (partnerMode: boolean) => void;
+  readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
   readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId) => void;
 }
@@ -126,6 +127,7 @@ export function Lobby({
   onRemoveBot,
   onSetScenario,
   onSetPartnerMode,
+  onSetCharacterSelection,
   onStart,
   onStartHotseat,
 }: LobbyProps): JSX.Element {
@@ -168,6 +170,24 @@ export function Lobby({
                   {' '}Partner Mode (Alliance expansion rules)
                 </label>
               </div>
+              {room.partnerMode && (
+                <div style={{ marginTop: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '0.9em' }}>
+                    Main character:
+                    <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
+                      <option value="">Random</option>
+                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
+                    Partner character:
+                    <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
+                      <option value="">Random</option>
+                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
             </>
           )}
 
@@ -232,7 +252,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, partnerMode ? mainChar || undefined : undefined, partnerMode ? partnerChar || undefined : undefined);
+      props.onCreateRoom(name.trim(), scenario, partnerMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -260,24 +280,6 @@ function RoomEntry(props: {
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
         </label>
-        {partnerMode && (
-          <div style={{ marginTop: '8px' }}>
-            <label style={{ display: 'block', fontSize: '0.9em' }}>
-              Main character:
-              <select value={mainChar} onChange={e => setMainChar(e.target.value)}>
-                <option value="">Random</option>
-                {allianceChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-            <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
-              Partner character:
-              <select value={partnerChar} onChange={e => setPartnerChar(e.target.value)}>
-                <option value="">Random</option>
-                {allianceChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-          </div>
-        )}
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

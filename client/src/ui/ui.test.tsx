@@ -545,6 +545,7 @@ describe('Lobby (T08)', () => {
     onRemoveBot: () => {},
     onSetScenario: () => {},
     onSetPartnerMode: () => {},
+    onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
     ...over,

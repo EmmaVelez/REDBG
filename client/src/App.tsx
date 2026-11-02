@@ -147,6 +147,7 @@ export function App(): JSX.Element {
         onRemoveBot={seat => dispatchClient({ kind: 'removeBot', seat })}
         onSetScenario={scenario => dispatchClient({ kind: 'setScenario', scenario })}
         onSetPartnerMode={partnerMode => dispatchClient({ kind: 'setPartnerMode', partnerMode })}
+        onSetCharacterSelection={(main?: string, partner?: string) => dispatchClient({ kind: 'setCharacterSelection', mainCharacterId: main, partnerCharacterId: partner })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
         onStartHotseat={(names, scenario) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario)}
       />

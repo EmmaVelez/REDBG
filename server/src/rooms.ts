@@ -40,6 +40,8 @@ export interface RoomStore {
   setScenario(roomCode: string, hostClientId: string, scenario: ScenarioId): Room;
   /** Host only, lobby only: set partner mode. */
   setPartnerMode(roomCode: string, hostClientId: string, partnerMode: boolean): Room;
+  /** Host only, lobby only: set host character selection. */
+  setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
   startGame(roomCode: string, hostClientId: string): Room;
   /** Mark a player's connection state (used on ws open/close + reconnect). */
@@ -260,6 +262,18 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       requireLobby(room);
       requireHost(roomCode, hostClientId);
       return save(roomCode, { ...room, partnerMode });
+    },
+
+    setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      const host = room.players.find(p => p.clientId === hostClientId);
+      if (host === undefined) throw new Error('not in room');
+      const nextPlayers = room.players.map(p =>
+        p.clientId === hostClientId ? { ...p, mainCharacterId, partnerCharacterId } : p
+      );
+      return save(roomCode, { ...room, players: nextPlayers });
     },
 
     startGame(roomCode: string, hostClientId: string): Room {
