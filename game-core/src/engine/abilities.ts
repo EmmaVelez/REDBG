@@ -219,6 +219,30 @@ export function actionBonus(
 
 export const actionCardBonus = actionBonus;
 
+/**
+ * Rebecca L2: trash actions/effects are worth more gold when played.
+ * Returns extra gold for an action card whose actionEffects include a trash
+ * effect (deck thinning). 0 for non-trash actions or characters without
+ * the ability.
+ */
+export function trashEffectBonus(
+  abilities: readonly CharacterAbility[],
+  def: CardDef | undefined
+): number {
+  if (def?.type !== 'action') return 0;
+  const hasTrash = (def.actionEffects ?? []).some(e =>
+    e.kind === 'trashUpToTwoFromDiscard' ||
+    e.kind === 'trashHandCard' ||
+    e.kind === 'upgradeAmmoBy30Gold'
+  );
+  if (!hasTrash) return 0;
+  let gold = 0;
+  for (const ability of abilities) {
+    if (ability.kind === 'trashEffectBonus') gold += ability.amount;
+  }
+  return gold;
+}
+
 /** True when the weapon def is an explosive (tagged). */
 export function isExplosive(def: CardDef | undefined): boolean {
   return def?.type === 'weapon' && (def.weaponTags ?? []).includes('explosive');
