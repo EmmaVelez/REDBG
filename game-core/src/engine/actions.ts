@@ -10,6 +10,7 @@ import {
   passiveDamageBonus,
   exploreGoldBonus,
   ammunitionCardBonus,
+  actionBonus,
   explosivesGoToDiscard,
   isExplosive,
   infectedDamageReduction,
@@ -147,7 +148,7 @@ export function applyAction(state: GameState, action: Action): GameState {
                 weaponDamageBonusThisTurn += e.amount;
               }
             }
-            const newPlayer: PlayerState = { ...played.player, weaponDamageBonusThisTurn };
+            const newPlayer: PlayerState = { ...played.player, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) };
 
       let prompts = state.prompts;
       let promptKind: string | undefined;

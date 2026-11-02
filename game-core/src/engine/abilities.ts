@@ -205,6 +205,21 @@ export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): b
 }
 
 /** True when the weapon def is an explosive (tagged). */
+export function actionBonus(
+  abilities: readonly CharacterAbility[],
+  def: CardDef | undefined
+): number {
+  if (def?.type !== 'action') return 0;
+  let gold = 0;
+  for (const ability of abilities) {
+    if (ability.kind === 'actionBonus') gold += ability.amount;
+  }
+  return gold;
+}
+
+export const actionCardBonus = actionBonus;
+
+/** True when the weapon def is an explosive (tagged). */
 export function isExplosive(def: CardDef | undefined): boolean {
   return def?.type === 'weapon' && (def.weaponTags ?? []).includes('explosive');
 }
