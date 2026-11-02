@@ -84,6 +84,8 @@ export interface CardDef {
   /** Machine-readable effect keys the engine interprets (see WeaponEffect). */
   readonly weaponEffects?: readonly WeaponEffect[];
   readonly weaponTags?: readonly WeaponTag[]; // e.g. "explosive" (Jill synergy)
+  /** Weapon category type (e.g. "handgun", "shotgun") — used by Desperate Forces (AC-022). */
+  readonly weaponType?: string;
 
   // -- infected --
   readonly hp?: number;
