@@ -32,6 +32,8 @@ export function typeLabel(t: CardDef['type']): string {
       return 'TOKEN';
     case 'infected':
       return 'INFECTED';
+    default:
+      return '';
   }
 }
 
@@ -52,6 +54,8 @@ export function typeClass(t: CardDef['type']): string {
       return 'card-token';
     case 'infected':
       return 'card-infected';
+    default:
+      return '';
   }
 }
 

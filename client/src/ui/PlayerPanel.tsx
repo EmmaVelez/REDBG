@@ -25,6 +25,7 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
     return <div className="player-panel" data-seat={seat}>—</div>;
   }
   const charDef = defForInstance(state, player.characterInstanceId);
+  const partnerDef = defForInstance(state, player.partnerInstanceId);
   const statusBits: string[] = [];
   if (player.downed) statusBits.push('downed');
   if (player.dead) statusBits.push('dead');
@@ -59,6 +60,14 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
           <HoverCard def={charDef} decorations={player.decorations} hp={player.hp} maxHp={player.maxHp}>
             <CardView def={charDef} compact decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} />
           </HoverCard>
+        </div>
+      )}
+      {partnerDef !== null && (
+        <div className="player-character-card player-partner-card" data-partner-character-card data-anim-zone="attached">
+          <HoverCard def={partnerDef} decorations={0} hp={player.hp} maxHp={player.maxHp}>
+            <CardView def={partnerDef} compact decorations={0} hp={player.hp} maxHp={player.maxHp} />
+          </HoverCard>
+          <span className="player-partner-attached">Attached {player.partnerAttached?.length ?? 0}</span>
         </div>
       )}
       {charDef !== null && <CharacterSkills state={state} seat={seat} />}

@@ -30,6 +30,8 @@ const VERBS: Record<Action['type'], string> = {
   endTurn: 'ended their turn',
   chooseOption: 'resolved a choice',
   startGame: 'started the game',
+  attachToPartner: 'attached to partner',
+  chooseExploreLeader: 'chose explore leader',
 };
 
 function cardName(state: GameState, instanceId: string | undefined): string | null {

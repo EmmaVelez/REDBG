@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS } from '@re/game-core';
+import { SCENARIOS, ALLIANCE_CARDS } from '@re/game-core';
 
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
@@ -18,7 +18,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -219,17 +219,20 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
   readonly onSetPartnerMode: (partnerMode: boolean) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [partnerMode, setPartnerMode] = useState(false);
+  const [mainChar, setMainChar] = useState<string>('');
+  const [partnerChar, setPartnerChar] = useState<string>('');
+  const allianceChars = ALLIANCE_CARDS.filter(c => c.type === 'character');
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, partnerMode ? mainChar || undefined : undefined, partnerMode ? partnerChar || undefined : undefined);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -257,6 +260,24 @@ function RoomEntry(props: {
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
         </label>
+        {partnerMode && (
+          <div style={{ marginTop: '8px' }}>
+            <label style={{ display: 'block', fontSize: '0.9em' }}>
+              Main character:
+              <select value={mainChar} onChange={e => setMainChar(e.target.value)}>
+                <option value="">Random</option>
+                {allianceChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
+              Partner character:
+              <select value={partnerChar} onChange={e => setPartnerChar(e.target.value)}>
+                <option value="">Random</option>
+                {allianceChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

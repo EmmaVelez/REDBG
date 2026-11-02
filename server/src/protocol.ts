@@ -46,7 +46,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }

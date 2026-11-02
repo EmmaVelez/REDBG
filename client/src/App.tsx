@@ -140,7 +140,7 @@ export function App(): JSX.Element {
         room={room}
         clientId={clientId}
         status={status}
-        onCreateRoom={(name, scenario, partnerMode) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode })}
+        onCreateRoom={(name, scenario, partnerMode, mainCharacterId, partnerCharacterId) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode, mainCharacterId, partnerCharacterId })}
         onJoinRoom={(code, name) => dispatchClient({ kind: 'joinRoom', roomCode: code, playerName: name })}
         onSelectSeat={seat => dispatchClient({ kind: 'selectSeat', seat })}
         onAddBot={seat => dispatchClient({ kind: 'addBot', seat })}
