@@ -397,18 +397,36 @@ export function startTurn(state: GameState): GameState {
   let turnPlayer: PlayerState = newPlayer;
   let nextRng = state.rngState;
   if (player.skipRewardPending === true) {
-    const d = drawWithReshuffle({
-      deck: newPlayer.inventory,
-      discard: newPlayer.discard,
+    // Base turn draw (5) if the hand is empty (skip clears it), plus the
+    // skip reward bonus draw (5) = up to 10 cards total.
+    let baseHand: readonly string[] = newPlayer.hand;
+    let baseDeck: readonly string[] = newPlayer.inventory;
+    let baseDiscard: readonly string[] = newPlayer.discard;
+    let rng = state.rngState;
+    if (newPlayer.hand.length === 0) {
+      const base = drawWithReshuffle({
+        deck: newPlayer.inventory,
+        discard: newPlayer.discard,
+        count: 5,
+        rngState: state.rngState,
+      });
+      baseHand = base.hand;
+      baseDeck = base.deck;
+      baseDiscard = base.discard;
+      rng = base.rngState;
+    }
+    const bonus = drawWithReshuffle({
+      deck: baseDeck,
+      discard: baseDiscard,
       count: 5,
-      rngState: state.rngState,
+      rngState: rng,
     });
-    nextRng = d.rngState;
+    nextRng = bonus.rngState;
     turnPlayer = {
       ...newPlayer,
-      hand: [...newPlayer.hand, ...d.hand],
-      inventory: d.deck,
-      discard: d.discard,
+      hand: [...baseHand, ...bonus.hand],
+      inventory: bonus.deck,
+      discard: bonus.discard,
       actionsLeft: newPlayer.actionsLeft + 1,
       buysLeft: newPlayer.buysLeft + 1,
       exploresLeft: newPlayer.exploresLeft + 1,
