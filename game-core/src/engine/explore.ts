@@ -81,11 +81,14 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
       player.playArea.map(id => state.cards[id]?.cardId).map(cid => state.cardDefs[cid ?? '']?.type ?? ''),
       t => t === 'action'
     );
+  const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
+    const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
+  })) ? 10 : 0;
   return computeDamage({
     weapons,
     ammo: player.turnAmmo,
     knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
-    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
+    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus,
   });
 }
 

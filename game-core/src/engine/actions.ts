@@ -149,9 +149,9 @@ export function applyAction(state: GameState, action: Action): GameState {
                 weaponDamageBonusThisTurn += e.amount;
               }
             }
-            // AC-013 Partners: attach this card to the partner (if any) on play.
+            // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the partner (if any) on play.
             let partnerAttached = played.player.partnerAttached ?? [];
-            if (def.id === 'ac-013' && player.partnerInstanceId && partnerAttached.length < 2) {
+            if ((def.id === 'ac-013' || def.id === 'ac-014') && player.partnerInstanceId && partnerAttached.length < 2) {
               partnerAttached = [...partnerAttached, instanceId];
             }
             const newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
@@ -383,6 +383,10 @@ export function applyAction(state: GameState, action: Action): GameState {
             passiveDamageBonus(abilities, weaponDefs, exploreCount) +
             exploreBigHandBonus(abilities, state.seats) +
             exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action');
+          // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
+          const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
+            const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
+          })) ? 10 : 0;
           // Weapon effects like "plusDamageIfAmmoAbove" read the ammo the player
           // has available for this attack — the pool before it is spent.
           const ammoForEffects = player.turnAmmo;
@@ -427,7 +431,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
