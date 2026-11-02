@@ -167,6 +167,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
         remainingCharacters.splice(pick.value, 1);
       } else if (remainingCharacters.includes(partnerCardId)) {
         remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
+      } else if (characterIds.includes(partnerCardId)) {
+        throw new Error(`character ${partnerCardId} already assigned to another player/partner`);
       }
       partnerCardId = partnerCardId ?? '';
       const partnerInstanceIdStr = `${partnerCardId}#p${i + 1}`;

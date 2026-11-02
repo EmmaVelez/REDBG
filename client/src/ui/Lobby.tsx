@@ -175,7 +175,10 @@ export function Lobby({
                   Main character:
                   <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
                     <option value="">Random</option>
-                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
+                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').filter(c => {
+                      const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
+                      return !taken.has(c.id) || c.id === me?.mainCharacterId;
+                    }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                   </select>
                 </label>
                 {room.partnerMode && (
@@ -183,7 +186,10 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
+                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').filter(c => {
+                        const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
+                        return !taken.has(c.id) || c.id === me?.partnerCharacterId;
+                      }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
                 )}
