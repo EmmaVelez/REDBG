@@ -190,6 +190,14 @@ export function applyAction(state: GameState, action: Action): GameState {
                                   }
                                   break;
                                 }
+                                if (e.kind === 'upgradeAmmoBy30Gold') {
+                                  const ammoInHand = played.player.hand.filter(id => cardDef(state, id)?.type === 'ammunition');
+                                  if (ammoInHand.length > 0) {
+                                    promptKind = 'upgradeAmmoBy30Gold';
+                                    promptOptions = ammoInHand;
+                                  }
+                                  break;
+                                }
                                 if (e.kind === 'stealRevealedWeaponsFromOpponentsTopCards') {
                                   // Master of Unlocking: everyone else's top inventory card is
                                   // revealed; each revealed Weapon may be taken (chain, DONE ends).
@@ -895,6 +903,34 @@ export function applyAction(state: GameState, action: Action): GameState {
                 prompts: trashRedirectPrompt(state, seat, chosenId, prompts, nextBase.version),
               };
             }
+
+      if (kind === 'upgradeAmmoBy30Gold' && chosenId !== undefined) {
+        const chosenDef = cardDef(state, chosenId);
+        const chosenCost = chosenDef?.cost ?? 0;
+        const targetCost = chosenCost + 30;
+        const ammoDefsMap = new Map();
+        for (const c of Object.values(state.cards)) {
+          const d = cardDef(state, c.instanceId);
+          if (d?.type === 'ammunition') ammoDefsMap.set(d.id, d);
+        }
+        const uniq = [...ammoDefsMap.values()];
+        let target = uniq.filter(d => (d.cost ?? 0) >= targetCost).sort((a,b)=> (a.cost??0)-(b.cost??0))[0];
+        if (!target) target = uniq.sort((a,b)=> (b.cost??0)-(a.cost??0))[0];
+        const gainedId = `${target.id}#g${nextBase.version}-${seat}`;
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, hand: [...player.hand.filter(id => id !== chosenId), gainedId] } : s,
+          ),
+          cards: {
+            ...state.cards,
+            [gainedId]: { instanceId: gainedId, cardId: target.id, location: { zone: 'hand', index: 0, seat } },
+          },
+          removed: [...state.removed, chosenId],
+          prompts: newPrompts,
+        };
+      }
 
       if (kind === 'stealRevealedWeaponsFromOpponentsTopCards') {
               // Master of Unlocking chain: options are revealed weapon instance

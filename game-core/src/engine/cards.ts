@@ -60,7 +60,8 @@ export type PromptKind =
   | 'lookAtMansionTop'
   | 'negateWeaponCost40OrLessFromHand'
   | 'healGreenHerb'
-  | 'stealRevealedWeaponsFromOpponentsTopCards';
+  | 'stealRevealedWeaponsFromOpponentsTopCards'
+  | 'upgradeAmmoBy30Gold';
 
 export function promptsFor(card: CardDef): readonly PromptKind[] {
   const prompts: PromptKind[] = [];
@@ -101,6 +102,9 @@ export function promptsFor(card: CardDef): readonly PromptKind[] {
         break;
       case 'stealRevealedWeaponsFromOpponentsTopCards':
         addPrompt('stealRevealedWeaponsFromOpponentsTopCards');
+        break;
+      case 'upgradeAmmoBy30Gold':
+        addPrompt('upgradeAmmoBy30Gold');
         break;
       default:
         // Weapons with triggers (Burst-Fire Handgun, Survival Knife, etc.)
