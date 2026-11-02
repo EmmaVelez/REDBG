@@ -149,7 +149,12 @@ export function applyAction(state: GameState, action: Action): GameState {
                 weaponDamageBonusThisTurn += e.amount;
               }
             }
-            const newPlayer: PlayerState = { ...played.player, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
+            // AC-013 Partners: attach this card to the partner (if any) on play.
+            let partnerAttached = played.player.partnerAttached ?? [];
+            if (def.id === 'ac-013' && player.partnerInstanceId && partnerAttached.length < 2) {
+              partnerAttached = [...partnerAttached, instanceId];
+            }
+            const newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
 
       let prompts = state.prompts;
       let promptKind: string | undefined;

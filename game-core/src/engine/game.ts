@@ -362,13 +362,20 @@ export function startTurn(state: GameState): GameState {
   // the start of this (real) turn. Capped at max HP, then the debt is cleared.
   const herbHeal = player.pendingHerbHeal ?? 0;
 
+  // AC-013 Partners: +1 action if a Partners card is attached to partner at turn start.
+  const partnersAttachedAtTurnStart = (player.partnerAttached ?? []).some(id => {
+    const ci = state.cards[id];
+    const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+    return cd?.id === 'ac-013';
+  });
+
   const newPlayer: PlayerState = {
     ...player,
     hp: Math.min(player.hp + herbHeal, player.maxHp),
     pendingHerbHeal: 0,
     turnAmmo: 0,
     turnGold: 0,
-    actionsLeft: 1,
+    actionsLeft: 1 + (partnersAttachedAtTurnStart ? 1 : 0),
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
