@@ -151,6 +151,29 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     const characterInstanceId = `${characterCardId}#${i + 1}`;
     register(characterInstanceId, characterCardId, 'hand');
 
+    // Partner (Alliance): assign a partner character to this seat when
+    // partnerMode is on or an explicit partnerCharacterId is provided.
+    let partnerInstanceId: string | undefined;
+    const wantPartner = setup.partnerMode === true || p.partnerCharacterId !== undefined;
+    if (wantPartner) {
+      let partnerCardId = p.partnerCharacterId;
+      if (partnerCardId === undefined) {
+        if (remainingCharacters.length === 0) {
+          throw new Error(`not enough unique characters for partner of seat ${i}`);
+        }
+        const pick = nextInt(rng, remainingCharacters.length);
+        rng = pick.rng;
+        partnerCardId = remainingCharacters[pick.value] as string;
+        remainingCharacters.splice(pick.value, 1);
+      } else if (remainingCharacters.includes(partnerCardId)) {
+        remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
+      }
+      partnerCardId = partnerCardId ?? '';
+      const partnerInstanceIdStr = `${partnerCardId}#p${i + 1}`;
+      partnerInstanceId = partnerInstanceIdStr;
+      register(partnerInstanceIdStr, partnerCardId, 'hand');
+    }
+
     // Starting deck per the rulebook (First Timer): 7x Ammo x10, 1x Handgun,
     // 2x Combat Knife. The card IDs are NOT hardcoded — they are DERIVED from
     // each card's stats so this works with any database, including the real
@@ -192,6 +215,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       controller: p.controller,
       ...(p.botLevel !== undefined ? { botLevel: p.botLevel } : {}),
       characterInstanceId,
+      ...(partnerInstanceId !== undefined ? { partnerInstanceId } : {}),
       hp: maxHp,
       maxHp,
       decorations: 0,

@@ -26,6 +26,8 @@ export interface PlayerInfo {
   readonly seat: number;
   readonly isBot: boolean;
   readonly connected: boolean;
+  readonly mainCharacterId?: string;
+  readonly partnerCharacterId?: string;
 }
 
 export type RoomPhase = 'lobby' | 'playing';

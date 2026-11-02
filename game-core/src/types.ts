@@ -357,9 +357,13 @@ export interface GameSetup {
     readonly botLevel?: number;
     /** Chosen character cardId; if omitted the engine deals randomly from the 10. */
     readonly characterCardId?: string;
+    /** Partner character cardId (Alliance). */
+    readonly partnerCharacterId?: string;
   }>;
   /** Scenario config (defaults to First Timer Story Mode). */
   readonly scenario?: "firstTimer";
+  /** Enable Partner Modification rules (Alliance expansion). */
+  readonly partnerMode?: boolean;
 }
 
 /**

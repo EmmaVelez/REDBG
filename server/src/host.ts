@@ -62,7 +62,8 @@ export function createHost(room: Room): GameHost {
       .map(p => ({
         name: p.name,
         controller: (p.isBot ? 'bot' : 'human') as 'bot' | 'human',
-        characterCardId: undefined,
+        characterCardId: p.mainCharacterId,
+        ...(room.partnerMode ? { partnerCharacterId: p.partnerCharacterId } : {}),
       }));
 
   return {
@@ -80,7 +81,7 @@ export function createHost(room: Room): GameHost {
       if (players.length === 0) {
         throw new Error('no seated players');
       }
-      state = setup({ seed, players }, PREMIER_CARDS, pilesForScenario(room.scenario));
+      state = setup({ seed, players, partnerMode: room.partnerMode }, PREMIER_CARDS, pilesForScenario(room.scenario));
       return state;
     },
 

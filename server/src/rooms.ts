@@ -24,7 +24,7 @@ export interface Room {
 export interface RoomStore {
   readonly rooms: ReadonlyMap<string, Room>;
   /** Create a room; the creator becomes host seated at 0. Returns the new room. */
-  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean): Room;
+  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean, mainCharacterId?: string, partnerCharacterId?: string): Room;
   /** Add an unseated player (seat -1) to a lobby room. */
   joinRoom(roomCode: string, clientId: string, name: string): Room;
   /** Remove a player; host leaves -> lowest-seat remaining becomes host;
@@ -114,14 +114,14 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
   return {
     rooms,
 
-    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false): Room {
+    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string): Room {
       const roomCode = allocateCode();
       const room: Room = {
         roomCode,
         phase: 'lobby',
         maxSeats: MAX_SEATS,
         scenario,
-        players: [{ clientId, name, seat: 0, isBot: false, connected: true }],
+        players: [{ clientId, name, seat: 0, isBot: false, connected: true, mainCharacterId, partnerCharacterId }],
         partnerMode,
       };
       save(roomCode, room);

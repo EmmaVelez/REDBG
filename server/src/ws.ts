@@ -181,7 +181,7 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           return;
         }
         if (session.clientId === null) return; // identity issued at connect
-        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode);
+        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId);
         session.roomCode = room.roomCode;
         broadcastRoomState(room.roomCode);
         return;
