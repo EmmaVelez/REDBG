@@ -388,7 +388,7 @@ export function startTurn(state: GameState): GameState {
         ? 1
         : 0),
     weaponDamageBonusThisTurn: 0,
-    desperateForcesType: undefined,
+    desperateForcesTypes: undefined,
     playArea: [],
   };
 

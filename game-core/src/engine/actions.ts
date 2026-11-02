@@ -442,7 +442,7 @@ export function applyAction(state: GameState, action: Action): GameState {
 
           const weaponDefs = weapons.map(id => cardDef(state, id));
           const exploreWeapons = weaponDefs.map(w => ({
-            damage: (w?.damage ?? 0) + (player.desperateForcesType && w?.weaponType === player.desperateForcesType ? 10 : 0),
+            damage: (w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0),
             ammoReq: ammoReqForWeapon(abilities, w),
             weaponEffects: w?.weaponEffects,
             tags: w?.weaponTags,
@@ -952,7 +952,7 @@ export function applyAction(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s =>
-            s.seat === seat ? { ...player, desperateForcesType: chosen } : s,
+            s.seat === seat ? { ...player, desperateForcesTypes: [...(player.desperateForcesTypes ?? []), chosen] } : s,
           ),
           prompts: newPrompts,
         };
