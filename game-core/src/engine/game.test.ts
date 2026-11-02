@@ -183,7 +183,7 @@ test('setup with battleHardenedVeteran piles offers Deadly Aim, Merchant and maj
 });
 
 test('SCENARIOS registry includes all scenarios', () => {
-  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance']);
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance', 'partnersInEscape']);
   for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }

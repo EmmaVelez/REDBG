@@ -209,7 +209,7 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
   { pileId: 'sub', cardIds: ['we-003'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance';
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape';
 
 export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
   // Basic Resources (Alliance rulebook ch. V)
@@ -297,6 +297,31 @@ export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly s
   { pileId: 'action-merc', cardIds: ['ac-050'] },
 ];
 
+export const PARTNERS_IN_ESCAPE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'herb', cardIds: ['it-004'] },
+  { pileId: 'action-archrival', cardIds: ['ac-016'] },
+  { pileId: 'action-cornered', cardIds: ['ac-020'] },
+  { pileId: 'action-great-ambition', cardIds: ['ac-015'] },
+  { pileId: 'action-partners', cardIds: ['ac-013'] },
+  { pileId: 'action-quirk', cardIds: ['ac-019'] },
+  { pileId: 'action-star-crossed', cardIds: ['ac-014'] },
+  { pileId: 'weapon-flamethrower', cardIds: ['we-024'] },
+  { pileId: 'weapon-flash-grenade', cardIds: ['we-017', 'we-018g'] },
+  { pileId: 'weapon-shotgun', cardIds: ['we-020', 'we-021'] },
+  { pileId: 'weapon-assault', cardIds: ['we-022', 'we-023'] },
+  { pileId: 'weapon-telescopic', cardIds: ['we-019'] },
+];
+
+export const PARTNERS_IN_ESCAPE_SCENARIO_DEF = {
+  id: 'partnersInEscape' as ScenarioId,
+  name: 'Partners in Escape',
+  description: 'Partners in Escape scenario - Red Herb plus partner-focused action and weapon piles.',
+  piles: PARTNERS_IN_ESCAPE_PILES,
+};
+
 export const ALLIANCE_SCENARIO_DEF = {
   id: 'alliance' as ScenarioId,
   name: 'Alliance',
@@ -345,6 +370,7 @@ export const SCENARIOS = [
     piles: BATTLE_HARDENED_VETERAN_PILES,
   },
   ALLIANCE_SCENARIO_DEF,
+  PARTNERS_IN_ESCAPE_SCENARIO_DEF,
 ];
 
 export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
