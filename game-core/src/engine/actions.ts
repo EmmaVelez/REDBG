@@ -439,6 +439,12 @@ export function applyAction(state: GameState, action: Action): GameState {
             ? [...player.discard, ...explosiveIds]
             : player.discard;
           const exploresLeft = player.exploresLeft - exploreCount;
+          // grantExplores weapon effect: +explores when this weapon is used.
+          const grantedExplores = weapons.reduce((sum, id) => {
+            const def = cardDef(state, id);
+            const eff = def?.weaponEffects?.find(e => e.kind === 'grantExplores');
+            return sum + (eff && eff.kind === 'grantExplores' ? eff.amount : 0);
+          }, 0);
 
           const weaponDefs = weapons.map(id => cardDef(state, id));
           const exploreWeapons = weaponDefs.map(w => ({
@@ -491,7 +497,7 @@ export function applyAction(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
           removed: removedAfter,
           mansionDeck,
           mansionBottom,
