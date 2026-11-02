@@ -711,6 +711,40 @@ export function applyAction(state: GameState, action: Action): GameState {
           }
         }
 
+    case 'attachToPartner': {
+          const { seat, instanceId, replaceIndex } = action;
+          const player = state.seats[seat] as PlayerState;
+          let attached = [...(player.partnerAttached ?? [])];
+          const hand = player.hand.filter(id => id !== instanceId);
+          let newDiscard = [...player.discard];
+          if (attached.length >= 2 && (replaceIndex === 0 || replaceIndex === 1)) {
+            const removed = attached[replaceIndex];
+            if (removed !== undefined) {
+              attached = attached.filter((_, i) => i !== replaceIndex);
+              newDiscard = [...newDiscard, removed];
+            }
+          }
+          attached = [...attached, instanceId];
+          const newPlayer: PlayerState = {
+            ...player,
+            hand,
+            actionsLeft: player.actionsLeft - 1,
+            partnerAttached: attached,
+            discard: newDiscard,
+          };
+          return { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)) };
+        }
+
+    case 'chooseExploreLeader': {
+          const { seat, leader } = action;
+          const player = state.seats[seat] as PlayerState;
+          const newPlayer: PlayerState = {
+            ...player,
+            partnerLeading: leader === 'partner',
+          };
+          return { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)) };
+        }
+
     case 'endTurn': {
           const { seat } = action;
           const player = state.seats[seat] as PlayerState;

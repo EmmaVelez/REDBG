@@ -95,6 +95,28 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   }
 
+  // --- attachToPartner (weapons in hand) ---
+  if (player.partnerInstanceId) {
+    for (const instanceId of player.hand) {
+      const cardData = state.cards[instanceId];
+      if (cardData) {
+        const cd = state.cardDefs[cardData.cardId];
+        if (cd?.type === 'weapon' || cd?.type === 'action') {
+          const attached = player.partnerAttached ?? [];
+          if (attached.length < 2) {
+            generatedActions.push({ type: 'attachToPartner', seat, instanceId });
+          } else {
+            generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 0 });
+            generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 1 });
+          }
+        }
+      }
+    }
+    // chooseExploreLeader when partner present
+    generatedActions.push({ type: 'chooseExploreLeader', seat, leader: 'main' });
+    generatedActions.push({ type: 'chooseExploreLeader', seat, leader: 'partner' });
+  }
+
   // --- 7. endTurn ---
   generatedActions.push({ type: 'endTurn', seat });
 

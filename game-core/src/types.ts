@@ -24,7 +24,8 @@ export type CardType =
   | "item"
   | "action"
   | "token"      // Mansion-only cases (Rocket Launcher Case, Gatling Gun Case)
-  | "infected";  // Mansion-only creatures
+  | "infected"  // Mansion-only creatures
+  | "event";    // Mansion-only events
 
 /** Zones a card instance can live in. */
 export type CardZone =
@@ -255,6 +256,12 @@ export interface PlayerState {
   /** Instance ids of defeated Infected attached under the Character (trophies). */
   readonly attached: readonly string[];
 
+  /** Partner character instance id, if any. */
+  readonly partnerInstanceId?: string;
+  /** Cards attached to the partner (max 2 unless stated). */
+  readonly partnerAttached?: readonly string[];
+  /** Whether partner leads exploration this turn (shared explore). */
+  readonly partnerLeading?: boolean;
   readonly inventory: readonly string[]; // deck, top = index 0
   readonly hand: readonly string[];
   readonly discard: readonly string[];
@@ -337,6 +344,8 @@ export type Action =
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }
+  | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
+  | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }
   | { readonly type: "endTurn"; readonly seat: number }
   | { readonly type: "chooseOption"; readonly seat: number; readonly promptId: string; readonly option: number };
 

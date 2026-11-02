@@ -348,6 +348,61 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           return { ok: false, reason: 'useCharacterAbility: passive ability' };
       }
 
+    case 'attachToPartner':
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'attachToPartner: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `attachToPartner: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'attachToPartner: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'attachToPartner: not your turn' };
+      }
+      if (player.actionsLeft < 1) {
+        return { ok: false, reason: 'attachToPartner: no actions left' };
+      }
+      if (!player.hand.includes(action.instanceId)) {
+        return { ok: false, reason: `attachToPartner: card not in hand: ${action.instanceId}` };
+      }
+      if (!player.partnerInstanceId) {
+        return { ok: false, reason: 'attachToPartner: no partner' };
+      }
+      const attachDef = cardDef(state, action.instanceId);
+      if (attachDef === undefined || (attachDef.type !== 'weapon' && attachDef.type !== 'action')) {
+        return { ok: false, reason: 'attachToPartner: not eligible card' };
+      }
+      const attached = player.partnerAttached ?? [];
+      if (attached.length >= 2) {
+        if (action.replaceIndex !== 0 && action.replaceIndex !== 1) {
+          return { ok: false, reason: 'attachToPartner: replaceIndex required when partner full' };
+        }
+      } else {
+        if (action.replaceIndex !== undefined) {
+          return { ok: false, reason: 'attachToPartner: replaceIndex not allowed when under limit' };
+        }
+      }
+      return { ok: true };
+
+    case 'chooseExploreLeader':
+      if (state.phase !== 'main') {
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `chooseExploreLeader: unknown seat: ${action.seat}` };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'chooseExploreLeader: not your turn' };
+      }
+      if (!player.partnerInstanceId) {
+        return { ok: false, reason: 'chooseExploreLeader: no partner' };
+      }
+      if (action.leader !== 'main' && action.leader !== 'partner') {
+        return { ok: false, reason: 'chooseExploreLeader: bad leader' };
+      }
+      return { ok: true };
+
     case 'endTurn':
       if (state.phase !== 'main') {
         return { ok: false, reason: 'endTurn: not in main phase' };
