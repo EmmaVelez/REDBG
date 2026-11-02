@@ -251,11 +251,29 @@ export function applyAction(state: GameState, action: Action): GameState {
         return { ...p, partnerAttached: keep, discard: [...p.discard, ...excess] };
       };
 
+      // AC-017 Fierce Battle: choose another player to give +1 card.
+      let finalPrompts = prompts;
+      if (def.id === 'ac-017') {
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+        if (others.length > 0) {
+          finalPrompts = [
+            ...prompts,
+            {
+              id: 'p' + (state.prompts.length + 1),
+              seat,
+              text: 'Choose a player to give +1 card.',
+              options: [...others.map(s => String(s.seat)), 'Decline'],
+              payload: { kind: 'giveOneCardToPlayer' },
+            },
+          ];
+        }
+      }
+
       return {
               ...state,
               ...nextBase,
               seats: state.seats.map(s => applyArchrival(s.seat === seat ? newPlayer : s)),
-              prompts,
+              prompts: finalPrompts,
               rngState: ac015Rng,
             };
           }
