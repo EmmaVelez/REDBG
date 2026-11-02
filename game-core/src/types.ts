@@ -245,6 +245,8 @@ export interface PlayerState {
   readonly exploresLeft: number;
   /** Temporary per-turn combat bonus (Deadly Aim etc.). */
   readonly weaponDamageBonusThisTurn: number;
+  /** AC-022 Desperate Forces: chosen weapon type gets +10 damage this turn. */
+  readonly desperateForcesType?: string;
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;

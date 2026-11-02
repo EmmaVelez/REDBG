@@ -274,7 +274,25 @@ export function applyAction(state: GameState, action: Action): GameState {
           ];
         }
       }
-      // AC-019 Quirck of Fate: trash a card from hand (then draw 1 already done).
+      // AC-022 Desperate Forces: choose a weapon type for +10 damage this turn.
+      if (def.id === 'ac-022') {
+        const candidateWeapons = [...newPlayer.hand, ...newPlayer.playArea]
+          .map(id => state.cardDefs[state.cards[id]?.cardId ?? ''])
+          .filter((d): d is NonNullable<typeof d> => !!d && d.type === 'weapon' && !!d.weaponType);
+        const types = [...new Set(candidateWeapons.map(d => d.weaponType as string))];
+        if (types.length > 0) {
+          finalPrompts = [
+            ...finalPrompts,
+            {
+              id: 'p' + (finalPrompts.length + state.prompts.length + 1),
+              seat,
+              text: 'Choose a weapon type for +10 damage this turn.',
+              options: [...types, 'Decline'],
+              payload: { kind: 'chooseWeaponType' },
+            },
+          ];
+        }
+      }
       if (def.id === 'ac-019' && newPlayer.hand.length > 0) {
         finalPrompts = [
           ...finalPrompts,
@@ -424,7 +442,7 @@ export function applyAction(state: GameState, action: Action): GameState {
 
           const weaponDefs = weapons.map(id => cardDef(state, id));
           const exploreWeapons = weaponDefs.map(w => ({
-            damage: w?.damage ?? 0,
+            damage: (w?.damage ?? 0) + (player.desperateForcesType && w?.weaponType === player.desperateForcesType ? 10 : 0),
             ammoReq: ammoReqForWeapon(abilities, w),
             weaponEffects: w?.weaponEffects,
             tags: w?.weaponTags,
@@ -914,16 +932,31 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       if (kind === 'trashHandCard' && chosenId !== undefined) {
-              return {
-                ...state,
-                ...nextBase,
-                seats: state.seats.map(s =>
-                  s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
-                ),
-                removed: [...state.removed, chosenId],
-                prompts: trashRedirectPrompt(state, seat, chosenId, newPrompts, nextBase.version),
-              };
-            }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
+          ),
+          removed: [...state.removed, chosenId],
+          prompts: trashRedirectPrompt(state, seat, chosenId, newPrompts, nextBase.version),
+        };
+      }
+
+      if (kind === 'chooseWeaponType') {
+        const chosen = prompt.options[option];
+        if (chosen === 'Decline' || chosen === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, desperateForcesType: chosen } : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
 
             if (kind === 'trashUpToTwoFromDiscard') {
               // Options are discard instance ids + a 'DONE' sentinel. Each non-DONE
