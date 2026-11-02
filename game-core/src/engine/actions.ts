@@ -457,7 +457,13 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (outcome.kind !== 'notDefeated') {
         throw new Error('applyAction: explore: unexpected non-infected reveal');
       }
-      const newHp = Math.max(player.hp - outcome.damageTaken, 0);
+      // Hunk L1: damageRedirectToPartner — when Hunk would take damage and has
+      // a partner, redirect the damage to his partner instead (partner absorbs
+      // it; Hunk takes none). Automatic redirect when a partner is present.
+      const hasDamageRedirect = characterAbilities(state, seat).some(a => a.kind === 'damageRedirectToPartner');
+      const newHp = (hasDamageRedirect && player.partnerInstanceId)
+        ? player.hp
+        : Math.max(player.hp - outcome.damageTaken, 0);
       let downed = false;
       let hand: readonly string[] = handAfter;
       let discard: readonly string[] = discardAfterExplosives;
