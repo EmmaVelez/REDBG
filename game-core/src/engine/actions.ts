@@ -151,7 +151,7 @@ export function applyAction(state: GameState, action: Action): GameState {
             }
             // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the partner (if any) on play.
             let partnerAttached = played.player.partnerAttached ?? [];
-            if ((def.id === 'ac-013' || def.id === 'ac-014') && player.partnerInstanceId && partnerAttached.length < 2) {
+            if ((def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020') && player.partnerInstanceId && partnerAttached.length < 2) {
               partnerAttached = [...partnerAttached, instanceId];
             }
             let newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
