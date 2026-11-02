@@ -170,15 +170,15 @@ export function Lobby({
                   {' '}Partner Mode (Alliance expansion rules)
                 </label>
               </div>
-              {room.partnerMode && (
-                <div style={{ marginTop: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '0.9em' }}>
-                    Main character:
-                    <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
-                      <option value="">Random</option>
-                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
-                    </select>
-                  </label>
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.9em' }}>
+                  Main character:
+                  <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
+                    <option value="">Random</option>
+                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
+                  </select>
+                </label>
+                {room.partnerMode && (
                   <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
@@ -186,8 +186,8 @@ export function Lobby({
                       {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 
