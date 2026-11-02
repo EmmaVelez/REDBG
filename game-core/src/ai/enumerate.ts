@@ -2,6 +2,7 @@
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
 import { explorableWeapons } from '../engine/weaponReuse';
+import { characterAbilities } from '../engine/abilities';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -50,6 +51,7 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     // an ability lets this seat use again (Leon L2 pistolsTwicePerTurn). The
     // pool must match explore validation exactly, or legal explores go missing.
     const weaponsAvailable = explorableWeapons(state, seat);
+    const singleWeaponLimiter = characterAbilities(state, seat).some(a => a.kind === 'singleWeaponLimiter');
 
     // 4b. Generate candidates: every non-empty subset of the pool.
     // The rules place no cap on weapons per explore (each weapon used once,
@@ -59,6 +61,10 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     const maxSubsetWeapons = Math.min(weaponsAvailable.length, 10);
     for (let mask = 1; mask < (1 << maxSubsetWeapons); mask++) {
       const combo: string[] = [];
+      if (singleWeaponLimiter) {
+        let pc = 0; let m = mask; while (m) { pc += m & 1; m >>= 1; }
+        if (pc > 1) continue;
+      }
       for (let bit = 0; bit < maxSubsetWeapons; bit++) {
         if ((mask & (1 << bit)) !== 0) {
           const weapon = weaponsAvailable[bit];

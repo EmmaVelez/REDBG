@@ -196,6 +196,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.weapons.length === 0) {
         return { ok: false, reason: 'explore: no weapons' };
       }
+      // singleWeaponLimiter: cannot use >1 weapon in one explore.
+      if (action.weapons.length > 1 && characterAbilities(state, action.seat).some(a => a.kind === 'singleWeaponLimiter')) {
+        return { ok: false, reason: 'explore: single weapon limiter' };
+      }
       const weaponSet = new Set(action.weapons);
       if (weaponSet.size !== action.weapons.length) {
         return { ok: false, reason: `explore: duplicate weapon: ${action.weapons.find((id, index) => action.weapons.indexOf(id) !== index)}` };
