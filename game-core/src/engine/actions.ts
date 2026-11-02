@@ -241,10 +241,20 @@ export function applyAction(state: GameState, action: Action): GameState {
         ];
       }
 
+      // AC-016 Archrival: all players discard down to one or fewer cards attached to their partners.
+      const applyArchrival = (p: PlayerState): PlayerState => {
+        if (def.id !== 'ac-016') return p;
+        const pa = p.partnerAttached ?? [];
+        if (pa.length <= 1) return p;
+        const keep = pa.slice(0, 1);
+        const excess = pa.slice(1);
+        return { ...p, partnerAttached: keep, discard: [...p.discard, ...excess] };
+      };
+
       return {
               ...state,
               ...nextBase,
-              seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+              seats: state.seats.map(s => applyArchrival(s.seat === seat ? newPlayer : s)),
               prompts,
               rngState: ac015Rng,
             };
