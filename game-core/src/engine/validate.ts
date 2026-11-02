@@ -296,7 +296,6 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'revealMansionTopNoEffect':
         case 'trashFromHandAtWill':
         case 'forceExploreOtherPlayer':
-        case 'skipTurnForSuperNextTurn':
         case 'giveOneCardToPlayerThenMaybeAnother':
         case 'revealHandForDamageIfTwoTypes': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited

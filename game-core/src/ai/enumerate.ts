@@ -86,6 +86,9 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     const charDef = state.cardDefs[charInstData.cardId];
     if (charDef?.abilities) {
       for (let i = 0; i < charDef.abilities.length; i++) {
+        const ability = charDef.abilities[i];
+        // PR-002 Jill's skip-turn ability is turn-start only (prompt); no manual button.
+        if (ability?.kind === 'skipTurnForSuperNextTurn') continue;
         generatedActions.push({
           type: 'useCharacterAbility',
           seat,
