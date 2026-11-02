@@ -39,7 +39,6 @@ Character ability kinds defined in `game-core/src/types.ts` (`CharacterAbility` 
 
 - `actionBonus`
 - `trashEffectBonus`
-- `extraExploreAtTurnStart`
 - `damageRedirectToPartner`
 - `singleWeaponLimiter`
 
