@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, ALLIANCE_CARDS } from '@re/game-core';
+import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS } from '@re/game-core';
 
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
@@ -176,14 +176,14 @@ export function Lobby({
                     Main character:
                     <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
                       <option value="">Random</option>
-                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
+                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
                   <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
+                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
                 </div>
@@ -247,7 +247,7 @@ function RoomEntry(props: {
   const [partnerMode, setPartnerMode] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
-  const allianceChars = ALLIANCE_CARDS.filter(c => c.type === 'character');
+  const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character');
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
