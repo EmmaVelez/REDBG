@@ -373,6 +373,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (attachDef === undefined || (attachDef.type !== 'weapon' && attachDef.type !== 'action')) {
         return { ok: false, reason: 'attachToPartner: not eligible card' };
       }
+      // Chris L1: cannot attach non-Infected cards. Attachable cards here are
+      // weapons/actions, so Chris cannot attach any of them.
+      if (hasNoHealingAbility(state, action.seat)) {
+        return { ok: false, reason: 'attachToPartner: Chris cannot attach non-Infected cards' };
+      }
       const attached = player.partnerAttached ?? [];
       if (attached.length >= 2) {
         if (action.replaceIndex !== 0 && action.replaceIndex !== 1) {
