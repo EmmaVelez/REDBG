@@ -176,14 +176,14 @@ export function Lobby({
                     Main character:
                     <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
                       <option value="">Random</option>
-                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
                   <label style={{ display: 'block', fontSize: '0.9em', marginTop: '4px' }}>
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {ALLIANCE_CARDS.filter(c => c.type === 'character').map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
                     </select>
                   </label>
                 </div>
