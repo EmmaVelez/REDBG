@@ -161,6 +161,12 @@ export function applyAction(state: GameState, action: Action): GameState {
               newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
               ac015Rng = d.rngState;
             }
+            if (def.id === 'ac-019' && newPlayer.hand.length > 0) {
+              // draw 1 immediately; trash choice handled via trashHandCard prompt
+              const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 1, rngState: ac015Rng });
+              newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+              ac015Rng = d.rngState;
+            }
 
       let prompts = state.prompts;
       let promptKind: string | undefined;
@@ -267,6 +273,19 @@ export function applyAction(state: GameState, action: Action): GameState {
             },
           ];
         }
+      }
+      // AC-019 Quirck of Fate: trash a card from hand (then draw 1 already done).
+      if (def.id === 'ac-019' && newPlayer.hand.length > 0) {
+        finalPrompts = [
+          ...finalPrompts,
+          {
+            id: 'p' + (finalPrompts.length + state.prompts.length + 1),
+            seat,
+            text: def.text,
+            options: newPlayer.hand,
+            payload: { kind: 'trashHandCard' },
+          },
+        ];
       }
 
       return {
