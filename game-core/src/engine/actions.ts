@@ -1128,6 +1128,19 @@ export function applyAction(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'jillFlashGrenade' && chosenId !== undefined) {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
+          ),
+          removed: [...state.removed, chosenId],
+          reactiveTrashWindow: undefined,
+          prompts: newPrompts,
+        };
+      }
+
       if (kind === 'chooseWeaponType') {
         const chosen = prompt.options[option];
         if (chosen === 'Decline' || chosen === undefined) {
