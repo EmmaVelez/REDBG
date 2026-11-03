@@ -537,6 +537,19 @@ export function applyAction(state: GameState, action: Action): GameState {
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
 
+      // MA-037 Guardian of Insanity: on reveal, each character takes 10 damage.
+      // MA-031 Proto Tyrant: on reveal, non-exploring chars with 50+ HP take 40.
+      let revealHpDelta: Record<number, number> = {};
+      if (revealedDef?.id === 'ma-037') {
+        for (const s of state.seats) revealHpDelta[s.seat] = (revealHpDelta[s.seat] ?? 0) - 10;
+      }
+      if (revealedDef?.id === 'ma-031') {
+        for (const s of state.seats) {
+          if (s.seat === seat) continue; // exploring char excluded
+          if ((s.hp ?? 0) >= 50) revealHpDelta[s.seat] = (revealHpDelta[s.seat] ?? 0) - 40;
+        }
+      }
+
       let mansionDeck = rev.mansion.deck;
       let mansionBottom = rev.mansion.bottom;
       let currentRng = state.rngState;
