@@ -233,6 +233,26 @@ export function applyAction(state: GameState, action: Action): GameState {
                                   break;
                                 }
                                 // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
+                              if (e.kind === 'chooseOtherPlayerRevealHand') {
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                if (others.length > 0) {
+                                  promptKind = 'chooseOtherPlayerRevealHand';
+                                  promptOptions = [...others.map(s => String(s.seat))];
+                                }
+                                break;
+                              }
+                              if (e.kind === 'chooseActionCardCostAtMost') {
+                                const maxCost = e.maxCost;
+                                const candidates = played.player.hand.filter(id => {
+                                  const c = cardDef(state, id);
+                                  return c?.type === 'action' && (c.cost ?? 0) <= maxCost;
+                                });
+                                if (candidates.length > 0) {
+                                  promptKind = 'chooseActionCardCostAtMost';
+                                  promptOptions = [...candidates];
+                                }
+                                break;
+                              }
                               }
                       if (promptKind !== undefined && promptOptions !== undefined) {
         prompts = [
@@ -306,12 +326,79 @@ export function applyAction(state: GameState, action: Action): GameState {
         ];
       }
 
+      // Apply simple ActionEffects not handled via prompts above.
+            let seatsAfterEffects = state.seats.map(s => (s.seat === seat ? newPlayer : s));
+            let rngAfterEffects = ac015Rng;
+            for (const e of def.actionEffects ?? []) {
+              if (e.kind === 'gainActions') {
+                newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + e.count };
+                seatsAfterEffects = seatsAfterEffects.map(s =>
+                  s.seat === seat ? { ...s, actionsLeft: s.actionsLeft + e.count } : s,
+                );
+              }
+              if (e.kind === 'gainCards') {
+                const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: e.count, rngState: rngAfterEffects });
+                newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+                rngAfterEffects = d.rngState;
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'damageCharacter') {
+                newPlayer = { ...newPlayer, hp: Math.max(newPlayer.hp - e.amount, 0) };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'unlimitedActionsThisTurn') {
+                newPlayer = { ...newPlayer, actionsLeft: 999 };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? { ...s, actionsLeft: 999 } : s));
+              }
+              if (e.kind === 'damagePerAdditionalAction') {
+                newPlayer = { ...newPlayer, damagePerAdditionalActionThisTurn: (newPlayer.damagePerAdditionalActionThisTurn ?? 0) + e.amount };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'moveCardsFromDiscardToTopInventory') {
+                const targetSeat = e.owner === 'player' ? seat : Number(e.owner);
+                seatsAfterEffects = seatsAfterEffects.map(s => {
+                  if (s.seat !== targetSeat) return s;
+                  const n = Math.min(e.count, s.discard.length);
+                  const moved = s.discard.slice(s.discard.length - n);
+                  const newDiscard = s.discard.slice(0, s.discard.length - n);
+                  return { ...s, discard: newDiscard, inventory: [...moved, ...s.inventory] };
+                });
+                if (targetSeat === seat) {
+                  const updated = seatsAfterEffects.find(s => s.seat === seat);
+                  if (updated) newPlayer = updated as PlayerState;
+                }
+              }
+              if (e.kind === 'attachToCharacter') {
+                newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'beginTurnTrashIfHealthAtMost') {
+                if (newPlayer.hp <= e.threshold) {
+                  newPlayer = { ...newPlayer, attached: newPlayer.attached.filter(id => id !== instanceId), discard: [...newPlayer.discard, instanceId] };
+                  seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+                }
+              }
+              if (e.kind === 'elseDamageAndDraw') {
+                // Only applies when the card was NOT trashed above.
+                const stillAttached = newPlayer.attached.includes(instanceId);
+                // If beginTurnTrashIfHealthAtMost already trashed, instanceId is gone from attached.
+                const trashed = !stillAttached && newPlayer.discard.includes(instanceId);
+                if (!trashed) {
+                  newPlayer = { ...newPlayer, hp: Math.max(newPlayer.hp - e.damage, 0) };
+                  const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: e.cards, rngState: rngAfterEffects });
+                  newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+                  rngAfterEffects = d.rngState;
+                  seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+                }
+              }
+            }
+
       return {
               ...state,
               ...nextBase,
-              seats: state.seats.map(s => applyArchrival(s.seat === seat ? newPlayer : s)),
+              seats: seatsAfterEffects.map(s => applyArchrival(s)),
               prompts: finalPrompts,
-              rngState: ac015Rng,
+              rngState: rngAfterEffects,
             };
           }
 
@@ -1188,6 +1275,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       const chosenId = prompt.options[option];
 
       if (kind === 'recoverWeaponFromDiscardToHand' && chosenId !== undefined) {
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
         return {
           ...state,
           ...nextBase,

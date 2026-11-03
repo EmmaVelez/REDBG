@@ -93,6 +93,67 @@ function turnStartAbilityPrompts(
     });
   }
 
+  // Luis Sera L1: optional +1 card if discard pile has <= 10 cards.
+  if (abilities.some(a => a.kind === 'optionalPlusOneCardWithDiscardCondition')) {
+    if (player.discard.length <= 10) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: ['Yes', 'No'],
+        payload: { kind: 'luisPlusOneCard' },
+      });
+    }
+  }
+
+  // Wesker (Nightmare) L1: at turn start, if exactly one other player's char has <= threshold HP, may +1 card.
+  const weskerL1 = abilities.find(a => a.kind === 'plusOneCardAtTurnStartIfSingleLowHpPlayer') as { hpThreshold: number } | undefined;
+  if (weskerL1 !== undefined) {
+    const lowHpOthers = state.seats.filter(s => s.seat !== player.seat && !s.dead && s.hp <= weskerL1.hpThreshold);
+    if (lowHpOthers.length === 1) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: ['Yes', 'No'],
+        payload: { kind: 'weskerPlusOneCard' },
+      });
+    }
+  }
+
+  // Sergei L1: optional self-damage for +10 damage this turn.
+  if (abilities.some(a => a.kind === 'optionalSelfDamageForDamageThisTurn')) {
+    const ab = abilities.find(a => a.kind === 'optionalSelfDamageForDamageThisTurn')!;
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l1Text,
+      options: [`Take ${ab.damage} damage for +${ab.amount} damage`, 'Decline'],
+      payload: { kind: 'sergeiSelfDamage' },
+    });
+  }
+
+  // Josh Stone L2: at turn start, if at max HP, may move one weapon from discard to hand.
+  if (
+    abilities.some(a => a.kind === 'weaponFromDiscardToHandAtTurnStartIfMaxHp') &&
+    player.hp === player.maxHp
+  ) {
+    const weaponsInDiscard = player.discard.filter(id => {
+      const ci = state.cards[id];
+      const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+      return cd?.type === 'weapon';
+    });
+    if (weaponsInDiscard.length > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: [...weaponsInDiscard, 'Decline'],
+        payload: { kind: 'recoverWeaponFromDiscardToHand' },
+      });
+    }
+  }
+
   return prompts;
 }
 
@@ -230,6 +291,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       buysLeft: 1,
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
+      damagePerAdditionalActionThisTurn: 0,
       attached: [],
       inventory,
       hand: [],
@@ -335,8 +397,10 @@ export function startTurn(state: GameState): GameState {
       buysLeft: 1,
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
+      damagePerAdditionalActionThisTurn: 0,
       mustExplore: false,
       skipRewardPending: false,
+      healedFirstTimeThisTurn: false,
       // pendingHerbHeal intentionally preserved: a skipped (downed) turn does
       // not consume the Yellow Herb heal debt.
     };
@@ -394,7 +458,13 @@ export function startTurn(state: GameState): GameState {
     hp: Math.min(player.hp + herbHeal, player.maxHp),
     pendingHerbHeal: 0,
     turnAmmo: 0,
-    turnGold: 0,
+    turnGold: ((herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'))
+      ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldOnFirstHealThisTurn') as { amount: number }).amount
+      : 0) +
+      (abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldAtTurnStart')
+        ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldAtTurnStart') as { amount: number }).amount
+        : 0),
+    healedFirstTimeThisTurn: herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'),
     actionsLeft: (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0),
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
@@ -409,6 +479,7 @@ export function startTurn(state: GameState): GameState {
         ? 1
         : 0),
     weaponDamageBonusThisTurn: 0,
+      damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,
     skipNextTurn: undefined,
     noActionsNextTurn: undefined,

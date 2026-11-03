@@ -81,6 +81,13 @@ export function passiveDamageBonus(
     if (ability.kind === 'weaponPlusDamagePerInfectedFought') {
       bonus += ability.amount * Math.max(infectedFought, 0);
     }
+    if (ability.kind === 'differentWeaponTypesDamageBonus') {
+      const tags = new Set<string>();
+      for (const def of weaponDefs) {
+        for (const t of def?.weaponTags ?? []) tags.add(t);
+      }
+      if (tags.size >= 2) bonus += ability.amount;
+    }
   }
   return bonus;
 }
@@ -200,6 +207,18 @@ export function knifeWeaponsUsedThisTurn(state: GameState, seat: number): number
   return count;
 }
 
+export function revealHighHpInfectedBonusDamage(
+  abilities: readonly CharacterAbility[],
+  revealedHp: number
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind !== 'revealHighHpInfectedBonusDamage') continue;
+    if (revealedHp >= a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}
+
 export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'explosivesGoToDiscardInsteadOfTrash');
 }
@@ -246,4 +265,24 @@ export function trashEffectBonus(
 /** True when the weapon def is an explosive (tagged). */
 export function isExplosive(def: CardDef | undefined): boolean {
   return def?.type === 'weapon' && (def.weaponTags ?? []).includes('explosive');
+}
+
+export function exploreOnInfectedDefeat(abilities: readonly CharacterAbility[]): number {
+  return abilities.reduce((s, a) => (a.kind === 'exploreOnInfectedDefeat' ? s + a.amount : s), 0);
+}
+
+export function trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat');
+}
+
+export function plusOneCardOnGainCard(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'plusOneCardOnGainCard');
+}
+
+export function trashCardFromDiscardOnInfectedDefeat(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'trashCardFromDiscardOnInfectedDefeat');
+}
+
+export function discardActionCardFromHandForPlusTwoCards(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'discardActionCardFromHandForPlusTwoCards');
 }

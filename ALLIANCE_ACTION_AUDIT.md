@@ -9,7 +9,7 @@ None define an `actionEffects` entry, so their bonus text is applied via `sumBon
 |---|---|---|---|---|
 | ac-013 | Partners | ammo +20, actions +2 | attach to partner; +1 action next turn if attached | Missing |
 | ac-014 | Star-Crossed Duo | cards +2, buys +1 | attach to partner; partner weapon +10 dmg when partner leading | Missing |
-| ac-015 | Great Ambition | gold +10, actions +1 | +2 cards if no partner | Missing (conditional) |
+| ac-015 | Great Ambition | gold +10, actions +1 | +2 cards if no partner | Implemented (conditional) |
 | ac-016 | Archrival | cards +2 | all players discard partners to <=1 attached | Missing |
 | ac-017 | Fierce Battle | cards +4 | choose player +1 card | Missing |
 | ac-018 | Uroboros Injection | actions +2, buys +1 | reactive trash to +20 HP to revealed infected | Missing |

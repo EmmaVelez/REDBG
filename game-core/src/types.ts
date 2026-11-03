@@ -64,7 +64,7 @@ export interface CardDef {
   readonly id: string;
   readonly name: string;
   readonly type: CardType;
-  readonly set: 'premier' | 'promo' | 'alliance';
+  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare';
   /** Human-readable rules text (for UI + reference). */
   readonly text: string;
   /** Copies of this card in the game (used when building piles). */
@@ -137,7 +137,16 @@ export type WeaponEffect =
   | {readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number} // Bolt-Action Rifle
   | {readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number}    // Survival Knife
   | {readonly kind: "plusDamageWhenUsingMultipleWeapons"; readonly amount: number} // Burst-Fire Handgun Alliance
-  | {readonly kind: "plusDamagePerOtherKnifeUsedThisTurn"; readonly amount: number}; // Survival Knife Alliance
+  | {readonly kind: "plusDamagePerOtherKnifeUsedThisTurn"; readonly amount: number} // Survival Knife Alliance
+  | { readonly kind: "gainCardsAndActions"; readonly cards: number; readonly actions: number } // Silver Ghost/Punisher
+  | { readonly kind: "plusDamagePerAmmoInPlayArea"; readonly amount: number } // Mine Thrower
+  | { readonly kind: "plusDamageIfInventoryAtLeast"; readonly threshold: number; readonly amount: number } // Broken Butterfly
+  | { readonly kind: "choosePlayerDiscard"; readonly count: number } // Single Shot Rifle
+  | { readonly kind: "allNonExploringPlayersDiscard"; readonly count: number } // Special Ops Rifle
+  | { readonly kind: "gainGoldThisTurn"; readonly amount: number } // Machine Pistol
+  | { readonly kind: "plusDamagePerWeaponTagInDiscard"; readonly tag: WeaponTag; readonly amount: number } // Gangster's Machine Gun
+  | { readonly kind: "grantExploreAndSuppressLowHpInfected"; readonly hpThreshold: number; readonly trashAfterUse: boolean } // Flashbang
+  | { readonly kind: "plusDamagePerInfectedBattled"; readonly amount: number }; // Incendiary Grenade
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -148,13 +157,27 @@ export type InfectedEffect =
   | { readonly kind: "mustExploreNextTurnOnDefeat" } // MA-030 Cephalo
   | { readonly kind: "buffOtherRevealedInfected"; readonly hp: number; readonly damage: number } // MA-029 Albert Wesker
   | { readonly kind: "onKillGainAmmoX10ToMostDecorated"; readonly count: number } // MA-025 Duvalia
-  | { readonly kind: "plusHpIfAttackedWithAnotherInfected"; readonly amount: number }; // MA-023 Infected Bat
+  | { readonly kind: "plusHpIfAttackedWithAnotherInfected"; readonly amount: number } // MA-023 Infected Bat
+  | { readonly kind: "onNotDefeatedGainAmmoAndShuffle"; readonly base: number; readonly perLevel: number } // Osmund Saddler
+  | { readonly kind: "extraTurnOnDefeat" } // Bitores Mendez
+  | { readonly kind: "onRevealWeaponDamagePenalty"; readonly amount: number } // Regenerator
+  | { readonly kind: "onDefeatGainTopResourceCard" } // Jack Krauser
+  | { readonly kind: "onRevealDamageToExploringCharacters"; readonly base: number; readonly perInventoryCard: number } // Militia Rocket Launcher
+  | { readonly kind: "cannotBeDefeatedIfActionsAtLeast"; readonly count: number } // Novistador
+  | { readonly kind: "onDefeatGainGoldAndBuy"; readonly gold: number; readonly buys: number } // Zombie Security Guard
+  | { readonly kind: "cannotBeDefeatedIfInventoryAtMost"; readonly count: number } // Verdugo
+  | { readonly kind: "onDefeatHealExploring"; readonly amount: number } // Ivy
+  | { readonly kind: "onRevealBonusDamageIfCharacterDamaged"; readonly threshold: number; readonly amount: number } // Neptune
+  | { readonly kind: "mostDecoratedLowersMaxHp"; readonly amount: number } // Hunter
+  | { readonly kind: "onRevealHealthPenaltyIfMultipleWeapons"; readonly count: number; readonly amount: number }; // Cerberus
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
   | { readonly kind: "healToFull" }                                          // First Aid Spray
   | { readonly kind: "healSelfAndPartnerToFull" }                            // Red Herb IT-004
   | { readonly kind: "plusMaxHp"; readonly amount: number }                  // Yellow Herb (Mansion only): +amount max HP
+  | { readonly kind: "attachThenRemoveForCardsAndGold"; readonly cards: number; readonly gold: number } // Treasure Map
+  | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number }; // Hidden Treasure
 
 export type ActionEffect =
   | { readonly kind: "allWeaponsPlusDamageThisTurn"; readonly amount: number } // Deadly Aim: +10
@@ -165,7 +188,32 @@ export type ActionEffect =
   | { readonly kind: "lookAtMansionTop"; readonly count: number }           // Mansion Foyer style peek (Prompt ordering)
   | { readonly kind: "trashUpToTwoFromDiscard" }                             // Shattered Memories (multi-choice)
   | { readonly kind: "upgradeAmmoBy30Gold" }                                 // Item Management: trash 1 Ammo from hand, gain one worth 30 Gold more
-  | { readonly kind: "stealRevealedWeaponsFromOpponentsTopCards" };          // Master of Unlocking
+  | { readonly kind: "stealRevealedWeaponsFromOpponentsTopCards" }          // Master of Unlocking
+  | { readonly kind: "prl412RevealAndAutoDefeatOrShuffle" } // P.R.L. 412
+  // Nightmare action card stubs (NIGHTMARE_ACTION_EFFECTS.md)
+  | { readonly kind: "gainAmmo"; readonly amount: number }
+  | { readonly kind: "onExploreWeaponDamagePerDiscardCard"; readonly amount: number }
+  | { readonly kind: "gainGoldAndAmmoPerInventoryCard"; readonly gold: number; readonly ammo: number }
+  | { readonly kind: "discardInventoryUntilWeaponToHand" }
+  | { readonly kind: "lookAtTopInventory"; readonly count: number }
+  | { readonly kind: "trashOneOfLooked" }
+  | { readonly kind: "returnRestTopOrBottomInAnyOrder" }
+  | { readonly kind: "drawCardsPerInventoryDivisor"; readonly divisor: number }
+  | { readonly kind: "gainCards"; readonly count: number }
+  | { readonly kind: "discardInventory" }
+  | { readonly kind: "chooseOtherPlayerRevealHand" }
+  | { readonly kind: "chooseActionCardCostAtMost"; readonly maxCost: number }
+  | { readonly kind: "discardChosen" }
+  | { readonly kind: "copyBonusesAndEffectsTwice" }
+  | { readonly kind: "gainActions"; readonly count: number }
+  | { readonly kind: "gainAction"; readonly amount: number }
+  | { readonly kind: "moveCardsFromDiscardToTopInventory"; readonly count: number; readonly owner: string }
+  | { readonly kind: "damageCharacter"; readonly amount: number }
+  | { readonly kind: "unlimitedActionsThisTurn" }
+  | { readonly kind: "damagePerAdditionalAction"; readonly amount: number }
+  | { readonly kind: "attachToCharacter" }
+  | { readonly kind: "beginTurnTrashIfHealthAtMost"; readonly threshold: number }
+  | { readonly kind: "elseDamageAndDraw"; readonly damage: number; readonly cards: number };
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -194,6 +242,7 @@ export type CharacterAbility =
   | { readonly kind: "weaponDamageReduction"; readonly amount: number; readonly level: 1 | 2 }               // PR-001 Chris L2: Weapons deal -amount damage to him (dormant until PvP exists)
   | { readonly kind: "extraExploreAtTurnStart"; readonly level: 1 | 2 }                                      // PR-001 Chris L2: +1 Explore at the beginning of the turn
   | { readonly kind: "exploreDamagePerPlayerWithBigHand"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 }   // PR-009 Rebecca L2: +amount per player with >threshold cards in hand while exploring
+  | { readonly kind: "revealHighHpInfectedBonusDamage"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 }   // CH-034 Chris Nightmare: +amount damage this turn when revealing infected with HP >= threshold
   | { readonly kind: "revealHandForDamageIfTwoTypes"; readonly amount: number; readonly level: 1 | 2 }       // PR-010 Hunk L1: reveal hand; if >=2 different types, +amount damage this turn
   | { readonly kind: "exploreBonusIfActionsInPlayArea"; readonly amount: number; readonly minActions: number; readonly level: 1 | 2 }     // PR-010 Hunk L2: +amount explore damage with >=minActions actions in play area
   | { readonly kind: "skipTurnForSuperNextTurn"; readonly level: 1 | 2 }                                     // PR-002 Jill: skip turn & discard hand -> next turn +5 cards/+1 Buy/Action/Explore
@@ -201,8 +250,25 @@ export type CharacterAbility =
   | { readonly kind: "giveOneCardToPlayerThenMaybeAnother"; readonly level: 1 | 2 }                          // PR-009 Rebecca L1: another player +1 card; if so, a player +1 card
   | { readonly kind: "damageRedirectToPartner"; readonly level: 1 | 2 }                                 // HUNK (Alliance) L1: takes damage for partner and redirects it to them
     | { readonly kind: "singleWeaponLimiter"; readonly level: 1 | 2 }                                   // Jack L1: can't use >1 weapon while limitation is active
-      | { readonly kind: "generic"; readonly level: 1 | 2 };                                                  // fallback: text-only ability, engine treats as no-op (v1)
-
+      | { readonly kind: "generic"; readonly level: 1 | 2 }                                                  // fallback: text-only ability, engine treats as no-op (v1)
+  | { readonly kind: "optionalSelfDamageForDamageThisTurn"; readonly damage: number; readonly amount: number; readonly level: 1 | 2 } // Sergei L1
+  | { readonly kind: "exploreOnInfectedDefeat"; readonly amount: number; readonly level: 1 | 2 }            // Sergei L2
+  | { readonly kind: "optionalPlusOneCardWithDiscardCondition"; readonly level: 1 | 2 }                    // Luis Sera L1
+  | { readonly kind: "onDefeatMoveDiscardToInventoryBottom"; readonly level: 1 | 2 }                      // Luis Sera L2
+  | { readonly kind: "goldOnFirstHealThisTurn"; readonly amount: number; readonly level: 1 | 2 }         // Josh Stone L1
+  | { readonly kind: "weaponFromDiscardToHandAtTurnStartIfMaxHp"; readonly level: 1 | 2 }               // Josh Stone L2
+  | { readonly kind: "weaponBuyCostReduction"; readonly amount: number; readonly level: 1 | 2 }         // Mikhail Victor L1: weapons cost amount less to buy
+  | { readonly kind: "differentWeaponTypesDamageBonus"; readonly amount: number; readonly level: 1 | 2 }  // Mikhail Victor L2: while using weapons of different types, +amount damage
+  | { readonly kind: "goldAtTurnStart"; readonly amount: number; readonly level: 1 | 2 }                      // Carlos Oliveira (Nightmare) L1: at turn start +amount gold
+  | { readonly kind: "exploreOnBuyCardCostAtLeast"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // Carlos Oliveira (Nightmare) L2: on buy card cost >= threshold, +amount explore
+  | { readonly kind: "trashCardFromDiscardOnInfectedDefeat"; readonly level: 1 | 2 } // Mysterious Mask (Nightmare) L1: on defeat infected, may trash a card from discard
+  | { readonly kind: "discardActionCardFromHandForPlusTwoCards"; readonly level: 1 | 2 } // Mysterious Mask (Nightmare) L2: during turn, may discard one action card from hand for +2 cards
+  | { readonly kind: "plusOneCardAtTurnStartIfSingleLowHpPlayer"; readonly hpThreshold: number; readonly level: 1 | 2 } // Albert Wesker (Nightmare) L1: at turn start, if only one other player's character has <=hpThreshold HP, may +1 card
+  | { readonly kind: "choosePlayerToDiscardOneCardDuringTurn"; readonly level: 1 | 2 } // Albert Wesker (Nightmare) L2: during turn, may choose that player to discard one card
+  | { readonly kind: "trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat"; readonly level: 1 | 2 } // Leon S. Kennedy (Nightmare) L1: on defeat infected, may trash card from discard then gain card costing up to 20 more
+  | { readonly kind: "plusOneCardOnGainCard"; readonly level: 1 | 2 } // Leon S. Kennedy (Nightmare) L2: on gain card, +1 card
+  | { readonly kind: "cardsOnDamageTakenDuringTurn"; readonly amount: number; readonly level: 1 | 2 } // Ada Wong (Nightmare) L1: during turn, if Ada takes damage, +amount cards
+  | { readonly kind: "setHpToOnLethal"; readonly amount: number; readonly level: 1 | 2 }; // Ada Wong (Nightmare) L2: when HP would be reduced to 0 or less, set to amount instead
 
 
 // ---------------------------------------------------------------------------
@@ -258,18 +324,23 @@ export interface PlayerState {
   readonly exploresLeft: number;
   /** Temporary per-turn combat bonus (Deadly Aim etc.). */
   readonly weaponDamageBonusThisTurn: number;
+  /** Vengeful Intention etc: damage added per additional action played this turn. */
+  readonly damagePerAdditionalActionThisTurn?: number;
   /** AC-022 Desperate Forces: chosen weapon types get +10 damage this turn. */
   readonly desperateForcesTypes?: readonly string[];
   /** Skip the next turn entirely (Executioner). */
   readonly skipNextTurn?: boolean;
   /** Cannot play Actions next turn (Zombie Female). */
   readonly noActionsNextTurn?: boolean;
+  readonly extraTurnPending?: boolean;
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;
   /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
    *  NEXT real turn (fallen from a herb attached via Explore gain). */
   readonly pendingHerbHeal?: number;
+  /** Josh Stone L1: whether the first heal this turn has already fired. */
+  readonly healedFirstTimeThisTurn?: boolean;
   /** PR-002 Jill: set when she skips a turn; her NEXT turn start grants the
    *  super-turn bonuses (+5 cards, +1 Buy/Action/Explore) and clears it. */
   readonly skipRewardPending?: boolean;
