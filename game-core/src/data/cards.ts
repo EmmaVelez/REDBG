@@ -76,7 +76,23 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ma-015', name: 'Cerberus', type: 'infected', set: 'premier', text: 'No effect.', copies: 3, hp: 25, attack: 10, decorations: 2 },
   { id: 'ma-016', name: 'El Gigante', type: 'infected', set: 'premier', text: 'No effect.', copies: 1, hp: 70, attack: 60, decorations: 6 },
   { id: 'ma-017', name: 'Executioner', type: 'infected', set: 'premier', text: 'On defeat: choose a player; they skip their next turn.', copies: 1, hp: 30, attack: 25, decorations: 3, infectedEffects: [{ kind: 'skipNextTurnOfAPlayerOnDefeat' }] },
-
+  // Alliance infected
+  { id: 'ma-022', name: 'Lurker', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 10, attack: 10, decorations: 1 },
+  { id: 'ma-023', name: 'Infected Bat', type: 'infected', set: 'alliance', text: '+20 HP if attacked with another infected.', copies: 3, hp: 15, attack: 20, decorations: 1 },
+  { id: 'ma-024', name: 'Licker Beta', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 35, attack: 20, decorations: 3 },
+  { id: 'ma-025', name: 'Duvalia (Las Plagas)', type: 'infected', set: 'alliance', text: 'On kill: player with most decorations gains five Ammo x 10.', copies: 2, hp: 60, attack: 40, decorations: 5 },
+  { id: 'ma-026', name: 'Garrador', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 50, attack: 40, decorations: 4 },
+  { id: 'ma-027', name: 'Zombie (Male)', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 20, attack: 10, decorations: 1 },
+  { id: 'ma-028', name: 'Kipepeo (Las Plagas)', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 20, attack: 20, decorations: 1 },
+  { id: 'ma-029', name: 'Albert Wesker', type: 'infected', set: 'alliance', text: 'Other revealed infected get +10 HP and +10 damage this turn.', copies: 1, hp: 90, attack: 70, decorations: 8 },
+  { id: 'ma-030', name: 'Cephalo (Las Plagas)', type: 'infected', set: 'alliance', text: 'On defeat: choose a player; they must explore next turn.', copies: 3, hp: 25, attack: 20, decorations: 2 },
+  { id: 'ma-031', name: 'Proto Tyrant', type: 'infected', set: 'alliance', text: 'On reveal: non-exploring characters with 50+ HP take 40 damage.', copies: 1, hp: 60, attack: 40, decorations: 5 },
+  { id: 'ma-032', name: 'Iron Maiden', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 50, attack: 30, decorations: 4 },
+  { id: 'ma-033', name: 'Zombie Horde', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 30, attack: 20, decorations: 2 },
+  { id: 'ma-034', name: 'Nosferatu', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 55, attack: 30, decorations: 4 },
+  { id: 'ma-035', name: 'Los Illuminados Monk', type: 'infected', set: 'alliance', text: '+5 HP and +5 damage per infected attached to exploring main char.', copies: 2, hp: 15, attack: 20, decorations: 3 },
+  { id: 'ma-036', name: 'Reaper', type: 'infected', set: 'alliance', text: 'If not defeated for exact HP, trash highest-cost card attached to partner.', copies: 2, hp: 35, attack: 40, decorations: 4 },
+  { id: 'ma-037', name: 'Guardian of Insanity', type: 'infected', set: 'alliance', text: 'On reveal: each character takes 10 damage.', copies: 3, hp: 30, attack: 20, decorations: 2 },
   // Tokens
   { id: 'ma-012', name: 'Rocket Launcher Case', type: 'token', set: 'premier', text: 'Gain the Rocket Launcher weapon. Trash this token.', copies: 1, tokenEffects: [{ kind: 'gainWeaponAndTrashToken', weaponCardId: 'we-008' }] },
   { id: 'ma-013', name: 'Gatling Gun Case', type: 'token', set: 'premier', text: 'Gain the Gatling Gun weapon. Trash this token.', copies: 1, tokenEffects: [{ kind: 'gainWeaponAndTrashToken', weaponCardId: 'we-007' }] }
