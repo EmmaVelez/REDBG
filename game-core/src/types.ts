@@ -144,7 +144,8 @@ export type InfectedEffect =
   | { readonly kind: "noActionsNextTurnOfAPlayerOnDefeat" }                  // Zombie (Female): on defeat, choose a player (Prompt); they can't play Actions next turn
   | { readonly kind: "plusDamagePerFull10AmmoOfAttacker"; readonly amount: number } // Gatling Gun Majini: +5 per full 10 Ammo
   | { readonly kind: "trashHighestCostAttachedOnPartnerIfNotExactDefeat" } // MA-036 Reaper
-  | { readonly kind: "plusHpAndDamagePerAttachedInfected"; readonly amount: number }; // MA-035 Los Illuminados Monk
+  | { readonly kind: "plusHpAndDamagePerAttachedInfected"; readonly amount: number } // MA-035 Los Illuminados Monk
+  | { readonly kind: "mustExploreNextTurnOnDefeat" }; // MA-030 Cephalo
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
