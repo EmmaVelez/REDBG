@@ -541,7 +541,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       // MA-031 Proto Tyrant: on reveal, non-exploring chars with 50+ HP take 40.
       let revealHpDelta: Record<number, number> = {};
       if (revealedDef?.id === 'ma-037') {
-        for (const s of state.seats) revealHpDelta[s.seat] = (revealHpDelta[s.seat] ?? 0) - 10;
+        state = { ...state, seats: state.seats.map(s => ({ ...s, hp: Math.max(0, (s.hp ?? 0) - 10) })) };
       }
       if (revealedDef?.id === 'ma-031') {
         for (const s of state.seats) {
