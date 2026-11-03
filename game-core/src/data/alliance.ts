@@ -65,8 +65,8 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   { id: 'we-012', name: 'Full-Bore Machine Gun', type: 'weapon', set: 'alliance', text: '+30 damage if more than 100 ammo in play area. Requires 70 ammo. Deals 40 damage.', copies: 1, cost: 100, ammoReq: 70, damage: 40, weaponTags: ['gun', 'machineGun'], weaponEffects: [{ kind: 'plusDamageIfAmmoAbove', threshold: 100, amount: 30 }] },
   { id: 'we-038', name: 'Machine Pistol w/Stock', type: 'weapon', set: 'alliance', text: '+20 gold this turn. Requires 30 ammo. Deals 20 damage.', weaponType: 'handgun', copies: 4, cost: 40, ammoReq: 30, damage: 20, weaponTags: ['gun', 'machineGun'], weaponEffects: [] },
   { id: 'we-039', name: 'Gangster\'s Machine Gun', type: 'weapon', set: 'alliance', text: '+10 damage per "Machine Gun" in discard pile. Requires 50 ammo. Deals 50 damage.', copies: 1, cost: 80, ammoReq: 50, damage: 50, weaponTags: ['gun', 'machineGun'], weaponEffects: [] },
-  { id: 'we-022', name: 'Russian Assault Rifle', type: 'weapon', set: 'alliance', text: 'Machine gun. Fixed to 20 ammo max. Deals 40 damage.', weaponType: 'rifle', copies: 4, cost: 40, ammoReq: 20, damage: 40, weaponTags: ['gun', 'machineGun'], weaponEffects: [] },
-  { id: 'we-023', name: 'Signature Special', type: 'weapon', set: 'alliance', text: 'Machine gun. Fixed to 60 ammo max. Deals 50 damage.', copies: 1, cost: 70, ammoReq: 60, damage: 50, weaponTags: ['gun', 'machineGun'], weaponEffects: [] },
+  { id: 'we-022', name: 'Russian Assault Rifle', type: 'weapon', set: 'alliance', text: 'Machine gun. X/X ammo/damage, cap 20.', weaponType: 'rifle', copies: 4, cost: 40, ammoReq: 0, damage: 0, weaponTags: ['gun', 'machineGun'], weaponEffects: [], xAmmo: true, ammoCap: 20 },
+  { id: 'we-023', name: 'Signature Special', type: 'weapon', set: 'alliance', text: 'Machine gun. X/X ammo/damage, cap 60.', copies: 1, cost: 70, ammoReq: 0, damage: 0, weaponTags: ['gun', 'machineGun'], weaponEffects: [], xAmmo: true, ammoCap: 60 },
   
   // ========================================================================
   // WEAPONS - MAGNUM

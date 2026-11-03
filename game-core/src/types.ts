@@ -83,6 +83,10 @@ export interface CardDef {
   readonly damage?: number;
   /** Machine-readable effect keys the engine interprets (see WeaponEffect). */
   readonly weaponEffects?: readonly WeaponEffect[];
+  /** Ammo cap for X-machine-gun weapons (max ammo assignable). */
+  readonly ammoCap?: number;
+  /** X-weapon: ammo assigned = damage. */
+  readonly xAmmo?: boolean;
   readonly weaponTags?: readonly WeaponTag[]; // e.g. "explosive" (Jill synergy)
   /** Weapon category type (e.g. "handgun", "shotgun") — used by Desperate Forces (AC-022). */
   readonly weaponType?: string;
