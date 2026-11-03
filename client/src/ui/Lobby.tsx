@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS } from '@re/game-core';
+import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS } from '@re/game-core';
 
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
@@ -175,7 +175,7 @@ export function Lobby({
                   Main character:
                   <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
                     <option value="">Random</option>
-                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').filter(c => {
+                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character').filter(c => {
                       const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                       return !taken.has(c.id) || c.id === me?.mainCharacterId;
                     }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
@@ -186,7 +186,7 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character').filter(c => {
+                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character').filter(c => {
                         const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                         return !taken.has(c.id) || c.id === me?.partnerCharacterId;
                       }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
@@ -253,7 +253,7 @@ function RoomEntry(props: {
   const [partnerMode, setPartnerMode] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
-  const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS].filter(c => c.type === 'character');
+  const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
