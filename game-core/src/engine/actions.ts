@@ -454,6 +454,17 @@ export function applyAction(state: GameState, action: Action): GameState {
             return cd?.type === 'action';
           }).length;
           // plusDamageIfSelfHpAtLeast: +amount if player HP >= threshold.
+          // revealTopOfInventoryCostGate: if top of inventory cost >= threshold, +amount.
+          const topInvCard = player.inventory[0];
+          const topInvDef = topInvCard ? cardDef(state, topInvCard) : undefined;
+          const costGateBonus = weaponDefs.reduce((sum, w) => {
+            const eff = w?.weaponEffects?.find(e => e.kind === 'revealTopOfInventoryCostGate');
+            if (eff && eff.kind === 'revealTopOfInventoryCostGate' && (topInvDef?.cost ?? 0) >= eff.threshold) {
+              return sum + eff.amount;
+            }
+            return sum;
+          }, 0);
+          // plusDamagePerActionPlayedThisTurn
           const perActionBonus = weaponDefs.reduce((sum, w) => {
             const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamagePerActionPlayedThisTurn');
             return sum + (eff && eff.kind === 'plusDamagePerActionPlayedThisTurn' ? eff.amount * actionPlayedCount : 0);
@@ -529,7 +540,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
