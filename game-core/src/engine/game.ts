@@ -362,15 +362,35 @@ export function startTurn(state: GameState): GameState {
   // the start of this (real) turn. Capped at max HP, then the debt is cleared.
   const herbHeal = player.pendingHerbHeal ?? 0;
 
-  // AC-013 Partners: +1 action if a Partners card is attached to partner at turn start.
-  const partnersAttachedAtTurnStart = (player.partnerAttached ?? []).some(id => {
+  // AC-020 Cornered: if 2+ Cornered attached to partner at turn start, trash them.
+  const corneredAttached = (player.partnerAttached ?? []).filter(id => {
+    const ci = state.cards[id];
+    const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+    return cd?.id === 'ac-020';
+  });
+  let partnerAttached = player.partnerAttached ?? [];
+  if (corneredAttached.length >= 2) {
+    // remove first two
+    let removed = 0;
+    partnerAttached = partnerAttached.filter(id => {
+        const ci = state.cards[id];
+        const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+        if (cd?.id === 'ac-020' && removed < 2) { removed++; return false; }
+        return true;
+      });
+    }
+
+    // AC-013 Partners: +1 action if a Partners card is attached to partner at turn start.
+    const partnersAttachedAtTurnStart = (player.partnerAttached ?? []).some(id => {
     const ci = state.cards[id];
     const cd = ci ? state.cardDefs[ci.cardId] : undefined;
     return cd?.id === 'ac-013';
   });
 
+
   const newPlayer: PlayerState = {
     ...player,
+    partnerAttached,
     hp: Math.min(player.hp + herbHeal, player.maxHp),
     pendingHerbHeal: 0,
     turnAmmo: 0,
