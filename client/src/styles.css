@@ -274,6 +274,13 @@ h1, h2 { margin: 0 0 8px; }
 }
 .health-ring-label { font-weight: 700; font-family: inherit; }
 .health-segment { transition: stroke 0.25s; }
+.player-character-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
 .player-character-card {
   position: relative;
   display: flex;
@@ -281,6 +288,11 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 4px;
   padding-top: 6px;
   border-top: 1px solid var(--border);
+}
+.player-character-row .player-character-card {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
 }
 .player-character-card .card { width: 140px; min-height: 82px; }
 

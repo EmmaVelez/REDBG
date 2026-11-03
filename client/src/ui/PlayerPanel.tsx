@@ -55,21 +55,23 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         <span title="Hand">Hand {player.hand.length}</span>
         <span title="Defeated infected attached">Attached {player.attached.length}</span>
       </div>
-      {charDef !== null && (
-        <div className="player-character-card" data-character-card data-anim-zone="attached">
-          <HoverCard def={charDef} decorations={player.decorations} hp={player.hp} maxHp={player.maxHp}>
-            <CardView def={charDef} compact decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} />
-          </HoverCard>
-        </div>
-      )}
-      {partnerDef !== null && (
-        <div className="player-character-card player-partner-card" data-partner-character-card data-anim-zone="attached">
-          <HoverCard def={partnerDef} decorations={0} hp={player.hp} maxHp={player.maxHp}>
-            <CardView def={partnerDef} compact decorations={0} hp={player.hp} maxHp={player.maxHp} />
-          </HoverCard>
-          <span className="player-partner-attached">Attached {player.partnerAttached?.length ?? 0}</span>
-        </div>
-      )}
+      <div className="player-character-row">
+        {charDef !== null && (
+          <div className="player-character-card" data-character-card data-anim-zone="attached">
+            <HoverCard def={charDef} decorations={player.decorations} hp={player.hp} maxHp={player.maxHp}>
+              <CardView def={charDef} compact decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} />
+            </HoverCard>
+          </div>
+        )}
+        {partnerDef !== null && (
+          <div className="player-character-card player-partner-card" data-partner-character-card data-anim-zone="attached">
+            <HoverCard def={partnerDef} decorations={0} hp={player.hp} maxHp={player.maxHp}>
+              <CardView def={partnerDef} compact decorations={0} hp={player.hp} maxHp={player.maxHp} />
+            </HoverCard>
+            <span className="player-partner-attached">Attached {player.partnerAttached?.length ?? 0}</span>
+          </div>
+        )}
+      </div>
       {charDef !== null && <CharacterSkills state={state} seat={seat} />}
     </div>
   );
