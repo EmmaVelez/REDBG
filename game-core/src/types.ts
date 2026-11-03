@@ -374,7 +374,7 @@ export type Action =
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
-  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number }
+  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>> }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }

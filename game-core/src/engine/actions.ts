@@ -425,7 +425,7 @@ export function applyAction(state: GameState, action: Action): GameState {
           }
 
     case 'explore': {
-          const { seat, weapons, exploreCount } = action;
+          const { seat, weapons, exploreCount, ammoByWeapon } = action;
           const player = state.seats[seat] as PlayerState;
 
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
@@ -503,11 +503,14 @@ export function applyAction(state: GameState, action: Action): GameState {
             return sum + (eff && eff.kind === 'plusDamageIfSelfHpAtLeast' && player.hp >= eff.hp ? eff.amount : 0);
           }, 0);
 
-          const exploreWeapons = weaponDefs.map(w => {
-            const isX = w?.weaponEffects?.some(e => e.kind === 'damageEqualsCurrentAmmo');
+          const exploreWeapons = weaponDefs.map((w, i) => {
+            const instId = weapons[i];
+            const isGatling = w?.weaponEffects?.some(e => e.kind === 'damageEqualsCurrentAmmo');
+            const isX = w?.xAmmo === true;
+            const assigned = isX ? Math.min(ammoByWeapon?.[instId ?? ''] ?? 0, w?.ammoCap ?? 999) : 0;
             return {
-              damage: isX ? player.turnAmmo : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0)),
-              ammoReq: isX ? 0 : ammoReqForWeapon(abilities, w),
+              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0)),
+              ammoReq: isGatling ? 0 : isX ? assigned : ammoReqForWeapon(abilities, w),
               weaponEffects: w?.weaponEffects,
               tags: w?.weaponTags,
             };
