@@ -535,6 +535,43 @@ export function applyAction(state: GameState, action: Action): GameState {
           prompts: state.prompts,
         };
       }
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ma-039') {
+        // Collapsing Floor Traps: reveal next 2 mansion cards; battle any infected among them; shuffle non-infected back.
+        const rev2 = revealTop({ deck: mansionDeck, bottom: mansionBottom });
+        const secondId = rev2.revealedInstanceId;
+        const secondDef = cardDef(state, secondId);
+        mansionDeck = rev2.mansion.deck;
+        mansionBottom = rev2.mansion.bottom;
+        // collect infected targets
+        const targets = [];
+        if (revealedDef && false) {}
+        // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
+        const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
+        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        let newPlayer = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false };
+        // remove event + any defeated infected from game (simplified: remove all revealed)
+        const removedIds = [revealedInstanceId, secondId];
+        // shuffle non-infected back to bottom
+        const toShuffleBack = [revealedInstanceId, secondId].filter(id => {
+          const d = cardDef(state, id);
+          return d?.type !== 'infected';
+        });
+        if (toShuffleBack.length > 0) {
+          mansionBottom = [...mansionBottom, ...toShuffleBack];
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          removed: [...removedAfter, ...removedIds.filter(id => {
+            const d = cardDef(state, id); return d?.type === 'infected' || d?.type === 'event';
+          })],
+          mansionDeck,
+          mansionBottom,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
