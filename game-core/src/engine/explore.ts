@@ -155,7 +155,13 @@ export interface MultiExploreTarget {
 
 export function resolveMultiExplore(params: { readonly damage: number; readonly revealed: readonly MultiExploreTarget[] }): { readonly defeated: boolean; readonly combinedHp: number; readonly combinedAttack: number; readonly shuffleBackCards: readonly string[] } {
   const { damage, revealed } = params;
-  const combinedHp = revealed.reduce((sum, target) => sum + target.hp, 0);
+  const combinedHp = revealed.reduce((sum, target) => {
+    let hp = target.hp;
+    if (target.infectedEffects?.some(e => e.kind === 'plusHpIfAttackedWithAnotherInfected') && revealed.length > 1) {
+      hp += 20;
+    }
+    return sum + hp;
+  }, 0);
   const combinedAttack = revealed.reduce((sum, target) => sum + target.attack, 0);
   const defeated = damage >= combinedHp;
   const shuffleBackCards = revealed
