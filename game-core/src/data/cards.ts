@@ -91,7 +91,7 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ma-033', name: 'Zombie Horde', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 30, attack: 20, decorations: 2 },
   { id: 'ma-034', name: 'Nosferatu', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 55, attack: 30, decorations: 4 },
   { id: 'ma-035', name: 'Los Illuminados Monk', type: 'infected', set: 'alliance', text: '+5 HP and +5 damage per infected attached to exploring main char.', copies: 2, hp: 15, attack: 20, decorations: 3 },
-  { id: 'ma-036', name: 'Reaper', type: 'infected', set: 'alliance', text: 'If not defeated for exact HP, trash highest-cost card attached to partner.', copies: 2, hp: 35, attack: 40, decorations: 4 },
+  { id: 'ma-036', name: 'Reaper', type: 'infected', set: 'alliance', text: 'If not defeated with damage equal to its health, trash highest-cost card attached to partner.', copies: 2, hp: 35, attack: 40, decorations: 4, infectedEffects: [{ kind: 'trashHighestCostAttachedOnPartnerIfNotExactDefeat' }] },
   { id: 'ma-037', name: 'Guardian of Insanity', type: 'infected', set: 'alliance', text: 'On reveal: each character takes 10 damage.', copies: 3, hp: 30, attack: 20, decorations: 2 },
   // Tokens
   { id: 'ma-012', name: 'Rocket Launcher Case', type: 'token', set: 'premier', text: 'Gain the Rocket Launcher weapon. Trash this token.', copies: 1, tokenEffects: [{ kind: 'gainWeaponAndTrashToken', weaponCardId: 'we-008' }] },
