@@ -108,8 +108,17 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
 
   const damage = computeDamage({ weapons, ammo, bonusDamage, knifeUsesEarlierThisTurn });
 
+  // instantKillAtOrBelowHp: if revealed infected HP <= threshold, instant defeat.
+  const instantKill = weapons.some(w =>
+    w.weaponEffects?.some(e => e.kind === 'instantKillAtOrBelowHp' && (revealed.hp ?? 0) <= e.hp),
+  );
+
   if (revealed.type !== 'infected') {
     return { kind: 'nonInfected', cardId: revealed.id };
+  }
+
+  if (instantKill) {
+    return { kind: 'defeated', decorations: revealed.decorations ?? 0 };
   }
 
   let effective = damage;
