@@ -95,6 +95,8 @@ export interface CardDef {
   readonly decorations?: number;
   /** Machine-readable effect keys (see InfectedEffect). */
   readonly infectedEffects?: readonly InfectedEffect[];
+  /** Las Plagas infected flag (Alliance). */
+  readonly plagas?: boolean;
 
   // -- character --
     /** Starting AND maximum Health at Level 1. */
