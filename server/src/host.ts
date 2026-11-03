@@ -9,6 +9,7 @@ import {
   pilesForScenario,
   PREMIER_CARDS,
   ALLIANCE_CARDS,
+  ALL_CARDS,
 } from '@re/game-core';
 import type { Action, GameState, PlayerView, BotDifficulty } from '@re/game-core';
 import type { PlayerInfo } from './protocol';
@@ -83,7 +84,7 @@ export function createHost(room: Room): GameHost {
         throw new Error('no seated players');
       }
       const allianceScenarios = new Set(['alliance', 'partnersInEscape']);
-      const cards = allianceScenarios.has(room.scenario) ? ALLIANCE_CARDS : PREMIER_CARDS;
+      const cards = allianceScenarios.has(room.scenario) ? ALL_CARDS : PREMIER_CARDS;
       state = setup({ seed, players, partnerMode: room.partnerMode }, cards, pilesForScenario(room.scenario));
       return state;
     },
