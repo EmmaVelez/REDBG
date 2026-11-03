@@ -143,6 +143,7 @@ export type InfectedEffect =
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
   | { readonly kind: "healToFull" }                                          // First Aid Spray
+  | { readonly kind: "healSelfAndPartnerToFull" }                            // Red Herb IT-004
   | { readonly kind: "plusMaxHp"; readonly amount: number }                  // Yellow Herb (Mansion only): +amount max HP
 
 export type ActionEffect =

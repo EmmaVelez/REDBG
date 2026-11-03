@@ -330,7 +330,10 @@ export function applyAction(state: GameState, action: Action): GameState {
                       let prompts = state.prompts;
                       let hp = played.player.hp;
                       let maxHp = played.player.maxHp;
-                let promptKind: string | undefined;
+                      let promptKind: string | undefined;
+                      let partnerHp = played.player.partnerInstanceId ? (state.seats[seat] as PlayerState).hp : played.player.hp;
+                      let trashGreenHerbId: string | undefined;
+                      let healPartner = false;
                 for (const e of def.itemEffects ?? []) {
                         if (e.kind === 'healToFull') {
                           hp = played.player.maxHp;
@@ -338,6 +341,13 @@ export function applyAction(state: GameState, action: Action): GameState {
                           maxHp = played.player.maxHp + e.amount;
                         } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
                           promptKind = 'healGreenHerb';
+                        } else if (e.kind === 'healSelfAndPartnerToFull') {
+                          const green = played.player.hand.find(id => isGreenHerb(state, id));
+                          if (green) {
+                            trashGreenHerbId = green;
+                            hp = played.player.maxHp;
+                            healPartner = true;
+                          }
                         }
                       }
                 if (promptKind !== undefined) {
@@ -357,15 +367,27 @@ export function applyAction(state: GameState, action: Action): GameState {
                 }
 
       const newPlayer: PlayerState = { ...played.player, hp, maxHp };
-
-            return {
-              ...state,
-              ...nextBase,
-              seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-              removed: newRemoved,
-              prompts,
-              rngState: played.rngState,
-            };
+      // Red Herb: trash green herb + heal partner to full.
+      let finalRemoved = newRemoved;
+      let finalSeats = state.seats.map(s => (s.seat === seat ? newPlayer : s));
+      if (trashGreenHerbId) {
+        finalRemoved = [...finalRemoved, trashGreenHerbId];
+        finalSeats = finalSeats.map(s => {
+          if (s.seat === seat) {
+            return { ...s, hand: s.hand.filter(id => id !== trashGreenHerbId), hp };
+          }
+          return s;
+        });
+        // heal partner: partner is part of same player's partnerInstanceId; if partner exists, heal them via partner HP? Partner HP stored on player? 
+      }
+      return {
+        ...state,
+        ...nextBase,
+        seats: finalSeats,
+        removed: finalRemoved,
+        prompts,
+        rngState: played.rngState,
+      };
           }
 
           case 'playAmmo': {

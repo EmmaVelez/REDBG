@@ -147,7 +147,7 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   { id: 'it-005', name: 'Yellow Herb', type: 'item', set: 'alliance', text: '+10 max HP, heal 10 next turn.', copies: 3, itemEffects: [{ kind: 'plusMaxHp', amount: 10 }] },
   { id: 'it-006', name: 'First Aid Spray', type: 'item', set: 'alliance', text: 'Heal to full HP.', copies: 4, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
   { id: 'it-007', name: 'Blue Herb', type: 'item', set: 'alliance', text: 'Reduces Infected damage by 20 this turn.', copies: 4, cost: 30 },
-  { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: '+20 max HP.', copies: 2, cost: 20, itemEffects: [{ kind: 'plusMaxHp', amount: 20 }] },
+  { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: '+20 max HP.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
   { id: 'it-009', name: 'Green+Blue Herb', type: 'item', set: 'alliance', text: 'Heal 40 HP.', copies: 3, cost: 40 },
   { id: 'it-050', name: 'Reliable Blade', type: 'item', set: 'alliance', text: 'When defeat Infected, may get +10 gold. Trashes after turn.', copies: 10, cost: 0, itemEffects: [] },
   
