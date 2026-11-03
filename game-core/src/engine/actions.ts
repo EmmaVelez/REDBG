@@ -447,6 +447,17 @@ export function applyAction(state: GameState, action: Action): GameState {
           }, 0);
 
           const weaponDefs = weapons.map(id => cardDef(state, id));
+          // plusDamagePerActionPlayedThisTurn: +amount per Action card in play area this turn.
+          const actionPlayedCount = player.playArea.filter(id => {
+            const ci = state.cards[id];
+            const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+            return cd?.type === 'action';
+          }).length;
+          const perActionBonus = weaponDefs.reduce((sum, w) => {
+            const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamagePerActionPlayedThisTurn');
+            return sum + (eff && eff.kind === 'plusDamagePerActionPlayedThisTurn' ? eff.amount * actionPlayedCount : 0);
+          }, 0);
+
           const exploreWeapons = weaponDefs.map(w => ({
             damage: (w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0),
             ammoReq: ammoReqForWeapon(abilities, w),
@@ -508,7 +519,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
