@@ -521,6 +521,20 @@ export function applyAction(state: GameState, action: Action): GameState {
         return r.value;
       };
 
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ma-040') {
+        // Laser Targeting Device: +1 Explore, remove card.
+        const newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + 1, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          removed: [...removedAfter, revealedInstanceId],
+          mansionDeck,
+          mansionBottom,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
