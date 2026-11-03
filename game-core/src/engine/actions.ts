@@ -453,9 +453,15 @@ export function applyAction(state: GameState, action: Action): GameState {
             const cd = ci ? state.cardDefs[ci.cardId] : undefined;
             return cd?.type === 'action';
           }).length;
+          // plusDamageIfSelfHpAtLeast: +amount if player HP >= threshold.
           const perActionBonus = weaponDefs.reduce((sum, w) => {
             const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamagePerActionPlayedThisTurn');
             return sum + (eff && eff.kind === 'plusDamagePerActionPlayedThisTurn' ? eff.amount * actionPlayedCount : 0);
+          }, 0);
+          // plusDamageIfSelfHpAtLeast: +amount if player HP >= threshold.
+          const selfHpBonus = weaponDefs.reduce((sum, w) => {
+            const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamageIfSelfHpAtLeast');
+            return sum + (eff && eff.kind === 'plusDamageIfSelfHpAtLeast' && player.hp >= eff.hp ? eff.amount : 0);
           }, 0);
 
           const exploreWeapons = weaponDefs.map(w => ({
@@ -519,7 +525,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
