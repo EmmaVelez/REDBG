@@ -544,10 +544,7 @@ export function applyAction(state: GameState, action: Action): GameState {
         state = { ...state, seats: state.seats.map(s => ({ ...s, hp: Math.max(0, (s.hp ?? 0) - 10) })) };
       }
       if (revealedDef?.id === 'ma-031') {
-        for (const s of state.seats) {
-          if (s.seat === seat) continue; // exploring char excluded
-          if ((s.hp ?? 0) >= 50) revealHpDelta[s.seat] = (revealHpDelta[s.seat] ?? 0) - 40;
-        }
+        state = { ...state, seats: state.seats.map(s => (s.seat === seat || (s.hp ?? 0) < 50) ? s : { ...s, hp: Math.max(0, (s.hp ?? 0) - 40) }) };
       }
 
       let mansionDeck = rev.mansion.deck;
