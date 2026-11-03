@@ -658,6 +658,33 @@ export function applyAction(state: GameState, action: Action): GameState {
           }
         }
       }
+      // Reactive trash window: AC-018 Uroboros Injection — any infected revealed,
+      // eligible players (holding ac-018) may trash it to give +20 HP to the revealed infected.
+      const isAnyInfected = revealedDef?.type === 'infected';
+      let ac018Eligible = state.seats.filter(s => {
+        if (s.seat === seat || s.dead) return false;
+        return s.hand.some(id => {
+          const ci = state.cards[id];
+          const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+          return cd?.id === 'ac-018';
+        });
+      });
+      if (isAnyInfected && ac018Eligible.length > 0 && !isLasPlagas) {
+        reactiveWindow = { kind: 'uroborosInjection', triggeringSeat: seat, revealedInstanceId };
+        for (const es of ac018Eligible) {
+          reactivePrompts = [...reactivePrompts, {
+            id: 'p' + (reactivePrompts.length + 1),
+            seat: es.seat,
+            text: 'Trash Uroboros Injection to give +20 HP to the revealed infected?',
+            options: es.hand.filter(id => {
+              const ci = state.cards[id];
+              const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+              return cd?.id === 'ac-018';
+            }),
+            payload: { kind: 'uroborosInjection' },
+          }];
+        }
+      }
       if (revealedDef?.type !== 'infected') {
         const prompts = [
           ...reactivePrompts,
