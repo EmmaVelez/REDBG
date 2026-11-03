@@ -2,7 +2,7 @@ import type { GameState, Action, PlayerState, CardDef } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
-import { resolveExplore, computeDamage } from './explore';
+import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
 import { flipDown, levelForDecorations } from './characters';
 import {
   characterAbilities,
@@ -548,6 +548,13 @@ export function applyAction(state: GameState, action: Action): GameState {
         // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
         const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
         const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        // resolve combined battle
+        const multiResult = resolveMultiExplore({
+          damage: exploreDmg,
+          revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
+            cardId: d!.id, hp: d!.hp ?? 0, attack: d!.attack ?? 0, infectedEffects: d!.infectedEffects,
+          })),
+        });
         let newPlayer = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false };
         // remove event + any defeated infected from game (simplified: remove all revealed)
         const removedIds = [revealedInstanceId, secondId];
