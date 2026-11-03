@@ -668,6 +668,58 @@ export function applyAction(state: GameState, action: Action): GameState {
         throw new Error('applyAction: explore: insufficient ammo');
       }
 
+      // Defer explore resolution if Las Plagas revealed and eligible reactive players exist.
+      const shouldDefer = revealedDef?.type === 'infected' && revealedDef?.plagas === true &&
+        state.seats.some(s => {
+          if (s.seat === seat || s.dead) return false;
+          const charDef = cardDef(state, s.characterInstanceId);
+          if (charDef?.id !== 'ch-016' || s.level < 2) return false;
+          return s.hand.some(id => {
+            const ci = state.cards[id];
+            const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+            return cd?.id === 'we-017';
+          });
+        });
+
+      if (shouldDefer) {
+        const pendingOutcome = outcome.kind === 'defeated' ? 'defeated' : 'notDefeated';
+        const pendingDecorations = outcome.kind === 'defeated' ? player.decorations + (revealedDef.decorations ?? 0) : player.decorations;
+        const pendingDamageTaken = outcome.kind === 'notDefeated' ? Math.max((revealedDef.attack ?? 0) - 0, 0) : 0;
+        const pendingPlayer: PlayerState = {
+          ...player,
+          hand: handAfter,
+          playArea: playAreaAfter,
+          discard: discardAfterExplosives,
+          exploresLeft,
+          turnAmmo: turnAmmoAfter,
+          turnGold: turnGoldAfter,
+          mustExplore: false,
+          decorations: pendingDecorations,
+        };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
+          removed: removedAfter,
+          mansionDeck,
+          mansionBottom,
+          rngState: currentRng,
+          reactiveTrashWindow: { kind: 'jillFlashGrenade', triggeringSeat: seat, revealedInstanceId },
+          pendingExplore: {
+            seat,
+            revealedInstanceId,
+            outcome: pendingOutcome,
+            decorations: pendingDecorations,
+            damageTaken: pendingDamageTaken,
+            newPlayer: pendingPlayer,
+            mansionDeck,
+            mansionBottom,
+            rngState: currentRng,
+          },
+          prompts: reactivePrompts,
+        };
+      }
+
       if (outcome.kind === 'defeated') {
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
         const charDef = cardDef(state, player.characterInstanceId);
@@ -1130,7 +1182,8 @@ export function applyAction(state: GameState, action: Action): GameState {
 
       if (kind === 'jillFlashGrenade' && chosenId !== undefined) {
         const window = state.reactiveTrashWindow;
-        return {
+        const trashed = true;
+        const updatedState = {
           ...state,
           ...nextBase,
           seats: state.seats.map(s =>
@@ -1141,6 +1194,28 @@ export function applyAction(state: GameState, action: Action): GameState {
           flashGrenadeDefeatedInstanceId: window?.revealedInstanceId,
           prompts: newPrompts,
         };
+        // If no more reactive prompts, resolve the pending explore.
+        const remainingReactive = newPrompts.some(p => p.payload?.kind === 'jillFlashGrenade');
+        if (!remainingReactive && updatedState.pendingExplore) {
+          const pe = updatedState.pendingExplore;
+          const defeated = !!updatedState.flashGrenadeDefeatedInstanceId;
+          const newPlayer = defeated
+            ? { ...pe.newPlayer, decorations: pe.decorations, attached: [...pe.newPlayer.attached, pe.revealedInstanceId] }
+            : { ...pe.newPlayer, hp: Math.max(pe.newPlayer.hp - pe.damageTaken, 0) };
+          return {
+            ...updatedState,
+            ...nextBase,
+            seats: updatedState.seats.map(s => (s.seat === pe.seat ? newPlayer : s)),
+            removed: defeated ? [...updatedState.removed, pe.revealedInstanceId] : updatedState.removed,
+            mansionDeck: pe.mansionDeck,
+            mansionBottom: pe.mansionBottom,
+            rngState: pe.rngState,
+            pendingExplore: undefined,
+            flashGrenadeDefeatedInstanceId: undefined,
+            prompts: newPrompts,
+          };
+        }
+        return updatedState;
       }
 
       if (kind === 'chooseWeaponType') {
