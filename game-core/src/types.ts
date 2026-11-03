@@ -146,7 +146,8 @@ export type InfectedEffect =
   | { readonly kind: "trashHighestCostAttachedOnPartnerIfNotExactDefeat" } // MA-036 Reaper
   | { readonly kind: "plusHpAndDamagePerAttachedInfected"; readonly amount: number } // MA-035 Los Illuminados Monk
   | { readonly kind: "mustExploreNextTurnOnDefeat" } // MA-030 Cephalo
-  | { readonly kind: "buffOtherRevealedInfected"; readonly hp: number; readonly damage: number }; // MA-029 Albert Wesker
+  | { readonly kind: "buffOtherRevealedInfected"; readonly hp: number; readonly damage: number } // MA-029 Albert Wesker
+  | { readonly kind: "onKillGainAmmoX10ToMostDecorated"; readonly count: number }; // MA-025 Duvalia
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
