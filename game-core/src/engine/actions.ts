@@ -555,7 +555,8 @@ export function applyAction(state: GameState, action: Action): GameState {
             cardId: d!.id, hp: d!.hp ?? 0, attack: d!.attack ?? 0, infectedEffects: d!.infectedEffects,
           })),
         });
-        let newPlayer = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false };
+        const defeatedDecorations = multiResult.defeated ? infectedTargets.reduce((s, d) => s + (d?.decorations ?? 0), 0) : 0;
+        let newPlayer = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations };
         // remove event + any defeated infected from game (simplified: remove all revealed)
         const removedIds = [revealedInstanceId, secondId];
         // shuffle non-infected back to bottom
