@@ -573,6 +573,17 @@ export function applyAction(state: GameState, action: Action): GameState {
                   level,
                   attached: [...player.attached, revealedInstanceId],
                 };
+        const hasSkip = revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false;
+        const hasNoActions = revealedDef?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false;
+        const defeatPrompts = (hasSkip || hasNoActions)
+          ? [...state.prompts, {
+              id: 'p' + (state.prompts.length + 1),
+              seat,
+              text: 'Choose a player.',
+              options: state.seats.filter(s => !s.dead).map(s => String(s.seat)),
+              payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
+            }]
+          : state.prompts;
         return {
           ...state,
           ...nextBase,
@@ -581,6 +592,7 @@ export function applyAction(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
+          prompts: defeatPrompts,
         };
       }
 
@@ -984,6 +996,23 @@ export function applyAction(state: GameState, action: Action): GameState {
           ),
           removed: [...state.removed, chosenId],
           prompts: trashRedirectPrompt(state, seat, chosenId, newPrompts, nextBase.version),
+        };
+      }
+
+      if (kind === 'skipNextTurn' || kind === 'noActionsNextTurn') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const targetSeat = Number(chosen);
+        if (Number.isNaN(targetSeat)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === targetSeat
+              ? { ...s, skipNextTurn: kind === 'skipNextTurn' ? true : s.skipNextTurn, noActionsNextTurn: kind === 'noActionsNextTurn' ? true : s.noActionsNextTurn }
+              : s,
+          ),
+          prompts: newPrompts,
         };
       }
 

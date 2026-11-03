@@ -375,12 +375,13 @@ export function startTurn(state: GameState): GameState {
     pendingHerbHeal: 0,
     turnAmmo: 0,
     turnGold: 0,
-    actionsLeft: 1 + (partnersAttachedAtTurnStart ? 1 : 0),
+    actionsLeft: (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0),
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
     // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).
     exploresLeft:
+      player.skipNextTurn ? 0 :
       (player.mustExplore === true ? 2 : 1) +
       (abilitiesForLevel(charDef?.abilities, player.level).some(
         a => a.kind === 'extraExploreAtTurnStart'
@@ -389,6 +390,8 @@ export function startTurn(state: GameState): GameState {
         : 0),
     weaponDamageBonusThisTurn: 0,
     desperateForcesTypes: undefined,
+    skipNextTurn: undefined,
+    noActionsNextTurn: undefined,
     playArea: [],
   };
 

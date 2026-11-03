@@ -247,6 +247,10 @@ export interface PlayerState {
   readonly weaponDamageBonusThisTurn: number;
   /** AC-022 Desperate Forces: chosen weapon types get +10 damage this turn. */
   readonly desperateForcesTypes?: readonly string[];
+  /** Skip the next turn entirely (Executioner). */
+  readonly skipNextTurn?: boolean;
+  /** Cannot play Actions next turn (Zombie Female). */
+  readonly noActionsNextTurn?: boolean;
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;
