@@ -332,6 +332,12 @@ export interface GameState {
   readonly winners: readonly number[];
   readonly endReason?: "uroborosDefeated" | "allPlayersDead";
 
+  /** Reactive trash window (AC-018, Jill L2): pending off-turn reaction. */
+  readonly reactiveTrashWindow?: {
+    readonly kind: 'uroborosInjection' | 'jillFlashGrenade';
+    readonly triggeringSeat: number;
+    readonly revealedInstanceId: string;
+  };
   /** All actions applied so far (for replay/audit). */
   readonly log: readonly LoggedAction[];
 }
