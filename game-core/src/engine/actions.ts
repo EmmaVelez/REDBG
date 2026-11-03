@@ -598,11 +598,46 @@ export function applyAction(state: GameState, action: Action): GameState {
         };
       }
 
+      // Reactive trash window: if a Las Plagas infected is revealed, eligible
+      // players (Jill L2 with Flash Grenade in hand) may react.
+      const isLasPlagas = revealedDef?.type === 'infected' && revealedDef?.plagas === true;
+      let reactiveWindow = state.reactiveTrashWindow;
+      let reactivePrompts = state.prompts;
+      if (isLasPlagas) {
+        const eligibleSeats = state.seats.filter(s => {
+          if (s.seat === seat || s.dead) return false;
+          const charDef = cardDef(state, s.characterInstanceId);
+          // Jill L2 (level 2) — check character id
+          if (charDef?.id !== 'ch-016' || s.level < 2) return false;
+          // must have Flash Grenade in hand
+          return s.hand.some(id => {
+            const ci = state.cards[id];
+            const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+            return cd?.id === 'we-017';
+          });
+        });
+        if (eligibleSeats.length > 0) {
+          reactiveWindow = { kind: 'jillFlashGrenade', triggeringSeat: seat, revealedInstanceId };
+          for (const es of eligibleSeats) {
+            reactivePrompts = [...reactivePrompts, {
+              id: 'p' + (reactivePrompts.length + 1),
+              seat: es.seat,
+              text: 'Trash a Flash Grenade to defeat this Las Plagas infected?',
+              options: es.hand.filter(id => {
+                const ci = state.cards[id];
+                const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+                return cd?.id === 'we-017';
+              }),
+              payload: { kind: 'jillFlashGrenade' },
+            }];
+          }
+        }
+      }
       if (revealedDef?.type !== 'infected') {
         const prompts = [
-          ...state.prompts,
+          ...reactivePrompts,
           {
-            id: 'p' + (state.prompts.length + 1),
+            id: 'p' + (reactivePrompts.length + 1),
             seat,
             text: revealedDef?.text ?? '',
             options: ['Take', 'Send to bottom of Mansion'],
