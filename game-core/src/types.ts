@@ -338,6 +338,8 @@ export interface GameState {
     readonly triggeringSeat: number;
     readonly revealedInstanceId: string;
   };
+  /** Flash Grenade reactive defeat: instance ID of infected defeated by Flash Grenade. */
+  readonly flashGrenadeDefeatedInstanceId?: string;
   /** All actions applied so far (for replay/audit). */
   readonly log: readonly LoggedAction[];
 }

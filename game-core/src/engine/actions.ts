@@ -1129,6 +1129,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
 
       if (kind === 'jillFlashGrenade' && chosenId !== undefined) {
+        const window = state.reactiveTrashWindow;
         return {
           ...state,
           ...nextBase,
@@ -1137,6 +1138,7 @@ export function applyAction(state: GameState, action: Action): GameState {
           ),
           removed: [...state.removed, chosenId],
           reactiveTrashWindow: undefined,
+          flashGrenadeDefeatedInstanceId: window?.revealedInstanceId,
           prompts: newPrompts,
         };
       }
