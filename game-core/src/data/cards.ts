@@ -78,7 +78,7 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ma-017', name: 'Executioner', type: 'infected', set: 'premier', text: 'On defeat: choose a player; they skip their next turn.', copies: 1, hp: 30, attack: 25, decorations: 3, infectedEffects: [{ kind: 'skipNextTurnOfAPlayerOnDefeat' }] },
   // Alliance infected
   { id: 'ma-022', name: 'Lurker', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 10, attack: 10, decorations: 1 },
-  { id: 'ma-023', name: 'Infected Bat', type: 'infected', set: 'alliance', text: '+20 HP if attacked with another infected.', copies: 3, hp: 15, attack: 20, decorations: 1 },
+  { id: 'ma-023', name: 'Infected Bat', type: 'infected', set: 'alliance', text: '+20 HP if attacked with another infected.', copies: 3, hp: 15, attack: 20, decorations: 1, infectedEffects: [{ kind: 'plusHpIfAttackedWithAnotherInfected', amount: 20 }] },
   { id: 'ma-024', name: 'Licker Beta', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 35, attack: 20, decorations: 3 },
   { id: 'ma-025', name: 'Duvalia (Las Plagas)', type: 'infected', set: 'alliance', text: 'On kill: player with most decorations gains five Ammo x 10.', copies: 2, hp: 60, attack: 40, decorations: 5, infectedEffects: [{ kind: 'onKillGainAmmoX10ToMostDecorated', count: 5 }] },
   { id: 'ma-026', name: 'Garrador', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 50, attack: 40, decorations: 4 },
