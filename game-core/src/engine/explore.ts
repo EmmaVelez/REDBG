@@ -46,6 +46,12 @@ export function computeDamage(params: DamageParams): number {
           ).length;
           damage += effect.amount * (otherKnivesHere + (params.knifeUsesEarlierThisTurn ?? 0));
         }
+        if (effect.kind === 'plusDamagePerOtherKnifeUsedThisTurn') {
+          const otherKnivesHere = weapons.filter(
+            (w, idx) => idx !== weaponIndex && (w.tags ?? []).includes('knife'),
+          ).length;
+          damage += effect.amount * (otherKnivesHere + (params.knifeUsesEarlierThisTurn ?? 0));
+        }
       }
     }
   }

@@ -465,6 +465,12 @@ export function applyAction(state: GameState, action: Action): GameState {
             return sum;
           }, 0);
           // plusDamagePerActionPlayedThisTurn
+          // plusDamageWhenUsingMultipleWeapons: +amount when using >1 weapon.
+          const multiWeaponBonus = weaponDefs.reduce((sum, w) => {
+            const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamageWhenUsingMultipleWeapons');
+            return sum + (eff && eff.kind === 'plusDamageWhenUsingMultipleWeapons' && weapons.length > 1 ? eff.amount : 0);
+          }, 0);
+          // plusDamagePerActionPlayedThisTurn
           const perActionBonus = weaponDefs.reduce((sum, w) => {
             const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamagePerActionPlayedThisTurn');
             return sum + (eff && eff.kind === 'plusDamagePerActionPlayedThisTurn' ? eff.amount * actionPlayedCount : 0);
@@ -540,7 +546,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
