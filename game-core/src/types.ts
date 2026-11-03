@@ -340,7 +340,18 @@ export interface GameState {
   };
   /** Flash Grenade reactive defeat: instance ID of infected defeated by Flash Grenade. */
   readonly flashGrenadeDefeatedInstanceId?: string;
-  /** All actions applied so far (for replay/audit). */
+  /** Pending explore awaiting reactive responses (Las Plagas Flash Grenade). */
+  readonly pendingExplore?: {
+    readonly seat: number;
+    readonly revealedInstanceId: string;
+    readonly outcome: 'defeated' | 'notDefeated';
+    readonly decorations: number;
+    readonly damageTaken: number;
+    readonly newPlayer: PlayerState;
+    readonly mansionDeck: readonly string[];
+    readonly mansionBottom: readonly string[];
+    readonly rngState: number;
+  };
   readonly log: readonly LoggedAction[];
 }
 
