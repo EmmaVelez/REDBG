@@ -84,7 +84,7 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ma-026', name: 'Garrador', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 50, attack: 40, decorations: 4 },
   { id: 'ma-027', name: 'Zombie (Male)', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 20, attack: 10, decorations: 1 },
   { id: 'ma-028', name: 'Kipepeo (Las Plagas)', type: 'infected', set: 'alliance', text: 'No effect.', copies: 3, hp: 20, attack: 20, decorations: 1 },
-  { id: 'ma-029', name: 'Albert Wesker', type: 'infected', set: 'alliance', text: 'Other revealed infected get +10 HP and +10 damage this turn.', copies: 1, hp: 90, attack: 70, decorations: 8 },
+  { id: 'ma-029', name: 'Albert Wesker', type: 'infected', set: 'alliance', text: 'All other revealed infected get +10 health and +10 damage this turn.', copies: 1, hp: 90, attack: 70, decorations: 8, infectedEffects: [{ kind: 'buffOtherRevealedInfected', hp: 10, damage: 10 }] },
   { id: 'ma-030', name: 'Cephalo (Las Plagas)', type: 'infected', set: 'alliance', text: 'On defeat: choose a player; they must explore next turn.', copies: 3, hp: 25, attack: 20, decorations: 2, infectedEffects: [{ kind: 'mustExploreNextTurnOnDefeat' }] },
   { id: 'ma-031', name: 'Proto Tyrant', type: 'infected', set: 'alliance', text: 'On reveal: non-exploring characters with 50+ HP take 40 damage.', copies: 1, hp: 60, attack: 40, decorations: 5 },
   { id: 'ma-032', name: 'Iron Maiden', type: 'infected', set: 'alliance', text: 'No effect.', copies: 2, hp: 50, attack: 30, decorations: 4 },
