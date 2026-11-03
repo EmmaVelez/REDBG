@@ -464,13 +464,17 @@ export function applyAction(state: GameState, action: Action): GameState {
             return sum + (eff && eff.kind === 'plusDamageIfSelfHpAtLeast' && player.hp >= eff.hp ? eff.amount : 0);
           }, 0);
 
-          const exploreWeapons = weaponDefs.map(w => ({
-            damage: (w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0),
-            ammoReq: ammoReqForWeapon(abilities, w),
-            weaponEffects: w?.weaponEffects,
-            tags: w?.weaponTags,
-          }));
-          // Passive damage abilities: Barry L2 magnums, Krauser L2 knives,
+          const exploreWeapons = weaponDefs.map(w => {
+            const isX = w?.weaponEffects?.some(e => e.kind === 'damageEqualsCurrentAmmo');
+            return {
+              damage: isX ? player.turnAmmo : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0)),
+              ammoReq: isX ? 0 : ammoReqForWeapon(abilities, w),
+              weaponEffects: w?.weaponEffects,
+              tags: w?.weaponTags,
+            };
+          });
+
+          // Passive damage abilities
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
           // fights exploreCount Infected in one attack).
           const abilityDamage =
