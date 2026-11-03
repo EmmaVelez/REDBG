@@ -1232,6 +1232,20 @@ export function applyAction(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'uroborosInjection' && chosenId !== undefined) {
+        const window = state.reactiveTrashWindow;
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
+          ),
+          removed: [...state.removed, chosenId],
+          reactiveTrashWindow: undefined,
+          prompts: newPrompts,
+        };
+      }
+
       if (kind === 'jillFlashGrenade' && chosenId !== undefined) {
         const window = state.reactiveTrashWindow;
         const trashed = true;
