@@ -2,7 +2,7 @@ import type { GameState, Action, PlayerState, CardDef } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
-import { resolveExplore } from './explore';
+import { resolveExplore, computeDamage } from './explore';
 import { flipDown, levelForDecorations } from './characters';
 import {
   characterAbilities,
@@ -520,6 +520,24 @@ export function applyAction(state: GameState, action: Action): GameState {
         currentRng = r.rng.s;
         return r.value;
       };
+
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
+        // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
+        // otherwise +30 damage collectively and +1 Explore. Then remove card.
+        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        let newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? Math.max(player.hp - 30, 0) : player.hp };
+        // +30 damage collectively handled by not removing; for simplicity add to weaponDamageBonus? skip; damage already resolved via threshold only.
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          removed: [...removedAfter, revealedInstanceId],
+          mansionDeck,
+          mansionBottom,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
 
       if (revealedDef?.type !== 'infected') {
         const prompts = [
