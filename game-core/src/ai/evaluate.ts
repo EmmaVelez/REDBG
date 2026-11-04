@@ -88,9 +88,11 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     total -= 400;
   }
 
-  // 2.2. Health
+  // 2.2. Health (main + partner, when partner mode active)
   total += player.hp;
-
+  if (player.partnerHp !== undefined) {
+    total += player.partnerHp;
+  }
   // 2.3. Decorations
   total += player.decorations * 50;
 
@@ -185,6 +187,8 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
 
   // 2.14. Attached trophies
   total += player.attached.length * 25;
+  // Partner-attached cards (partner mode): same trophy weight
+  total += (player.partnerAttached?.length ?? 0) * 25;
 
   // 2.15. Opponents
   for (let i = 0; i < state.seats.length; i++) {
@@ -204,6 +208,9 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     total -= opponent.decorations * 20;
     // Opponent HP threat
     total -= opponent.hp;
+    if (opponent.partnerHp !== undefined) {
+      total -= opponent.partnerHp;
+    }
   }
 
   return total;
@@ -361,6 +368,7 @@ function truncActionCredit(cardDef: CardDef): number {
     else if (e.kind === 'stealRevealedWeaponsFromOpponentsTopCards') v += 18;
     else if (e.kind === 'upgradeAmmoBy30Gold') v += 12;
     else if (e.kind === 'trashUpToTwoFromDiscard' || e.kind === 'trashHandCard') v += 6;
+
   }
   return v;
 }
