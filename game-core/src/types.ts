@@ -354,6 +354,9 @@ export interface PlayerState {
   readonly partnerAttached?: readonly string[];
   /** Whether partner leads exploration this turn (shared explore). */
   readonly partnerLeading?: boolean;
+  /** Partner health, tracked separately from main character. */
+  readonly partnerHp?: number;
+  readonly partnerMaxHp?: number;
   readonly inventory: readonly string[]; // deck, top = index 0
   readonly hand: readonly string[];
   readonly discard: readonly string[];

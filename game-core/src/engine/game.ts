@@ -281,6 +281,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       ...(partnerInstanceId !== undefined ? { partnerInstanceId } : {}),
       hp: maxHp,
       maxHp,
+      ...(partnerInstanceId !== undefined ? { partnerHp: (defsById.get(partnerInstanceId!.split('#')[0]!)?.maxHp ?? 100), partnerMaxHp: (defsById.get(partnerInstanceId!.split('#')[0]!)?.maxHp ?? 100) } : {}),
       decorations: 0,
       // Chris (and any level1At: 0 character) starts with their L1 ability
       // active; everyone else starts at level 0 until their first decoration.

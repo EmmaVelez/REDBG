@@ -919,9 +919,12 @@ export function applyAction(state: GameState, action: Action): GameState {
       // a partner, redirect the damage to his partner instead (partner absorbs
       // it; Hunk takes none). Automatic redirect when a partner is present.
       const hasDamageRedirect = characterAbilities(state, seat).some(a => a.kind === 'damageRedirectToPartner');
-      const newHp = (hasDamageRedirect && player.partnerInstanceId)
-        ? player.hp
-        : Math.max(player.hp - outcome.damageTaken, 0);
+      const leadingIsPartner = !!player.partnerInstanceId && player.partnerLeading === true;
+      const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
+      const newLeadingHp = (hasDamageRedirect && player.partnerInstanceId)
+        ? baseLeadingHp
+        : Math.max(baseLeadingHp - outcome.damageTaken, 0);
+      const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
       let hand: readonly string[] = handAfter;
       let discard: readonly string[] = discardAfterExplosives;
@@ -969,6 +972,7 @@ export function applyAction(state: GameState, action: Action): GameState {
               turnGold: turnGoldAfter,
               mustExplore: false,
               hp: newHp,
+              ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
               downed,
             };
 
