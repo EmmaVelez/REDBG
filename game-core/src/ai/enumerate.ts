@@ -122,9 +122,8 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
         }
       }
     }
-    // chooseExploreLeader when partner present
-    generatedActions.push({ type: 'chooseExploreLeader', seat, leader: 'main' });
-    generatedActions.push({ type: 'chooseExploreLeader', seat, leader: 'partner' });
+  // partner mode leader selection is handled automatically; bots should not pick manually
+
   }
 
   // --- 7. endTurn ---
