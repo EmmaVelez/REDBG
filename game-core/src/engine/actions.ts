@@ -1503,11 +1503,11 @@ export function applyAction(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s =>
-            s.seat === seat ? { ...player, hand: [...player.hand.filter(id => id !== chosenId), gainedId] } : s,
+            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId), discard: [...player.discard, gainedId] } : s,
           ),
           cards: {
             ...state.cards,
-            [gainedId]: { instanceId: gainedId, cardId: target.id, location: { zone: 'hand', index: 0, seat } },
+            [gainedId]: { instanceId: gainedId, cardId: target.id, location: { zone: 'discard', index: 0, seat } },
           },
           removed: [...state.removed, chosenId],
           prompts: newPrompts,
