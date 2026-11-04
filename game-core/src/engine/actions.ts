@@ -3,7 +3,7 @@ import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
-import { flipDown, levelForDecorations } from './characters';
+import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
   characterAbilities,
   ammoReqForWeapon,
@@ -21,6 +21,7 @@ import {
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
+import { gainCard } from './gainCard';
 import { makeRng, shuffle } from '../util/rng';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
@@ -990,22 +991,63 @@ export function applyAction(state: GameState, action: Action): GameState {
         throw new Error('applyAction: buy: unknown pile: ' + pileId);
       }
       const boughtInstanceId = pile.cards[0] as string;
-      const cost = cardDef(state, boughtInstanceId)?.cost ?? 0;
+      const boughtDef = cardDef(state, boughtInstanceId);
+      let cost = boughtDef?.cost ?? 0;
 
-      const newPlayer: PlayerState = {
-        ...player,
-        turnGold: player.turnGold - cost,
-        buysLeft: player.buysLeft - 1,
-        discard: [...player.discard, boughtInstanceId],
-      };
+      // Mikhail Victor L1: weapons cost `amount` less to buy.
+      const charInst = state.cards[player.characterInstanceId];
+      const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+      const reductionAbility = charDef?.abilities !== undefined
+        ? abilitiesForLevel(charDef.abilities, player.level).find(a => a.kind === 'weaponBuyCostReduction')
+        : undefined;
+      if (reductionAbility !== undefined && boughtDef?.type === 'weapon') {
+        cost = Math.max(0, cost - (reductionAbility as { amount: number }).amount);
+      }
+
+      // Carlos Oliveira L2: on buy card cost >= threshold, +amount explore.
+      const exploreAbility = charDef?.abilities !== undefined
+        ? abilitiesForLevel(charDef.abilities, player.level).find(a => a.kind === 'exploreOnBuyCardCostAtLeast')
+        : undefined;
+      const boughtCost = boughtDef?.cost ?? 0;
+      const bonusExplores = (exploreAbility !== undefined && boughtCost >= (exploreAbility as { threshold: number }).threshold)
+        ? (exploreAbility as { amount: number }).amount
+        : 0;
+
       const marketPiles = { ...state.marketPiles, [pileId]: { pileId, cards: pile.cards.slice(1) } };
 
-      return {
+      let s: GameState = {
         ...state,
         ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+        seats: state.seats.map(s => (s.seat === seat ? {
+          ...player,
+          turnGold: player.turnGold - cost,
+          buysLeft: player.buysLeft - 1,
+          exploresLeft: player.exploresLeft + bonusExplores,
+        } : s)),
         marketPiles,
       };
+      // Centralized gain: bought card moves to discard (or hand under Gathering Forces).
+      s = gainCard(s, { seat, cardId: (boughtDef?.id ?? boughtInstanceId.split('#')[0]) as string, destination: 'discard', reason: 'buy' });
+      // ensure instance id matches the actual bought instance rather than a new one
+      // (gainCard generated a new id; revert to use the popped market instance)
+      // Simpler: keep original behavior by appending boughtInstanceId directly.
+      // Roll back gainCard's added instance and use the popped one:
+      const gainedIds = Object.keys(s.cards).filter(k => k.startsWith((boughtDef?.id ?? '') + '#g'));
+      // Remove generated instances
+      const cards2 = { ...s.cards };
+      for (const gid of gainedIds) delete cards2[gid];
+      const seatPlayer = s.seats[seat] as PlayerState;
+      const cleanedPlayer = {
+        ...seatPlayer,
+        hand: seatPlayer.hand.filter(id => !gainedIds.includes(id)),
+        discard: seatPlayer.discard.filter(id => !gainedIds.includes(id)),
+      };
+      // append original bought instance
+      cleanedPlayer.discard = [...cleanedPlayer.discard, boughtInstanceId];
+      cards2[boughtInstanceId] = state.cards[boughtInstanceId] ?? { instanceId: boughtInstanceId, cardId: boughtDef?.id ?? '', location: { zone: 'discard', index: 0, seat } };
+      s = { ...s, cards: cards2, seats: s.seats.map(p => (p.seat === seat ? cleanedPlayer : p)) };
+
+      return s;
     }
 
     case 'useCharacterAbility': {

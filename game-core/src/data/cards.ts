@@ -336,6 +336,7 @@ export const PARTNERS_IN_ESCAPE_SCENARIO_DEF = {
   name: 'Partners in Escape',
   description: 'Partners in Escape scenario - Red Herb plus partner-focused action and weapon piles.',
   piles: PARTNERS_IN_ESCAPE_PILES,
+  alliance: true,
 };
 
 export const ALLIANCE_SCENARIO_DEF = {
@@ -343,6 +344,7 @@ export const ALLIANCE_SCENARIO_DEF = {
   name: 'Alliance',
   description: 'Stand-alone expansion scenario — Basic Resources + all Alliance card piles.',
   piles: ALLIANCE_PILES,
+  alliance: true,
 };
 
 /** Scenario definition interface for type exports */
@@ -351,6 +353,7 @@ export interface ScenarioDef {
   readonly name: string;
   readonly description: string;
   readonly piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
+  readonly alliance?: boolean;
 }
 
 
