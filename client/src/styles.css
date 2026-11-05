@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Bohemian Typewriter';
+  src: url('/fonts/BohemianTypewriter.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* M4-T11 polish: Resident Evil DBG-style card frames + hover card popup.
    The original game's cards: dark distressed frame with a colored band per
    type, badge cost, and double-border (outer type color, inner black). */
@@ -20,7 +28,7 @@ body {
     radial-gradient(1200px 600px at 70% -10%, #23262e 0%, transparent 60%),
     var(--bg);
   color: var(--text);
-  font: 14px/1.4 system-ui, sans-serif;
+  font: 14px/1.4 'Bohemian Typewriter', monospace;
 }
 
 button {
@@ -182,7 +190,7 @@ h1, h2 { margin: 0 0 8px; }
     inset 0 0 0 1px var(--cc-line),
     inset 0 0 0 3px var(--cc-frame),
     0 2px 6px rgba(0, 0, 0, 0.6);
-  font-family: Consolas, ui-monospace, 'Courier New', monospace;
+  font-family: 'Bohemian Typewriter', monospace;
 }
 .card-character::before { display: none; } /* no gradient type band */
 

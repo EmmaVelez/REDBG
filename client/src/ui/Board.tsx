@@ -70,7 +70,13 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
       <div className="board-mansion">
         <h2 className="board-section-title">Mansion</h2>
         <div className="mansion-piles">
-          <ZonePile label="Deck" count={state.mansionDeck.length} animZone="mansion" />
+                  <div className="zone-pile" data-anim-zone="mansion" data-pile-count={state.mansionDeck.length}>
+                    <span className="zone-pile-label">Deck</span>
+                    <div className="zone-pile-stack">
+                      <img src="/mansion-deck.svg" alt="Mansion deck" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
+                    </div>
+                    <span className="zone-pile-count">{state.mansionDeck.length}</span>
+                  </div>
           <div className="mansion-counts" data-anim-zone="mansionBottom">
             <span>Bottom: {state.mansionBottom.length}</span>
             <span>Removed: {state.removed.length}</span>
