@@ -71,7 +71,8 @@ h1, h2 { margin: 0 0 8px; }
   --card-accent: #8fa3b0; /* default steel */
   position: relative;
   width: 150px;
-  min-height: 90px;
+  aspect-ratio: 5 / 7;
+  min-height: 0;
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
@@ -150,13 +151,174 @@ h1, h2 { margin: 0 0 8px; }
 .card-hidden { color: var(--muted); display: flex; align-items: center; justify-content: center; }
 
 /* per-type accents (matching the game's color language) */
-.card-character { --card-accent: #c9a86a; }
 .card-weapon    { --card-accent: #8fa3b0; }
 .card-ammo      { --card-accent: #c9a227; }
 .card-item      { --card-accent: #6fae6f; }
 .card-action    { --card-accent: #9c6fce; }
 .card-token     { --card-accent: #d4af37; }
 .card-infected  { --card-accent: #b3403a; }
+
+/* ---- character card: pixel-art frame (M5 redesign) ----
+   Reference frame: chunky charcoal border + thin light inner line with
+   corner ticks, centered [CHARACTER] banner, tall art window (portrait
+   artwork to be supplied later), red name on a maroon bar, pale rules
+   panel with charcoal [icon|level|gate] stat boxes per skill row.
+   Proportions: 168:228 aspect; head ~14px, art flex ~55%, name bar
+   and cream panel content-sized. */
+.card.card-character {
+  --cc-frame: #0c0d10;
+  --cc-line: #d8dbd3;
+  aspect-ratio: 5 / 7;
+  min-height: 0;
+  padding: 4px;
+  gap: 0;
+  border: 3px solid var(--cc-frame);
+  border-radius: 3px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg, #26282e 0%, #1a1b1f 100%);
+  box-shadow:
+    inset 0 0 0 1px var(--cc-line),
+    inset 0 0 0 3px var(--cc-frame),
+    0 2px 6px rgba(0, 0, 0, 0.6);
+  font-family: Consolas, ui-monospace, 'Courier New', monospace;
+}
+.card-character::before { display: none; } /* no gradient type band */
+
+.card-character::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--cc-line), var(--cc-line)) 4px 4px / 2px 2px no-repeat,
+    linear-gradient(var(--cc-line), var(--cc-line)) calc(100% - 4px) 4px / 2px 2px no-repeat,
+    linear-gradient(var(--cc-line), var(--cc-line)) 4px calc(100% - 4px) / 2px 2px no-repeat,
+    linear-gradient(var(--cc-line), var(--cc-line)) calc(100% - 4px) calc(100% - 4px) / 2px 2px no-repeat;
+}
+
+.card-character .cc-head {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 14px;
+  padding: 1px 0 3px;
+}
+.card-character .card-type {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--cc-line);
+  text-shadow: none;
+}
+.card-character .cc-hp {
+  position: absolute;
+  right: 0;
+  top: 1px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #ffd9d9;
+  background: #7d1116;
+  border: 1px solid #000;
+  padding: 0 2px;
+}
+.card-character .cc-hp-ring { position: absolute; right: -1px; top: 0; }
+
+/* art window — portrait artwork to be supplied later */
+.card-character .card-portrait {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 55%;
+  min-height: 34px;
+  margin: 0;
+  border: 1px solid #000;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 38%, #2b313d 0%, #141721 75%),
+    linear-gradient(180deg, #1b1f27 0%, #0d0f13 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  image-rendering: pixelated;
+}
+.card-character .card-portrait::after { content: 'Art'; opacity: 0.55; color: #8b93a3; }
+
+/* red name on a maroon bar */
+.card-character .card-name {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, #7a1218 0%, #4c0a0f 100%);
+  border: 1px solid #000;
+  border-top-width: 0;
+  color: #ff4242;
+  text-shadow: 0 1px 0 #000;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 2px 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* pale rules panel */
+.card-character .card-skills,
+.card-character .card-text {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, #efece1 0%, #dcd9cb 100%);
+  border: 1px solid #000;
+  border-top-width: 0;
+  padding: 4px;
+  color: #1d1f23;
+  font-size: 8px;
+  line-height: 1.3;
+}
+.card-character .card-skills { display: flex; flex-direction: column; gap: 3px; }
+.card-character .skill-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  border-left: none;
+  padding-left: 0;
+}
+.card-character .skill-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  background: #23242a;
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: #f2f2ee;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 3px;
+  min-width: 30px;
+}
+.card-character .skill-icon { flex: 0 0 auto; }
+.card-character .skill-level,
+.card-character .skill-gate { color: #fff; letter-spacing: 0; }
+.card-character .skill-gate { color: #ffd76e; }
+.card-character .skill-unlocked .skill-gate { color: #8dff9e; }
+.card-character .skill-locked .skill-gate { color: #c6c9cf; }
+.card-character .skill-text { font-size: 8px; line-height: 1.25; color: #1d1f23; }
+.card-character .skill-locked { opacity: 0.55; border-left: none; }
+.card-character .skill-locked .skill-level { color: var(--cc-line); }
 
 /* ---- hover card ---- */
 .hover-card { position: relative; display: inline-block; }
@@ -171,7 +333,8 @@ h1, h2 { margin: 0 0 8px; }
 .hover-card-pop.above { transform: translate(-50%, -100%); }
 .hover-card-pop .card {
   width: 232px;
-  min-height: 150px;
+  aspect-ratio: 5 / 7;
+  min-height: 0;
   padding: 10px 12px;
   gap: 6px;
   font-size: 13px;
@@ -190,6 +353,18 @@ h1, h2 { margin: 0 0 8px; }
   margin: 6px 0;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
 }
+
+/* character popup keeps the pixel frame but scales the type up */
+.hover-card-pop .card-character .card-type { font-size: 11px; }
+.hover-card-pop .card-character .cc-hp { font-size: 10px; top: 2px; right: 1px; }
+.hover-card-pop .card-character .cc-hp-ring svg { width: 34px; height: 34px; }
+.hover-card-pop .card-character .card-portrait::after { font-size: 12px; }
+.hover-card-pop .card-character .card-name { font-size: 14px; padding: 3px 6px; letter-spacing: 2px; }
+.hover-card-pop .card-character .card-skills,
+.hover-card-pop .card-character .card-text { font-size: 11px; padding: 6px; gap: 5px; }
+.hover-card-pop .card-character .skill-box { font-size: 12px; padding: 2px 5px; min-width: 42px; gap: 4px; }
+.hover-card-pop .card-character .skill-icon { width: 12px; height: 12px; }
+.hover-card-pop .card-character .skill-text { font-size: 11px; line-height: 1.35; }
 
 @keyframes hover-pop {
   from { opacity: 0; transform: translate(-50%, -6px) scale(0.96); }
@@ -545,7 +720,8 @@ h1, h2 { margin: 0 0 8px; }
 }
 .mansion-door-card .card {
   width: 232px;
-  min-height: 150px;
+  aspect-ratio: 5 / 7;
+  min-height: 0;
   padding: 10px 12px;
   gap: 6px;
   font-size: 13px;
