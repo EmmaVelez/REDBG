@@ -677,6 +677,7 @@ h1, h2 { margin: 0 0 8px; }
 }
 .mansion-door-card .card {
   background: transparent !important;
+  border: none !important;
   justify-content: flex-start;
 }
 .mansion-door-card .card .card-top {
