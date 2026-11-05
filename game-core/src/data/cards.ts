@@ -354,8 +354,30 @@ export interface ScenarioDef {
   readonly description: string;
   readonly piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
   readonly alliance?: boolean;
+  readonly mansionCards?: ReadonlyArray<{ cardId: string; count: number }>;
 }
 
+
+export const STANDARD_MANSION_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
+  { cardId: 'ma-001', count: 3 },
+  { cardId: 'ma-002', count: 2 },
+  { cardId: 'ma-003', count: 2 },
+  { cardId: 'ma-004', count: 3 },
+  { cardId: 'ma-005', count: 3 },
+  { cardId: 'ma-006', count: 3 },
+  { cardId: 'ma-007', count: 1 },
+  { cardId: 'ma-008', count: 2 },
+  { cardId: 'ma-009', count: 2 },
+  { cardId: 'ma-010', count: 1 },
+  { cardId: 'ma-011', count: 3 },
+  { cardId: 'ma-014', count: 3 },
+  { cardId: 'ma-015', count: 3 },
+  { cardId: 'ma-016', count: 1 },
+  { cardId: 'ma-017', count: 1 },
+  { cardId: 'ma-012', count: 1 },
+  { cardId: 'ma-013', count: 1 },
+  { cardId: 'it-002', count: 3 },
+];
 
 export const SCENARIOS = [
   {
@@ -363,24 +385,28 @@ export const SCENARIOS = [
     name: 'First Timer',
     description: 'The starter scenario — a guided intro with The Merchant and Six Shooter.',
     piles: FIRST_TIMER_PILES,
+    mansionCards: STANDARD_MANSION_DECK,
   },
   {
     id: 'classicHorror',
     name: 'Classic Horror',
     description: 'The base-game scenario — Item Management, First Aid Spray, Longbow and Submission for the classic RE arsenal.',
     piles: CLASSIC_HORROR_PILES,
+    mansionCards: STANDARD_MANSION_DECK,
   },
   {
     id: 'spyGames',
     name: 'Spy Games',
     description: 'Master of Unlocking lets you steal weapons from other survivors — plus Ominous Battle and Six Shooter.',
     piles: SPY_GAMES_PILES,
+    mansionCards: STANDARD_MANSION_DECK,
   },
   {
     id: 'whaddyaBuyin',
     name: 'Whaddya Buyin?',
     description: 'The Merchant appears — bargain-hunter economy with Reload, Master of Unlocking and the full rifle lineup.',
     piles: WHADDYA_BUYIN_PILES,
+    mansionCards: STANDARD_MANSION_DECK,
   },
   {
     id: 'battleHardenedVeteran',

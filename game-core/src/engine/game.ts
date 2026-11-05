@@ -157,7 +157,7 @@ function turnStartAbilityPrompts(
   return prompts;
 }
 
-export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>): GameState {
+export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>, mansionCards?: ReadonlyArray<{ cardId: string; count: number }>): GameState {
   const defsById = new Map(cards.map(c => [c.id, c]));
   const cardDefs: Record<string, CardDef> = {};
   for (const c of cards) cardDefs[c.id] = c;
@@ -310,12 +310,24 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
 
   // Mansion: infected + token + Yellow Herb (plusMaxHp20 item — id-independent)
   const mansionIds: string[] = [];
-  for (const c of cards) {
-    if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp'))) {
-      for (let j = 0; j < c.copies; j++) {
+  if (mansionCards !== undefined) {
+    for (const mc of mansionCards) {
+      const c = defsById.get(mc.cardId);
+      if (c === undefined) continue;
+      for (let j = 0; j < mc.count; j++) {
         const id = `${c.id}#${j + 1}`;
         mansionIds.push(id);
         register(id, c.id, 'mansionDeck');
+      }
+    }
+  } else {
+    for (const c of cards) {
+      if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp'))) {
+        for (let j = 0; j < c.copies; j++) {
+          const id = `${c.id}#${j + 1}`;
+          mansionIds.push(id);
+          register(id, c.id, 'mansionDeck');
+        }
       }
     }
   }

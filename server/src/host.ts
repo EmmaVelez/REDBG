@@ -7,6 +7,7 @@ import {
   chooseBotAction,
   sanitize,
   pilesForScenario,
+  SCENARIOS,
   PREMIER_CARDS,
   ALLIANCE_CARDS,
   ALL_CARDS,
@@ -85,7 +86,8 @@ export function createHost(room: Room): GameHost {
       }
       const allianceScenarios = new Set(['alliance', 'partnersInEscape']);
       const cards = allianceScenarios.has(room.scenario) ? ALL_CARDS : PREMIER_CARDS;
-      state = setup({ seed, players, partnerMode: room.partnerMode }, cards, pilesForScenario(room.scenario));
+const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
+      state = setup({ seed, players, partnerMode: room.partnerMode }, cards, pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards);
       return state;
     },
 
