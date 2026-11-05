@@ -39,7 +39,7 @@ export function MansionReveal({ def, resultText, damage, weapons, onContinue }: 
           </div>
         )}
         <div className="mansion-door-card" style={{ backgroundImage: `url(/card-art/${def.id.toUpperCase()}.svg)`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}>
-          <CardView def={def} />
+          <CardView def={def} hideCost />
         </div>
         <span className="mansion-door-result">{resultText}</span>
         <button type="button" className="mansion-door-continue btn-primary" onClick={onContinue}>

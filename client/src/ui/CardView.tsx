@@ -30,9 +30,11 @@ export interface CardViewProps {
   /** Current/max HP — character cards swap their cost badge for the HP ring. */
   readonly hp?: number;
   readonly maxHp?: number;
+  /** Hide the cost badge (e.g. for revealed mansion cards). */
+  readonly hideCost?: boolean;
 }
 
-export function CardView({ def, compact = false, decorations, hp, maxHp }: CardViewProps): JSX.Element {
+export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false }: CardViewProps): JSX.Element {
   if (def.type === 'character') {
     return <CharacterCard def={def} compact={compact} decorations={decorations} hp={hp} maxHp={maxHp} />;
   }
@@ -42,7 +44,7 @@ export function CardView({ def, compact = false, decorations, hp, maxHp }: CardV
     <div className={`card ${typeClass(def.type)}`} data-card-id={def.id} data-card-type={def.type}>
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
-        <span className="card-cost" data-card-cost>{costText(def)}</span>
+        {!hideCost && <span className="card-cost" data-card-cost>{costText(def)}</span>}
       </div>
       <div className="card-name">{def.name}</div>
       {!compact && stats !== '' && <div className="card-stats">{stats}</div>}
