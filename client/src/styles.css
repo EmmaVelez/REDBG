@@ -1,6 +1,6 @@
 @font-face {
-  font-family: 'Bohemian Typewriter';
-  src: url('/fonts/BohemianTypewriter.ttf') format('truetype');
+  font-family: 'Victoria Typewriter';
+  src: url('/fonts/VictoriaTypewriter.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -28,7 +28,7 @@ body {
     radial-gradient(1200px 600px at 70% -10%, #23262e 0%, transparent 60%),
     var(--bg);
   color: var(--text);
-  font: 14px/1.4 'Bohemian Typewriter', monospace;
+  font: 14px/1.4 'Victoria Typewriter', monospace;
 }
 
 button {
@@ -190,7 +190,7 @@ h1, h2 { margin: 0 0 8px; }
     inset 0 0 0 1px var(--cc-line),
     inset 0 0 0 3px var(--cc-frame),
     0 2px 6px rgba(0, 0, 0, 0.6);
-  font-family: 'Bohemian Typewriter', monospace;
+  font-family: 'Victoria Typewriter', monospace;
 }
 .card-character::before { display: none; } /* no gradient type band */
 
