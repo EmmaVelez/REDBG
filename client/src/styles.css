@@ -666,9 +666,9 @@ h1, h2 { margin: 0 0 8px; }
   gap: 4px;
 }
 .flight-card-name { color: #fff; font-weight: 800; font-size: 13px; text-shadow: 0 1px 2px #000; }
-.card-name { text-shadow: 1px 1px 0 #000; }
-.card-stats { text-shadow: 1px 1px 0 #000; }
-.card-text { text-shadow: 1px 1px 0 #000; }
+.card-name { text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
+.card-stats { text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
+.card-text { text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
 .flight-card-type { color: var(--gold); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; }
 .flight-face-down { background: linear-gradient(180deg, #1b1e26 0%, #0e1014 100%); }
 
@@ -687,15 +687,7 @@ h1, h2 { margin: 0 0 8px; }
   display: none !important;
 }
 .mansion-door-card .card::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 40%;
-  background: rgba(80, 80, 80, 0.5);
-  z-index: 0;
-  pointer-events: none;
+  display: none !important;
 }
 .mansion-door-card .card > * {
   position: relative;
@@ -706,7 +698,7 @@ h1, h2 { margin: 0 0 8px; }
   text-align: center;
 }
 .mansion-door-card .card .card-name {
-  margin-top: 68%;
+  margin-top: 80%;
   text-align: center;
 }
 .mansion-door-card .card .card-name,
