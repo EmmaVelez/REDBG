@@ -689,7 +689,7 @@ h1, h2 { margin: 0 0 8px; }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 33%;
+  height: 40%;
   background: rgba(80, 80, 80, 0.5);
   z-index: 0;
   pointer-events: none;
@@ -710,8 +710,8 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-door-card .card .card-stats,
 .mansion-door-card .card .card-bonus,
 .mansion-door-card .card .card-text {
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: 9px;
+  line-height: 1.1;
   text-align: center;
 }
 .btn-primary {
