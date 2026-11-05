@@ -533,12 +533,13 @@ h1, h2 { margin: 0 0 8px; }
 .skill-next { color: var(--muted); }
 
 /* ---- hand / zones ---- */
-.hand { display: flex; flex-wrap: wrap; gap: 8px; }
+.hand { display: flex; flex-wrap: wrap; }
 .hand-card {
   background: transparent;
   border: none;
   padding: 0;
   transition: transform 0.12s ease-out;
+  margin-right: -24px;
 }
 .hand-card:hover { transform: translateY(-6px) scale(1.04); z-index: 2; }
 .hand-card:disabled { opacity: 0.45; }
