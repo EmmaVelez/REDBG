@@ -706,9 +706,12 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: auto;
   text-align: center;
 }
+.mansion-door-card .card .card-name,
 .mansion-door-card .card .card-stats,
 .mansion-door-card .card .card-bonus,
 .mansion-door-card .card .card-text {
+  font-size: 10px;
+  line-height: 1.2;
   text-align: center;
 }
 .btn-primary {
