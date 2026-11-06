@@ -302,7 +302,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'forceExploreOtherPlayer':
         case 'giveOneCardToPlayerThenMaybeAnother':
         case 'revealHandForDamageIfTwoTypes':
-        case 'choosePlayerToDiscardOneCardDuringTurn': {
+        case 'choosePlayerToDiscardOneCardDuringTurn':
+        case 'discardCardToInventoryBottom':
+        case 'inventoryBottomToTop':
+        case 'gainAmmoX10ForGold':
+        case 'discardToHandIfTenPlus': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -337,6 +341,24 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
             }
+          }
+          if (ability.kind === 'gainAmmoX10ForGold') {
+            const available = Object.values(state.marketPiles).some(pile => {
+              const top = pile.cards[0];
+              return top !== undefined && cardDef(state, top)?.id === 'am-001';
+            });
+            if (!available) {
+              return { ok: false, reason: 'useCharacterAbility: no Ammo x10 in the market' };
+            }
+          }
+          if (ability.kind === 'discardToHandIfTenPlus' && player.discard.length < ability.threshold) {
+            return { ok: false, reason: 'useCharacterAbility: not enough cards in discard' };
+          }
+          if (ability.kind === 'discardCardToInventoryBottom' && player.discard.length === 0) {
+            return { ok: false, reason: 'useCharacterAbility: discard is empty' };
+          }
+          if (ability.kind === 'inventoryBottomToTop' && player.inventory.length === 0) {
+            return { ok: false, reason: 'useCharacterAbility: inventory is empty' };
           }
           if (ability.kind === 'choosePlayerToDiscardOneCardDuringTurn') {
             // Nightmare Wesker L2: needs EXACTLY one other living player at

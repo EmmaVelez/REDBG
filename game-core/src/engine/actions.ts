@@ -1300,6 +1300,79 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'gainAmmoX10ForGold': {
+              // Billy (Alliance) L1: gain one Ammo x10 (Resource Area -> discard
+              // per the rules glossary) and get +amount gold.
+              const pileEntry = Object.entries(state.marketPiles).find(([, pile]) => {
+                const top = pile.cards[0];
+                return top !== undefined && cardDef(state, top)?.id === 'am-001';
+              });
+              if (pileEntry === undefined) {
+                return { ...state, ...nextBase };
+              }
+              const [pileId, pile] = pileEntry;
+              const gainedId = pile.cards[0]!;
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...player, discard: [...player.discard, gainedId], turnGold: player.turnGold + ability.amount }
+                  : s)),
+                marketPiles: {
+                  ...state.marketPiles,
+                  [pileId]: { pileId, cards: pile.cards.slice(1) },
+                },
+              };
+            }
+            case 'discardToHandIfTenPlus': {
+              // Billy (Alliance) L2: move one discard card to hand.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Move one card from your discard to your hand.',
+                    options: [...player.discard],
+                    payload: { kind: 'discardToHandIfTenPlus' },
+                  },
+                ],
+              };
+            }
+            case 'discardCardToInventoryBottom': {
+              // Leon (Alliance) L1: choose one discard card and move it to the
+              // BOTTOM of the inventory (the draw pile's far end).
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Move one card from your discard to the bottom of your Inventory.',
+                    options: [...player.discard],
+                    payload: { kind: 'discardCardToInventoryBottom' },
+                  },
+                ],
+              };
+            }
+            case 'inventoryBottomToTop': {
+              // Leon (Alliance) L2: move the bottom card of the inventory to the top.
+              const bottom = player.inventory[player.inventory.length - 1];
+              if (bottom === undefined) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...player, inventory: [bottom, ...player.inventory.slice(0, -1)] }
+                  : s)),
+              };
+            }
             case 'choosePlayerToDiscardOneCardDuringTurn': {
               // Nightmare Wesker L2: the one other player with 30 or less HP
               // discards one card. The victim chooses which card, so the
@@ -1701,6 +1774,37 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'discardToHandIfTenPlus') {
+        // Billy (Alliance) L2: the chosen discard card moves to the hand.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || !player.discard.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, discard: player.discard.filter(id => id !== chosen), hand: [...player.hand, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'discardCardToInventoryBottom') {
+        // Leon (Alliance) L1: the chosen discard card goes to the bottom of the
+        // inventory (appended - the draw pile draws from index 0).
+        const chosen = prompt.options[option];
+        if (chosen === undefined || !player.discard.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, discard: player.discard.filter(id => id !== chosen), inventory: [...player.inventory, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
       if (kind === 'weskerDiscardOneCard') {
         // Nightmare Wesker L2: the victim (the prompt's seat) discards the
         // chosen card from their own hand.

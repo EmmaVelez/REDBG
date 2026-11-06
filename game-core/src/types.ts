@@ -279,7 +279,11 @@ export type CharacterAbility =
   | { readonly kind: "trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat"; readonly level: 1 | 2 } // Leon S. Kennedy (Nightmare) L1: on defeat infected, may trash card from discard then gain card costing up to 20 more
   | { readonly kind: "plusOneCardOnGainCard"; readonly level: 1 | 2 } // Leon S. Kennedy (Nightmare) L2: on gain card, +1 card
   | { readonly kind: "cardsOnDamageTakenDuringTurn"; readonly amount: number; readonly level: 1 | 2 } // Ada Wong (Nightmare) L1: during turn, if Ada takes damage, +amount cards
-  | { readonly kind: "setHpToOnLethal"; readonly amount: number; readonly level: 1 | 2 }; // Ada Wong (Nightmare) L2: when HP would be reduced to 0 or less, set to amount instead
+  | { readonly kind: "setHpToOnLethal"; readonly amount: number; readonly level: 1 | 2 } // Ada Wong (Nightmare) L2: when HP would be reduced to 0 or less, set to amount instead
+  | { readonly kind: "discardCardToInventoryBottom"; readonly level: 1 | 2 } // Leon S. Kennedy (Alliance) L1: during turn, move one discard card to the bottom of the inventory
+  | { readonly kind: "inventoryBottomToTop"; readonly level: 1 | 2 } // Leon S. Kennedy (Alliance) L2: during turn, move the bottom card of the inventory to the top
+  | { readonly kind: "gainAmmoX10ForGold"; readonly amount: number; readonly level: 1 | 2 } // Billy Coen (Alliance) L1: during turn, gain one Ammo x10 and get +amount gold
+  | { readonly kind: "discardToHandIfTenPlus"; readonly threshold: number; readonly level: 1 | 2 }; // Billy Coen (Alliance) L2: during turn, if discard >= threshold, move one discard card to hand
 
 
 // ---------------------------------------------------------------------------
