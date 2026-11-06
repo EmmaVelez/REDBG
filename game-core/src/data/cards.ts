@@ -1,5 +1,6 @@
 import type { CardDef, CardBonuses } from '../types';
 import { ALLIANCE_CARDS } from './alliance';
+import { OUTBREAK_CARDS } from './outbreak';
 
 export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   // Characters
@@ -208,7 +209,7 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
   { pileId: 'sub', cardIds: ['we-003'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape';
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape' | 'outbreak';
 
 export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
   // Basic Resources (Alliance rulebook ch. V)
@@ -330,6 +331,62 @@ export const ALLIANCE_SCENARIO_DEF = {
   alliance: true,
 };
 
+/**
+ * "Outbreak" scenario (RE3 rulebook p.8, base set + Outbreak).
+ * Resource piles: Basic Resources plus the Outbreak additions.
+ */
+export const OUTBREAK_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  // Basic Resources
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  // Outbreak additions
+  { pileId: 'weskers-secret', cardIds: ['ac-025'] },
+  { pileId: 'rf', cardIds: ['we-015', 'we-016'] },
+  { pileId: 'sh', cardIds: ['we-013', 'we-014'] },
+  { pileId: 'magnum', cardIds: ['we-030', 'we-029'] },
+  { pileId: 'stun-rod', cardIds: ['we-028'] },
+  { pileId: 'merc', cardIds: ['ac-006'] },
+  { pileId: 'injection', cardIds: ['ac-026'] },
+  { pileId: 'i-have-this', cardIds: ['ac-024'] },
+  { pileId: 'foyer', cardIds: ['ac-001'] },
+  { pileId: 'smt', cardIds: ['ac-003'] },
+  { pileId: 'escape', cardIds: ['ac-004'] },
+  { pileId: 'tvirus', cardIds: ['ac-023'] },
+];
+
+/** Outbreak mansion deck (MA-041..MA-057, counts per the rulebook card list). */
+export const OUTBREAK_MANSION: ReadonlyArray<{ cardId: string; count: number }> = [
+  { cardId: 'ma-041', count: 1 },
+  { cardId: 'ma-042', count: 2 },
+  { cardId: 'ma-043', count: 1 },
+  { cardId: 'ma-044', count: 3 },
+  { cardId: 'ma-045', count: 2 },
+  { cardId: 'ma-046', count: 2 },
+  { cardId: 'ma-047', count: 3 },
+  { cardId: 'ma-048', count: 2 },
+  { cardId: 'ma-049', count: 3 },
+  { cardId: 'ma-050', count: 2 },
+  { cardId: 'ma-051', count: 3 },
+  { cardId: 'ma-052', count: 2 },
+  { cardId: 'ma-053', count: 1 },
+  { cardId: 'ma-054', count: 1 },
+  { cardId: 'ma-055', count: 2 },
+  { cardId: 'ma-056', count: 1 },
+  { cardId: 'ma-057', count: 1 },
+];
+
+export const OUTBREAK_SCENARIO_DEF = {
+  id: 'outbreak' as ScenarioId,
+  name: 'Outbreak',
+  description: 'Outbreak mode (base set + Outbreak) — Infection levels, the Infection Deck and Infected Characters.',
+  piles: OUTBREAK_PILES,
+  mansionCards: OUTBREAK_MANSION,
+  outbreak: true,
+};
 /** Scenario definition interface for type exports */
 export interface ScenarioDef {
   readonly id: ReadonlyArray<ScenarioId>[0];
@@ -337,6 +394,8 @@ export interface ScenarioDef {
   readonly description: string;
   readonly piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
   readonly alliance?: boolean;
+  /** Outbreak mode: infection levels, Infection Deck, Infected Characters. */
+  readonly outbreak?: boolean;
   readonly mansionCards?: ReadonlyArray<{ cardId: string; count: number }>;
 }
 
@@ -399,6 +458,7 @@ export const SCENARIOS = [
   },
   ALLIANCE_SCENARIO_DEF,
   PARTNERS_IN_ESCAPE_SCENARIO_DEF,
+  OUTBREAK_SCENARIO_DEF,
 ];
 
 export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
@@ -427,7 +487,7 @@ export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
   * cost 50 / ammoReq 0 / damage 10. Telescopic Sight Rifle (we-019) is an
   * Alliance-exclusive rifle with a bottom-reveal mechanic.
  */
-export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS];
+export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS];
 
 export const MANSION_EXTRA_ITEM_IDS: readonly string[] = ['it-002'];
 

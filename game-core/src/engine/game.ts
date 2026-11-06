@@ -182,6 +182,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
 
   const characterIds = cards.filter(c => c.type === 'character').map(c => c.id);
+  // Outbreak mode: infection levels, the Infection Deck and Infected Characters.
+  const outbreakMode = setup.outbreakMode === true || setup.scenario === 'outbreak';
   // Characters are unique per game (user ruling): each seat gets its own
   // character card. Random picks draw from the remaining pool (no
   // replacement), and explicit picks consume their slot — a duplicate
@@ -294,6 +296,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
       damageMultiplierThisTurn: undefined,
+      ...(outbreakMode ? { infectionCards: [] as string[], isInfectedCharacter: false, exploredOrAttackedThisTurn: false } : {}),
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       attached: [],
@@ -353,6 +356,22 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     marketPiles[pileSpec.pileId] = { pileId: pileSpec.pileId, cards: shuffled };
   }
 
+  // Outbreak: the Infection Deck (face down above the Mansion).
+  let infectionDeck: readonly string[] = [];
+  if (outbreakMode) {
+    const infectionIds: string[] = [];
+    for (const c of cards) {
+      if (c.id.startsWith('in-')) {
+        for (let j = 0; j < c.copies; j++) {
+          const id = `${c.id}#${j + 1}`;
+          infectionIds.push(id);
+          register(id, c.id, 'infectionDeck');
+        }
+      }
+    }
+    infectionDeck = rngShuffle(infectionIds);
+  }
+
   return {
     version: 1,
     seed: setup.seed,
@@ -370,6 +389,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     prompts: [],
     winners: [],
     log: [],
+    ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
   };
 }
 
@@ -381,6 +401,49 @@ export function startTurn(state: GameState): GameState {
   const player = state.seats[state.activeSeat] as PlayerState;
   const charInst = state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+
+  // Outbreak: a Character who died of the Infection reanimates as a random
+  // Infected Character (Zombie A/B/C), keeping its Decorations.
+  if (player.pendingReanimate === true) {
+    const zombieIds = ['ch-031', 'ch-032', 'ch-033'];
+    const pick = nextInt(makeRng(state.rngState), zombieIds.length);
+    const zombieId = zombieIds[pick.value] ?? 'ch-031';
+    const zDef = state.cardDefs[zombieId];
+    const zMaxHp = zDef?.maxHp ?? 100;
+    const instanceId = `${zombieId}#${player.seat + 1}`;
+    const d = drawWithReshuffle({ deck: player.inventory, discard: [], count: 5, rngState: pick.rng.s });
+    const newPlayer: PlayerState = {
+      ...player,
+      characterInstanceId: instanceId,
+      hp: zMaxHp,
+      maxHp: zMaxHp,
+      dead: false,
+      downed: false,
+      isInfectedCharacter: true,
+      pendingReanimate: undefined,
+      hand: d.hand,
+      inventory: d.deck,
+      discard: d.discard,
+      playArea: [],
+      attached: [],
+      infectionCards: [],
+      turnAmmo: 0,
+      turnGold: 0,
+      actionsLeft: 0,
+      buysLeft: 0,
+      exploresLeft: 1,
+      exploredOrAttackedThisTurn: false,
+    };
+    return {
+      ...state,
+      rngState: d.rngState,
+      cards: {
+        ...state.cards,
+        [instanceId]: { instanceId, cardId: zombieId, location: { zone: 'hand' as CardZone, index: 0 } },
+      },
+      seats: state.seats.map(s => (s.seat === player.seat ? newPlayer : s)),
+    };
+  }
 
   if (player.downed) {
     const ch = revive({
@@ -498,6 +561,16 @@ export function startTurn(state: GameState): GameState {
         : 0),
     weaponDamageBonusThisTurn: 0,
     damageMultiplierThisTurn: undefined,
+    ...(player.isInfectedCharacter === true
+      ? {
+          // Infected Characters (rulebook): 0 Buys, 0 Actions, 1 Explore,
+          // no Weapons/Items, cannot change their Infection Level.
+          actionsLeft: 0,
+          buysLeft: 0,
+          exploresLeft: 1,
+        }
+      : {}),
+    exploredOrAttackedThisTurn: false,
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,
@@ -565,7 +638,25 @@ export function startTurn(state: GameState): GameState {
   };
 }
 
-export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' } {
+export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' } {
+  // Scenario trigger (Outbreak: Tyrant T-002) - ends the game as soon as that
+  // Infected is Defeated and attached to a Character.
+  if (state.endInfectedCardId !== undefined) {
+    const defeated = state.seats.some(seat =>
+      seat.attached.some(instanceId => state.cards[instanceId]?.cardId === state.endInfectedCardId),
+    );
+    if (defeated) {
+      const ranked = state.seats
+        .map((seat, i) => ({ index: i, decorations: seat.decorations, hp: seat.hp }))
+        .sort((a, b) => b.decorations - a.decorations || b.hp - a.hp);
+      const top = ranked[0];
+      const winners = (top === undefined ? [] : ranked
+        .filter((w) => w.decorations === top.decorations && w.hp === top.hp)
+        .map(w => w.index)
+        .sort((a, b) => a - b));
+      return { gameOver: true, winners, endReason: 'scenarioInfectedDefeated' };
+    }
+  }
   const uroborosDefeated = state.seats.some(seat =>
     seat.attached.some(instanceId => {
       const inst = state.cards[instanceId];

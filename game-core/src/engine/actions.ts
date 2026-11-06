@@ -141,7 +141,80 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number
  * out of sync when a new damage source is added.
  */
 export function applyAction(state: GameState, action: Action): GameState {
-  return applyDamageTakenHooks(state, applyActionInternal(state, action));
+  const next = applyDamageTakenHooks(state, applyActionInternal(state, action));
+  return applyOutbreakHooks(state, next, action);
+}
+
+/** Outbreak: all Characters have a Maximum Infection Level of 10. */
+export const MAX_INFECTION_LEVEL = 10;
+
+/**
+ * Outbreak hooks that must run AFTER an action is applied:
+ *  - Exploring the Mansion or Attacking an Infected Character suppresses
+ *    that seat's end-of-turn Infection increase.
+ *  - Reaching the Maximum Infection Level kills the Character, who
+ *    reanimates as an Infected Character on its next turn.
+ */
+function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): GameState {
+  void prev;
+  let state = next;
+  const mark = (seat: number): void => {
+    const s = state.seats[seat];
+    if (s === undefined) return;
+    state = {
+      ...state,
+      seats: state.seats.map(x => (x.seat === seat ? { ...x, exploredOrAttackedThisTurn: true } : x)),
+    };
+  };
+  if (action.type === 'explore') {
+    mark(action.seat);
+  } else if (action.type === 'attack') {
+    const target = state.seats[action.targetSeat];
+    if (target?.isInfectedCharacter === true) mark(action.seat);
+  }
+  if (state.infectionDeck === undefined) return state;
+  for (let i = 0; i < state.seats.length; i++) {
+    const s = state.seats[i];
+    if (s === undefined) continue;
+    const level = s.infectionCards?.length ?? 0;
+    if (level >= MAX_INFECTION_LEVEL && !s.dead && s.isInfectedCharacter !== true) {
+      state = reanimateAsInfected(state, s.seat);
+    }
+  }
+  return state;
+}
+
+/**
+ * Outbreak "Becoming the Infected": shuffle the Character's cards together
+ * (including the face-up Infections), remove the Character card and its
+ * non-Infected attachments, and mark the seat to reanimate as a random
+ * Infected Character on its next turn.
+ */
+function reanimateAsInfected(state: GameState, seat: number): GameState {
+  const player = state.seats[seat] as PlayerState;
+  const combined = shuffle(makeRng(state.rngState), [
+    ...player.hand,
+    ...player.discard,
+    ...player.inventory,
+    ...(player.infectionCards ?? []),
+  ]);
+  const newPlayer: PlayerState = {
+    ...player,
+    dead: true,
+    downed: false,
+    hp: 0,
+    hand: [],
+    playArea: [],
+    discard: [],
+    inventory: combined.value,
+    infectionCards: [],
+    pendingReanimate: true,
+  };
+  return {
+    ...state,
+    rngState: combined.rng.s,
+    seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+  };
 }
 
 function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
@@ -1538,12 +1611,95 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)) };
         }
 
+    case 'attack': {
+          const { seat, targetSeat, weaponInstanceId } = action;
+          const player = state.seats[seat] as PlayerState;
+          const target = state.seats[targetSeat] as PlayerState;
+          const attackerDef = cardDef(state, player.characterInstanceId);
+          const infectedAttacker = player.isInfectedCharacter === true;
+
+          let damage = 0;
+          let newHand = player.hand;
+          let newPlayArea = player.playArea;
+          let newDiscard = player.discard;
+          let turnAmmoAfter = player.turnAmmo;
+
+          if (infectedAttacker) {
+            // Infected Characters deal their base Damage (Zombie A/B/C: 0/5/10).
+            damage = attackerDef?.baseDamage ?? 0;
+          } else {
+            const wId = weaponInstanceId ?? player.hand.find(id => cardDef(state, id)?.type === 'weapon');
+            if (wId === undefined) {
+              throw new Error('applyAction: attack: no weapon available');
+            }
+            const wDef = cardDef(state, wId);
+            if (wDef === undefined) {
+              throw new Error('applyAction: attack: unknown weapon');
+            }
+            const req = wDef.ammoReq ?? 0;
+            if (player.turnAmmo < req) {
+              throw new Error('applyAction: attack: insufficient ammo');
+            }
+            turnAmmoAfter = player.turnAmmo - req;
+            damage = computeDamage({ weapons: [{ damage: wDef.damage ?? 0, ammoReq: req }], ammo: turnAmmoAfter, bonusDamage: 0 });
+            if (player.hand.includes(wId)) {
+              newHand = player.hand.filter(id => id !== wId);
+              newDiscard = [...newDiscard, wId];
+            } else if (player.playArea.includes(wId)) {
+              newPlayArea = player.playArea.filter(id => id !== wId);
+            }
+          }
+
+          const targetDef = cardDef(state, target.characterInstanceId);
+          const targetSurvives = target.hp - damage > 0;
+          const newTarget: PlayerState = { ...target, hp: target.hp - damage };
+          let finalPlayer: PlayerState = {
+            ...player,
+            hand: newHand,
+            playArea: newPlayArea,
+            discard: newDiscard,
+            turnAmmo: turnAmmoAfter,
+            exploresLeft: player.exploresLeft - 1,
+          };
+          // An Infected Character that survives deals its base Damage back.
+          if (targetSurvives && target.isInfectedCharacter === true) {
+            finalPlayer = { ...finalPlayer, hp: finalPlayer.hp - (targetDef?.baseDamage ?? 0) };
+          }
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => {
+              if (s.seat === seat) return finalPlayer;
+              if (s.seat === targetSeat) return newTarget;
+              return s;
+            }),
+          };
+        }
+
     case 'endTurn': {
           const { seat } = action;
           const player = state.seats[seat] as PlayerState;
 
           const dh = discardHand({ hand: player.hand, discard: player.discard });
           const dh2 = discardHand({ hand: player.playArea, discard: dh.discard });
+
+          // Outbreak: if the active Player did not Explore the Mansion or
+          // Attack an Infected Character this turn, increase their Infection
+          // Level by 1 (draw the top Infection card, place it face up next to
+          // the Character). Infected Characters cannot change their level.
+          let infectionDeckOut = state.infectionDeck ?? [];
+          const infectionCardsOut = [...(player.infectionCards ?? [])];
+          if (
+            state.infectionDeck !== undefined &&
+            player.exploredOrAttackedThisTurn !== true &&
+            player.isInfectedCharacter !== true
+          ) {
+            const [topInfection, ...restInfections] = infectionDeckOut;
+            if (topInfection !== undefined) {
+              infectionCardsOut.push(topInfection);
+              infectionDeckOut = restInfections;
+            }
+          }
 
           const ctx = advanceTurn({
             seatCount: state.seats.length,
@@ -1562,6 +1718,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               hand: [],
               discard: dh2.discard,
               playArea: [],
+              infectionCards: infectionCardsOut,
             };
             return {
               ...state,
@@ -1569,6 +1726,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               seats: state.seats.map(s => (s.seat === seat ? downedPlayer : s)),
               activeSeat: ctx.activeSeat,
               turnNumber: ctx.turnNumber,
+              ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
             };
           }
 
@@ -1582,6 +1740,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             inventory: d.deck,
             discard: d.discard,
             playArea: [],
+            infectionCards: infectionCardsOut,
           };
 
           return {
@@ -1591,6 +1750,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             activeSeat: ctx.activeSeat,
             turnNumber: ctx.turnNumber,
             rngState: d.rngState,
+            ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
           };
         }
 

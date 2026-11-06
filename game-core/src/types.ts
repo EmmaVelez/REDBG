@@ -36,6 +36,7 @@ export type CardZone =
   | "attached"     // attached under a Character (defeated Infected trophies)
   | "inventory"    // player's deck (top = index 0)
   | "discard"
+  | "infectionDeck" // Outbreak: face-down Infection Deck
   | "removed";     // removed from the game
 
 export interface CardLocation {
@@ -105,6 +106,10 @@ export interface CardDef {
   // -- character --
     /** Starting AND maximum Health at Level 1. */
     readonly maxHp?: number;
+    /** Outbreak: base Damage this Character deals when Attacking (Infected
+     *  Characters). 0 when absent (rulebook: all characters have base
+     *  Damage 0 if not shown otherwise). */
+    readonly baseDamage?: number;
     /** Decorations needed to reach Level 2. */
     readonly level2At?: number;
     /** Decorations needed to reach Level 1 (default 0; Krauser requires 1). */
@@ -395,6 +400,17 @@ export interface PlayerState {
   /** Instance ids of cards gained this turn (for WE-026 etc.). */
   readonly gainedThisTurn?: readonly string[];
 
+  /** Outbreak: the face-up Infection cards next to this Character. The
+   *  Infection Level IS the number of these cards (rulebook). */
+  readonly infectionCards?: readonly string[];
+  /** Outbreak: this seat has reanimated as an Infected Character. */
+  readonly isInfectedCharacter?: boolean;
+  /** Outbreak: the Character died of the Infection and will reanimate as an
+   *  Infected Character when its next turn comes around. */
+  readonly pendingReanimate?: boolean;
+  /** Outbreak: this seat Explored the Mansion or Attacked an Infected
+   *  Character this turn (suppresses the end-of-turn Infection increase). */
+  readonly exploredOrAttackedThisTurn?: boolean;
   /** Face-down (recovering): revives on own turn with -20 maxHp, skips it. */
   readonly downed: boolean;
   /** Permanently dead (maxHp reached 0). */
@@ -434,6 +450,12 @@ export interface GameState {
 
   /** Removed-from-game cards. */
   readonly removed: readonly string[];
+
+  /** Outbreak: the Infection Deck (face down above the Mansion). */
+  readonly infectionDeck?: readonly string[];
+  /** Scenario win trigger: the game ends when this Infected is Defeated
+   *  (Outbreak: Tyrant T-002, ma-041). */
+  readonly endInfectedCardId?: string;
 
   /** Every card instance, keyed by instanceId. */
   readonly cards: Readonly<Record<string, CardInstance>>;
@@ -488,6 +510,11 @@ export type Action =
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>> }
+  /** Outbreak: spend 1 Explore to Attack another Character (instead of
+   *  revealing the Mansion). Non-Infected attackers must name a weapon.
+   *  Infected attackers deal their base Damage.
+   */
+  | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }
@@ -508,7 +535,10 @@ export interface GameSetup {
     readonly partnerCharacterId?: string;
   }>;
   /** Scenario config (defaults to First Timer Story Mode). */
-  readonly scenario?: "firstTimer";
+  readonly scenario?: "firstTimer" | "outbreak";
+  /** Outbreak mode: infection levels, the Infection Deck and Infected
+   *  Characters. Implied by scenario === 'outbreak'. */
+  readonly outbreakMode?: boolean;
   /** Enable Partner Modification rules (Alliance expansion). */
   readonly partnerMode?: boolean;
 }

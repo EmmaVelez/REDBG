@@ -231,6 +231,53 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             }
             return { ok: true };
 
+    case 'attack':
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'attack: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `attack: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'attack: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'attack: not your turn' };
+      }
+      const target = state.seats[action.targetSeat];
+      if (target === undefined) {
+        return { ok: false, reason: 'attack: unknown target' };
+      }
+      if (action.targetSeat === action.seat) {
+        return { ok: false, reason: 'attack: cannot attack yourself' };
+      }
+      if (target.dead) {
+        return { ok: false, reason: 'attack: target is dead' };
+      }
+      if (player.exploresLeft < 1) {
+        return { ok: false, reason: 'attack: no explores left' };
+      }
+      // Infected Characters cannot attack other Infected Characters.
+      if (player.isInfectedCharacter === true && target.isInfectedCharacter === true) {
+        return { ok: false, reason: 'attack: infected cannot attack infected' };
+      }
+      if (player.isInfectedCharacter === true) {
+        return { ok: true };
+      }
+      const attackWeaponId = action.weaponInstanceId
+        ?? player.hand.find(id => cardDef(state, id)?.type === 'weapon');
+      if (attackWeaponId === undefined) {
+        return { ok: false, reason: 'attack: no weapon' };
+      }
+      const attackWeaponDef = cardDef(state, attackWeaponId);
+      if (attackWeaponDef === undefined || attackWeaponDef.type !== 'weapon') {
+        return { ok: false, reason: 'attack: not a weapon' };
+      }
+      if (player.turnAmmo < (attackWeaponDef.ammoReq ?? 0)) {
+        return { ok: false, reason: 'attack: insufficient ammo' };
+      }
+      return { ok: true };
+
     case 'buy':
       if (state.phase !== 'main') {
         return { ok: false, reason: 'buy: not in main phase' };

@@ -86,6 +86,28 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       });
     }
 
+  // --- 4c. attack (Outbreak) ---
+  // Attacking spends 1 Explore. Non-Infected attackers must name a weapon
+  // they can pay the ammo for; Infected attackers deal their base Damage.
+  if (state.infectionDeck !== undefined && player.exploresLeft >= 1) {
+    const infectedAttacker = player.isInfectedCharacter === true;
+    for (let t = 0; t < state.seats.length; t++) {
+      const target = state.seats[t];
+      if (target === undefined || t === seat || target.dead) continue;
+      if (infectedAttacker && target.isInfectedCharacter === true) continue;
+      if (infectedAttacker) {
+        generatedActions.push({ type: 'attack', seat, targetSeat: t });
+      } else {
+        for (const wId of weaponsAvailable) {
+          const cd = state.cardDefs[state.cards[wId]?.cardId ?? ''];
+          if ((cd?.ammoReq ?? 0) <= player.turnAmmo) {
+            generatedActions.push({ type: 'attack', seat, targetSeat: t, weaponInstanceId: wId });
+          }
+        }
+      }
+    }
+  }
+
   // --- 5. buy ---
   // Object.keys preserves insertion order in modern JS environments
   const pileIds = Object.keys(state.marketPiles);

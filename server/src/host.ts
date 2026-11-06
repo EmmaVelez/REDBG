@@ -29,7 +29,7 @@ import type { Room } from './rooms';
  */
 
 export type HostResult =
-  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[]; readonly endReason?: 'uroborosDefeated' | 'allPlayersDead' }
+  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[]; readonly endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' }
   | { readonly ok: false; readonly reason: string };
 
 export interface GameHost {
@@ -84,10 +84,10 @@ export function createHost(room: Room): GameHost {
       if (players.length === 0) {
         throw new Error('no seated players');
       }
-      const allianceScenarios = new Set(['alliance', 'partnersInEscape']);
-      const cards = allianceScenarios.has(room.scenario) ? ALL_CARDS : PREMIER_CARDS;
+      const expansionScenarios = new Set(['alliance', 'partnersInEscape', 'outbreak']);
+      const cards = expansionScenarios.has(room.scenario) ? ALL_CARDS : PREMIER_CARDS;
 const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
-      state = setup({ seed, players, partnerMode: room.partnerMode }, cards, pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards);
+      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak' }, cards, pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards);
       return state;
     },
 
