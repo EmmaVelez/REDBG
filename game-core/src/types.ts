@@ -236,7 +236,9 @@ export type ActionEffect =
   | { readonly kind: "injection" } // AC-026
   | { readonly kind: "byAnyMeansNecessary" } // AC-027
   | { readonly kind: "higherPriorities" } // AC-028
-  | { readonly kind: "returnedFavor" }; // AC-030
+  | { readonly kind: "returnedFavor" } // AC-030
+  | { readonly kind: "partingWays" } // AC-029
+  | { readonly kind: "gatheringDarkness" }; // AC-031
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007

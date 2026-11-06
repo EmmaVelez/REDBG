@@ -283,6 +283,57 @@ describe('Outbreak mode', () => {
     const after = applyAction(explored, { type: 'endTurn', seat: 0 });
     expect(after.seats[0]!.infectionCards).toHaveLength(1);
   });
+  test('AC-026 Injection: discard any number, draw the same, optional -1 Infection', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, hand: [...x.hand, 'ac-026#1'], infectionCards: ['in-001#1', 'in-001#2', 'in-001#3'] }
+        : x)),
+    })), ['ac-026#1']);
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-026#1' });
+    expect(played.seats[0]!.actionsLeft).toBe(1); // 1 - 1 + 1
+    expect(pr(played).payload?.kind).toBe('injectionDiscard');
+    const d1 = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 0 });
+    expect(pr(d1).payload?.count).toBe('1');
+    const d2 = applyAction(d1, { type: 'chooseOption', seat: 0, promptId: pr(d1).id, option: 0 });
+    expect(pr(d2).payload?.count).toBe('2');
+    const donePrompt = pr(d2);
+    const done = applyAction(d2, { type: 'chooseOption', seat: 0, promptId: donePrompt.id, option: donePrompt.options.indexOf('DONE') });
+    expect(pr(done).payload?.kind).toBe('injectionTrash');
+    const trashed = applyAction(done, { type: 'chooseOption', seat: 0, promptId: pr(done).id, option: 0 });
+    expect(trashed.seats[0]!.infectionCards).toHaveLength(2);
+  });
+
+  test('AC-029 Parting Ways: +1 action, trash a card, then gain a Resource card', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'ac-029#1'] } : x)),
+    })), ['ac-029#1']);
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-029#1' });
+    expect(played.seats[0]!.actionsLeft).toBe(1);
+    expect(pr(played).payload?.kind).toBe('partingWays');
+    const trashed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 0 });
+    expect(pr(trashed).payload?.kind).toBe('partingWaysGain');
+    const declined = applyAction(trashed, { type: 'chooseOption', seat: 0, promptId: pr(trashed).id, option: pr(trashed).options.indexOf('Decline') });
+    expect(declined.seats[0]!.hand).not.toContain(pr(played).options[0]!);
+  });
+
+  test('AC-031 The Gathering Darkness: target trashes their best Ammunition and gains Ammo x10', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => {
+        if (i === 0) return { ...x, hand: [...x.hand, 'ac-031#1'] };
+        return { ...x, hand: [...x.hand, 'am-003#1'] };
+      }),
+    })), ['ac-031#1', 'am-003#1']);
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-031#1' });
+    expect(pr(played).payload?.kind).toBe('gatheringDarkness');
+    const done = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 0 });
+    expect(done.seats[1]!.hand).not.toContain('am-003#1');
+    expect(done.seats[1]!.discard).toContain('am-003#1');
+    // Ammo x30 provides 30 ammo -> three Ammo x10
+    expect(done.seats[1]!.hand.filter(id => id.includes('#g') && done.cards[id]?.cardId === 'am-001')).toHaveLength(3);
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,

@@ -307,7 +307,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             if (def.id === 'ac-026') {
               newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + 1 };
-            }            if (def.id === 'ac-027') {
+            }            if (def.id === 'ac-029') {
+              newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + 1 };
+            }
+            if (def.id === 'ac-027') {
               // +2 Actions; "decrease by any amount, then increase by the
               // same amount minus one" is a net -1 Infection Level.
               const lvl = newPlayer.infectionCards?.length ?? 0;
@@ -440,6 +443,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                 promptInstanceId = instanceId;
                                 break;
                               }
+                              if (e.kind === 'injection') {
+                                promptKind = 'injectionDiscard';
+                                promptOptions = [...played.player.hand, 'DONE'];
+                                break;
+                              }
+                              if (e.kind === 'partingWays') {
+                                promptKind = 'partingWays';
+                                promptOptions = [...played.player.hand, 'Decline'];
+                                break;
+                              }
+                              if (e.kind === 'gatheringDarkness') {
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                if (others.length > 0) {
+                                  promptKind = 'gatheringDarkness';
+                                  promptOptions = [...others.map(s => String(s.seat))];
+                                }
+                                break;
+                              }
                               if (e.kind === 'iHaveThis') {
                                 const costlyWeapons = played.player.hand.filter(id => {
                                   const c = cardDef(state, id);
@@ -460,7 +481,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seat,
             text: def.text,
             options: promptOptions,
-            payload: { kind: promptKind, ...(promptInstanceId !== undefined ? { instanceId: promptInstanceId } : {}) },
+            payload: { kind: promptKind, instanceId },
           },
         ];
       }
@@ -1884,6 +1905,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const player = state.seats[seat] as PlayerState;
       const kind = prompt.payload?.kind;
       const chosenId = prompt.options[option];
+      const instanceId = String(prompt.payload?.instanceId ?? '');
 
       if (kind === 'weskersSecretMansion' && chosenId !== undefined) {
         const top4 = state.mansionDeck.slice(0, 4);
@@ -2126,6 +2148,143 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'injectionDiscard') {
+        // AC-026 Injection: discard any number, then draw the same amount,
+        // then optionally trash this card for -1 Infection Level.
+        const count = Number(prompt.payload?.count ?? '0');
+        if (chosenId === undefined || chosenId === 'DONE') {
+          const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count, rngState: state.rngState });
+          const drawnPlayer: PlayerState = {
+            ...player,
+            hand: [...player.hand, ...d.hand],
+            inventory: d.deck,
+            discard: d.discard,
+          };
+          return {
+            ...state,
+            ...nextBase,
+            rngState: d.rngState,
+            seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
+            prompts: [...newPrompts, {
+              id: 'p' + (newPrompts.length + 1),
+              seat,
+              text: 'You may trash Injection to decrease your Infection Level by 1.',
+              options: ['Trash for -1 Infection', 'Decline'],
+              payload: { kind: 'injectionTrash' },
+            }],
+          };
+        }
+        const remaining = player.hand.filter(id => id !== chosenId);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: remaining, discard: [...player.discard, chosenId] }
+            : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Discard any number of cards from your hand, then draw the same amount.',
+            options: [...remaining, 'DONE'],
+            payload: { kind: 'injectionDiscard', count: String(count + 1) },
+          }],
+        };
+      }
+
+      if (kind === 'injectionTrash') {
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const lvl = player.infectionCards?.length ?? 0;
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? {
+                ...player,
+                playArea: player.playArea.filter(id => id !== instanceId),
+                infectionCards: lvl > 0 ? (player.infectionCards ?? []).slice(0, -1) : [],
+              }
+            : s)),
+          removed: [...state.removed, instanceId],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'partingWays') {
+        // AC-029: optionally trash a card from hand, then gain a Resource card
+        // costing up to 20 more than the trashed card.
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const trashedCost = cardDef(state, chosenId)?.cost ?? 0;
+        const maxCost = trashedCost + 20;
+        const affordable = Object.values(state.marketPiles)
+          .map(pile => pile.cards[0])
+          .filter((id): id is string => id !== undefined)
+          .filter(id => (cardDef(state, id)?.cost ?? 0) <= maxCost);
+        const afterTrash: PlayerState = {
+          ...player,
+          hand: player.hand.filter(id => id !== chosenId),
+          discard: [...player.discard, chosenId],
+        };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? afterTrash : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Gain a Resource card costing up to ' + maxCost + ' Gold.',
+            options: [...affordable, 'Decline'],
+            payload: { kind: 'partingWaysGain' },
+          }],
+        };
+      }
+
+      if (kind === 'partingWaysGain') {
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const s = gainCard(state, { seat, cardId: cardDef(state, chosenId)?.id ?? '', destination: 'discard' });
+        return { ...s, ...nextBase, prompts: newPrompts };
+      }
+
+      if (kind === 'gatheringDarkness') {
+        // AC-031: choose another player; they trash their highest-cost
+        // Ammunition and move one Ammo x10 into their hand per 10 ammo it
+        // provided. This card is trashed.
+        if (chosenId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(chosenId);
+        const target = state.seats[targetSeat] as PlayerState;
+        const targetAmmo = target.hand.filter(id => cardDef(state, id)?.type === 'ammunition');
+        targetAmmo.sort((a, b) => (cardDef(state, b)?.cost ?? 0) - (cardDef(state, a)?.cost ?? 0));
+        const trashedAmmo = targetAmmo[0];
+        const provided = trashedAmmo !== undefined ? (cardDef(state, trashedAmmo)?.bonuses?.ammo ?? 0) : 0;
+        let s: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === targetSeat
+            ? {
+                ...target,
+                hand: trashedAmmo !== undefined ? target.hand.filter(id => id !== trashedAmmo) : target.hand,
+                discard: trashedAmmo !== undefined ? [...target.discard, trashedAmmo] : target.discard,
+              }
+            : x)),
+        };
+        const times = Math.floor(provided / 10);
+        for (let i = 0; i < times; i++) {
+          s = gainCard(s, { seat: targetSeat, cardId: 'am-001', destination: 'hand' });
+        }
+        return {
+          ...s,
+          removed: [...s.removed, instanceId],
+          seats: s.seats.map(x => (x.seat === seat ? { ...x, playArea: x.playArea.filter(id => id !== instanceId) } : x)),
+          prompts: newPrompts,
+        };
+      }
       if (kind === 'iHaveThis') {
         // AC-024: reveal a weapon costing 50 or more from hand -> +1 card.
         if (chosenId === undefined || chosenId === 'Decline') {
