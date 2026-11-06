@@ -51,6 +51,40 @@ Model inventory: gemma4:e4b (active coder), qwen2.5-coder:14b, qwen3.8:27b, qwen
 - Audit EVERY zone transition for scoring arbitrage (see the local-llm-coder skill's `ai-evaluator-tuning.md`): hand cards score at held value, discard/inventory at owned value, so any effect that SHIPS cards manufactures points. `clampDiscardToHeld` is the remedy, and it must be applied to any simulation whose action ends the turn (endTurn AND a skip option) — otherwise the bot loops on the free transition forever.
 - A stall seed is not automatically a regression: bisect by reverting ONE change and re-measuring (the RNG stream shifts with any reshuffle change, so pinned seeds move). `git stash` + re-run the probe is the fastest attribution.
 
+## Mercenaries Skill System (2026-11-06, commit edb87fd)
+
+**Done:** the Skill System add-on is implemented, tested, committed and pushed.
+- `game-core/src/engine/skill.ts` — queries (activation/XP), the opening draft
+  state machine (`draftPrompt` / `advanceDraft` / `finishDraft`), `moveXp`,
+  turn-start effects, and the manual ("can") skills (`applyUseSkill`).
+- `game-core/src/data/mercenaries.ts` — SK-001..SK-030 (verbatim text from the
+  official card scans; ids lowercase `sk-NNN`).
+- `docs/rules/mercenaries/RE5_Rulebook.pdf` + `.txt` — the official manual.
+  Spec + rulings: `docs/rules/MERCENARIES-ENGINE-SPEC.md`.
+- Server: `skillSystem` flag (createRoom/setSkillSystem), draft-hand
+  sanitization in `engine/view.ts`.
+- Client: lobby toggle, draft prompts (ActionBar), `ui/SkillPanel.tsx`.
+- Tests: `game-core/src/engine/skill.test.ts` (6). Gates: 539 / 96 / 128 green.
+
+**Rulings (Manny):** XP movement is a free action, any amount, during your turn
+while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
+3 of 5); the toggle applies to any scenario.
+
+**Pending:**
+1. **The rest of the Mercenaries card data** (8 characters CH-044..051, 8 weapons
+   WE-043..050, 10 actions AC-042..051, 26 infected MA-073..098, AM-005..007,
+   IT-005). The card scans are in `docs/rules/mercenaries/scans-merc/` (gitignored).
+   OCR results are arriving via subagents; transcribe them into
+   `data/mercenaries.ts`, add a Mercenaries scenario/piles if desired, and wire
+   the set into `ALL_CARDS` + `cardsForScenario`.
+2. **Unconsumed skill kinds:** `copyActivatedSkills` (SK-009),
+   `negateDamageRemoveXp` (SK-008), `negateInfectedEffectRemoveXp` (SK-010),
+   `redirectInfectedEffectRemoveXp` (SK-012), `healTrashFromDiscard` (SK-005),
+   `revealPistolsForExplore` (SK-029), `exploreDuplicateWeaponEffect` (SK-021).
+   Each is encoded in `data/mercenaries.ts` but has no engine consumer yet.
+3. Hotseat (pass-and-play) does not yet expose the Skill System toggle.
+4. `sim.ts` / the soak do not drive the draft (skillSystem is off there).
+
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
 2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `efbb111` (M5-T04).
