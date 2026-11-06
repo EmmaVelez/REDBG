@@ -694,34 +694,20 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-door-card .card::after {
   display: none !important;
 }
+.mansion-door-card .card .card-art-img {
+  display: none !important;
+}
 .mansion-door-card .card > * {
   position: relative;
   z-index: 1;
 }
 .mansion-door-card .card .card-top {
-  position: absolute;
-  top: 4%;
-  left: 50%;
-  transform: translateX(-50%);
   justify-content: center;
   text-align: center;
-  z-index: 2;
 }
 .mansion-door-card .card .card-name {
-  position: absolute;
-  top: 80%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  margin-top: 80%;
   text-align: center;
-  z-index: 2;
-}
-.mansion-door-card .card .card-text {
-  position: absolute;
-  top: 80%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 2;
 }
 .mansion-door-card .card .card-name,
 .mansion-door-card .card .card-stats,
