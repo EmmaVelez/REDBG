@@ -275,7 +275,6 @@ export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly s
 
   // Weapons - Melee/Special
   { pileId: 'melee-submission', cardIds: ['we-003'] },
-  { pileId: 'melee-combat', cardIds: ['we-004'] },  // already in knife-plain
   { pileId: 'gun-grenade', cardIds: ['we-001'] },
   { pileId: 'gun-gatling', cardIds: ['we-007'] },
   { pileId: 'gun-flame', cardIds: ['we-024'] },
@@ -488,6 +487,23 @@ export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
   * Alliance-exclusive rifle with a bottom-reveal mechanic.
  */
 export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS];
+
+/** Scenarios played with the FULL database (Premier + Alliance + Outbreak). */
+const EXPANSION_SCENARIOS: ReadonlySet<ScenarioId> = new Set(['alliance', 'partnersInEscape', 'outbreak']);
+
+export function isExpansionScenario(id: ScenarioId): boolean {
+  return EXPANSION_SCENARIOS.has(id);
+}
+
+/**
+ * The card database a scenario plays with. Single source of truth for the
+ * server host, the pass-and-play client, and the bot soak — the mapping used
+ * to live as a duplicated inline copy in both the server and the client.
+ * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
+ */
+export function cardsForScenario(id: ScenarioId): ReadonlyArray<CardDef> {
+  return isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
+}
 
 export const MANSION_EXTRA_ITEM_IDS: readonly string[] = ['it-002'];
 

@@ -8,9 +8,7 @@ import {
   sanitize,
   pilesForScenario,
   SCENARIOS,
-  PREMIER_CARDS,
-  ALLIANCE_CARDS,
-  ALL_CARDS,
+  cardsForScenario,
 } from '@re/game-core';
 import type { Action, GameState, PlayerView, BotDifficulty } from '@re/game-core';
 import type { PlayerInfo } from './protocol';
@@ -84,10 +82,8 @@ export function createHost(room: Room): GameHost {
       if (players.length === 0) {
         throw new Error('no seated players');
       }
-      const expansionScenarios = new Set(['alliance', 'partnersInEscape', 'outbreak']);
-      const cards = expansionScenarios.has(room.scenario) ? ALL_CARDS : PREMIER_CARDS;
-const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
-      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak' }, cards, pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards);
+      const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
+      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak' }, cardsForScenario(room.scenario), pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards);
       return state;
     },
 

@@ -5,10 +5,9 @@ import {
   applyAction,
   validateAction,
   viewForSeat,
-  PREMIER_CARDS,
-  ALL_CARDS,
   pilesForScenario,
   SCENARIOS,
+  cardsForScenario,
 } from '@re/game-core';
 import type { Action, GameState, PlayerView, ScenarioId } from '@re/game-core';
 
@@ -45,9 +44,8 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     controller: 'human' as const,
     characterCardId: undefined,
   }));
-const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  const expansion = scenario === 'alliance' || scenario === 'partnersInEscape' || scenario === 'outbreak';
-  return setup({ seed, players, outbreakMode: scenario === 'outbreak' }, expansion ? ALL_CARDS : PREMIER_CARDS, pilesForScenario(scenario), (scenarioDef as any)?.mansionCards);
+  const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak' }, cardsForScenario(scenario), pilesForScenario(scenario), (scenarioDef as any)?.mansionCards);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

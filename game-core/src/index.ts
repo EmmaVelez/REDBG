@@ -12,7 +12,7 @@ export {
   weaponUsesThisTurn,
 } from "./engine/weaponReuse";
 export { sanitize, viewForSeat } from "./engine/view";
-export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SPY_GAMES_PILES, WHADDYA_BUYIN_PILES, BATTLE_HARDENED_VETERAN_PILES, SCENARIOS, pilesForScenario, ALL_CARDS } from "./data/cards";
+export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SPY_GAMES_PILES, WHADDYA_BUYIN_PILES, BATTLE_HARDENED_VETERAN_PILES, SCENARIOS, pilesForScenario, cardsForScenario, isExpansionScenario, ALL_CARDS } from "./data/cards";
 export { ALLIANCE_CARDS } from "./data/alliance";
 export { NIGHTMARE_CARDS } from "./data/nightmare";
 export { OUTBREAK_CARDS } from "./data/outbreak";

@@ -449,6 +449,10 @@ describe('ActionBar (T07)', () => {
     // in the pool every non-empty subset is legal, so the fullest combo (both
     // weapons) is the one the button must send.
     const knifeInst = 'we-004#99';
+    // The starting Handgun's instance id comes from setup (seat-scoped since
+    // the starting-deck id fix), so look it up instead of hardcoding it.
+    const handgunInst = state.seats[0]?.hand.find(id => state.cards[id]?.cardId === 'we-009');
+    expect(handgunInst).toBeDefined();
     const armed = {
       ...state,
       cards: { ...state.cards, [knifeInst]: { instanceId: knifeInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
@@ -458,8 +462,8 @@ describe('ActionBar (T07)', () => {
     };
     // The component holds its selection in React state, so the dispatch is
     // asserted through the pure picker logic the button is wired to.
-    expect(bestExploreCombo(armed, 0)).toEqual(['we-009#1', knifeInst]);
-    const evalResult = evaluateExploreCombo(armed, 0, ['we-009#1', knifeInst]);
+    expect(bestExploreCombo(armed, 0)).toEqual([handgunInst, knifeInst]);
+    const evalResult = evaluateExploreCombo(armed, 0, [handgunInst as string, knifeInst]);
     expect(evalResult.legal).toBe(true);
     expect(evalResult.damage).toBe(15);
     expect(evalResult.ammo).toBe(20);

@@ -42,6 +42,16 @@ function sameCoreState(a: GameState, b: GameState): boolean {
 }
 
 /**
+ * True when the action is the SKIP option of a `skipTurn` prompt (PR-002
+ * Jill: option 0 skips the turn, option 1 declines).
+ */
+function isSkipTurnOption(state: GameState, action: Action): boolean {
+  if (action.type !== 'chooseOption') return false;
+  const prompt = state.prompts.find(p => p.id === action.promptId);
+  return prompt?.payload?.kind === 'skipTurn' && action.option === 0;
+}
+
+/**
  * Chooses the greedy 1-ply action for a given seat.
  * It simulates every legal action, evaluates the resulting state, and selects the action
  * that yields the highest score. Ties are broken deterministically by action order.
@@ -92,9 +102,20 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
         // startTurn zeroes them; the dumped hand must also score at held value
         // (no arbitrage). Non-endTurn actions score normally. Explores get the
         // flat fighting bias (see EXPLORE_BIAS).
-        const raw = action.type === 'endTurn'
-          ? evaluateState(withSpentTurnPoolsZeroed(next, seat), seat, { clampDiscardToHeld: true })
-          : evaluateState(next, seat);
+        // A skip option ENDS the turn exactly like endTurn (the resolver
+        // calls advanceTurn), so it needs the same honest simulation: the
+        // seat's turn pools are gone by its next startTurn, and the hand it
+        // ships to the discard must not be revalued from held to owned.
+        // Without both, skipping manufactures points and the greedy bot
+        // skips every turn forever — the game never ends.
+        // Buys are the exception to the discard clamp: a bought card
+        // landing in the discard at owned value IS the buy incentive.
+        const endsTurn = action.type === 'endTurn' || isSkipTurnOption(state, action);
+        const raw = evaluateState(
+          endsTurn ? withSpentTurnPoolsZeroed(next, seat) : next,
+          seat,
+          { clampDiscardToHeld: action.type === 'buy' ? false : true },
+        );
         const score = action.type === 'explore' ? raw + EXPLORE_BIAS : raw;
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.

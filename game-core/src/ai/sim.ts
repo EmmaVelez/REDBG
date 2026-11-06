@@ -1,9 +1,10 @@
 
-import type { Action, GameState, GameSetup } from '../types';
+import type { Action, GameState, GameSetup, CardDef } from '../types';
 import { setup, startTurn, checkWin } from '../engine/game';
 import { applyAction } from '../engine/actions';
 import { chooseBotAction, type BotDifficulty } from './bot';
-import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
+import { cardsForScenario, pilesForScenario, SCENARIOS } from '../data/cards';
+import type { ScenarioId } from '../data/cards';
 import { makeRng, nextFloat } from '../util/rng';
 
 export interface SimConfig {
@@ -12,6 +13,18 @@ export interface SimConfig {
   readonly difficulties: readonly BotDifficulty[];
   /** Hard cap on applied actions; the game stops there if no winner yet. */
   readonly maxActions: number;
+  /** Scenario to play (default `firstTimer`). Selects piles + mansion. */
+  readonly scenario?: ScenarioId;
+  /** Card database override; defaults to `cardsForScenario(scenario)`. */
+  readonly cards?: ReadonlyArray<CardDef>;
+  /** Pile override; defaults to `pilesForScenario(scenario)`. */
+  readonly piles?: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>;
+  /** Mansion override; defaults to the scenario's own `mansionCards`. */
+  readonly mansionCards?: ReadonlyArray<{ cardId: string; count: number }>;
+  /** Outbreak mode (infection levels, Infection Deck). */
+  readonly outbreakMode?: boolean;
+  /** Partner Modification rules (Alliance). */
+  readonly partnerMode?: boolean;
 }
 
 export interface SimResult {
@@ -37,6 +50,15 @@ function rngFromSeed(seed: number): () => number {
  * Runs a single bot game simulation from the initial setup.
  */
 export function playBotGame(config: SimConfig): SimResult {
+  const scenario = config.scenario ?? 'firstTimer';
+  const cards = config.cards ?? cardsForScenario(scenario);
+  const piles = config.piles ?? pilesForScenario(scenario);
+  const scenarioDef = SCENARIOS.find(s => s.id === scenario);
+  const mansionCards =
+    config.mansionCards ??
+    (scenarioDef as { mansionCards?: ReadonlyArray<{ cardId: string; count: number }> } | undefined)
+      ?.mansionCards;
+
   // Build players array
   const players = config.difficulties.map((d, i) => ({
     name: 'Bot' + i,
@@ -44,9 +66,14 @@ export function playBotGame(config: SimConfig): SimResult {
     botLevel: (d === 'hard' ? 3 : d === 'normal' ? 2 : 1),
   }));
 
-  const setupConfig: GameSetup = { seed: config.seed, players };
+  const setupConfig: GameSetup = {
+    seed: config.seed,
+    players,
+    outbreakMode: config.outbreakMode ?? scenario === 'outbreak',
+    partnerMode: config.partnerMode,
+  };
 
-  const initialState = setup(setupConfig, PREMIER_CARDS, FIRST_TIMER_PILES);
+  const initialState = setup(setupConfig, cards, piles, mansionCards);
   const rand = rngFromSeed(config.seed);
 
   return playBotGameFrom(initialState, config.difficulties, rand, config.maxActions);

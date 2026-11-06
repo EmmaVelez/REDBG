@@ -60,8 +60,8 @@ test('replay empty actions', () => {
 
 test('replay single buy', () => {
   const acts: Action[] = [
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#6' },
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#3' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_6' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_3' },
     { type: 'buy', seat: 0, pileId: 'hg' },
   ];
   const replayed = replay(spec(1), CARDS, PILES, acts);
@@ -74,11 +74,11 @@ test('replay single buy', () => {
 test('replay two buys', () => {
   // seat 0 buys in its turn, then seat 1 buys after the turn passes
   const acts: Action[] = [
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#6' },
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#3' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_6' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_3' },
     { type: 'buy', seat: 0, pileId: 'hg' },
     { type: 'endTurn', seat: 0 },
-    { type: 'playAmmo', seat: 1, instanceId: 'am-1#7' },
+    { type: 'playAmmo', seat: 1, instanceId: 'am-1#s2_7' },
     { type: 'buy', seat: 1, pileId: 'kn' },
   ];
   const replayed = replay(spec(1), CARDS, PILES, acts);
@@ -94,8 +94,8 @@ test('replay two buys', () => {
 test('replay throws on illegal action in the list', () => {
   // a second buy in the same turn violates the 1-buy limit
   const acts: Action[] = [
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#6' },
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#3' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_6' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_3' },
     { type: 'buy', seat: 0, pileId: 'hg' },
     { type: 'buy', seat: 0, pileId: 'kn' },
   ];
@@ -104,8 +104,8 @@ test('replay throws on illegal action in the list', () => {
 
 test('replay determinism — full sequence', () => {
   const acts: Action[] = [
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#6' },
-    { type: 'playAmmo', seat: 0, instanceId: 'am-1#3' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_6' },
+    { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_3' },
     { type: 'buy', seat: 0, pileId: 'hg' },
     { type: 'endTurn', seat: 0 },
     { type: 'buy', seat: 1, pileId: 'kn' },
@@ -117,8 +117,8 @@ test('replay determinism — full sequence', () => {
 
 test('assertReplayDeterministic true', () => {
   let s0 = state(1);
-  let s1 = applyAction(s0, { type: 'playAmmo', seat: 0, instanceId: 'am-1#6' });
-  let s2 = applyAction(s1, { type: 'playAmmo', seat: 0, instanceId: 'am-1#3' });
+  let s1 = applyAction(s0, { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_6' });
+  let s2 = applyAction(s1, { type: 'playAmmo', seat: 0, instanceId: 'am-1#s1_3' });
   let s3 = applyAction(s2, { type: 'buy', seat: 0, pileId: 'hg' });
   expect(assertReplayDeterministic(s3)).toBe(true);
 });

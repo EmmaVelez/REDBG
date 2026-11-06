@@ -61,7 +61,7 @@ test('setup starting deck contents', () => {
   const s = setup2(1);
   const all = [...p0(s).hand, ...p0(s).inventory];
   expect(all.filter(id => id.startsWith('am-1#')).length).toBe(7);
-  expect(all.filter(id => id === 'we-1#1').length).toBe(1);
+  expect(all.filter(id => id === 'we-1#s1_1').length).toBe(1);
   expect(all.filter(id => id.startsWith('we-4#')).length).toBe(2);
 });
 
@@ -89,7 +89,7 @@ test('setup market', () => {
 test('setup cardDefs + cards registry', () => {
   const s = setup2(1);
   const we1 = s.cardDefs['we-1'];
-  const am = s.cards['am-1#1'];
+  const am = s.cards['am-1#s1_1'];
   const ma = s.cards['ma-10#2'];
   if (we1 === undefined || am === undefined || ma === undefined) throw new Error('missing card');
   expect(we1.damage).toBe(10);
@@ -187,8 +187,10 @@ test('SCENARIOS registry includes all scenarios', () => {
   for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }
-  // Alliance has different number of piles (62)
-  expect(pilesForScenario('alliance')).toHaveLength(62);
+  // Alliance has a different number of piles (61 — the redundant 'melee-combat'
+  // pile that duplicated knife-plain's Combat Knife was removed; two piles
+  // listing one card would register the SAME instances twice)
+  expect(pilesForScenario('alliance')).toHaveLength(61);
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {

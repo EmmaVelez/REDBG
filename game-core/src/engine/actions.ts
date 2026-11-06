@@ -37,6 +37,7 @@ import {
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
 import { gainCard } from './gainCard';
+import { dropEmptyPrompts } from './prompts';
 import { makeRng, shuffle } from '../util/rng';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
@@ -147,7 +148,9 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number
  */
 export function applyAction(state: GameState, action: Action): GameState {
   const next = applyDamageTakenHooks(state, applyActionInternal(state, action));
-  return applyOutbreakHooks(state, next, action);
+  // Choke point: a prompt with no options can never be resolved and would
+  // deadlock the seat behind the "resolve pending prompt first" gate.
+  return dropEmptyPrompts(applyOutbreakHooks(state, next, action));
 }
 
 /** Outbreak: all Characters have a Maximum Infection Level of 10. */
@@ -197,8 +200,14 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
  */
 function reanimateAsInfected(state: GameState, seat: number): GameState {
   const player = state.seats[seat] as PlayerState;
+  // "Shuffle their cards together" includes the Play Area: the rulebook
+  // is explicit that Items and Ammunition played this turn stay there until
+  // the end of the turn, so they are the Character's cards at the moment of
+  // death. Dropping them here destroyed every card the player had played
+  // that turn (ammo, weapons, items).
   const combined = shuffle(makeRng(state.rngState), [
     ...player.hand,
+    ...player.playArea,
     ...player.discard,
     ...player.inventory,
     ...(player.infectionCards ?? []),
@@ -1558,6 +1567,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             case 'moveHandCardToTopOfInventory': {
               // Leon S. Kennedy (Outbreak) L1: put a card from hand on top of the Inventory.
+              // No cards to move -> no prompt (an empty option list would deadlock the seat).
+              if (player.hand.length === 0) {
+                return { ...state, ...nextBase };
+              }
               return {
                 ...state,
                 ...nextBase,
@@ -1576,6 +1589,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'discardForActionFromDiscard': {
               // Leon S. Kennedy (Outbreak) L2: discard a card, then move an action
               // card from the discard pile to your hand.
+              // No cards to discard -> no prompt (an empty option list would deadlock the seat).
+              if (player.hand.length === 0) {
+                return { ...state, ...nextBase };
+              }
               return {
                 ...state,
                 ...nextBase,

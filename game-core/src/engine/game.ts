@@ -2,6 +2,7 @@ import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
+import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
 
@@ -290,21 +291,29 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     const ammoId = ammoDef?.id ?? '';
     const handgunId = handgunDef?.id ?? '';
     const knifeId = knifeDef?.id ?? '';
+    // Instance ids must be unique across SEATS, not just within one seat.
+    // Every player is dealt the same 10-card starter, so an id like
+    // `am-001#1` would otherwise name four different physical cards and
+    // `state.cards` could only hold one of them — breaking conservation
+    // audits and any effect that targets an instanceId. The `s{i}`
+    // segment is the seat number; `cardDef` only reads before the '#'.
     const deckCards: string[] = [];
+    const deckId = (cardId: string, n: number): string => `${cardId}#s${i + 1}_${n}`;
     if (ammoId !== '') {
       for (let j = 0; j < 7; j++) {
-        const id = `${ammoId}#${j + 1}`;
+        const id = deckId(ammoId, j + 1);
         deckCards.push(id);
         register(id, ammoId, 'hand');
       }
     }
     if (handgunId !== '') {
-      deckCards.push(`${handgunId}#1`);
-      register(`${handgunId}#1`, handgunId, 'hand');
+      const id = deckId(handgunId, 1);
+      deckCards.push(id);
+      register(id, handgunId, 'hand');
     }
     if (knifeId !== '') {
       for (let j = 0; j < 2; j++) {
-        const id = `${knifeId}#${j + 1}`;
+        const id = deckId(knifeId, j + 1);
         deckCards.push(id);
         register(id, knifeId, 'hand');
       }
@@ -384,7 +393,16 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       const def = defsById.get(cardId);
       if (def === undefined) continue;
       for (let j = 0; j < def.copies; j++) {
-        const id = `${cardId}#${j + 1}`;
+        // The same card may legitimately be listed by more than one pile
+        // (a themed pile plus a combined pile, or two scenarios merged into
+        // one super-scenario). Each pile needs its OWN physical copies:
+        // reusing the id would place a single instance in two piles at
+        // once, and buying from either pile would move the same card.
+        const plain = `${cardId}#${j + 1}`;
+        const owner = instances[plain];
+        const id = owner !== undefined && owner.location.zone === 'marketPile' && owner.location.pileId !== pileSpec.pileId
+          ? `${cardId}#${pileSpec.pileId}-${j + 1}`
+          : plain;
         ids.push(id);
         register(id, cardId, 'marketPile', pileSpec.pileId);
       }
@@ -430,7 +448,16 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
 }
 
+/**
+ * Turns are produced here, so this is the second prompt choke point (with
+ * applyAction): turn-start builders add prompts too, and an empty option
+ * list would deadlock the seat behind the prompt gate.
+ */
 export function startTurn(state: GameState): GameState {
+  return dropEmptyPrompts(startTurnInternal(state));
+}
+
+function startTurnInternal(state: GameState): GameState {
   if (state.phase !== 'main') {
     return state;
   }
@@ -511,7 +538,19 @@ export function startTurn(state: GameState): GameState {
       inventory: player.inventory,
     });
 
-    const d = draw({ deck: ch.inventory, discard: ch.discard, reshuffledDiscard: [], count: 5 });
+    // A downed character should hold no cards (flipDown merged hand + discard
+    // into the inventory), but an effect may still have given them some. Fold
+    // any stray hand back into the discard BEFORE redrawing — otherwise the
+    // `hand: d.hand` assignment below silently destroys those cards.
+    // The draw must also reshuffle (rulebook: draw 5, reshuffling the discard
+    // into the inventory when it runs short) — a plain `draw` left a downed
+    // character with fewer than 5 cards whenever the inventory was low.
+    const d = drawWithReshuffle({
+      deck: ch.inventory,
+      discard: [...ch.discard, ...ch.hand],
+      count: 5,
+      rngState: state.rngState,
+    });
 
     const newPlayer: PlayerState = {
       ...player,
@@ -551,6 +590,7 @@ export function startTurn(state: GameState): GameState {
     return {
       ...state,
       version: state.version + 1,
+      rngState: d.rngState,
       seats: state.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
       activeSeat: ctx.activeSeat,
       turnNumber: ctx.turnNumber,
