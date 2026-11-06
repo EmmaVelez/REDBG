@@ -382,7 +382,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'moveHandCardToTopOfInventory':
         case 'discardForActionFromDiscard':
         case 'gainSpecificWeaponIntoInventory':
-        case 'movePlayAreaWeaponToInventoryTop': {
+        case 'movePlayAreaWeaponToInventoryTop':
+        case 'discardWeaponToCopyEffects': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would

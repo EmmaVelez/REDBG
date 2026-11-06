@@ -1,4 +1,4 @@
-import type { GameState, Action, PlayerState, CardDef } from '../types';
+import type { GameState, Action, PlayerState, CardDef, WeaponEffect } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
@@ -849,10 +849,34 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             return {
               damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0)),
               ammoReq: isGatling ? 0 : isX ? assigned : Math.max(ammoReqForWeapon(abilities, w) - chrisSingleDiscount - (w?.weaponType !== undefined && chrisTypeDiscountTypes.includes(w.weaponType) ? chrisTypeDiscount : 0), 0),
-              weaponEffects: w?.weaponEffects,
+              weaponEffects: (instId !== undefined && player.copiedWeaponEffects?.instanceId === instId)
+                ? [...(w?.weaponEffects ?? []), ...player.copiedWeaponEffects.effects]
+                : w?.weaponEffects,
               tags: w?.weaponTags,
             };
           });
+
+          // David King (Outbreak) L2: when he uses a Knife weapon, he may also
+          // use one from his discard pile.
+          const davidAbilities = characterAbilities(state, seat);
+          if (davidAbilities.some(a => a.kind === 'knifeFromDiscardForExplore')) {
+            const usesKnife = exploreWeapons.some(w => (w.tags ?? []).includes('knife'));
+            if (usesKnife) {
+              const discardKnife = player.discard.find(id => {
+                const d = cardDef(state, id);
+                return d?.type === 'weapon' && (d.weaponTags ?? []).includes('knife');
+              });
+              if (discardKnife !== undefined) {
+                const kd = cardDef(state, discardKnife);
+                exploreWeapons.push({
+                  damage: kd?.damage ?? 0,
+                  ammoReq: 0,
+                  weaponEffects: kd?.weaponEffects,
+                  tags: kd?.weaponTags,
+                });
+              }
+            }
+          }
 
           // Passive damage abilities
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
@@ -1620,6 +1644,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'discardWeaponToCopyEffects': {
+              // David King (Outbreak) L1: discard a weapon from hand and apply
+              // its effect text to another weapon this turn.
+              if (player.hand.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Discard a weapon from your hand to copy its effect text.',
+                    options: player.hand.filter(id => cardDef(state, id)?.type === 'weapon'),
+                    payload: { kind: 'davidDiscardWeapon' },
+                  },
+                ],
+              };
+            }
             case 'exchangeBuyForAction': {
               // Ada L2: spend the Buy for an extra Action.
               return {
@@ -2360,6 +2405,46 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             options: [...remaining, 'DONE'],
             payload: { kind: 'discardAnyForAmmo', count: String(count + 1), amount: String(prompt.payload?.amount ?? '0') },
           }],
+        };
+      }
+      if (kind === 'davidDiscardWeapon') {
+        if (chosenId === undefined || !player.hand.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const effects = cardDef(state, chosenId)?.weaponEffects ?? [];
+        const afterDiscard: PlayerState = {
+          ...player,
+          hand: player.hand.filter(id => id !== chosenId),
+          discard: [...player.discard, chosenId],
+        };
+        const targets = [...afterDiscard.hand, ...afterDiscard.playArea]
+          .filter(id => cardDef(state, id)?.type === 'weapon' && id !== chosenId);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? afterDiscard : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Apply that effect text to which weapon?',
+            options: [...targets, 'Decline'],
+            payload: { kind: 'davidCopyEffects', effects: JSON.stringify(effects) },
+          }],
+        };
+      }
+
+      if (kind === 'davidCopyEffects') {
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const effects = JSON.parse(String(prompt.payload?.effects ?? '[]')) as WeaponEffect[];
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, copiedWeaponEffects: { instanceId: chosenId, effects } }
+            : s)),
+          prompts: newPrompts,
         };
       }
       if (kind === 'kevinPistolToInventoryTop') {

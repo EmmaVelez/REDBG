@@ -103,12 +103,32 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
   const chrisSingleDiscount = (weaponIds?.length ?? 0) === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
   const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
   const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
-  const weapons: ExploreWeapon[] = defs.map(def => ({
-    damage: def?.damage ?? 0,
-    ammoReq: Math.max(ammoReqForWeapon(abilities, def) - chrisSingleDiscount - (def?.weaponType !== undefined && chrisTypeDiscountTypes.includes(def.weaponType) ? chrisTypeDiscount : 0), 0),
-    weaponEffects: def?.weaponEffects,
-    tags: def?.weaponTags,
-  }));
+  const weapons: ExploreWeapon[] = defs.map((def, i) => {
+    // David King (Outbreak) L1: effects copied onto this weapon from a
+    // discarded one apply for this turn's explore.
+    const id = weaponIds[i];
+    const copied = id !== undefined && player.copiedWeaponEffects?.instanceId === id
+      ? player.copiedWeaponEffects.effects
+      : [];
+    return {
+      damage: def?.damage ?? 0,
+      ammoReq: Math.max(ammoReqForWeapon(abilities, def) - chrisSingleDiscount - (def?.weaponType !== undefined && chrisTypeDiscountTypes.includes(def.weaponType) ? chrisTypeDiscount : 0), 0),
+      weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
+      tags: def?.weaponTags,
+    };
+  });
+  // David King (Outbreak) L2: when he uses a Knife, one from the discard
+  // pile is used as well.
+  if (abilities.some(a => a.kind === 'knifeFromDiscardForExplore') && weapons.some(w => (w.tags ?? []).includes('knife'))) {
+    const discardKnife = player.discard.find(id => {
+      const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+      return cd?.type === 'weapon' && (cd.weaponTags ?? []).includes('knife');
+    });
+    if (discardKnife !== undefined) {
+      const kd = state.cardDefs[state.cards[discardKnife]?.cardId ?? ''];
+      weapons.push({ damage: kd?.damage ?? 0, ammoReq: 0, weaponEffects: kd?.weaponEffects, tags: kd?.weaponTags });
+    }
+  }
   const abilityDamage =
     passiveDamageBonus(abilities, defs, 1, player.hand.length) +
     exploreBigHandBonus(abilities, state.seats) +

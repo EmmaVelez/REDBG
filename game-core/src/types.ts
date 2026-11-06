@@ -333,7 +333,9 @@ export type CharacterAbility =
   | { readonly kind: "moveHandCardToTopOfInventory"; readonly level: 1 | 2 } // Leon S. Kennedy (Outbreak) L1
   | { readonly kind: "discardForActionFromDiscard"; readonly level: 1 | 2 } // Leon S. Kennedy (Outbreak) L2
   | { readonly kind: "gainSpecificWeaponIntoInventory"; readonly cardId: string; readonly level: 1 | 2 } // Kevin Ryman (Outbreak) L1
-  | { readonly kind: "movePlayAreaWeaponToInventoryTop"; readonly tag: string; readonly level: 1 | 2 }; // Kevin Ryman (Outbreak) L2
+  | { readonly kind: "movePlayAreaWeaponToInventoryTop"; readonly tag: string; readonly level: 1 | 2 } // Kevin Ryman (Outbreak) L2
+  | { readonly kind: "discardWeaponToCopyEffects"; readonly level: 1 | 2 } // David King (Outbreak) L1
+  | { readonly kind: "knifeFromDiscardForExplore"; readonly level: 1 | 2 }; // David King (Outbreak) L2
 
 
 // ---------------------------------------------------------------------------
@@ -445,6 +447,9 @@ export interface PlayerState {
   readonly actionsCapNextTurn?: number;
   /** Outbreak IN-005 Drag: this seat may not Attack the named seat next turn. */
   readonly cannotAttackSeatNextTurn?: number;
+  /** Outbreak David King L1: effect text copied from a discarded weapon onto
+   *  another weapon, for this turn's explore. */
+  readonly copiedWeaponEffects?: { readonly instanceId: string; readonly effects: readonly WeaponEffect[] };
   /** Outbreak: this seat Explored the Mansion or Attacked an Infected
    *  Character this turn (suppresses the end-of-turn Infection increase). */
   readonly exploredOrAttackedThisTurn?: boolean;

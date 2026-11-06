@@ -590,6 +590,36 @@ describe('Outbreak mode', () => {
     expect(moved.seats[0]!.playArea).not.toContain('we-009#1');
     expect(moved.seats[0]!.inventory[0]).toBe('we-009#1');
   });
+  test('CH-023 David King L1: copy a discarded weapon\'s effect text to another weapon', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-023#1', level: 1, hand: [...x.hand, 'we-005#1', 'we-004#1', 'we-004#2'], turnAmmo: 0 }
+        : x)),
+    })), ['ch-023#1', 'we-005#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    const p = pr(used);
+    const discarded = applyAction(used, { type: 'chooseOption', seat: 0, promptId: p.id, option: p.options.indexOf('we-005#1') });
+    const q = pr(discarded);
+    const copied = applyAction(discarded, { type: 'chooseOption', seat: 0, promptId: q.id, option: q.options.indexOf('we-004#1') });
+    expect(copied.seats[0]!.copiedWeaponEffects?.instanceId).toBe('we-004#1');
+    // Survival Knife's +5 per other Knife now applies to the Combat Knife,
+    // so exploring with two knives deals 5 + 5 + 5.
+    expect(exploreDamage(copied, 0, ['we-004#1', 'we-004#2'])).toBe(5 + 5 + 5);
+  });
+
+  test('CH-023 David King L2: a Knife from the discard pile is used as well', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-023#1', level: 2, hand: [...x.hand, 'we-004#1'], turnAmmo: 0, discard: ['we-005#1'] }
+        : x)),
+    })), ['ch-023#1', 'we-003#1']);
+    // Combat Knife 5 + Survival Knife 10, plus its +5 for the other Knife.
+    expect(exploreDamage(s, 0, ['we-004#1'])).toBe(5 + 10 + 5);
+    // Without a Knife in the explore, the discard pile is untouched.
+    expect(exploreDamage(s, 0, ['we-003#1'])).toBe(5);
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,
