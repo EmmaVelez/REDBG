@@ -1300,6 +1300,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'discardCardForHealAndDamage': {
+              // Steve (Alliance) L2: discard the named card from hand -> recover
+              // heal HP (capped) and gain +damage base damage this turn.
+              const idx = player.hand.findIndex(id => cardDef(state, id)?.id === ability.cardId);
+              if (idx === -1) {
+                return { ...state, ...nextBase };
+              }
+              const discarded = player.hand[idx]!;
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? {
+                      ...player,
+                      hand: player.hand.filter(id => id !== discarded),
+                      discard: [...player.discard, discarded],
+                      hp: Math.min(player.hp + ability.heal, player.maxHp),
+                      weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.damage,
+                    }
+                  : s)),
+              };
+            }
             case 'gainAmmoX10ForGold': {
               // Billy (Alliance) L1: gain one Ammo x10 (Resource Area -> discard
               // per the rules glossary) and get +amount gold.

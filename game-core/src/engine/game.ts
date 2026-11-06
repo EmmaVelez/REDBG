@@ -3,6 +3,7 @@ import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { advanceTurn } from './turn';
+import { healAtTurnStart } from './abilities';
 
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
@@ -470,7 +471,7 @@ export function startTurn(state: GameState): GameState {
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
-    hp: Math.min(player.hp + herbHeal, player.maxHp),
+    hp: Math.min(player.hp + herbHeal + healAtTurnStart(abilitiesForLevel(charDef?.abilities, player.level)), player.maxHp),
     pendingHerbHeal: 0,
     turnAmmo: 0,
     turnGold: ((herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'))

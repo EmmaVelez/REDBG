@@ -284,7 +284,9 @@ export type CharacterAbility =
   | { readonly kind: "inventoryBottomToTop"; readonly level: 1 | 2 } // Leon S. Kennedy (Alliance) L2: during turn, move the bottom card of the inventory to the top
   | { readonly kind: "gainAmmoX10ForGold"; readonly amount: number; readonly level: 1 | 2 } // Billy Coen (Alliance) L1: during turn, gain one Ammo x10 and get +amount gold
   | { readonly kind: "discardToHandIfTenPlus"; readonly threshold: number; readonly level: 1 | 2 } // Billy Coen (Alliance) L2: during turn, if discard >= threshold, move one discard card to hand
-  | { readonly kind: "plusDamagePerCardInHand"; readonly amount: number; readonly level: 1 | 2 }; // Jack Krauser (Alliance) L2: +amount damage for every card in his hand
+  | { readonly kind: "plusDamagePerCardInHand"; readonly amount: number; readonly level: 1 | 2 } // Jack Krauser (Alliance) L2: +amount damage for every card in his hand
+  | { readonly kind: "healAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // Steve Burnside (Alliance) L1: recover amount HP at the start of each turn
+  | { readonly kind: "discardCardForHealAndDamage"; readonly cardId: string; readonly heal: number; readonly damage: number; readonly level: 1 | 2 }; // Steve Burnside (Alliance) L2: discard the named card from hand -> heal and +damage this turn
 
 
 // ---------------------------------------------------------------------------

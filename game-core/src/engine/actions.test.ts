@@ -1,6 +1,7 @@
 import { applyAction } from './actions';
 import { validateAction } from './validate';
 import { exploreDamage } from './explore';
+import { startTurn } from './game';
 import type { GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
@@ -47,6 +48,8 @@ const DEFS: Record<string, CardDef> = {
   'ch-leon-a': { id: 'ch-leon-a', name: 'Leon S. Kennedy (Alliance)', type: 'character', set: 'alliance', text: 'Leon (Alliance)', copies: 1, maxHp: 80, level1At: 1, level2At: 7, abilities: [{ kind: 'discardCardToInventoryBottom', level: 1 }, { kind: 'inventoryBottomToTop', level: 2 }] },
   'ch-billy': { id: 'ch-billy', name: 'Billy Coen (Alliance)', type: 'character', set: 'alliance', text: 'Billy (Alliance)', copies: 1, maxHp: 80, level1At: 1, level2At: 5, abilities: [{ kind: 'gainAmmoX10ForGold', amount: 10, level: 1 }, { kind: 'discardToHandIfTenPlus', threshold: 10, level: 2 }] },
   'ch-krauser-a': { id: 'ch-krauser-a', name: 'Jack Krauser (Alliance)', type: 'character', set: 'alliance', text: 'Krauser (Alliance)', copies: 1, maxHp: 90, level1At: 0, level2At: 6, abilities: [{ kind: 'singleWeaponLimiter', level: 1 }, { kind: 'plusDamagePerCardInHand', amount: 10, level: 2 }] },
+  'ch-steve': { id: 'ch-steve', name: 'Steve Burnside (Alliance)', type: 'character', set: 'alliance', text: 'Steve (Alliance)', copies: 1, maxHp: 70, level1At: 5, level2At: 7, abilities: [{ kind: 'healAtTurnStart', amount: 10, level: 1 }, { kind: 'discardCardForHealAndDamage', cardId: 'ac-018', heal: 20, damage: 30, level: 2 }] },
+  'ac-018': { id: 'ac-018', name: 'Uroboros Injection', type: 'action', set: 'alliance', text: 'Uroboros Injection', copies: 1, cost: 30 },
   'am-001': { id: 'am-001', name: 'Ammo x10', type: 'ammunition', set: 'premier', text: 'Ammo x10', copies: 28, bonuses: { ammo: 10, gold: 10 } },
   'ch-becky': { id: 'ch-becky', name: 'Rebecca', type: 'character', set: 'premier', text: 'Rebecca', copies: 1, maxHp: 70, level1At: 2, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'trashFromHandAtWill', level: 2 }] },
 };
@@ -67,7 +70,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -241,6 +244,24 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Alliance Steve L1: recovers 10 HP at the start of his turn', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'csteve', level: 1 as const, hp: 40, maxHp: 70 } });
+  const s = startTurn({ ...base, activeSeat: 0 });
+  expect(s.seats[0]?.hp).toBe(50); // 40 + 10, capped at max
+  const capped = baseState({ seat0: { characterInstanceId: 'csteve', level: 1 as const, hp: 65, maxHp: 70 } });
+  expect(startTurn({ ...capped, activeSeat: 0 }).seats[0]?.hp).toBe(70);
+});
+
+test('Alliance Steve L2: discard Uroboros Injection for +20 HP and +30 damage', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'csteve', level: 2 as const, hp: 40, maxHp: 70, hand: ['ac18', 'w1'] } });
+  const s = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+  expect(p0(s).hand).toEqual(['w1']);
+  expect(p0(s).discard).toEqual(['ac18']);
+  expect(p0(s).hp).toBe(60);
+  expect(p0(s).weaponDamageBonusThisTurn).toBe(30);
+  const without = baseState({ seat0: { characterInstanceId: 'csteve', level: 2 as const, hand: ['w1'] } });
+  expect(validateAction(without, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 }).ok).toBe(false);
+});
 test('Alliance Krauser L1: cannot explore with more than one weapon', () => {
   const base = baseState({ seat0: { characterInstanceId: 'ckra', level: 1 as const, hand: ['w1', 'w2'], turnAmmo: 100 } });
   expect(validateAction(base, { type: 'explore', seat: 0, weapons: ['w1', 'w2'], exploreCount: 1 }).ok).toBe(false);

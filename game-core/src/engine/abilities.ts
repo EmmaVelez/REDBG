@@ -335,3 +335,15 @@ export function applyHpLoss(abilities: readonly CharacterAbility[], hp: number, 
 export function movesDiscardToInventoryOnDefeat(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'onDefeatMoveDiscardToInventoryBottom');
 }
+
+/**
+ * Steve Burnside (Alliance CH-013) L1: recover `amount` HP at the start of
+ * each turn (capped at max HP by the caller).
+ */
+export function healAtTurnStart(abilities: readonly CharacterAbility[]): number {
+  let heal = 0;
+  for (const a of abilities) {
+    if (a.kind === 'healAtTurnStart') heal += a.amount;
+  }
+  return heal;
+}
