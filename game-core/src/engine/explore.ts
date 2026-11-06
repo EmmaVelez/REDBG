@@ -150,7 +150,7 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
 }
 
 export type ExploreOutcome =
-  | { readonly kind: 'defeated'; readonly decorations: number }
+  | { readonly kind: 'defeated'; readonly decorations: number; readonly damage: number; readonly hp: number }
   | { readonly kind: 'notDefeated'; readonly damageTaken: number; readonly shuffleBack: boolean }
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
@@ -177,7 +177,7 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
   }
 
   if (instantKill) {
-    return { kind: 'defeated', decorations: revealed.decorations ?? 0 };
+    return { kind: 'defeated', decorations: revealed.decorations ?? 0, damage, hp: revealed.hp ?? 0 };
   }
 
   let effective = damage;
@@ -220,7 +220,7 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
       const raw = suppressed ? 0 : boostedAttack;
       return { kind: 'notDefeated', damageTaken: Math.max(raw - (params.damageReduction ?? 0), 0), shuffleBack };
     }
-    return { kind: 'defeated', decorations: revealed.decorations ?? 0 };
+    return { kind: 'defeated', decorations: revealed.decorations ?? 0, damage: effective, hp: effectiveHp };
   } else {
     const shuffleBack = revealed.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle') ?? false;
     // Flashbang: low-HP infected deal 0 damage.

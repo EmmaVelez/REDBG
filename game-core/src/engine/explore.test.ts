@@ -65,7 +65,7 @@ test('resolveExplore insufficient ammo', () => {
 });
 
 test('resolveExplore defeated', () => {
-  expect(resolveExplore({ weapons: [{ damage: 20, ammoReq: 10 }], ammo: 20, bonusDamage: 0, revealed: { id: 'ma-005', name: 'Bui Kichwa', type: 'infected', set: 'premier', text: '', copies: 3, hp: 10, attack: 10, decorations: 1 } })).toEqual({ kind: 'defeated', decorations: 1 });
+  expect(resolveExplore({ weapons: [{ damage: 20, ammoReq: 10 }], ammo: 20, bonusDamage: 0, revealed: { id: 'ma-005', name: 'Bui Kichwa', type: 'infected', set: 'premier', text: '', copies: 3, hp: 10, attack: 10, decorations: 1 } })).toEqual({ kind: 'defeated', decorations: 1, damage: 20, hp: 10 });
 });
 
 test('resolveExplore notDefeated', () => {
@@ -77,7 +77,7 @@ test('resolveExplore Uroboros shuffleBack', () => {
 });
 
 test('resolveExplore Gatling Gun Majini', () => {
-  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 60, bonusDamage: 0, revealed: { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] } })).toEqual({ kind: 'defeated', decorations: 4 });
+  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 60, bonusDamage: 0, revealed: { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] } })).toEqual({ kind: 'defeated', decorations: 4, damage: 60, hp: 40 });
   expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 10, bonusDamage: 0, revealed: { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] } })).toEqual({ kind: 'notDefeated', damageTaken: 25, shuffleBack: false });
 });
 

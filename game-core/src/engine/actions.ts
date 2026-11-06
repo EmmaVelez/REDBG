@@ -15,6 +15,7 @@ import {
   partnerAttachCap,
   herbTrashDamageBonus,
   hasDoubleDamageOnBothHerbs,
+  hasPerfectExploreReward,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -1016,6 +1017,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'luisSeraDiscardToInventory' },
             }]
           : defeatPrompts;
+        // Carlos Oliveira (Alliance) L2: a perfect explore (damage dealt equals
+        // the Revealed Infected's health) lets him take one card from his
+        // Discard Pile into his hand.
+        const carlosPrompts = hasPerfectExploreReward(characterAbilities(state, seat)) &&
+          outcome.damage === outcome.hp && newPlayer.discard.length > 0
+          ? [...luisPrompts, {
+              id: 'p' + (luisPrompts.length + 1),
+              seat,
+              text: 'Take one card from your Discard Pile into your hand.',
+              options: [...newPlayer.discard],
+              payload: { kind: 'perfectExploreReward' },
+            }]
+          : luisPrompts;
         return {
           ...state,
           ...nextBase,
@@ -1024,7 +1038,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
-          prompts: luisPrompts,
+          prompts: carlosPrompts,
         };
       }
 
@@ -1871,6 +1885,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s =>
             s.seat === seat ? { ...player, chrisAmmoDiscountTypes: [...(player.chrisAmmoDiscountTypes ?? []), chosen] } : s,
           ),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'perfectExploreReward') {
+        // Carlos (Alliance) L2: the chosen discard card moves to the hand.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || !player.discard.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, discard: player.discard.filter(id => id !== chosen), hand: [...player.hand, chosen] }
+            : s)),
           prompts: newPrompts,
         };
       }

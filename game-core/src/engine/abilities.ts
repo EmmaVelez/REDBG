@@ -399,6 +399,10 @@ export function herbTrashDamageBonus(abilities: readonly CharacterAbility[]): nu
   return amount;
 }
 
+/** Carlos Oliveira (Alliance CH-011) L2: perfect-explore reward. */
+export function hasPerfectExploreReward(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'perfectExploreReward');
+}
 /** Claire Redfield (Alliance CH-020) L2: double all damage this turn. */
 export function hasDoubleDamageOnBothHerbs(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'doubleDamageOnBothHerbs');

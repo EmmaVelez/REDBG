@@ -294,7 +294,8 @@ export type CharacterAbility =
   | { readonly kind: "weaponCostCap"; readonly maxCost: number; readonly level: 1 | 2 } // Josh Stone (Alliance) L1: cannot use weapons costing maxCost or more
   | { readonly kind: "partnerAttachCapBonus"; readonly amount: number; readonly level: 1 | 2 } // Josh Stone (Alliance) L2: partner may attach amount extra cards
   | { readonly kind: "herbTrashDamageBonus"; readonly amount: number; readonly level: 1 | 2 } // Claire Redfield (Alliance) L1: +amount damage this turn when a Green/Red Herb is trashed
-  | { readonly kind: "doubleDamageOnBothHerbs"; readonly level: 1 | 2 }; // Claire Redfield (Alliance) L2: double all damage this turn when a Green and a Red Herb are both trashed
+  | { readonly kind: "doubleDamageOnBothHerbs"; readonly level: 1 | 2 } // Claire Redfield (Alliance) L2: double all damage this turn when a Green and a Red Herb are both trashed
+  | { readonly kind: "perfectExploreReward"; readonly level: 1 | 2 }; // Carlos Oliveira (Alliance) L2: on a perfect explore (damage == health), take one discard card to hand
 
 
 // ---------------------------------------------------------------------------

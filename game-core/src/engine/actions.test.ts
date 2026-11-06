@@ -55,6 +55,8 @@ const DEFS: Record<string, CardDef> = {
   'ch-jill-a': { id: 'ch-jill-a', name: 'Jill Valentine (Alliance)', type: 'character', set: 'alliance', text: 'Jill (Alliance)', copies: 1, maxHp: 90, level1At: 1, level2At: 6, abilities: [{ kind: 'partnerAttachedCountDamageBonus', amount: 10, threshold: 1, level: 1 }, { kind: 'offTurnFlashGrenadeLasPlagas', level: 2 }] },
   'ch-josh-a': { id: 'ch-josh-a', name: 'Josh Stone (Alliance)', type: 'character', set: 'alliance', text: 'Josh (Alliance)', copies: 1, maxHp: 80, level1At: 0, level2At: 4, abilities: [{ kind: 'weaponCostCap', maxCost: 50, level: 1 }, { kind: 'partnerAttachCapBonus', amount: 2, level: 2 }] },
   'ch-claire-a': { id: 'ch-claire-a', name: 'Claire Redfield (Alliance)', type: 'character', set: 'alliance', text: 'Claire (Alliance)', copies: 1, maxHp: 80, level1At: 3, level2At: 7, abilities: [{ kind: 'herbTrashDamageBonus', amount: 20, level: 1 }, { kind: 'doubleDamageOnBothHerbs', level: 2 }] },
+  'ch-carlos-a': { id: 'ch-carlos-a', name: 'Carlos Oliveira (Alliance)', type: 'character', set: 'alliance', text: 'Carlos (Alliance)', copies: 1, maxHp: 90, level1At: 4, level2At: 9, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'perfectExploreReward', level: 2 }] },
+  'w30-1': { id: 'w30-1', name: 'Test Shotgun', type: 'weapon', set: 'premier', text: 'Shotgun', copies: 1, ammoReq: 0, damage: 30 },
   'it-001': { id: 'it-001', name: 'Green Herb', type: 'item', set: 'premier', text: 'Trash: heal 20, or trash with another Green Herb to heal 60.', copies: 6, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
   'it-004': { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: 'Trash: heal yourself and your partner to full Health.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
   'we-expensive': { id: 'we-expensive', name: 'Bolt-Action Rifle', type: 'weapon', set: 'premier', text: 'Rifle', copies: 1, cost: 60, ammoReq: 30, damage: 20 },
@@ -83,7 +85,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'), 'cclaire': inst('cclaire', 'ch-claire-a'), 'rh1': inst('rh1', 'it-004'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'), 'cclaire': inst('cclaire', 'ch-claire-a'), 'rh1': inst('rh1', 'it-004'), 'ccarlos': inst('ccarlos', 'ch-carlos-a'), 'w30': inst('w30', 'w30-1'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -257,6 +259,37 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Alliance Carlos L1: can look at the top of the Mansion before exploring', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'ccarlos', level: 1 as const, hand: ['w1'], turnAmmo: 100 } });
+  const s = applyAction(base, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+  expect(s.prompts.length).toBe(1);
+  expect(pr(s).payload?.kind).toBe('lookAtMansionTop');
+});
+
+test('Alliance Carlos L2: a perfect explore lets him take a discard card to hand', () => {
+  // w20 (Test Magnum, 20 damage) exactly matches ma-1 (Majini, 20 HP).
+  const base = baseState({
+    seat0: { characterInstanceId: 'ccarlos', level: 2 as const, hand: ['w20'], turnAmmo: 100, discard: ['a1'] },
+    mansionDeck: ['inf1'],
+  });
+  const s = applyAction(base, { type: 'explore', seat: 0, weapons: ['w20'], exploreCount: 1 });
+  expect(s.prompts.length).toBe(1);
+  expect(pr(s).payload?.kind).toBe('perfectExploreReward');
+  const after = applyAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 0 });
+  expect(after.seats[0]!.hand).toContain('a1');
+  expect(after.seats[0]!.discard).not.toContain('a1');
+});
+
+test('Alliance Carlos L2: no prompt when the damage overkills', () => {
+  // w30 (30 damage) overkills ma-1 (20 HP), so the damage is not equal to its health.
+  const base = baseState({
+    seat0: { characterInstanceId: 'ccarlos', level: 2 as const, hand: ['w30'], turnAmmo: 100, discard: ['a1'] },
+    mansionDeck: ['inf1'],
+  });
+  const s = applyAction(base, { type: 'explore', seat: 0, weapons: ['w30'], exploreCount: 1 });
+  expect(s.prompts.length).toBe(0);
+  expect(s.seats[0]!.discard).toContain('a1');
+});
 test('Alliance Claire L1: +20 damage when a herb is trashed from hand', () => {
   const base = baseState({ seat0: { characterInstanceId: 'cclaire', level: 1 as const, hand: ['gh1', 'w1'], turnAmmo: 100 } });
   const played = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'gh1' });
