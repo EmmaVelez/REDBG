@@ -1,10 +1,11 @@
-import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt } from '../types';
+import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt, SkillDraftState } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
+import { skillCardDefs, draftPrompt, turnStartSkillEffects } from './skill';
 
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
@@ -427,7 +428,21 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     infectionDeck = rngShuffle(infectionIds);
   }
 
-  return {
+  // Mercenaries Skill System: build the 30-card Skill deck (one copy each),
+  // shuffle it, and deal 5 cards to each seat. The pass-left draft then runs
+  // as a sequence of chooseOption prompts (see engine/skill.ts).
+  const skillDefs = skillCardDefs(cards);
+  const skillIds: string[] = [];
+  for (const def of skillDefs) {
+    for (let j = 0; j < def.copies; j++) {
+      const id = `${def.id}#${j + 1}`;
+      skillIds.push(id);
+      register(id, def.id, 'skillArea');
+    }
+  }
+  const shuffledSkills: readonly string[] = skillIds.length > 0 ? rngShuffle(skillIds) : [];
+
+  const baseState: GameState = {
     version: 1,
     seed: setup.seed,
     rngState: rng.s,
@@ -446,6 +461,41 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     log: [],
     ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
   };
+
+  if (setup.skillSystem !== true) {
+    return baseState;
+  }
+
+  const seatCount = drawnHands.length;
+  const hands = {} as Record<number, string[]>;
+  let offset = 0;
+  for (let s = 0; s < seatCount; s++) {
+    hands[s] = shuffledSkills.slice(offset, offset + 5);
+    offset += 5;
+  }
+  const emptyRecords = (): Record<number, string[]> =>
+    Object.fromEntries(Array.from({ length: seatCount }, (_, i) => [i, []]));
+  const draft: SkillDraftState = {
+    deck: shuffledSkills.slice(offset),
+    hands,
+    kept: emptyRecords(),
+    pendingPass: emptyRecords(),
+    round: 0,
+    pickSeat: 0,
+    step: 'pick',
+    keepSeat: 0,
+    keepPicks: 0,
+    final: emptyRecords(),
+  };
+  const draftState: GameState = {
+    ...baseState,
+    phase: 'skillDraft',
+    skillSystem: true,
+    skillDeck: draft.deck,
+    skillDraft: draft,
+  };
+  const prompt = draftPrompt(draftState);
+  return prompt === undefined ? draftState : { ...draftState, prompts: [prompt] };
 }
 
 /**
@@ -627,18 +677,20 @@ function startTurnInternal(state: GameState): GameState {
   });
 
 
+  const skillTurn = turnStartSkillEffects(state, player.seat);
+
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
-    hp: Math.min(player.hp + herbHeal + healAtTurnStart(abilitiesForLevel(charDef?.abilities, player.level)), player.maxHp),
+    hp: Math.min(player.hp + herbHeal + healAtTurnStart(abilitiesForLevel(charDef?.abilities, player.level)) + skillTurn.heal, player.maxHp),
     pendingHerbHeal: 0,
-    turnAmmo: 0,
+    turnAmmo: skillTurn.ammo,
     turnGold: ((herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'))
       ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldOnFirstHealThisTurn') as { amount: number }).amount
       : 0) +
       (abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldAtTurnStart')
         ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldAtTurnStart') as { amount: number }).amount
-        : 0),
+        : 0) + skillTurn.gold,
     healedFirstTimeThisTurn: herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'),
     actionsLeft: (() => {
       const base = (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0);
@@ -661,8 +713,8 @@ function startTurnInternal(state: GameState): GameState {
         a => a.kind === 'extraExploreAtTurnStart'
       )
         ? 1
-        : 0),
-    weaponDamageBonusThisTurn: 0,
+        : 0) + skillTurn.explores,
+    weaponDamageBonusThisTurn: skillTurn.damageThisTurn,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
       ? {
@@ -679,6 +731,8 @@ function startTurnInternal(state: GameState): GameState {
       damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,
     chrisAmmoDiscountTypes: undefined,
+    pendingSkillEffects: undefined,
+    skillAmmoDiscountTypes: undefined,
     skipNextTurn: undefined,
     noActionsNextTurn: undefined,
     actionsCapNextTurn: undefined,

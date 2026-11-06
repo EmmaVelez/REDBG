@@ -187,6 +187,7 @@ describe('createRoomStore', () => {
       scenario: 'firstTimer',
       players: room.players,
       partnerMode: false,
+      skillSystem: false,
     });
   });
 

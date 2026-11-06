@@ -36,6 +36,32 @@ export function sanitize(state: GameState, viewerSeat: number): GameState {
         return action;
     }
   };
+  // Mercenaries Skill draft: each seat's hand / kept / pending cards are
+  // private, and the undealt deck is face-down. Only the viewer's own draft
+  // cards stay visible (spectators see counts only).
+  const hiddenDraft = state.skillDraft === undefined
+    ? undefined
+    : {
+        ...state.skillDraft,
+        deck: state.skillDraft.deck.map((_, i) => `hidden-draft-${i}`),
+        hands: Object.fromEntries(Object.entries(state.skillDraft.hands).map(([seat, hand]) => [
+          seat,
+          Number(seat) === viewerSeat ? hand : hand.map((_, i) => `hidden-draft-hand-${i}`),
+        ])),
+        kept: Object.fromEntries(Object.entries(state.skillDraft.kept).map(([seat, cards]) => [
+          seat,
+          Number(seat) === viewerSeat ? cards : cards.map((_, i) => `hidden-draft-kept-${i}`),
+        ])),
+        pendingPass: Object.fromEntries(Object.entries(state.skillDraft.pendingPass).map(([seat, cards]) => [
+          seat,
+          Number(seat) === viewerSeat ? cards : cards.map((_, i) => `hidden-draft-pass-${i}`),
+        ])),
+        final: Object.fromEntries(Object.entries(state.skillDraft.final).map(([seat, cards]) => [
+          seat,
+          Number(seat) === viewerSeat ? cards : cards.map((_, i) => `hidden-draft-final-${i}`),
+        ])),
+      };
+
   return {
     ...state,
     seats: state.seats.map(s => {
@@ -51,6 +77,7 @@ export function sanitize(state: GameState, viewerSeat: number): GameState {
       };
     }),
     log: state.log.map(entry => ({ seq: entry.seq, action: redactAction(entry.action) })),
+    ...(hiddenDraft !== undefined ? { skillDraft: hiddenDraft } : {}),
   };
 }
 

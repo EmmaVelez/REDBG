@@ -41,6 +41,8 @@ export interface RoomSnapshot {
   readonly players: readonly PlayerInfo[];
   /** Enable Partner Modification rules (Alliance expansion feature). */
   readonly partnerMode: boolean;
+  /** Enable the Mercenaries Skill System (Skill cards, XP, draft). */
+  readonly skillSystem: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +50,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -63,6 +65,8 @@ export type ClientMessage =
   | { readonly kind: 'setScenario'; readonly scenario: ScenarioId }
   /** Host control: enable/disable partner mode (Alliance expansion). */
   | { readonly kind: 'setPartnerMode'; readonly partnerMode: boolean }
+  /** Host control: enable/disable the Mercenaries Skill System. */
+  | { readonly kind: 'setSkillSystem'; readonly skillSystem: boolean }
   | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
@@ -146,7 +150,7 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
@@ -155,6 +159,9 @@ export function validateMessage(value: unknown): DecodeResult {
     }
     if (typeof m.partnerMode !== 'boolean') {
       return { ok: false, error: 'createRoom requires a partnerMode boolean' };
+    }
+    if (m.skillSystem !== undefined && typeof m.skillSystem !== 'boolean') {
+      return { ok: false, error: 'createRoom requires a skillSystem boolean when present' };
     }
     return { ok: true, msg: value as WireMessage };
   }
@@ -169,6 +176,13 @@ export function validateMessage(value: unknown): DecodeResult {
     const m = value as { kind: string; partnerMode?: unknown };
     if (typeof m.partnerMode !== 'boolean') {
       return { ok: false, error: 'setPartnerMode requires a partnerMode boolean' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setSkillSystem') {
+    const m = value as { kind: string; skillSystem?: unknown };
+    if (typeof m.skillSystem !== 'boolean') {
+      return { ok: false, error: 'setSkillSystem requires a skillSystem boolean' };
     }
     return { ok: true, msg: value as WireMessage };
   }

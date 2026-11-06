@@ -181,7 +181,7 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           return;
         }
         if (session.clientId === null) return; // identity issued at connect
-        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId);
+        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId, msg.skillSystem);
         session.roomCode = room.roomCode;
         broadcastRoomState(room.roomCode);
         return;
@@ -316,6 +316,17 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         if (session.roomCode === null || session.clientId === null) return;
         try {
           roomStore.setPartnerMode(session.roomCode, session.clientId, msg.partnerMode);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
+      case 'setSkillSystem': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setSkillSystem(session.roomCode, session.clientId, msg.skillSystem);
           broadcastRoomState(session.roomCode);
         } catch (e) {
           send(ws, { kind: 'error', message: (e as Error).message });

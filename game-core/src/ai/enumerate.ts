@@ -2,7 +2,8 @@
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
 import { explorableWeapons } from '../engine/weaponReuse';
-import { characterAbilities, weaponCostCap } from '../engine/abilities';
+import { characterAbilities, weaponCostCap } from '../engine/abilities';
+import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -158,6 +159,37 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   // partner mode leader selection is handled automatically; bots should not pick manually
 
+  }
+
+  // --- 6b. moveXp (Mercenaries Skill System) ---
+  // Moving XP is a free action; offer the amount that fills each Skill to its
+  // requirement, plus dumping the whole pool onto it.
+  if (state.skillSystem === true && (player.xp ?? 0) > 0) {
+    for (const skillId of player.skills ?? []) {
+      const need = Math.max(skillXpRequired(state, skillId) - skillXpOn(state, skillId), 0);
+      if (need > 0 && need <= (player.xp ?? 0)) {
+        generatedActions.push({ type: 'moveXp', seat, skillInstanceId: skillId, amount: need });
+      }
+      if ((player.xp ?? 0) > need) {
+        generatedActions.push({ type: 'moveXp', seat, skillInstanceId: skillId, amount: player.xp ?? 0 });
+      }
+    }
+  }
+
+  // --- 6c. useSkill (Mercenaries manual "can" Skills) ---
+  if (state.skillSystem === true) {
+    const manualKinds = new Set([
+      'selfDamageForCardsAndAction', 'selfDamageForTrashDiscard', 'trashAmmoForAmmo',
+      'movePlayAreaWeaponToInventoryTop', 'nameWeaponTypeAmmoDiscount', 'removeXpForTrashHand',
+      'exploreBonusDamagePerCharacterDamage', 'giantKillingPlusDamage',
+      'giantKillingAllWeaponsPlusDamage', 'exploreDuplicateWeaponEffect', 'removeXpForWeaponDamage',
+    ]);
+    for (const skillId of activeSkillIds(state, seat)) {
+      const def = state.cardDefs[state.cards[skillId]?.cardId ?? ''];
+      if ((def?.skillEffects ?? []).some(e => manualKinds.has(e.kind))) {
+        generatedActions.push({ type: 'useSkill', seat, skillInstanceId: skillId });
+      }
+    }
   }
 
   // --- 7. endTurn ---

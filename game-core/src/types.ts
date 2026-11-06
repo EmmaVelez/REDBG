@@ -25,7 +25,8 @@ export type CardType =
   | "action"
   | "token"      // Mansion-only cases (Rocket Launcher Case, Gatling Gun Case)
   | "infected"  // Mansion-only creatures
-  | "event";    // Mansion-only events
+  | "event"     // Mansion-only events
+  | "skill";    // Mercenaries Skill System (SK-001..SK-030)
 
 /** Zones a card instance can live in. */
 export type CardZone =
@@ -37,6 +38,7 @@ export type CardZone =
   | "inventory"    // player's deck (top = index 0)
   | "discard"
   | "infectionDeck" // Outbreak: face-down Infection Deck
+  | "skillArea" // Mercenaries: Skill cards in a player's Skill Area
   | "removed";     // removed from the game
 
 export interface CardLocation {
@@ -65,7 +67,7 @@ export interface CardDef {
   readonly id: string;
   readonly name: string;
   readonly type: CardType;
-  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare' | 'outbreak';
+  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare' | 'outbreak' | 'mercenaries';
   /** Human-readable rules text (for UI + reference). */
   readonly text: string;
   /** Copies of this card in the game (used when building piles). */
@@ -123,6 +125,16 @@ export interface CardDef {
   readonly itemEffects?: readonly ItemEffect[];
   readonly actionEffects?: readonly ActionEffect[];
   readonly tokenEffects?: readonly TokenEffect[];
+
+  // -- skill (Mercenaries Skill System) --
+  /** XP that must sit on this Skill before its effect is usable. */
+  readonly skillXp?: number;
+  /** Skill family name, e.g. "Extension" (grouping/display). */
+  readonly skillFamily?: string;
+  /** Skill level 1-3. */
+  readonly skillLevel?: number;
+  /** Machine-readable effect keys (see SkillEffect). */
+  readonly skillEffects?: readonly SkillEffect[];
 }
 
 /**
@@ -252,6 +264,43 @@ export type ActionEffect =
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
 
+/**
+ * Mercenaries Skill System effects. A Skill is active once the XP on it reaches
+ * its `skillXp`; effects with "can" in the card text are MANUAL (once per turn),
+ * the rest are passive/triggered. The engine switches on these kinds.
+ */
+export type SkillEffect =
+  | { readonly kind: "extensionAmmoAtTurnStart"; readonly infectedAttached: number; readonly decorations: number; readonly amount: number } // SK-001
+  | { readonly kind: "extensionDamageAndHealAtTurnStart"; readonly infectedAttached: number; readonly decorations: number; readonly damage: number; readonly heal: number } // SK-002
+  | { readonly kind: "extensionExploreAtTurnStart"; readonly infectedAttached: number; readonly decorations: number } // SK-003
+  | { readonly kind: "healAmountBonus"; readonly amount: number } // SK-004
+  | { readonly kind: "healTrashFromDiscard" } // SK-005
+  | { readonly kind: "healAtTurnStartOrElseExplore"; readonly heal: number } // SK-006
+  | { readonly kind: "lethalDamageReplacement"; readonly amount: number } // SK-007
+  | { readonly kind: "negateDamageRemoveXp" } // SK-008 (manual)
+  | { readonly kind: "copyActivatedSkills" } // SK-009
+  | { readonly kind: "negateInfectedEffectRemoveXp" } // SK-010 (manual/reactive)
+  | { readonly kind: "damageReduction"; readonly amount: number } // SK-011
+  | { readonly kind: "redirectInfectedEffectRemoveXp" } // SK-012 (manual/reactive)
+  | { readonly kind: "selfDamageForCardsAndAction"; readonly damage: number; readonly cards: number; readonly actions: number } // SK-013 (manual)
+  | { readonly kind: "selfDamageForTrashDiscard"; readonly damage: number; readonly count: number } // SK-014 (manual)
+  | { readonly kind: "exploreBonusDamagePerCharacterDamage" } // SK-015 (manual, explore)
+  | { readonly kind: "trashAmmoForAmmo"; readonly maxCost: number } // SK-016 (manual)
+  | { readonly kind: "turnStartGoldAndAmmo"; readonly gold: number; readonly ammo: number } // SK-017
+  | { readonly kind: "movePlayAreaWeaponToInventoryTop" } // SK-018 (manual)
+  | { readonly kind: "nameWeaponTypeAmmoDiscount"; readonly amount: number } // SK-019 (manual)
+  | { readonly kind: "exploreAllWeaponsPlusDamage"; readonly amount: number } // SK-020
+  | { readonly kind: "exploreDuplicateWeaponEffect" } // SK-021 (manual, explore)
+  | { readonly kind: "giantKillingReduceDamage"; readonly hpThreshold: number } // SK-022
+  | { readonly kind: "giantKillingPlusDamage"; readonly hpThreshold: number; readonly amount: number } // SK-023 (manual, explore)
+  | { readonly kind: "giantKillingAllWeaponsPlusDamage"; readonly hpThreshold: number; readonly amount: number } // SK-024 (manual, explore)
+  | { readonly kind: "xpOnDefeatHighDecoration"; readonly decorations: number } // SK-025
+  | { readonly kind: "removeXpForTrashHand" } // SK-026 (manual)
+  | { readonly kind: "removeXpForWeaponDamage"; readonly perXp: number } // SK-027 (manual, explore)
+  | { readonly kind: "pistolAmmoDiscount"; readonly amount: number } // SK-028
+  | { readonly kind: "revealPistolsForExplore"; readonly count: number } // SK-029 (manual, turn start)
+  | { readonly kind: "explorePistolPlusDamage"; readonly amount: number }; // SK-030
+
 export type CharacterAbility =
   | { readonly kind: "weaponPlusDamagePerInfectedFought"; readonly amount: number; readonly level: 1 | 2 } // Chris L1: +5 per Infected being fought
   | { readonly kind: "noHealingNoNonInfectedAttach"; readonly level: 1 | 2 }                              // Chris restriction
@@ -351,6 +400,8 @@ export interface CardInstance {
   readonly instanceId: string;
   readonly cardId: string;
   readonly location: CardLocation;
+  /** Mercenaries: XP currently moved onto this Skill card. */
+  readonly xp?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -463,6 +514,16 @@ export interface PlayerState {
   readonly downed: boolean;
   /** Permanently dead (maxHp reached 0). */
   readonly dead: boolean;
+
+  /** Mercenaries Skill System: XP on the Character (moved onto Skills to activate them). */
+  readonly xp?: number;
+  /** Mercenaries Skill System: Skill cards in the Skill Area (instance ids. */
+  readonly skills?: readonly string[];
+  /** Mercenaries: explore-time "can" Skills declared this turn (consumed by the
+   *  next explore, then cleared). */
+  readonly pendingSkillEffects?: readonly PendingSkillEffect[];
+  /** Mercenaries: weapon types chosen via Weapon Master LV.1 this turn. */
+  readonly skillAmmoDiscountTypes?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -471,9 +532,45 @@ export interface PlayerState {
 
 export type Phase =
   | "setup"
+  | "skillDraft" // Mercenaries: opening Skill draft (pick 1 / pass left x5, keep 3)
   | "main"       // active player spends Action/Buy/Explore tokens in any order
   | "turnEnd"    // discard play area + hand, draw 5
   | "gameOver";
+
+/** Mercenaries: an explore-time "can" Skill declared before the explore and
+ *  consumed by it (Giant Killing LV.2/3, Reversal LV.3, Weapon Master LV.3,
+ *  Maximizer LV.3). */
+export type PendingSkillEffect =
+  | { readonly kind: 'giantKillingPlusDamage'; readonly amount: number }
+  | { readonly kind: 'giantKillingAllWeaponsPlusDamage'; readonly amount: number }
+  | { readonly kind: 'reversalBonusPerCharacterDamage' }
+  | { readonly kind: 'duplicateWeaponEffect'; readonly weaponInstanceId: string }
+  | { readonly kind: 'removeXpForWeaponDamage'; readonly weaponInstanceId: string; readonly amount: number };
+
+/** Mercenaries opening draft: 5 cards each, pick 1 and pass left for 5 rounds,
+ *  then keep 3 of the 5 chosen. Driven entirely by chooseOption prompts. */
+export interface SkillDraftState {
+  /** Face-down Skill cards not yet dealt. */
+  readonly deck: readonly string[];
+  /** Current hand per seat (the cards being drafted this round). */
+  readonly hands: Readonly<Record<number, readonly string[]>>;
+  /** Cards each seat has chosen so far. */
+  readonly kept: Readonly<Record<number, readonly string[]>>;
+  /** Cards each seat will pass left at the end of the round. */
+  readonly pendingPass: Readonly<Record<number, readonly string[]>>;
+  /** 0-based round (0..4); each round the hands shrink by one. */
+  readonly round: number;
+  /** Seat whose pick is pending. */
+  readonly pickSeat: number;
+  /** 'pick' = pick 1 of hand; 'keep' = keep 3 of the 5 chosen. */
+  readonly step: 'pick' | 'keep';
+  /** Seat whose keep-pick is pending. */
+  readonly keepSeat: number;
+  /** How many cards the current keep seat has already kept (0..3). */
+  readonly keepPicks: number;
+  /** Final kept cards per seat (filled during the keep step). */
+  readonly final: Readonly<Record<number, readonly string[]>>;
+}
 
 export interface GameState {
   /** Bumped on every applied action; used for sync/optimistic UI. */
@@ -541,6 +638,13 @@ export interface GameState {
     readonly rngState: number;
   };
   readonly log: readonly LoggedAction[];
+
+  /** Mercenaries Skill System: master toggle for this game. */
+  readonly skillSystem?: boolean;
+  /** Mercenaries: face-down Skill deck remaining in the opening draft. */
+  readonly skillDeck?: readonly string[];
+  /** Mercenaries: the opening draft in progress (phase === "skillDraft"). */
+  readonly skillDraft?: SkillDraftState;
 }
 
 export interface LoggedAction {
@@ -569,6 +673,10 @@ export type Action =
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
   | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }
   | { readonly type: "endTurn"; readonly seat: number }
+  /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
+  | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
+  /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */
+  | { readonly type: "useSkill"; readonly seat: number; readonly skillInstanceId: string }
   | { readonly type: "chooseOption"; readonly seat: number; readonly promptId: string; readonly option: number };
 
 export interface GameSetup {
@@ -589,6 +697,8 @@ export interface GameSetup {
   readonly outbreakMode?: boolean;
   /** Enable Partner Modification rules (Alliance expansion). */
   readonly partnerMode?: boolean;
+  /** Enable the Mercenaries Skill System (Skill cards, XP, draft). */
+  readonly skillSystem?: boolean;
 }
 
 /**

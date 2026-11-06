@@ -33,6 +33,8 @@ const VERBS: Record<Action['type'], string> = {
   startGame: 'started the game',
   attachToPartner: 'attached to partner',
   chooseExploreLeader: 'chose explore leader',
+  moveXp: 'moved XP onto a Skill',
+  useSkill: 'used a Skill',
 };
 
 function cardName(state: GameState, instanceId: string | undefined): string | null {

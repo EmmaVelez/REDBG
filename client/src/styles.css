@@ -1225,3 +1225,23 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 12px;
 }
 .explore-picker-actions { display: flex; gap: 6px; }
+
+/* ---- Mercenaries Skill System panel ---- */
+.skill-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.skill-panel-head { display: flex; gap: 8px; align-items: baseline; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+.skill-panel-xp { color: var(--accent); font-weight: 700; }
+.skill-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.04); }
+.skill-row-active { border: 1px solid var(--accent); }
+.skill-row-inactive { opacity: 0.6; }
+.skill-row-name { font-weight: 600; }
+.skill-row-pips { color: var(--muted-foreground); }
+.skill-use, .skill-move-xp { font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border); background: var(--accent); color: #1d1f23; cursor: pointer; }
+.skill-move-xp:disabled, .skill-use:disabled { opacity: 0.45; cursor: default; }

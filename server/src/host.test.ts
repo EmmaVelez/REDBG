@@ -65,6 +65,7 @@ describe('createHost', () => {
       scenario: 'firstTimer',
       players: [],
       partnerMode: false,
+      skillSystem: false,
     };
     const host = createHost(lonely);
     expect(() => host.start(1)).toThrow('no seated players');

@@ -1,0 +1,985 @@
+©CAPCOM. Licensed for use by BANDAI.
+Chapter I >> Game Concept       >> 02
+
+Chapter II >> Card Analysis     >> 02
+
+Chapter III >> Things You Need
+
+to Play                         >> 06
+
+Chapter IV >> Field Layout      >> 06
+
+Chapter V >> Basic Game Setup >> 07
+
+Chapter VI >> Game Modes        >> 08
+
+Chapter VII >> Terminology      >> 36
+
+Chapter VIII >> FAQ             >> 37
+
+News reports begin to come in, speaking of cannibalism
+in the remote corners of the United States. Reports
+indicate that people were attacked by a group of
+roughly 10 people. The only evidence found were bits of
+torn flesh and bone. The grisly incidents continue
+to increase, with the epicenter being triangulated to an
+isolated mansion just outside the city limits.
+Upon approaching the Mansion, however, you come
+under attack. Your aggressors seem unfazed by your
+attacks, and you retreat into the mansion. Unable
+to go back the way you came, will you be able to forge
+ahead, find a way out and, most of all, escape with
+your life? Welcome to the Survival Horror....
+
+                                                                                                                                                                                                                                                                                                   01
+Chapter I. Game Concept \\                                                                     A                    B (3) Weapon Card
+
+Welcome to the Resident EvilTM Deck Building Game. This is a game where you                                         Weapon cards are used in battle to deal
+build up a deck from meager beginnings. The deck you build represents your
+Inventory, whether that includes Items , Weapons, or Ammunition. Your deck                                          Damage to the Infected. Most Weapons have
+will be your lifeline to survival.
+                                                                                                                    an Ammo Requirement that you need to
+
+                                                                                                                    fulfill in order to deal Damage. Weapons will be
+
+                                                                                                                    your primary Resource used to deal Damage
+
+                                                                                                                    to the Infected.
+
+Chapter II. Card Analysis                                                                                           A Card Type
+                                                                                                                    B Cost to Buy
+                                                                                         G                          C Weapon Name
+                                                                                                                    D Weapon Type
+      A                               B (1) Character Card                                                          E Ammo Requirement: This shows how much
+
+                                      Character cards are used to battle against                              C         Ammo is needed to use the Weapon.
+                                                                                      D
+                                      the Infected you encounter throughout the
+
+                                      game. Each Character has special effects that   E           F
+
+                                      could change the game when used.
+
+                                      All Characters have a base damage of 0.         F Damage: This shows how much Damage this Weapon deals when used.
+                                      (See Pg 14 for new Base Damage Rule)
+                                                                                      G Weapon Effect: The special effect the Weapon provides, if any.
+                                      A Card Type                                         Weapon effects are activated when the Weapon is used.
+
+   C                                  B Starting and Maximum Health: This shows
+                                         the starting Health of this Character.
+D     E                                  This also represents the starting Maximum
+                                         Health of this Character.
+
+                                      C Character Name
+
+D Levels & Decoration Requirements: This shows the Decorations required                        A                    (4) Infected Card
+    to be the Level indicated. (See Pg 15 for Level Up and Decorations)
+
+E Effects: These are the special effects of this Character. Character effects which                                 Infected cards are only in the Mansion
+    use the word "can" in them may only be used once during their noted timing.
+                                                                                                                    (See Pg 07 for Mansion). As Players Explore
+
+                                                                                                                    the Mansion, they have a high chance
+
+                                                                                                                    of encountering the Infected. When they
+
+                                   A                                                                                do, they must Battle and Defeat them
+
+                                  D   B (2) Ammunition Card                                                         using whatever Weapon cards they have,
+                   C                        Ammunition serves as the Basic Resource
+                                            Players need to use their Weapons and to                                lest they be permanently incapacitated.
+                             E              gain Gold to Buy other Resources.
+02                                                                                             D                    A Card Type
+                                            A Card Type
+                                                                                      B                             B Infected Name
+                                            B Cost to Buy
+                                                                                      C     E                    F  C Health
+                                            C Name
+                                                                                                                    D Effect: This shows the special effects
+                                            D Effect                                                                    this Infected has, if any.
+
+                                            E Bonus Icons: These show any additional  E Damage: This shows how much Damage it deals to the Exploring
+                                                bonuses the Ammunition gives. In the       Character if it is not Defeated in battle.
+                                                example, this Ammunition gives +10
+                                                Ammo and +10 Gold.                    F Decoration Reward: This shows how many Decorations the Infected
+                                                                                          provides once Defeated. The stronger the Infected is, the more
+                                                                                          Decorations your Character earns.
+
+                                                                                                                                                                                                                            03
+    Chapter II. Card Analysis <Cont.>
+
+                   A     (5) Item Card                                                A          (6) Action Card
+    C
+                      B  Item cards have useful effects like healing     C                    B  Action cards have powerful effects that
+                                                                                        E
+                         or increasing the Maximum Health of                                     provide bonuses that Players will need
+
+                         Characters. Certain Items can only be found                             in their quest to defeat the Infected.
+
+                         in the Mansion.
+
+                                                                                                 A Card Type
+
+                               A Card Type                                                       B Cost to Buy
+
+                               B Cost to Buy                                                     C Action Name
+
+                               C Item Name                                                       D Effect: The special effect it gives to
+                                                                                                     the Player.
+                               D Effect: The special effect it gives to
+                                    the Player.                                            D     E Bonus Icons: The extra bonuses you are
+
+                      D                                                                          getting during the turn the card is played.
+
+                                                                                                 Apply these Bonus Icons before applying
+
+                                                                                                 the effect.
+
+04                                                                                                                                            05
+    Chapter III. Things you need to play \\                                                  Basic Resource Piles:
+
+    o 1-4 PlayersB
+    o Game counters (dice, loose change, etc) or a pen and paper to keep
+
+       track of the Health of the Characters.
+
+    Chapter IV. Field Layout \\
+
+                                D Inventory Area C Discard Pile B Player Play Area
+                                                                               Inventory
+       Player                                                                     Area       Each Player has their own Play Area B , Discard Pile C and Inventory Area D .
+    Play Area                                                                                Whenever a Player plays a card from their Hand, it is placed in their Play Area
+                                                                               D             face up. At the end of a Player's turn, that Player discards all cards in their Play
+                                                                                             Area that are not attached to their Character, and moves any cards left in their
+    C                                                                          Discard       Hand to their Discard Pile. Whenever a Player Buys or Gains a card, it is also
+                                                                                  Pile       moved to their Discard Pile.
+
+       Discard                                                                 C             Another area called the Mansion Area E is added next to the Resource Area.
+    Pile                                                                                     The Mansion includes powerful Weapons, Items, and various Events, along
+                  Mansion                                                                    with the vicious Infected.
+                     Area
+
+    D                                                                          Player
+                                                                                  Play Area
+                  E
+
+       Inventory                         A Resource Area
+    Area
+                     B Player Play Area  C Discard Pile D Inventory Area
+                                                                               B
+
+    The area in the center is referred to as the Resource Area                               INFECTED CARDS         MANSION DECK
+    A and 18 different card piles (known as Resource Piles)
+    are placed here, face up. All the cards in this area are                                 Chapter V. Basic Game Setup \\
+    referred to as Resources in the game. Players may Buy
+    these cards by paying their cost. For example, the cost of                               (1) Decide who goes First!
+    the "First Aid Spray" is 50.                                                             Randomly determine the first Player. If you are playing multiple games in a
+                                                                                             row, randomly determine the starting Player from all Players that lost the
+    Depending on which Scenario you play, different Resources are placed in                  previous game. Play continues clockwise from the Player who went first.
+    the Resource Area. (See Pg. 23 for Scenarios) However, there are certain
+    cards you need in every game, called [Basic Resources]. The following                    (2) Pick a Character!
+    cards are the [Basic Resources] and are placed in the Resource Area for                  Randomly pass out 2 Character cards to each Player. Each Player chooses 1
+    every game. The Basic Resources are:                                                     of these Characters to play as and removes the other Character card from
+                                                                                             the game.
+    Basic Resource Piles:
+
+    (1) "Ammo x10"         (2) "Ammo x20"                 (3) "Ammo x30"
+
+    (4) "First Aid Spray"  (5) "Custom Standard Sidearm" (6) "Reliable Blade"
+
+06                                                                                                                                                                                 07
+    Chapter VI. Game Modes \\
+
+     [GAME MODE: 1] STORY MODE
+
+      Players needed: 1 to 4 Players
+      Estimated Play Time: 45 min to 1 hour
+
+     A deadly virus is causing the recently deceased to arise again in a suburb.
+     Moving under the cover of night, you attempted to infiltrate the epicenter,
+     an old, decrepit mansion. However, monstrous animals and abominations,
+     created by the virus infecting living beings, gave chase.
+     Fleeing to the mansion, you are now trapped, and must find an exit by other
+     means. Will you bravely step forward into the abyss and find a way out,
+     or will you fall victim to one of the Infected?
+
+    Step 1: Set up the "Neophyte" Scenario!                                                 Giant Majini
+
+    Story Mode is meant to be played with any combination of cards. You may
+    play with as few as 18 Resource Piles, or as many as you want. For the first
+    time you play, start with the "Neophyte" Scenario:
+
+    "Neophyte" Resources:
+
+    o [Basic Resources]  o Custom               o Ibex Standard          o Fight or Flight
+    o Custom               Lightning Hawk       o Tear Gas               o The Mercenaries
+                                                o Boundless Battlefield  o Anticipation
+      Bolt-Action Rifle  o Custom               o Melee                  o Battle Hardened
+    o Hunting Bow          Pump-Action Shotgun
+
+    Take all of the Resources and add them to the Resource Area.
+
+08                                                                                                        09
+    Step 2: Create the Starting Inventory and draw your                                                                Tribal Majini (Shield)
+    starting Hand!
+
+    Each Player takes the following cards from the Resource Area. Leave the
+    remainder in the Resource Area, if there are any:
+
+                                                                                              Hard Mansion: "Majini Rock"
+
+                                                                                              1x Chicken               3x Militia (Bow)         3x Base Majini      1x Red Executioner
+                                                                                              3x Town Majini           3x Adjule                    (Shield)        2x J.J.
+                                                                                              3x Base Majini (Gun)     3x Town Majini
+    7x "Ammo x10"                                      1x "Custom    2x "Reliable blade"      3x Town Majini (Shovel)                           3x Big Man Majini
+                                                 Standard Sidearm"                                                         (Motorcycle)         2x Chainsaw Majini
+
+    Each Player shuffles these 10 cards together and places the pile face down                The more bad cards that Players Trash, the more they will find coming back to them.
+    in their Inventory area. These cards are referred to as the "Inventory".
+    Then, each Player draws 5 cards from the top of their Inventory as their                  Take all of the cards for the Mansion you chose and shuffle them together.
+    starting Hand.                                                                            Then place the newly created deck in the Mansion Area.
+
+    Step 3: Build the Mansion!                                                                (A) Game End and Victory Condition: Earn the most
+                                                                                              Decorations before "Red Executioner" is defeated!
+    "Resident EvilTM: Mercenaries" features up to 3 different Mansions for Players
+    to use, with each Mansion providing a different experience altogether! After              The game ends as soon as a Character Defeats the most powerful
+    trying the 3 pre-built Mansions, try to build your own to match your play style.          Infected in the Mansion. In this expansion, the most powerful Infected is
+                                                                                              "Red Executioner".
+    Each Mansion's difficulty is a measure of how hard it will be for Players to
+    continuously Defeat the Infected.                                                         Once "Red Executioner" has been Defeated, each Player will total up their
+                                                                                              Decorations. The Player with the most Decorations is the winner. If Players
+    Easy Mansion: "The Cult"                                                                  are tied for most Decorations, then the Player with less Damage on their
+                                                                                              Character at the moment the game ended is declared the winner. If they
+    3x Los Ganados             3x Los Ganados    3x Los Illuminados       3x Los Illuminados  are tied, then all of the tying Players are the winners.
+        (Female)                   (Handscythe)      (Scythe)                 (Shield)
+
+    3x Los Ganados (Male)      3x Los Ganados    3x Los Illuminados       1x Red Executioner
+    3x Los Ganados                 (Pitchfork)       (Bow)                1x Chicken
+
+    The more Infected that appear, the more difficult this Mansion becomes.
+
+                                                                                              Red Executioner          If every Player's
+                                                                                                                       Character is
+    Normal Mansion: "Tribal Technology"                                                                                Permanently Defeated,
+                                                                                                                       have all Players total
+    1x Chicken                 3x Tribal Majini  3x Militia (Bow)         1x Red Executioner                           up their Decorations
+    3x Venomous Snake              (Oil Pot)     3x Base Majini (Shield)                                               to determine
+    3x Tribal Majini (Bow)                       3x Base Majini (Gun)                                                  the winner as if "Red
+    3x Tribal Majini (Shield)  3x Crocodile      2x J.J.                                                               Executioner" had been
+                               2x Giant Majini                                                                         Defeated. If there is
+                                                                                                                       ever only 1 Player with
+    Instead of going directly for you, this Mansion aspires to destroy the                                             a Character that isn't
+    Resource Area.                                                                                                     Permanently Defeated,
+                                                                                                                       then that Player
+                                                                                                                       wins automatically.
+
+10                                                                                                                                                                                      11
+    (B) Game Flow: 1 Action, 1 Buy, 1 Explore, discard everything                (1) Playing Action(s)
+    and draw 5 at the end!
+                                                                                 Each Player begins their turn with 1 Action. Playing an
+    Each Player begins their turn with the following:                            Action card uses 1 Action, but some cards or effects
+                                                                                 allow a Player to get more Actions during their turn,
+    o 1 Action  o 1 Buy                                o 1 Explore               allowing for more Actions to be played in a single turn.
+
+    The Player may do any of the following 5 options in any order they wish.     To play an Action, place the card from your Hand face
+    Players do NOT have to perform any of these options if they do not want to:  up in your Play Area, then apply the Bonus Icons on the
+                                                                                 bottom of the card first, then the written effect(s), if any.
+    (1) Play an Action(s)                     (4) Explore the Mansion
+    (2) Play an Item(s) and/or Ammunition(s)  (5) Buy a Resource(s)              A Player must finish all effects of the current Action
+    (3) Activate a Character's Effect(s)                                         before another card can be played. If a Player cannot
+                                                                                 perform all of the listed effects, then the Player does
+                                                                                 as much as they can. Any Action played remains in the
+                                                                                 Player's Play Area until the end of their turn.
+
+                                                                                 (2) Playing Item(s) & Ammunition
+
+                                                                                 Playing Items or Ammunition does not require any
+                                                                                 Actions to play. To play an Item, place the card from your
+                                                                                 Hand face up in your Play Area, then do any effects
+                                                                                 that are listed on the Item, starting with the Bonus Icons
+                                                                                 first (if any). If a Player cannot perform all of the listed
+                                                                                 effects, then the Player does as much as they can. When
+                                                                                 you play Ammunition, apply the bonus effects first, then
+                                                                                 the written effects (if any). Remember that Gold and
+                                                                                 Ammo are a total that disappears at the end of the turn,
+                                                                                 so using all of your Ammunition is usually a good idea.
+
+                                                                                 Any Items and Ammunition played remains in that
+                                                                                 player's Play Area until the end of the turn.
+
+12                                                                               13
+                                           (3) Activating a Character's Effect(s)                           Then, Reveal the top card of the Mansion. If an Infected is Revealed and it has
+                                           To activate a Character's effect, the timing                     an effect, apply it when the effect says so. If a non-Infected and an Infected effect
+                                           needs to be correct. If it is, you can activate it.              share the same timing, the Infected effect must be applied first.
+                                           There are some effects that are active as long                   If the Character's total Damage meets or exceeds the Infected's Health, then the
+                                           as you are meeting certain conditions. For the                   Infected is Defeated. The Infected itself is attached to the Player's Character, and its
+                                           timing of the effects, read each effect carefully to             Decoration Reward value is added to that Character's total.
+                                           determine when you may activate them.
+                                           A Character's effect with the word "can" in it                                                       Ex. James Reveals
+                                           may only be activated once during its noted                                                          the top card of
+                                           timing per turn.                                                                                     the Mansion, which
+                                           If, at any time, a non-Infected card effect and an                                                   turns out to be a
+                                           Infected card effect have the same timing, the                                                       Zombie (Female).
+                                           Infected effect must be applied first.
+                                                                                                                                                                                                       Ex. James' 15
+         All Characters & Infected Characters have a base Damage of 0 if not shown                                                                                                                     Damage equals
+         otherwise. Some effects in the game increase a Character's base Damage,                                                                                                                       the 15 Health
+         allowing for a Character to deal Damage without using any Weapons.                                                                                                                            on the Zombie
+                                                                                                                                                                                                       (Female), and
+         (4) Exploring the Mansion                                                                                                                                                                     he attaches the
+         When a Character Explores the Mansion, do the following:                                                                                         Infected to his Character, adding its Decorations
+         1) Announce that you are Exploring.                                                                                                              to his total. The Zombie (Female) also allows
+         2) Play any Weapons your Character will be using. Each Weapon can only                                                                           James to select another Player and deny that
+         be used once, unless stated otherwise.                                                                                                           Player the ability to play Actions during their
+         3) Pay the Ammo Requirement on the Weapons being used. Add up your                                                                               next turn!
+         Ammo from all of the cards in your Play Area and assign any amount of that
+         Ammo to each Weapon being used.                                                                    Level up!
+         4) Total up the amount of Damage that your Character is dealing by adding                          When a Character has obtained a certain amount
+         up your Weapon's Damage, Character's Damage, and any effects provided                              (or more) of the indicated Decorations, that Character
+         by other cards.                                                                                    "levels up", giving you access to more powerful
+         5) If any Weapons being used have any effects, they must be used at this moment.                   effects to aid you in your escape. When a Character
+         Other effects that occur when your Character Explores must be used here as well.                   becomes Level 2, that Character has all of the
+                                                                                                            effects of Level 1 as well as Level 2.
+                                                                            Ex. James declares that he is
+                                                                            going to Explore the Mansion.                                                                              Custom Bolt-Action Rifle
+                                                                            He plays a Combat Knife and
+                                                                            a Handgun, and notes the 20                                                                                                                                            15
+                                                                            Ammo he received from Ammo
+                                                                            x20, giving James' Character a
+                                                                            total of 15 Damage.
+
+14
+     Should a Character fail to Defeat the Revealed Infected, the Infected lashes out                       Chainsaw Majini
+     and damages the Character, dealing the indicated Damage amount (plus any
+     modifiers) to the Character. The Revealed Infected is moved to the bottom of the                                                                  17
+     Mansion afterwards. Note that some Infected have effects when they are NOT
+     Defeated. These effects are applied before the Infected deals Damage.
+
+                                                                            Ex. Instead of a Zombie
+                                                                            (Female), James runs into the
+                                                                            Hunter. James' 15 Damage is
+                                                                            not enough to beat the Hunter.
+                                                                            He applies the Hunter's
+                                                                            effect, which forces James
+                                                                            to randomly Trash 2 cards
+                                                                            from his Discard Pile, take 30
+                                                                            Damage, then move the Hunter
+                                                                            to the bottom of the Mansion.
+
+16
+Penalty for Losing all your Character's Health                                        1st Explore  2nd Explore
+
+If your Character's Health is reduced to 0 or less, then that Character has
+been fatally injured in their conquest. Turn the Character face down and
+shuffle together all the cards in your Hand, Player Area and Discard Pile into
+your Inventory. Then, place your Inventory face down in front of you. All cards
+currently attached to your Character remain attached to your Character.
+A face down Character is considered to not exist, and neither does their
+Player, meaning that neither can be targeted or affected by effects.
+
+Character  Inventory                                                                        Ex: Tylar has 60 Ammo and his Character is using a Riot Shotgun which
+                                                                                            deals 45 Damage. He uses 1 Explore and Reveals Mimicry Marcus,
+     When your turn comes around, flip your Character face up. Reduce the                   which has 30 Health. He decides to use his 2nd Explore and Reveals
+     maximum Health of your Character by 20, Heal your Character to your                    Licker, which has 40 Health. Since their total Health is greater than
+     new Maximum Health amount, draw 5 new cards from your Inventory,                       Tylar's Character's 45 Damage, both Infected deal 50 Damage to Tylar's
+     and end your turn. If your Character's Maximum Health is 0 or less at this             Character (30 from the Licker & 20 from Mimicry Marcus).
+     point, your Character is Permanently Defeated and your game is over.
+     Keep all cards you have Gained throughout the game in front of you until         Players may also choose to Explore 1 at a time. While this way is much safer,
+     the game is over.                                                                you also require more weaponry this way, since Weapons apply their whole
+                                                                                      Damage only on the Explore when they are used and can only be used once
+     Extra Explore                                                                    per turn. When doing this, repeat all steps under EXPLORING THE MANSION
+                                                                                      (Pg 14) for each instance of Exploring.
+     Some Weapons, like Shotguns, allow a Character to Explore multiple times
+     in a turn. If a Player has multiple Explores, they may use 1 Explore at a time,     EXAMPLE
+     or all at once.
+                                                                                         Alex has 40 Ammo and is using a Shotgun which deals 25 Damage. He uses
+     If multiple Infected are Revealed all at once, the Player's total Damage            his first Explore and Reveals a Kipepeo, which has 20 Health. Alex decides to
+     must exceed or equal the Revealed Infected's combined Health. If it does not,       stop, and adds the Kipepeo to his Decorations. Later in the turn, Alex decides to
+     then the Character receives the total Damage of all the Revealed Infected.          use his 2nd Explore, playing 2 Knives and a Handgun, for a total of 20 Damage.
+                                                                                         Alex Reveals the Zombie (Male), which has 20 Health. Alex defeats the Zombie
+     Afterwards, all Revealed Infected that were not Defeated are moved to the           (Male) and also adds it to his Decorations.
+     bottom of the Mansion in a random order.
+                                                                                                                                                                                                                            19
+18
+    (5) Buying Resources                                                        End of Turn
+
+    When Buying, a Player may spend their Gold gained for the turn to Buy       At the end of a Player's turn, that Player Discards all cards in their Play
+    Resources in order to aid them in upcoming battles. The cost of each card   Area that aren't attached to their Character(s) and all remaining cards
+    is located in the upper right hand corner.                                  in their Hand. Then they draw 5 new cards from their Inventory.
+
+                                                                                Once a Player has completed drawing a new Hand of 5, play is passed
+                                                                                to the Player to the left.
+
+             Resource area  Discard Pile            When a Player Buys
+                                                    a card, they move
+                                                    that card from the          Inventory  Draw 5 new cards             Discard pile
+                                                    Resource Area to
+                                                    their Discard Pile.                                                                        Move all
+                                                    When a Resource                                                                            unattached cards
+                                                    Pile is empty, Players                                                                     from Play Area
+                                                    cannot Buy any more                                                                        to Discard Pile at
+                                                    of that Resource.                                                                          the end.
+
+    If the Player has multiple Buys, they combine the total amount of Gold      * Anytime a Player needs to draw
+    they have for the turn before Buying. This total amount is used to pay for  cards but cannot because of an
+    everything they Buy this turn. Buys are done one at a time. Here is an      insufficient amount of cards in their
+    example of Buying multiple Resources during a turn.                         Inventory, they draw as many as
+                                                                                they can, then shuffle their Discard
+    Ex. After playing his Ammunition and Action,                                Pile, then place it in their Inventory
+    Andy has a total of 50 Gold to Buy with and                                 Area face down, and draw the rest.
+    2 Buys to use this turn. Andy chooses to first
+    Buy the Handgun:                                                                                                       Current        Draw rest
+                                                                                                                        cards in hand  from reshuffled
+
+                                                                                                                                           Inventory
+
+    1st Buy                 After moving the Handgun to his Discard
+                            Pile, the next card in the Pistol Resource
+                            Pile is revealed to be the powerful Burst-
+                            Fire Handgun.
+
+                            Seeing that the Burst-Fire Handgun costs
+                            60 Gold to Buy, Andy finds himself too low
+                            on Gold to Buy it. Instead, Andy chooses
+                            to use his 2nd Buy to Buy a Green Herb:
+
+                                                                     2ND Buy
+
+20                                                                                                                                                                 21
+      Additional Story Mode Scenarios  Additional Scenarios for Resident EvilTM: Mercenaries
+                                       Try out the following Scenarios after you have tried the "Neophyte" Scenario (Pg. 08).
+22
+                                       "Standard Play" Resources:
+
+                                       o [Basic Resources]      o Custom                 o Custom             o Melee
+                                       o Hunting Bow              Pump-Action Shotgun      Bolt-Action Rifle  o Tear Gas
+                                       o Custom Lightning Hawk                                                o Boundless Battlefield
+                                       o Ibex Standard          o Custom Full-Bore       o Resuscitate        o The Mercenaries
+                                                                  Machine Gun            o Anticipation
+
+                                       Use this Scenario when your looking for something that helps any play style.
+
+                                       "Easy Actions" Resources:
+
+                                       o [Basic Resources]      o Custom                 o Custom             o Melee
+                                       o Hunting Bow              Pump-Action Shotgun      Bolt-Action Rifle  o Fight or Flight
+                                       o Custom Lightning Hawk                                                o Boundless Battlefield
+                                       o Ibex Standard          o Custom Full-Bore       o Battle Hardened    o Resuscitate
+                                                                  Machine Gun            o Anticipation
+
+                                       Cheap Actions are abound in this Scenario, giving players plenty of time to
+                                       get their Inventory ready.
+
+                                       Resident EvilTM: The Deck Building Game with Mercenaries
+
+                                       Use the following Scenarios if you have the Resident EvilTM:
+                                       The Deck Building Game along with Resident EvilTM: Mercenaries.
+
+                                       "Giveaway" Resources:
+
+                                       o [Basic Resources]      o Custom Lightning Hawk  o Grenade            o Shattered Memories
+                                       o Custom                 o Custom                 o Tear Gas           o Boundless Battlefield
+                                                                                         o The Mercenaries    o Item Management
+                                         Bolt-Action Rifle        Pump-Action Shotgun    o Fight or Flight
+                                       o Hunting Bow            o Ibex Standard
+
+                                       Steal, Trash, and give your worst cards to your opponents.
+
+                                       "Golden Standard" Resources:
+
+                                       o [Basic Resources]      o Six Shooter            o Escape From        o Ominous Battle
+                                       o Custom                 o Pump-Action Shotgun      The Dead City      o Shattered Memories
+                                                                                                              o Boundless Battlefield
+                                         Bolt-Action Rifle        & Automatic Shotgun*   o Fight or Flight    o Umbrella Corporation
+                                       o Hunting Bow            o Ibex Standard          o Reload
+                                                                                                                                                23
+                                       *Combine and shuffle them into a pile.
+
+                                       Play with the best of the best from Sets 1 & 5.
+    Additional Story Mode Scenarios
+
+    Resident EvilTM: Alliance with Mercenaries                                                           Advanced Note 3: Custom Starting Inventories
+
+    Use the following Scenarios if you have the Resident EvilTM: Alliance game                           Players can also play with the Custom Starting Inventories in order to
+    along with Resident EvilTM: Mercenaries.                                                             enhance the flavor of the game even more. You can find these Custom
+                                                                                                         Starting Inventories under the MERCENARY MODE section. (Pg 28)
+
+    "Interaction" Resources:
+
+    o [Basic Resources]       o Custom                 o Russian Assault Rifle  o Anticipation           Advanced Note 4: Resident EvilTM Expanded
+    o Telescopic Sight Rifle    Pump-Action Shotgun      & Signature Special*   o Boundless Battlefield
+    o Hunting Bow                                                               o Fierce Battle          Own every expansion of the Resident EvilTM: Deck Building Game? Try out
+    o Custom Lightning Hawk   o Ibex Standard          o Uroboros Injection                              these Scenarios for a more diverse gaming experience!
+                              o Fight or Flight        o The Mercenaries
+
+    *Combine and shuffle them into a pile.
+
+    Slowing your opponents down is never a bad thing.                                                    "Control" Resources:
+
+    "Buying Spree" Resources:                                                                            o [Basic Resources]      o Single Shot Rifle      o Silver Ghost       o Anticipation
+                                                                                                         o HE Grenade               w/ Scope &               & Punisher*        o Uroboros Injection
+                                                                                                         o Russian Assault Rifle    Special Ops Rifle*                          o Master of Unlocking
+                                                                                                                                                           o Fight or Flight
+    o [Basic Resources]       o Riot Shotgun & Triple  o Russian Assault Rifle  o Anticipation             & Signature Special*   o Custom                 o The Mercenaries
+    o Telescopic Sight Rifle    Barreled Shotgun*        & Signature Special*   o Star-Crossed Duo       o Six Shooter              Pump-Action Shotgun    o Mind Control
+    o Hunting Bow                                                               o Desperate Escape
+    o Custom Lightning Hawk   o Blowback Pistol        o Tear Gas                                        *Combine and shuffle them into a pile.
+                              o Fight or Flight        o Gathering Forces
+                                                                                                         Most cards in this scenario can be used against your opponents while also
+    *Combine and shuffle them into a pile.                                                               giving you a benefit.
+
+    Buy multiple cards a turn to ensure the greatest chance of survival!
+
+                                                                                                         "Big Inventory Wins" Resources:
+
+    Advanced Note 1: Custom Resources                                                                    o [Basic Resources]      o Russian Assault Rifle  o Toe to Toe         o Fierce Battle
+                                                                                                         o Six Shooter              & Signature Special*   o Raccoon City       o Parting Ways
+    As Players become more experienced, they may wish to try their own                                   o Flamethrower
+    combination of Resources. Allow each Player to pick one of the Resource                              o Hunting Bow            o Treasure                 Police Department
+    Piles one at a time, until you have 18 Resource piles total. It is advised                                                    o Mine Thrower           o Lonewolf
+    that you always play with the Basic Resources.
+                                                                                                         *Combine and shuffle them into a pile.
+
+                                                                                                         The bigger the Inventory, the better the benefits.
+
+    Advanced Note 2: Alternate Play Difficulty                                                           "Every Way Out" Resources:
+
+    Use the below if you feel that the above setups are not suitable enough                              o [Basic Resources]      o Mine Thrower           o Tear Gas           o Boundless
+    to meet your demands:                                                                                o Custom Lightning Hawk  o Custom                 o Silver Ghost         Battlefield
+                                                                                                         o Custom
+    Easy Difficulty: All Infected get -10 Health, -10 Damage, and their effects                                                     Pump-Action Shotgun      & Punisher*        o Parting Ways
+    are not active.                                                                                        Bolt-Action Rifle      o Grenade                o Toe to Toe
+
+    Hard Difficulty: All Infected get +10 Health, +10 Damage, and apply                                  *Combine and shuffle them into a pile.
+    their effects twice.
+                                                                                                         With multiple ways to play, choosing the best one is the key to victory.
+    Professional Difficulty: Hard Difficulty & Player's must Explore at least
+    once on their turn.
+
+24                                                                                                                                                                                                     25
+[GAME MODE: 2] MERCENARY MODE                                                                 Step 1: Pick a Scenario!
+                                                                                              Any Scenario from STORY MODE can be used for this game mode, or you
+Players needed: 2 to 4 Players                                                                can choose from one of the below:
+Estimated Game Time: 30 min to 45 min
+                                                                                              Resident EvilTM: The Deck Building Game &
+You and your Team have been dropped into the middle of a huge mob of                          Mercenaries Scenarios:
+Infected. Your mission: destroy everything around you in a quick and timely
+manner. For every Infected Defeated, you have been promised a greater                         "Quick Tactics" Resources:
+reward for your bravery.
+                                                                                              o [Basic Resources]      o Pump-Action Shotgun    o Bolt-Action Rifle &     o Struggle for Survival
+                                                                                              o Ibex Standard            & Automatic Shotgun*     Semi- Automatic Rifle*  o Reload
+                                                                                              o Custom Full-Bore
+                                                                                                                       o Custom                 o Melee
+                                                                                                Machine Gun              Pump-Action Shotgun    o Resuscitate
+                                                                                              o Grenade                                         o Deadly Aim
+                                                                                                                       o Fight or Flight
+
+New Card!                                                                                     *Combine and shuffle them into a pile.
+For MERCENARY MODE, a new card type is introduced, exclusive to this mode:
+                                                                                              With everything on the cheap, setting up your Inventory could never be easier!
+
+             A  Bonus Card
+
+                Bonus cards are used only in MERCENARY                                        "Weapon Club" Resources:
+
+                MODE. This card can only be found in
+
+                the Mansion.                                                                  o [Basic Resources]      o Custom                 o Custom                  o Custom
+                                                                                              o Ibex Standard            Pump-Action Shotgun      Bolt-Action Rifle         Lightning Hawk
+                A Card Type                                                                   o Custom Full-Bore
+                                                                                                                       o Pump-Action Shotgun    o Bolt-Action Rifle &     o Submission
+                B Card Name                                                                     Machine Gun              & Automatic Shotgun*     Semi- Automatic Rifle*  o Shattered
+                                                                                              o Grenade
+                C Effect: When this card is Revealed from                                                              o Hunting Bow            o Six Shooter               Memories
+                    the Mansion and the Player decides to
+                    Gain it, perform this effect.                                             *Combine and shuffle them into a pile.
+
+          B                                                                                   Ever wanted to play with almost nothing but Weapons? This Scenario is for you!
+C
+
+                                                                                              Resident EvilTM: Alliance & Mercenaries Scenarios:
+
+                                                                                              "Draw Power" Resources:
+
+                                                                                              o [Basic Resources]      o Custom                 o Russian Assault Rifle   o Melee
+                                                                                              o Riot Shotgun & Triple    Bolt-Action Rifle        & Signature Special*    o Boundless Battlefield
+                                                                                                                                                                          o Quirk of Fate
+                                                                                                Barreled Shotgun*      o Nautilus Pump-Action   o Fight or Flight         o Fierce Battle
+                                                                                              o Blowback Pistol        o Ibex Standard          o Great Ambition
+
+                                                                                              *Combine and shuffle them into a pile.
+
+                                                                                              Every Action in this Scenario will net you more cards.
+
+                                                                                              "Different Methods" Resources:
+
+                                                                                    Chris     o [Basic Resources]      o Riot Shotgun & Triple  o Telescopic Sight Rifle  o Melee
+                                                                                    Redfield  o Blowback Pistol          Barreled Shotgun*      o The Mercenaries         o Resuscitate
+                                                                                              o Custom Lightning Hawk                           o Anticipation            o Tear Gas
+26                                                                                            o Flamethrower           o Custom Full-Bore       o Boundless Battlefield
+                                                                                                                         Machine Gun
+
+                                                                                              *Combine and shuffle them into a pile.
+
+                                                                                              Every Weapon in this Scenario can end the game in its own way.
+
+                                                                                                                                                                                                   27
+Step 2: Build the Mansion!                                                                     (B) Game Flow [Cont.]
+Build one of the Mansions detailed on Pg 10-11. After building a
+Mansion, add the Bonus cards to it. Shuffle up the entire Mansion,                             MERCENARY MODE follows all the rules of STORY MODE, except that when
+and place it in the Mansion Area.                                                              an Infected is Defeated, it begins or continues a Combo that the Team which
+                                                                                               Defeated it has started. (See the next section for "Combos").
+Step 3: Prepare the Custom Starting Inventory!
+Each Character card has a Custom Starting Inventory that they start                            Each game starts with 15 turns. Every time each Team has had a turn, 1
+with. Custom Inventories are detailed below:                                                   turn is subtracted from the remaining turns. By adding more time, you can
+                                                                                               increase your score dramatically by extending your combo.
+Albert Wesker    2x Custom Pump-Action Shotgun, 1x Ammo x20, 7x Ammo x10
+Barry Burton                                                                                   (C) Other Rules To Remember
+                 1x Ibex Standard, 1x Custom Bolt-Action Rifle, 1x Ammo x20,
+Chris Redfield   7x Ammo x10                                                                   Combos
+                                                                                               A combo is a string of Defeated Infected that a Team has created as their
+Claire Redfield  1x Ibex Standard, 1x Custom Pump-Action Shotgun,                              Characters Explore the Mansion. When Exploring, follow the Instructions
+Hunk             1x Custom Bolt-Action Rifle, 7x Ammo x10                                      under "EXPLORING THE MANSION" in the STORY MODE section. (See Pg 14)
+                                                                                               In order to keep a Combo going, the Team must Defeat an Infected every
+Jack Krauser     1x Ibex Standard, 2x Melee, 1x Ammo x20, 6x Ammo x10                          turn in succession. For every Infected the Team Defeats, more Decorations
+Jill Valentine                                                                                 can be earned.
+                 1x Custom Full-Bore Machine Gun, 1x Ibex Standard,
+Rebecca          1x Backstab,1x Battle Hardened, 6x Ammo x10                                   When an Infected is Defeated, it is moved into the Team's Combo Pile. If, at
+Chambers                                                                                       the end of the Team's turn, they have a Combo Pile and did not Defeat any
+                 1x Hunting Bow, 1x Melee, 4x Reliable Blade, 4x Ammo x10                      Infected that turn, the Decorations are determined and are written down and
+                                                                                               added to their total.
+                 1x Custom Full-Bore Machine Gun, 2x Reliable Blade,
+                 1x Custom Pump-Action Shotgun, 1x Ammo x20, 5x Ammo x10                       To determine the total Decorations in the Combo Pile, add up the printed
+                                                                                               Decoration amount on each Infected card ("Zombie (Male)", for instance,
+                 2x Custom Full-Bore Machine Gun, 1x Tear Gas,                                 is worth 1) in the Combo Pile, then multiply that amount by the number of
+                 1x Resuscitate, 1x Ammo x20, 5x Ammo x10                                      cards in the Combo Pile. After determining the total, write down the total
+                                                                                               Decorations your Team just earned, and move all of the cards in your Combo
+          Step 4: Have something ready to keep track of turns!                                 Pile to the bottom of the Mansion in any order your Team wishes. Note that
+                                                                                               the "Combo Bonus" card is not worth any Decorations on its own.
+          Have game counters of some kind or paper and a pen ready to keep track
+          of the remaining turns of the game.                                                   Here is the Blue Team's Combo Pile:
+
+                (A) Game End & Victory Condition                                                Failing to Defeat an Infected this turn,
+                The game will start with 15 turns, but more time can be added with              they start to total their Decorations
+                the "Time Bonus" cards drawn from the Mansion, or with the "Melee"              up, with Zombie (Male) being worth 1
+                Action card (AC-046). After all turns have been depleted, or only 1 Team        Decoration, Kipepeo worth 1, and
+                is not Permanent Defeated, the Team with the most Decorations is                the Licker  worth 3. This totals up
+                declared the winner. If Teams are tied in Decorations, then the Team with       to 5, but is then multiplied by the total
+                the Character who has the most Health at the time the game ended                number of cards in the Blue Teams
+                is the winner.                                                                  Combo pile, which was 3, giving them a
+                                                                                                total of 15 Decorations for this Combo.
+                (B) Game Flow
+                Mercenary Mode is played in Teams. Every Player can either be on a              Leveling Up
+                Team by themselves (1 vs. 1 vs. 1 vs. 1, known as free for all), Teams of 2
+                (2 vs. 2 max) or, if one Player is more experienced than the others, 1 vs. 3.   Unlike the STORY MODE, Character's Levels are determined by how many
+                                                                                                Decorations the Team currently has. In other words, the Team members
+28                                                                                              share the Decorations they earn.
+
+                                                                                                                                                                                                                                      29
+    Penalty for Losing all your Character's Health                                   Step 1: Pick a Scenario!
+                                                                                     Any Scenario from a previous game mode may be used with the Skill System.
+    When a Character's Health is reduced to 0 or lower in MERCENARY                  You may also choose a of the below scenarios, specifically designed to introduce
+    MODE, that Player is eliminated from the game. If the Health of all the          the Skill System.
+    Character's in a Team is reduced to 0 or less, that Team loses the game.
+                                                                                     Resident EvilTM: Mercenaries Scenarios:
+
+    [GAME Modification] Skill System                                                 "Additional Benefits" Resources:
+
+    Players needed: 2 to 4 Players                                                   o [Basic Resources]   o Custom                  o Custom Lightning Hawk     o Anticipation
+    Estimated Game Time: 30 min to 45 min                                            o Custom Full-Bore      Bolt-Action Rifle       o Hunting Bow               o Backstab
+                                                                                                                                     o Coup De Grâce             o Tear Gas
+    With every step you take, with every enemy you defeat, you begin to realize        Machine Gun         o Custom                  o Battle Hardened           o Boundless Battlefield
+    how to combat a situation accordingly. Soon fighting a score of Infected is      o Ibex Standard         Pump-Action Shotgun
+    a joke to you, teaching yourself how to remain cool under pressure, and to
+    take the necessary steps to survival. Using the skills you have learned, you     Your introduction to the Skill System gives additional benefits to new cards.
+    can turn any unfavorable situation into a favorable one.
+
+                                                                                     "Hand to Hand" Resources:
+
+    The Skill System can be applied to any game mode in any Resident EvilTM:         o [Basic Resources]   o Custom                  o Custom Lightning Hawk     o Anticipation
+    Deck Building Game set. This system will deepen your gameplay experience         o Custom Full-Bore      Bolt-Action Rifle       o Hunting Bow               o Backstab
+    by introducing an XP system that rewards players the more that they                                                              o Coup De Grâce             o Melee
+    explore, allowing them to put their experience into a skill that will better       Machine Gun         o Custom                  o Tear Gas                  o The Mercenaries
+    their Character in different ways.                                               o Ibex Standard         Pump-Action Shotgun
+
+                                                                                     Using Actions to win the game may be quicker than going the standard route with
+                                                                                     this Scenario.
+
+    New Card!                                                                        Resident EvilTM: The Deck Building Game & Mercenaries Scenarios:
+
+    With the Skill System, a new card type is introduced, exclusive to               "Law of Thieves" Resources:
+    this modification:
+
+    A                               Skill Card                                       o [Basic Resources]   o Battle Hardened         o Custom Bolt-Action Rifle  o Ibex Standard
+                                                                                     o Escape From         o Reload                  o Custom Full-Bore          o Custom
+               B Skill cards are only used only with the Skill                                             o The Mercenaries
+                                                                                       the Dead City       o Shattered Memories        Machine Gun                 Pump-Action Shotgun
+                                    System. Players will receive Skill cards at      o Backstab                                      o Custom Lightning Hawk     o Grenade
+
+                                    the beginning of the game, and will use XP
+
+                                    to activate them.                                Stealing what you need from your opponents will boost you up and push them down.
+
+                                    A Card Type                                      Resident EvilTM: Alliance & Mercenaries Scenarios:
+
+     C                              B Skill XP Requirement: This is the amount       "Old Meets New" Resources:
+                                        of XP that needs to be on the Skill for its
+                            D           effect to be used.                           o [Basic Resources]   o Fight or Flight         o Blowback Pistol           o Custom
+                                                                                     o Great Ambition      o Backstab                o Riot Shotgun & Triple       Pump-Action Shotgun
+    A Skill card is not considered  C Skill Name                                     o Uroboros Injection  o Tear Gas
+    activated or usable until the                                                    o Quirk of Fate       o Telescopic Sight Rifle    Barreled Shotgun*         o Custom Full-Bore
+    indicated amount of XP has      D Effect: Skill effects follow the same                                                          o Custom Bolt-Action Rifle    Machine Gun
+    been moved onto it.                 rules as Character cards: Some require
+                                        activation, others are activated at all      *Combine and shuffle them into a pile.
+                                        times. A Skill effect with the word "can"
+                                        in it may only be used once per turn.        This Scenario has an equal amount of old cards with a mix of new cards to
+                                                                                     provide players with disruptive opportunities.
+
+30                                                                                                                                                                                        31
+          Step 2: Build the Mansion!                                                                    Additional Rules (Cont.)
+          Choose one of the Mansions on Pg 10-11, or build one of your own out
+          of the Infected in the Resident EvilTM: Mercenaries expansion.                                 (C): Skill System with Partner Modification
+
+          Step 3: Choose your Skill Cards!                                                               While playing with the Skill System and the Partner Modification* together,
+          After each Player has a Character, randomly pass out 5 Skill cards to
+          each Player, then set the remaining Skills to the side. Each Player will look                  each Character a Player controls can only have 1 Skill. When Players are
+          at their 5 Skill cards, choose one, place it face down in front of them, then                  choosing which Skills to keep, then choose 2 Skills instead of 3. If your Partner
+          pass the remaining 4 Skill cards to the Player to their left. Repeat this                      dies at any time, Remove the Skill and any XP that Partner had from the Game.
+          process until there are no more Skill cards to pass.
+          Afterwards, each Player will choose 3 of the 5 Skill cards they chose previously               (D): Penalty For Losing All Of Your Character's Health
+          to keep and will remove the other 2 Skill cards from the game. Then each                       When a Character's Health is reduced to 0 or less, that Character keeps
+          Player will turn their Skill cards face up and place them in the Skill Area                    all XP currently on them, as well as all XP on their Skills, and is turned face down
+          (just above your Character, which only exists when using the Skill System).                    as normal. From here, follow all rules as detailed in the original section on Pg 18.
+
+      Additional Rules                                                                                   *Partner Modification is found in the "Alliance" rulebook, which can be found at
+                                                                                                            bandai.com/residentevil/play.html
+         (A): Experience (XP)
+         As Characters Explore the Mansion, they will get XP. This XP is used to either                 (Game Mode 3) Speed Mini-Game
+         activate additional effects on Weapons or Actions, or to activate Skills. When
+         a Character Explores, the controlling Player places 1 XP on that Character,                    Players needed: 2 Players
+         which can be denoted with coins, slips of paper, or counters of any kind.                      Estimated Game Time: 2 min to 5 min
+         A Player may move any amount of XP from their Character to their Skills at
+         any time during their turn while their Character is NOT Exploring. However,                    Your eye catches the glint of flame in its periphery. You spin your gun around
+         once XP has been moved to a Skill, it cannot be moved from that Skill to                       to face an awkward being. With the majority of its face covered, you suspect
+         another Skill or back to the Character, except due to an effect.                               this person to be different from the others.
+
+         (B): Exploring the Mansion                                                                     "Got a challenge for ya, stranger," he says in his raspy voice. Pulling out a
+         When Players Explore the Mansion while using the Skill System, a few new                       few small bottle caps, you see the cloth covering his face move slightly as he
+         steps are introduced:                                                                          grins. The man points down the hallway to a few targets, waiting expectantly
+                                                                                                        to see your skill.
+                 1) Announce that you are Exploring.
+                                                                                                                          A  Player 2                          This mini-game will
+                 2) Play any Weapons your Character will be using. Each Weapon can only be used                              Play area                         require an Inventory
+                 once, unless otherwise stated.                                                          Player 2                                              Area (A) and a Play
+                                                                                                        Inventory                   B                          Area (B) for each
+                 3) Pay the Ammo Requirement on the Weapons being used. Add up your Ammo                                                                       Player, as well as a
+                 from all of the cards in your Play Area and assign any amount of that Ammo to                               Mansion Area                      Mansion Area in the
+                 each Weapon being used.                                                                                                C                      middle (C).
+
+                 4) Total up the amount of Damage that your Character is dealing by adding up your                               Player 1  A
+                 Weapon's Damage, Character's Damage, and any effects provided by other cards.                                  Play area
+                                                                                                                                                    Player 1
+                 5) Skill, Character, and Weapon effects all activate here, in any order the Exploring                                  B           Inventory
+                 Character's Player wishes.
+                                                                                                                                                                                               33
+                 6) The Exploring Character's Player places 1 XP on their Character
+
+         Continue to Explore from here as normal, which is detailed on Pg. 14.
+
+32
+                                                                                             Victory Condition
+
+                                                                                             When a Player plays every card in their Inventory and Hand, the game
+                                                                                             is over. Each Infected they Defeated throughout the game is worth 1
+                                                                                             Decoration for every 10 Health that Infected has. Every "Reload Counter"
+                                                                                             is worth -1 Decoration, and every card in your Hand and Inventory at
+                                                                                             the end of the game is worth -1 Decoration. The Player with the most
+                                                                                             Decorations at the end of the game wins!
+
+    Step 1: Build the Mansion!                                                               Game Flow
+
+    The following cards will form the Mansion for this mini-game:                            Each Player will draw 5 cards from the top of their Inventory. In this mini-
+                                                                                             game, Players will perform their turns simultaneously. If at any time, a
+    o 3x Venomous Snake  o 2x Town Majini       o 3x Los Illuminados  o 2x Big Man Majini    Player has a Hand of Ammunition or Weapons only, that Player can reveal
+    o 3x Town Majini       (Shovel)               (Bow)                                      their hand and take a "mulligan" (shuffle all of their cards in their Hand and
+    o 3x Los Ganados                                                                         Discard Pile into their Inventory, then draw a new Hand of 5 cards).
+                         o 3x Los Ganados       o 1x Los Illuminados
+      (Female)             (Handscythe)           (Shield)                                   When both Players are ready, they will each flip over the top card of each
+                                                                                             of the Mansions. Players will ignore all effects for this Game Mode.
+
+    Shuffle these 20 cards together, then create two separate Mansions                       Defeating the Infected
+    with 10 cards each, then place them face down in the middle of the table,
+    with space in between them.                                                              In order to Defeat the Infected, a Player needs to play the Ammunition cards
+                                                                                             required to use the Weapons in their Hand to Defeat 1 of the Revealed
+    Step 2: Build each Player's Inventory!                                                   Infected (Players can "overpay" and play too much Ammunition if
+                                                                                             they wish). As soon as a Player has done this, they can take that Infected
+    Each Player needs the following cards for their starting Inventory:                      from the middle of the table and move it to the side of their Play Area.
+                                                                                             Afterwards, turn over the next Infected in the same Mansion, then that Player
+    o 5x Ammo x10        o 4x Ammo x20          o 2x Ammo x30         o 2x Custom Full-Bore  draws cards from their Inventory until they have 5 cards in their Hand.
+    o 4x Custom          o 2x Custom            o 1x Custom             Machine Gun
+
+      Standard Sidearm     Pump-Action Shotgun    Lightning Hawk                             When a Player is using 1 Weapon, their Damage may exceed the Health
+                                                                                             of the Infected. However, a Player may not play a 2nd Weapon unless it
+    Each Player will take their 20 cards and shuffle them together, then place               is required to Defeat that Infected.
+    them in their Inventory Area. Players will also require counters of any kind.
+    These can be any type of coin, token, or a distinguishable card.                         If at any time, a Player cannot play any Weapons due to insufficient ammo,
+
+                                                                                             they Gain 1 "Reload Counter". A Reload Counter gives a Player +30 Ammo
+
+                                                                                             for their next Weapon. Ammo does not carry over. When you Defeat an
+
+                                                                                             Infected, any extra Ammo you have does not carry over, meaning you will
+
+34                                                                                           have to play Ammunition cards to generate new Ammo.                             35
+      Chapter VII. Terminology \\                                                       Chapter VIII. FAQ \\
+
+          These are the special terms used throughout the game.                          Q: For Barry Burton (CH-051), if I instantly Defeat an Infected with his
+                                                                                             effect, does his effect activate again?
+              Gain: Moving a card from Resource Area, Mansion Area, or from
+              outside the game into a Player's Discard Pile.                             A: Yes it does.
+                                                                                         Q: How does the Chicken's (MA-077) effect work in Story Mode?
+              Attach: Taking a card and placing it under your Character or Partner.      A: The effect doesn't function at all in Story Mode.
+                                                                                         You can find the latest information, upcoming events, updated rules,
+              Reveal: Show the indicated card to all Players.                            and erratas at our official website:
+
+              Trash: Moving a card to the bottom of its Resource Pile in the original    http://www.bandai.com/residentevil
+              Resource Area.
+                                                                                        Credits \\
+              Heal: Increasing the Health of the Character card by indicated amount.
+              However, it cannot exceed its Maximum Health.                              Game Design: Tylar Allinder
+                                                                                         Graphic Design: Cloud 88 Design
+              Remove from the Game: Move the card out of the game. It is no              Game Development: Anh Duc Do, Alex Bykov, Justin Kho, &
+              longer in the current game.                                                James Takenaka
+                                                                                         Special Thanks to our Game Testers: Austen Galentin, Ashlea Glaser,
+              Explore: Following the procedures designated on pgs 14-15.                 Aaron Taylor, Andrew Vansickle, & Nicholas Glaser
+
+              Defeat: When your Damage is greater than or equal to the Health of the                                                                                                                                             37
+              Revealed Infected.
+
+              Permanently Defeated: When a Characters Maximum Health is
+              reduced to 0 or less.
+
+              +X Card(s): As soon as the Player plays a card stating this, Draw X
+              cards from your Inventory. If there are not enough cards in the Player's
+              Inventory, that Player draws as many as they can, shuffles their Discard
+              Pile, places the shuffled cards in their Inventory Area, then draws the
+              rest. If the Player still does not have enough cards, then they draw as
+              many as they can.
+
+              +X Explore: The Player may Explore X times more during this turn.
+
+              +X Action(s): The Player gets X additional Actions during this turn.
+              The instructions on the current Action card must be completed
+              before the Player can play another Action card or moves on to an
+              additional step.
+
+              +X Buy(s): The Player may Buy an additional X Resources during their
+              turn. The extra Buy adds to the Players overall Buying amount and
+              does not require a Player to immediately Buy.
+
+              +X Gold: The Player has an additional X Gold for the turn to
+              Buy Resources with.
+
+              + X Ammo: The Player has an additional X Ammo for the turn to use
+              Weapons with.
+
+              Attack: A Player using 1 Explore to have their Character deal Damage
+              to another Character.
+
+36
+Card List & Organization \\
+
+Remove the cards and dividers from their wrappings, then organize them based on the
+card names on the dividers.
+
+Card                Card           Total  Card          Card                Total
+ no.                name          amount   no.          name               amount
+
+      CH-044  Jack Krauser        1       SK-016  Smart Reload LV. 1                 1
+      CH-045                              SK-017
+      CH-046  Hunk                1       SK-018  Smart Reload LV. 2                 1
+      CH-047                              SK-019
+      CH-048  Claire Redfield     1       SK-020  Smart Reload LV. 3                 1
+      CH-049                              SK-021
+      CH-050  Chris Redfield      1       SK-022  Weapon Master LV. 1 1
+      CH-051                              SK-023
+              Jill Valentine      1       SK-024  Weapon Master LV. 2 1
+      IT-005                              SK-025
+              Albert Wesker       1       SK-026  Weapon Master LV. 3 1
+      WE-043                              SK-027
+      WE-044  Rebecca Chambers    1       SK-028  Giant Killing LV. 1                1
+                                          SK-029
+      WE-045  Barry Burton        1       SK-030  Giant Killing LV. 2                1
+
+      WE-046  First Aid Spray     5       AM-005  Giant Killing LV. 3                1
+      WE-047                              AM-006
+      WE-048  Ibex Standard       5       AM-007  Maximizer LV. 1                    1
+      WE-049
+      WE-050  Custom Pump-Action          MA-073  Maximizer LV. 2                    1
+                                          MA-074
+      AC-042  Shotgun             5       MA-075  Maximizer LV. 3                    1
+      AC-043                              MA-076
+      AC-044  Custom Full-Bore    5       MA-077  Handgun Technique LV. 1 1
+      AC-045                              MA-078
+      AC-046  Machine Gun                 MA-079  Handgun Technique LV. 2 1
+      AC-047                              MA-080
+      AC-048  Custom Lightning Hawk 5     MA-081  Handgun Technique LV. 3 1
+      AC-049                              MA-082
+      AC-050  Custom Bolt-Action Rifle 5  MA-083  Ammo x10                           28
+      AC-051                              MA-084
+              Hunting Bow         5       MA-085  Ammo x20                           15
+      SK-001                              MA-086
+      SK-002  Custom Standard Sidearm 10  MA-087  Ammo x30                           15
+      SK-003                              MA-088
+      SK-004  Reliable Blade      10      MA-089  Town Majini                        3
+      SK-005                              MA-090
+      SK-006  Fight or Flight     5       MA-091  Town Majini (Shovel)               3
+      SK-007                              MA-092
+      SK-008  The Mercenaries     5       MA-093  Giant Majini                       2
+      SK-009                              MA-094
+      SK-010  Boundless Battlefield 8     MA-095  Base Majini (Gun)                  3
+      SK-011                              MA-096
+      SK-012  Coup De Grâce       5       MA-097  Chicken                            1
+      SK-013                              MA-098
+      SK-014  Melee               5               Red Executioner                    1
+      SK-015
+              Anticipation        5               Big Man Majini                     3
+
+              Backstab            5               Chainsaw Majini                    2
+
+              Battle Hardened     5               Los Illuminados (Shield) 3
+
+              Resuscitate         5               J.J.                               2
+
+              Tear Gas            5               Los Ganados (Male)                 3
+
+              Extension LV. 1     1               Los Ganados (Female) 3
+
+              Extension LV. 2     1               Adjule                             3
+
+              Extension LV. 3     1               Los Illuminados (Scythe) 3
+
+              Medic LV. 1         1               Venomous Snake                     3
+
+              Medic LV. 2         1               Tribal Majini (Bow)                3
+
+              Medic LV. 3         1               Tribal Majini (Oil Pot)            3
+
+              Luck LV. 1          1               Tribal Majini (Shield)             3
+
+              Luck LV. 2          1               Crocodile                          3
+
+              Luck LV. 3          1               Town Majini (Motorcycle) 3
+
+              Toughness LV. 1     1               Los Ganados (Handscythe) 3
+
+              Toughness LV. 2     1               Los Ganados (Pitchfork) 3
+
+              Toughness LV. 3     1               Los Ganados                        3
+
+              Reversal LV. 1      1               Los Illuminados (Bow) 3
+
+              Reversal LV. 2      1               Militia (Bow)                      3
+
+              Reversal LV. 3      1               Base Majini (Shield)               3
+

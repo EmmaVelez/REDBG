@@ -30,7 +30,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false } },
     },
     {
       name: 'stateSync',

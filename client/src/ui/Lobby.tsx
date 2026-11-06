@@ -18,13 +18,14 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId?: string, partnerCharacterId?: string) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
   readonly onRemoveBot: (seat: number) => void;
   readonly onSetScenario: (scenario: ScenarioId) => void;
   readonly onSetPartnerMode: (partnerMode: boolean) => void;
+  readonly onSetSkillSystem: (skillSystem: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
   readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId) => void;
@@ -127,6 +128,7 @@ export function Lobby({
   onRemoveBot,
   onSetScenario,
   onSetPartnerMode,
+  onSetSkillSystem,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -142,7 +144,7 @@ export function Lobby({
 
       {room === null ? (
         <div className="lobby-modes">
-          <RoomEntry onCreateRoom={onCreateRoom} onJoinRoom={onJoinRoom} onSetPartnerMode={onSetPartnerMode} />
+          <RoomEntry onCreateRoom={onCreateRoom} onJoinRoom={onJoinRoom} />
           <div className="lobby-divider">— or pass &amp; play —</div>
           <PassAndPlay onStart={onStartHotseat} />
         </div>
@@ -168,6 +170,17 @@ export function Lobby({
                     onChange={e => onSetPartnerMode(e.target.checked)}
                   />
                   {' '}Partner Mode (Alliance expansion rules)
+                </label>
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.skillSystem}
+                    onChange={e => onSetSkillSystem(e.target.checked)}
+                    data-testid="skill-system-toggle"
+                  />
+                  {' '}Skill System (Mercenaries expansion)
                 </label>
               </div>
               <div style={{ marginTop: '8px' }}>
@@ -245,12 +258,12 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId?: string, partnerCharacterId?: string) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
-  readonly onSetPartnerMode: (partnerMode: boolean) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [partnerMode, setPartnerMode] = useState(false);
+  const [skillSystem, setSkillSystem] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -258,7 +271,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -285,6 +298,15 @@ function RoomEntry(props: {
             onChange={e => setPartnerMode(e.target.checked)}
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={skillSystem}
+            onChange={e => setSkillSystem(e.target.checked)}
+            data-testid="skill-system-toggle"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
         </label>
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>

@@ -1,6 +1,7 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { requiredAmmoForWeapons, characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
-import { canReuseWeapon, explorableWeapons } from './weaponReuse';
+import { canReuseWeapon, explorableWeapons } from './weaponReuse';
+import { isSkillActive } from './skill';
 
 /** True when the seat's character has the given ability kind (level-gated). */
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
@@ -550,6 +551,69 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'endTurn: must Explore first (Wesker ability)' };
       }
       return { ok: true };
+
+    case 'moveXp': {
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'moveXp: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `moveXp: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'moveXp: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'moveXp: not your turn' };
+      }
+      const skillInst = state.cards[action.skillInstanceId];
+      if (skillInst === undefined) {
+        return { ok: false, reason: 'moveXp: unknown skill' };
+      }
+      if (!(player.skills ?? []).includes(action.skillInstanceId)) {
+        return { ok: false, reason: 'moveXp: not your skill' };
+      }
+      if (!Number.isInteger(action.amount) || action.amount < 1) {
+        return { ok: false, reason: 'moveXp: bad amount' };
+      }
+      if (action.amount > (player.xp ?? 0)) {
+        return { ok: false, reason: 'moveXp: not enough XP' };
+      }
+      return { ok: true };
+    }
+
+    case 'useSkill': {
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'useSkill: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `useSkill: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'useSkill: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'useSkill: not your turn' };
+      }
+      const skillInst = state.cards[action.skillInstanceId];
+      if (skillInst === undefined) {
+        return { ok: false, reason: 'useSkill: unknown skill' };
+      }
+      if (!(player.skills ?? []).includes(action.skillInstanceId)) {
+        return { ok: false, reason: 'useSkill: not your skill' };
+      }
+      if (!isSkillActive(state, action.skillInstanceId)) {
+        return { ok: false, reason: 'useSkill: skill not active' };
+      }
+      for (let i = state.log.length - 1; i >= 0; i--) {
+        const logged = state.log[i]?.action;
+        if (logged === undefined) continue;
+        if (logged.type === 'endTurn' && logged.seat === action.seat) break;
+        if (logged.type === 'useSkill' && logged.seat === action.seat && logged.skillInstanceId === action.skillInstanceId) {
+          return { ok: false, reason: 'useSkill: already used this turn' };
+        }
+      }
+      return { ok: true };
+    }
 
     case 'chooseOption':
       const prompt = state.prompts.find(p => p.id === action.promptId);

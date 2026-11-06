@@ -40,6 +40,8 @@ import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
 import { makeRng, shuffle } from '../util/rng';
 
+import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount } from './skill';
+
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
   const inst = state.cards[instanceId];
@@ -910,7 +912,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action') +
             partnerAttachedDamageBonus(abilities, player.partnerAttached) +
             plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
-            exploreBonusIfAmmoAbove(abilities, player.turnAmmo);
+            exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
+            exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs);
           // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
           const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
             const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
@@ -924,6 +927,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
+
+      // Mercenaries: explore-time "can" Skills declared this turn. Their damage
+      // is added to this explore; the declarations are consumed afterwards.
+      let pendingSkillDamage = 0;
+      for (const pe of player.pendingSkillEffects ?? []) {
+        if (pe.kind === 'giantKillingPlusDamage' && (revealedDef?.hp ?? 0) >= 40) {
+          pendingSkillDamage += pe.amount;
+        } else if (pe.kind === 'giantKillingAllWeaponsPlusDamage' && (revealedDef?.hp ?? 0) >= 40) {
+          pendingSkillDamage += pe.amount * weapons.length;
+        } else if (pe.kind === 'reversalBonusPerCharacterDamage') {
+          pendingSkillDamage += Math.max(player.maxHp - player.hp, 0);
+        } else if (pe.kind === 'removeXpForWeaponDamage') {
+          pendingSkillDamage += pe.amount * 10;
+        }
+      }
 
       // MA-037 Guardian of Insanity: on reveal, each character takes 10 damage.
       // MA-031 Proto Tyrant: on reveal, non-exploring chars with 50+ HP take 40.
@@ -970,7 +988,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (revealedDef && false) {}
         // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
         const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
-        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
@@ -1006,7 +1024,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
-        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         let newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead) : player.hp };
         // +30 damage collectively handled by not removing; for simplicity add to weaponDamageBonus? skip; damage already resolved via threshold only.
         return {
@@ -1108,7 +1126,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
@@ -1219,6 +1237,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         drawInfectionsFor(seat, defeatedInfectionInc);
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
+        const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
+          activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
         const charDef = cardDef(state, player.characterInstanceId);
         const level = charDef !== undefined ? levelForDecorations(charDef.level1At, charDef.level2At, decorations) : player.level;
         const newPlayer: PlayerState = {
@@ -1232,6 +1252,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   mustExplore: false,
                   decorations,
                   level,
+                  xp: (player.xp ?? 0) + 1 + maximizerXp,
+                  pendingSkillEffects: undefined,
                   attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId],
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 };
@@ -1306,8 +1328,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Ada (Nightmare) L2: lethal damage sets her HP to 10 instead of 0 -
       // only when she is the one taking the damage (never a leading partner).
       const damageOnAda = !leadingIsPartner && !(hasDamageRedirect && player.partnerInstanceId);
+      // Mercenaries: Toughness LV.2 (-10 all damage), Luck LV.1 (lethal hit
+      // becomes 10 while at 20+ HP), Giant Killing LV.1 (40+ HP Infected deals 0).
+      const damageSkillEffects = activeSkillEffects(state, seat);
+      const skillReduction = skillDamageReduction(damageSkillEffects);
+      const giantThreshold = skillGiantKillingThreshold(damageSkillEffects);
+      const skillSuppressed = giantThreshold !== undefined && (revealedDef?.hp ?? 0) >= giantThreshold;
+      const skillLethal = skillLethalReplacementAmount(damageSkillEffects);
+      const rawSkillDamage = skillSuppressed ? 0 : Math.max((outcome.damageTaken ?? 0) - skillReduction, 0);
+      const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
+        ? skillLethal
+        : rawSkillDamage;
       const newLeadingHp = damageOnAda
-        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, outcome.damageTaken, player.downed || player.dead)
+        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, effectiveSkillDamage, player.downed || player.dead)
         : baseLeadingHp;
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
@@ -1372,6 +1405,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               turnGold: turnGoldAfter,
               mustExplore: false,
               hp: newHp,
+              xp: (player.xp ?? 0) + 1,
+              pendingSkillEffects: undefined,
               ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
               downed,
               infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
@@ -2142,6 +2177,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           };
         }
 
+    case 'moveXp': {
+      const { seat, skillInstanceId, amount } = action;
+      return moveXp({ ...state, ...nextBase }, seat, skillInstanceId, amount);
+    }
+
+    case 'useSkill': {
+      const { seat, skillInstanceId } = action;
+      return applyUseSkill({ ...state, ...nextBase }, seat, skillInstanceId);
+    }
+
     case 'chooseOption': {
       const { seat, promptId, option } = action;
       const prompt = state.prompts.find(p => p.id === promptId) as NonNullable<GameState['prompts'][number]>;
@@ -2150,6 +2195,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const kind = prompt.payload?.kind;
       const chosenId = prompt.options[option];
       const instanceId = String(prompt.payload?.instanceId ?? '');
+
+      // Mercenaries Skill draft: advance the draft state machine.
+      if (kind === 'skillDraftPick' || kind === 'skillDraftKeep') {
+        return advanceDraft({ ...state, ...nextBase, prompts: newPrompts }, seat, chosenId ?? '');
+      }
 
       if (kind === 'weskersSecretMansion' && chosenId !== undefined) {
         const top4 = state.mansionDeck.slice(0, 4);
@@ -2199,6 +2249,97 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, chosenId],
           prompts: trashRedirectPrompt(state, seat, chosenId, newPrompts, nextBase.version),
         };
+      }
+
+      if (kind === 'smartReloadTrashAmmo' && chosenId !== undefined) {
+        // SK-016: trash a 0-cost ammo, then choose an ammo (cost <= 30) to gain.
+        const next: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s)),
+          removed: [...state.removed, chosenId],
+          prompts: newPrompts,
+        };
+        const ammoTops = Object.values(state.marketPiles)
+          .map(p => p.cards[0])
+          .filter((id): id is string => id !== undefined)
+          .filter(id => {
+            const d = cardDef(state, id);
+            return d?.type === 'ammunition' && (d.cost ?? 0) <= 30;
+          });
+        if (ammoTops.length === 0) return next;
+        return {
+          ...next,
+          prompts: [...next.prompts, {
+            id: `${prompt.id}:gain`,
+            seat,
+            text: 'Gain an Ammunition with a cost of 30 or less.',
+            options: ammoTops,
+            payload: { kind: 'smartReloadGainAmmo' },
+          }],
+        };
+      }
+      if (kind === 'smartReloadGainAmmo' && chosenId !== undefined) {
+        const pileEntry = Object.entries(state.marketPiles).find(([, p]) => p.cards[0] === chosenId);
+        if (pileEntry === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const [pileId, pile] = pileEntry;
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, discard: [...s.discard, chosenId] } : s)),
+          marketPiles: { ...state.marketPiles, [pileId]: { ...pile, cards: pile.cards.filter(id => id !== chosenId) } },
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'skillMovePlayAreaWeaponToInventoryTop' && chosenId !== undefined) {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, playArea: player.playArea.filter(id => id !== chosenId), inventory: [chosenId, ...player.inventory] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'skillNameWeaponType' && chosenId !== undefined) {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, skillAmmoDiscountTypes: [...(s.skillAmmoDiscountTypes ?? []), chosenId] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'skillDuplicateWeaponEffect' && chosenId !== undefined) {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, pendingSkillEffects: [...(s.pendingSkillEffects ?? []), { kind: 'duplicateWeaponEffect', weaponInstanceId: chosenId }] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'skillRemoveXpForWeaponDamage' && chosenId !== undefined) {
+        const xp = player.xp ?? 0;
+        if (xp < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:xp`,
+            seat,
+            text: `Remove how many XP? (1-${xp})`,
+            options: Array.from({ length: xp }, (_, i) => String(i + 1)),
+            payload: { kind: 'skillRemoveXpAmount', weaponInstanceId: chosenId, skillInstanceId: String(prompt.payload?.skillInstanceId ?? '') },
+          }],
+        };
+      }
+      if (kind === 'skillRemoveXpAmount' && chosenId !== undefined) {
+        const weaponInstanceId = String(prompt.payload?.weaponInstanceId ?? '');
+        const skillInstanceId = String(prompt.payload?.skillInstanceId ?? '');
+        return resolveSkillXpAmount({ ...state, ...nextBase, prompts: newPrompts }, seat, skillInstanceId, weaponInstanceId, Number(chosenId));
       }
 
       if (kind === 'skipNextTurn' || kind === 'noActionsNextTurn') {

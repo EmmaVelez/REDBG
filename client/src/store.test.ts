@@ -32,6 +32,7 @@ const roomState = (): Extract<ServerMessage, { kind: 'roomState' }> => ({
       { clientId: 'c2', name: 'Bot', seat: 1, isBot: true, connected: true },
     ],
     partnerMode: false,
+    skillSystem: false,
   },
 });
 
