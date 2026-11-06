@@ -12,6 +12,7 @@ import {
   singleWeaponAmmoDiscount,
   chosenWeaponTypeAmmoDiscount,
   partnerAttachedDamageBonus,
+  partnerAttachCap,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -201,7 +202,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the partner (if any) on play.
             let partnerAttached = played.player.partnerAttached ?? [];
-            if ((def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020') && player.partnerInstanceId && partnerAttached.length < 2) {
+            if ((def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020') && player.partnerInstanceId && partnerAttached.length < partnerAttachCap(characterAbilities(state, seat))) {
               partnerAttached = [...partnerAttached, instanceId];
             }
             let newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
@@ -1467,7 +1468,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           let attached = [...(player.partnerAttached ?? [])];
           const hand = player.hand.filter(id => id !== instanceId);
           let newDiscard = [...player.discard];
-          if (attached.length >= 2 && (replaceIndex === 0 || replaceIndex === 1)) {
+          const attachCap = partnerAttachCap(characterAbilities(state, seat));
+          if (attached.length >= attachCap && replaceIndex !== undefined && replaceIndex >= 0 && replaceIndex < attachCap) {
             const removed = attached[replaceIndex];
             if (removed !== undefined) {
               attached = attached.filter((_, i) => i !== replaceIndex);

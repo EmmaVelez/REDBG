@@ -2,7 +2,7 @@
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
 import { explorableWeapons } from '../engine/weaponReuse';
-import { characterAbilities } from '../engine/abilities';
+import { characterAbilities, weaponCostCap } from '../engine/abilities';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -50,7 +50,14 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     // 4a. Build the usable weapon pool: hand weapons PLUS any play-area weapon
     // an ability lets this seat use again (Leon L2 pistolsTwicePerTurn). The
     // pool must match explore validation exactly, or legal explores go missing.
-    const weaponsAvailable = explorableWeapons(state, seat);
+    // weaponCostCap (Josh L1): restricted weapons never enter the pool, so the
+    // UI and the bots cannot offer an explore validate would reject.
+    const costCap = weaponCostCap(characterAbilities(state, seat));
+    const weaponsAvailable = explorableWeapons(state, seat).filter(id => {
+      if (costCap === undefined) return true;
+      const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+      return (cd?.cost ?? 0) < costCap;
+    });
     const singleWeaponLimiter = characterAbilities(state, seat).some(a => a.kind === 'singleWeaponLimiter');
 
     // 4b. Generate candidates: every non-empty subset of the pool.

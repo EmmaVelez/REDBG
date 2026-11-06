@@ -376,6 +376,25 @@ export function chosenWeaponTypeAmmoDiscount(abilities: readonly CharacterAbilit
  * Jill Valentine (Alliance CH-016) L1: +amount explore damage when her
  * partner has `threshold` or fewer cards attached. No partner -> no bonus.
  */
+/**
+ * Josh Stone (Alliance CH-012) L1: cannot use weapons costing maxCost or
+ * more. Returns undefined when the character has no such restriction.
+ */
+export function weaponCostCap(abilities: readonly CharacterAbility[]): number | undefined {
+  for (const a of abilities) {
+    if (a.kind === 'weaponCostCap') return a.maxCost;
+  }
+  return undefined;
+}
+
+/** Partner attach cap: 2 by default, Josh L2 adds 2. */
+export function partnerAttachCap(abilities: readonly CharacterAbility[]): number {
+  let cap = 2;
+  for (const a of abilities) {
+    if (a.kind === 'partnerAttachCapBonus') cap += a.amount;
+  }
+  return cap;
+}
 export function partnerAttachedDamageBonus(
   abilities: readonly CharacterAbility[],
   partnerAttached: readonly string[] | undefined,

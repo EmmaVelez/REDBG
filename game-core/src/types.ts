@@ -290,7 +290,9 @@ export type CharacterAbility =
   | { readonly kind: "singleWeaponAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Alliance) L1: -amount ammo requirement when using exactly one weapon
   | { readonly kind: "chosenWeaponTypeAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Alliance) L2: -amount ammo requirement for a chosen weapon type
   | { readonly kind: "partnerAttachedCountDamageBonus"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Jill Valentine (Alliance) L1: +amount damage when exploring if her partner has <= threshold cards attached
-  | { readonly kind: "offTurnFlashGrenadeLasPlagas"; readonly level: 1 | 2 }; // Jill Valentine (Alliance) L2: on an opponent's Las Plagas reveal, may trash a Flash Grenade to defeat it
+  | { readonly kind: "offTurnFlashGrenadeLasPlagas"; readonly level: 1 | 2 } // Jill Valentine (Alliance) L2: on an opponent's Las Plagas reveal, may trash a Flash Grenade to defeat it
+  | { readonly kind: "weaponCostCap"; readonly maxCost: number; readonly level: 1 | 2 } // Josh Stone (Alliance) L1: cannot use weapons costing maxCost or more
+  | { readonly kind: "partnerAttachCapBonus"; readonly amount: number; readonly level: 1 | 2 }; // Josh Stone (Alliance) L2: partner may attach amount extra cards
 
 
 // ---------------------------------------------------------------------------

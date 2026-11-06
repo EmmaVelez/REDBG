@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
-import { requiredAmmoForWeapons, characterAbilities } from './abilities';
+import { requiredAmmoForWeapons, characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
 import { canReuseWeapon, explorableWeapons } from './weaponReuse';
 
 /** True when the seat's character has the given ability kind (level-gated). */
@@ -199,6 +199,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       // singleWeaponLimiter: cannot use >1 weapon in one explore.
       if (action.weapons.length > 1 && characterAbilities(state, action.seat).some(a => a.kind === 'singleWeaponLimiter')) {
         return { ok: false, reason: 'explore: single weapon limiter' };
+      }
+      // weaponCostCap (Josh L1): cannot use weapons costing maxCost or more.
+      const costCap = weaponCostCap(characterAbilities(state, action.seat));
+      if (costCap !== undefined && action.weapons.some(id => (cardDef(state, id)?.cost ?? 0) >= costCap)) {
+        return { ok: false, reason: 'explore: weapon cost cap' };
       }
       const weaponSet = new Set(action.weapons);
       if (weaponSet.size !== action.weapons.length) {
@@ -432,8 +437,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'attachToPartner: Chris cannot attach non-Infected cards' };
       }
       const attached = player.partnerAttached ?? [];
-      if (attached.length >= 2) {
-        if (action.replaceIndex !== 0 && action.replaceIndex !== 1) {
+      const attachCap = partnerAttachCap(characterAbilities(state, action.seat));
+      if (attached.length >= attachCap) {
+        if (action.replaceIndex === undefined || action.replaceIndex < 0 || action.replaceIndex >= attachCap) {
           return { ok: false, reason: 'attachToPartner: replaceIndex required when partner full' };
         }
       } else {

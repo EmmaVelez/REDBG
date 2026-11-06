@@ -2,6 +2,7 @@ import { applyAction } from './actions';
 import { validateAction } from './validate';
 import { exploreDamage } from './explore';
 import { startTurn } from './game';
+import { enumerateLegalActions } from '../ai/enumerate';
 import type { GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
@@ -52,6 +53,8 @@ const DEFS: Record<string, CardDef> = {
   'ch-steve': { id: 'ch-steve', name: 'Steve Burnside (Alliance)', type: 'character', set: 'alliance', text: 'Steve (Alliance)', copies: 1, maxHp: 70, level1At: 5, level2At: 7, abilities: [{ kind: 'healAtTurnStart', amount: 10, level: 1 }, { kind: 'discardCardForHealAndDamage', cardId: 'ac-018', heal: 20, damage: 30, level: 2 }] },
   'ch-chris-a': { id: 'ch-chris-a', name: 'Chris Redfield (Alliance)', type: 'character', set: 'alliance', text: 'Chris (Alliance)', copies: 1, maxHp: 80, level1At: 3, level2At: 8, abilities: [{ kind: 'singleWeaponAmmoDiscount', amount: 20, level: 1 }, { kind: 'chosenWeaponTypeAmmoDiscount', amount: 20, level: 2 }] },
   'ch-jill-a': { id: 'ch-jill-a', name: 'Jill Valentine (Alliance)', type: 'character', set: 'alliance', text: 'Jill (Alliance)', copies: 1, maxHp: 90, level1At: 1, level2At: 6, abilities: [{ kind: 'partnerAttachedCountDamageBonus', amount: 10, threshold: 1, level: 1 }, { kind: 'offTurnFlashGrenadeLasPlagas', level: 2 }] },
+  'ch-josh-a': { id: 'ch-josh-a', name: 'Josh Stone (Alliance)', type: 'character', set: 'alliance', text: 'Josh (Alliance)', copies: 1, maxHp: 80, level1At: 0, level2At: 4, abilities: [{ kind: 'weaponCostCap', maxCost: 50, level: 1 }, { kind: 'partnerAttachCapBonus', amount: 2, level: 2 }] },
+  'we-expensive': { id: 'we-expensive', name: 'Bolt-Action Rifle', type: 'weapon', set: 'premier', text: 'Rifle', copies: 1, cost: 60, ammoReq: 30, damage: 20 },
   'we-017': { id: 'we-017', name: 'Flash Grenade', type: 'weapon', set: 'alliance', text: 'Flash Grenade', copies: 1, cost: 20, ammoReq: 0, damage: 0, weaponTags: ['explosive'] },
   'ma-025': { id: 'ma-025', name: 'Duvalia (Las Plagas)', type: 'infected', set: 'alliance', text: '', copies: 2, hp: 60, attack: 40, decorations: 5, plagas: true },
   'we-pistol': { id: 'we-pistol', name: 'Handgun', type: 'weapon', set: 'premier', text: 'Handgun', copies: 9, cost: 20, ammoReq: 20, damage: 10, weaponType: 'handgun', weaponTags: ['gun', 'pistol'] },
@@ -77,7 +80,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -251,6 +254,27 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Alliance Josh L1: cannot explore with weapons costing 50 or more', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cjosh', level: 1 as const, hand: ['w1', 'wex'], turnAmmo: 100 } });
+  expect(validateAction(base, { type: 'explore', seat: 0, weapons: ['wex'], exploreCount: 1 }).ok).toBe(false);
+  expect(validateAction(base, { type: 'explore', seat: 0, weapons: ['w1'], exploreCount: 1 }).ok).toBe(true);
+  const legal = enumerateLegalActions(base, 0);
+  expect(legal.some(a => a.type === 'explore' && a.weapons.includes('wex'))).toBe(false);
+  expect(legal.some(a => a.type === 'explore' && a.weapons.includes('w1'))).toBe(true);
+});
+
+test('Alliance Josh L2: partner may attach up to 4 cards', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cjosh', level: 2 as const, hand: ['w1', 'w2', 'wp'], partnerInstanceId: 'cp#1', partnerAttached: ['a1', 'a2'], actionsLeft: 4 } });
+  expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'w1' }).ok).toBe(true);
+  const three = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['a1', 'a2', 'a3'] } : s)) };
+  expect(validateAction(three, { type: 'attachToPartner', seat: 0, instanceId: 'w1' }).ok).toBe(true);
+  const four = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['a1', 'a2', 'a3', 'a4'] } : s)) };
+  expect(validateAction(four, { type: 'attachToPartner', seat: 0, instanceId: 'w1' }).ok).toBe(false);
+  expect(validateAction(four, { type: 'attachToPartner', seat: 0, instanceId: 'w1', replaceIndex: 0 }).ok).toBe(true);
+  // a character without the bonus keeps the base cap of 2
+  const plain = baseState({ seat0: { characterInstanceId: 'c0', level: 2 as const, hand: ['w1'], partnerInstanceId: 'cp#1', partnerAttached: ['a1', 'a2'], actionsLeft: 2 } });
+  expect(validateAction(plain, { type: 'attachToPartner', seat: 0, instanceId: 'w1' }).ok).toBe(false);
+});
 test('Alliance Jill L1: +10 damage when her partner has 1 or fewer attached', () => {
   const withPartner = baseState({ seat0: { characterInstanceId: 'cjill', level: 1 as const, hand: ['w1'], turnAmmo: 100, partnerInstanceId: 'cp#1', partnerAttached: [] } });
   expect(exploreDamage(withPartner, 0, ['w1'])).toBe(20); // 10 base + 10
