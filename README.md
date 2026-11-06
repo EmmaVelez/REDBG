@@ -120,6 +120,19 @@ The server suite drives real WebSocket connections (ephemeral ports) through a s
 2-client game: lobby → seats → bot → start → multi-turn sanitized views → out-of-turn
 rejection → reconnect → spectator.
 
+### Deploy smoke test
+
+`tools/smoke.mjs` checks the single-port production path end to end against the real
+server entry: `/healthz`, the built SPA at `/`, hashed `/assets/*` MIME types, SPA
+fallback, 404 for missing assets, no static-root escape, and a live WebSocket round
+trip (welcome → createRoom → roomState).
+
+```bash
+npm run build
+PORT=18080 STATIC_DIR=$(pwd)/client/dist npm run dev:server   # terminal 1
+npm run smoke -- --port 18080                                # terminal 2
+```
+
 ## Deployment
 
 `render.yaml` at the repo root defines one free web service: the server serves `client/dist`
