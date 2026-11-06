@@ -371,3 +371,19 @@ export function chosenWeaponTypeAmmoDiscount(abilities: readonly CharacterAbilit
   }
   return amount;
 }
+
+/**
+ * Jill Valentine (Alliance CH-016) L1: +amount explore damage when her
+ * partner has `threshold` or fewer cards attached. No partner -> no bonus.
+ */
+export function partnerAttachedDamageBonus(
+  abilities: readonly CharacterAbility[],
+  partnerAttached: readonly string[] | undefined,
+): number {
+  if (partnerAttached === undefined) return 0;
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'partnerAttachedCountDamageBonus' && partnerAttached.length <= a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}

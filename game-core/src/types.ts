@@ -288,7 +288,9 @@ export type CharacterAbility =
   | { readonly kind: "healAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // Steve Burnside (Alliance) L1: recover amount HP at the start of each turn
   | { readonly kind: "discardCardForHealAndDamage"; readonly cardId: string; readonly heal: number; readonly damage: number; readonly level: 1 | 2 } // Steve Burnside (Alliance) L2: discard the named card from hand -> heal and +damage this turn
   | { readonly kind: "singleWeaponAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Alliance) L1: -amount ammo requirement when using exactly one weapon
-  | { readonly kind: "chosenWeaponTypeAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 }; // Chris Redfield (Alliance) L2: -amount ammo requirement for a chosen weapon type
+  | { readonly kind: "chosenWeaponTypeAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Alliance) L2: -amount ammo requirement for a chosen weapon type
+  | { readonly kind: "partnerAttachedCountDamageBonus"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Jill Valentine (Alliance) L1: +amount damage when exploring if her partner has <= threshold cards attached
+  | { readonly kind: "offTurnFlashGrenadeLasPlagas"; readonly level: 1 | 2 }; // Jill Valentine (Alliance) L2: on an opponent's Las Plagas reveal, may trash a Flash Grenade to defeat it
 
 
 // ---------------------------------------------------------------------------

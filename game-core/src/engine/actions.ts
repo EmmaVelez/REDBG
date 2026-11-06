@@ -11,6 +11,7 @@ import {
   movesDiscardToInventoryOnDefeat,
   singleWeaponAmmoDiscount,
   chosenWeaponTypeAmmoDiscount,
+  partnerAttachedDamageBonus,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -688,7 +689,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const abilityDamage =
             passiveDamageBonus(abilities, weaponDefs, exploreCount, player.hand.length) +
             exploreBigHandBonus(abilities, state.seats) +
-            exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action');
+            exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action') +
+            partnerAttachedDamageBonus(abilities, player.partnerAttached);
           // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
           const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
             const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
@@ -807,9 +809,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (isLasPlagas) {
         const eligibleSeats = state.seats.filter(s => {
           if (s.seat === seat || s.dead) return false;
-          const charDef = cardDef(state, s.characterInstanceId);
-          // Jill L2 (level 2) — check character id
-          if (charDef?.id !== 'ch-016' || s.level < 2) return false;
+          // Jill (Brainwashed) L2 — driven by the ability, not the card id,
+          // so the data decides who may react.
+          if (!characterAbilities(state, s.seat).some(a => a.kind === 'offTurnFlashGrenadeLasPlagas')) return false;
           // must have Flash Grenade in hand
           return s.hand.some(id => {
             const ci = state.cards[id];
@@ -900,8 +902,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const shouldDefer = revealedDef?.type === 'infected' && revealedDef?.plagas === true &&
         state.seats.some(s => {
           if (s.seat === seat || s.dead) return false;
-          const charDef = cardDef(state, s.characterInstanceId);
-          if (charDef?.id !== 'ch-016' || s.level < 2) return false;
+          if (!characterAbilities(state, s.seat).some(a => a.kind === 'offTurnFlashGrenadeLasPlagas')) return false;
           return s.hand.some(id => {
             const ci = state.cards[id];
             const cd = ci ? state.cardDefs[ci.cardId] : undefined;

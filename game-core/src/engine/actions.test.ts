@@ -12,6 +12,7 @@ function seat(s: number, over: Partial<PlayerState> = {}): PlayerState {
     turnAmmo: over.turnAmmo ?? 0, turnGold: over.turnGold ?? 50, actionsLeft: over.actionsLeft ?? 1,
     buysLeft: over.buysLeft ?? 1, exploresLeft: over.exploresLeft ?? 1,
     weaponDamageBonusThisTurn: over.weaponDamageBonusThisTurn ?? 0, attached: [],
+    ...(over.partnerInstanceId !== undefined ? { partnerInstanceId: over.partnerInstanceId, partnerAttached: over.partnerAttached ?? [], partnerHp: over.partnerHp ?? over.hp ?? 100, partnerMaxHp: over.partnerMaxHp ?? over.maxHp ?? 100 } : {}),
     inventory: over.inventory ?? ['inv1', 'inv2', 'inv3', 'inv4', 'inv5', 'inv6', 'inv7', 'inv8'],
     hand: over.hand ?? ['a1', 'i1', 'am1', 'w1', 'w2'],
     discard: over.discard ?? [], playArea: over.playArea ?? [], downed: over.downed ?? false, dead: over.dead ?? false,
@@ -50,6 +51,9 @@ const DEFS: Record<string, CardDef> = {
   'ch-krauser-a': { id: 'ch-krauser-a', name: 'Jack Krauser (Alliance)', type: 'character', set: 'alliance', text: 'Krauser (Alliance)', copies: 1, maxHp: 90, level1At: 0, level2At: 6, abilities: [{ kind: 'singleWeaponLimiter', level: 1 }, { kind: 'plusDamagePerCardInHand', amount: 10, level: 2 }] },
   'ch-steve': { id: 'ch-steve', name: 'Steve Burnside (Alliance)', type: 'character', set: 'alliance', text: 'Steve (Alliance)', copies: 1, maxHp: 70, level1At: 5, level2At: 7, abilities: [{ kind: 'healAtTurnStart', amount: 10, level: 1 }, { kind: 'discardCardForHealAndDamage', cardId: 'ac-018', heal: 20, damage: 30, level: 2 }] },
   'ch-chris-a': { id: 'ch-chris-a', name: 'Chris Redfield (Alliance)', type: 'character', set: 'alliance', text: 'Chris (Alliance)', copies: 1, maxHp: 80, level1At: 3, level2At: 8, abilities: [{ kind: 'singleWeaponAmmoDiscount', amount: 20, level: 1 }, { kind: 'chosenWeaponTypeAmmoDiscount', amount: 20, level: 2 }] },
+  'ch-jill-a': { id: 'ch-jill-a', name: 'Jill Valentine (Alliance)', type: 'character', set: 'alliance', text: 'Jill (Alliance)', copies: 1, maxHp: 90, level1At: 1, level2At: 6, abilities: [{ kind: 'partnerAttachedCountDamageBonus', amount: 10, threshold: 1, level: 1 }, { kind: 'offTurnFlashGrenadeLasPlagas', level: 2 }] },
+  'we-017': { id: 'we-017', name: 'Flash Grenade', type: 'weapon', set: 'alliance', text: 'Flash Grenade', copies: 1, cost: 20, ammoReq: 0, damage: 0, weaponTags: ['explosive'] },
+  'ma-025': { id: 'ma-025', name: 'Duvalia (Las Plagas)', type: 'infected', set: 'alliance', text: '', copies: 2, hp: 60, attack: 40, decorations: 5, plagas: true },
   'we-pistol': { id: 'we-pistol', name: 'Handgun', type: 'weapon', set: 'premier', text: 'Handgun', copies: 9, cost: 20, ammoReq: 20, damage: 10, weaponType: 'handgun', weaponTags: ['gun', 'pistol'] },
   'we-knife': { id: 'we-knife', name: 'Combat Knife', type: 'weapon', set: 'premier', text: 'Knife', copies: 11, cost: 0, ammoReq: 0, damage: 5, weaponType: 'knife', weaponTags: ['melee', 'knife'] },
   'ac-018': { id: 'ac-018', name: 'Uroboros Injection', type: 'action', set: 'alliance', text: 'Uroboros Injection', copies: 1, cost: 30 },
@@ -73,7 +77,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -247,6 +251,30 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Alliance Jill L1: +10 damage when her partner has 1 or fewer attached', () => {
+  const withPartner = baseState({ seat0: { characterInstanceId: 'cjill', level: 1 as const, hand: ['w1'], turnAmmo: 100, partnerInstanceId: 'cp#1', partnerAttached: [] } });
+  expect(exploreDamage(withPartner, 0, ['w1'])).toBe(20); // 10 base + 10
+  const twoAttached = { ...withPartner, seats: withPartner.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['x1', 'x2'] } : s)) };
+  expect(exploreDamage(twoAttached, 0, ['w1'])).toBe(10);
+  const noPartner = baseState({ seat0: { characterInstanceId: 'cjill', level: 1 as const, hand: ['w1'], turnAmmo: 100 } });
+  expect(exploreDamage(noPartner, 0, ['w1'])).toBe(10);
+});
+
+test('Alliance Jill L2: Flash Grenade reactive window triggers on a Las Plagas reveal', () => {
+  const base = baseState({
+    seat0: { hand: ['w20'], turnAmmo: 100 },
+    seat1: { characterInstanceId: 'cjill', level: 2 as const, hand: ['fg1'] },
+    mansionDeck: ['inf2'],
+  });
+  const s = applyAction(base, { type: 'explore', seat: 0, weapons: ['w20'], exploreCount: 1 });
+  expect(s.prompts.length).toBe(1);
+  expect(pr(s).payload?.kind).toBe('jillFlashGrenade');
+  expect(pr(s).seat).toBe(1);
+  // ability-driven, not id-driven: a different character gets no prompt
+  const notJill = { ...base, seats: base.seats.map(x => (x.seat === 1 ? { ...x, characterInstanceId: 'c0' } : x)) };
+  const s2 = applyAction(notJill, { type: 'explore', seat: 0, weapons: ['w20'], exploreCount: 1 });
+  expect(s2.prompts.length).toBe(0);
+});
 test('Alliance Chris L1: -20 ammo only when using exactly one weapon', () => {
   const base = baseState({ seat0: { characterInstanceId: 'cchris', level: 1 as const, hand: ['wp', 'wk'], turnAmmo: 100 } });
   const one = applyAction(base, { type: 'explore', seat: 0, weapons: ['wp'], exploreCount: 1 });
