@@ -322,3 +322,12 @@ export function applyHpLoss(abilities: readonly CharacterAbility[], hp: number, 
   if (next > 0 || seatDownedOrDead) return next;
   return setHpToOnLethal(abilities) ?? next;
 }
+
+/**
+ * Luis Sera (Nightmare CH-036) L2: once he defeats an Infected, the player
+ * may move any number of cards from the discard pile to the bottom of the
+ * Inventory.
+ */
+export function movesDiscardToInventoryOnDefeat(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'onDefeatMoveDiscardToInventoryBottom');
+}

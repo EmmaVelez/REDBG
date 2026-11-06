@@ -8,6 +8,7 @@ import {
   characterAbilities,
   cardsOnDamageTakenDuringTurn,
   applyHpLoss,
+  movesDiscardToInventoryOnDefeat,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -967,6 +968,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
             }]
           : state.prompts;
+        // Luis Sera (Nightmare) L2: on defeating an Infected, may move any
+        // number of cards from the discard pile to the bottom of the Inventory.
+        const luisPrompts = movesDiscardToInventoryOnDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+          ? [...defeatPrompts, {
+              id: 'p' + (defeatPrompts.length + 1),
+              seat,
+              text: 'Move any number of cards from your discard to the bottom of your Inventory.',
+              options: [...newPlayer.discard, 'DONE'],
+              payload: { kind: 'luisSeraDiscardToInventory' },
+            }]
+          : defeatPrompts;
         return {
           ...state,
           ...nextBase,
@@ -975,7 +987,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
-          prompts: defeatPrompts,
+          prompts: luisPrompts,
         };
       }
 
@@ -1986,6 +1998,35 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'luisSeraDiscardToInventory') {
+        // Luis Sera (Nightmare) L2: move discard cards to the BOTTOM of the
+        // Inventory (the draw pile's far end), any number; DONE ends the chain.
+        const chosen = prompt.options[option];
+        if (chosen === 'DONE' || chosen === undefined || !player.discard.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const remaining = player.discard.filter(id => id !== chosen);
+        const newPlayer = { ...player, discard: remaining, inventory: [...player.inventory, chosen] };
+        let prompts = newPrompts;
+        if (remaining.length > 0) {
+          prompts = [
+            ...prompts,
+            {
+              id: `${prompt.id}:t${state.log.length}`,
+              seat,
+              text: prompt.text,
+              options: [...remaining, 'DONE'],
+              payload: { kind: 'luisSeraDiscardToInventory' },
+            },
+          ];
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          prompts,
+        };
+      }
       if (kind === 'trashFromHandAtWill') {
         // Rebecca L2: trash cards from hand, any number; DONE ends the chain.
         const chosen = prompt.options[option];

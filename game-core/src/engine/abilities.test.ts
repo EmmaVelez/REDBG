@@ -10,6 +10,7 @@ import {
   knifeWeaponsUsedThisTurn,
   cardsOnDamageTakenDuringTurn,
   applyHpLoss,
+  movesDiscardToInventoryOnDefeat,
 } from './abilities';
 import { exploreDamage , resolveExplore } from './explore';
 import { applyAction } from './actions';
@@ -904,5 +905,13 @@ describe('applyHpLoss (Nightmare Ada L2)', () => {
   it('does not revive an already downed character', () => {
     const abilities: readonly CharacterAbility[] = [{ kind: 'setHpToOnLethal', amount: 10, level: 2 }];
     expect(applyHpLoss(abilities, 0, 10, true)).toBe(0);
+  });
+});
+
+describe('movesDiscardToInventoryOnDefeat (Luis Sera L2)', () => {
+  it('is present only when the character has the ability', () => {
+    const abilities: readonly CharacterAbility[] = [{ kind: 'onDefeatMoveDiscardToInventoryBottom', level: 2 }];
+    expect(movesDiscardToInventoryOnDefeat(abilities)).toBe(true);
+    expect(movesDiscardToInventoryOnDefeat([])).toBe(false);
   });
 });
