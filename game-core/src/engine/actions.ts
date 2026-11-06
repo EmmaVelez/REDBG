@@ -1300,6 +1300,32 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'choosePlayerToDiscardOneCardDuringTurn': {
+              // Nightmare Wesker L2: the one other player with 30 or less HP
+              // discards one card. The victim chooses which card, so the
+              // prompt is addressed to THEIR seat and resolved out of turn
+              // by that player's client (same pattern as the reactive trash
+              // window).
+              const lowHpOthers = state.seats.filter(s => s.seat !== seat && !s.dead && (s.hp ?? 0) <= 30);
+              const target = lowHpOthers.length === 1 ? lowHpOthers[0] : undefined;
+              if (target === undefined || target.hand.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat: target.seat,
+                    text: 'Wesker forces you to discard one card.',
+                    options: [...target.hand],
+                    payload: { kind: 'weskerDiscardOneCard' },
+                  },
+                ],
+              };
+            }
             default:
               // Passive/text-only abilities (generic, weaponTagBonus, ...): no-op.
               return { ...state, ...nextBase };
@@ -1675,6 +1701,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'weskerDiscardOneCard') {
+        // Nightmare Wesker L2: the victim (the prompt's seat) discards the
+        // chosen card from their own hand.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || !player.hand.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: player.hand.filter(id => id !== chosen), discard: [...player.discard, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
       if (kind === 'trashRedirect') {
         // Rebecca L1: option 0 leaves the card in the trash; any other option
         // is a seat number whose discard pile receives it (removed from trash).

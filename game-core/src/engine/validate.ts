@@ -301,7 +301,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'trashFromHandAtWill':
         case 'forceExploreOtherPlayer':
         case 'giveOneCardToPlayerThenMaybeAnother':
-        case 'revealHandForDamageIfTwoTypes': {
+        case 'revealHandForDamageIfTwoTypes':
+        case 'choosePlayerToDiscardOneCardDuringTurn': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -335,6 +336,16 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
+            }
+          }
+          if (ability.kind === 'choosePlayerToDiscardOneCardDuringTurn') {
+            // Nightmare Wesker L2: needs EXACTLY one other living player at
+            // 30 or less HP (the L1 condition), and that player must have a
+            // card to discard.
+            const lowHpOthers = state.seats.filter(s => s.seat !== action.seat && !s.dead && (s.hp ?? 0) <= 30);
+            const target = lowHpOthers.length === 1 ? lowHpOthers[0] : undefined;
+            if (target === undefined || target.hand.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: needs exactly one other player with 30 or less HP and a card in hand' };
             }
           }
           return { ok: true };
