@@ -543,6 +543,11 @@ h1, h2 { margin: 0 0 8px; }
 /* ---- hand / zones ---- */
 .hand { display: flex; flex-wrap: wrap; }
 .hand-card {
+  position: relative;
+  /* Each card is its own stacking context so the card's inner z-index:1
+     name/cost can't paint over the NEXT card's body. DOM order then makes
+     later cards overlap earlier ones, and :hover z-index:2 lifts a card. */
+  z-index: 0;
   background: transparent;
   border: none;
   padding: 0;
