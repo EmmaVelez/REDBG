@@ -1,11 +1,20 @@
 import type { JSX } from 'react';
 import type { CardDef } from '@re/game-core';
 import { typeLabel, typeClass, statLine, bonusLine, costText } from './cards';
+import { cardArtUrl } from './cardArt';
 import { HealthRing } from './HealthRing';
 
 /**
- * M4-T03/T11: CardView — card frames. No Bandai artwork; the frame carries
- * type color, name, cost, stat line, bonuses and rules text.
+ * M4-T03/T11: CardView — card frames. The frame carries type color, name, cost,
+ * stat line, bonuses and rules text.
+ *
+ * Cards that have an SVG in `game-core/src/data/CARD-ART/<ID>.svg` render it
+ * as the card face instead of the plain placeholder frame:
+ *   - non-character cards: the art fills the card (it ships with its own
+ *     decorative border) and the text rows sit on a scrim at the bottom;
+ *   - character cards: the art fills the portrait window above the name bar
+ *     and skill list, which stay intact.
+ * Cards without art keep the placeholder frame unchanged.
  *
  * Character cards (M5 redesign) use the pixel-art reference frame:
  *   - thick dark outer border with a thin light inner line + corner ticks
@@ -35,13 +44,22 @@ export interface CardViewProps {
 }
 
 export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false }: CardViewProps): JSX.Element {
+  const art = cardArtUrl(def.id);
   if (def.type === 'character') {
-    return <CharacterCard def={def} compact={compact} decorations={decorations} hp={hp} maxHp={maxHp} />;
+    return <CharacterCard def={def} compact={compact} decorations={decorations} hp={hp} maxHp={maxHp} art={art} />;
   }
   const stats = statLine(def);
   const bonus = bonusLine(def);
   return (
-    <div className={`card ${typeClass(def.type)}`} data-card-id={def.id} data-card-type={def.type}>
+    <div
+      className={`card ${typeClass(def.type)}${art !== undefined ? ' card-has-art' : ''}`}
+      data-card-id={def.id}
+      data-card-type={def.type}
+      data-has-art={art !== undefined || undefined}
+    >
+      {art !== undefined && (
+        <img className="card-art-img" src={art} alt="" draggable={false} loading="lazy" decoding="async" />
+      )}
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
         {!hideCost && <span className="card-cost" data-card-cost>{costText(def)}</span>}
@@ -60,15 +78,16 @@ interface CharacterCardProps {
   readonly decorations?: number;
   readonly hp?: number;
   readonly maxHp?: number;
+  readonly art: string | undefined;
 }
 
-function CharacterCard({ def, compact, decorations, hp, maxHp }: CharacterCardProps): JSX.Element {
+function CharacterCard({ def, compact, decorations, hp, maxHp, art }: CharacterCardProps): JSX.Element {
   const showRing = hp !== undefined && maxHp !== undefined;
   const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
   const levels = def.levels ?? [];
   return (
-    <div className="card card-character" data-card-id={def.id} data-card-type="character">
+    <div className="card card-character" data-card-id={def.id} data-card-type="character" data-has-art={art !== undefined || undefined}>
       <div className="cc-head">
         <span className="card-type">[{typeLabel(def.type)}]</span>
         {showRing ? (
@@ -77,7 +96,11 @@ function CharacterCard({ def, compact, decorations, hp, maxHp }: CharacterCardPr
           <span className="cc-hp">HP {def.maxHp}</span>
         ) : null}
       </div>
-      <div className="card-portrait" aria-label="character portrait placeholder" />
+      <div className={`card-portrait${art !== undefined ? ' card-portrait-has-art' : ''}`}>
+        {art !== undefined && (
+          <img className="card-portrait-img" src={art} alt="" draggable={false} loading="lazy" decoding="async" />
+        )}
+      </div>
       <div className="card-name">{def.name}</div>
       {!compact && (decorations !== undefined && levels.length > 0 ? (
         <div className="card-skills" data-decorations={decorations} data-level1-at={level1At} data-level2-at={level2At}>

@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-06 ~14:45):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), **M4 ✅ client complete (M4-T11..T14)**. All 47 characters across Premier/Nightmare/Alliance/Outbreak have engine behaviour. **gainCard refactor ✅ done** (central gain pipeline + AC-021 Gathering Forces implemented). Suites: game-core 526, server 89, client 126 — all green, typecheck clean. **Next: M5 (hardening & release)** — README, production build verification, reconnect torture test, deploy smoke test. Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+**Current state (2026-11-06 ~15:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), **M4 ✅ client complete (M4-T11..T14)**. All 47 characters across Premier/Nightmare/Alliance/Outbreak have engine behaviour. **gainCard refactor ✅ done** (central gain pipeline + AC-021 Gathering Forces implemented). **Card art ✅ wired** (`CARD-ART/*.svg` → CardView; stale `client/public/card-art/` copy deleted). Suites: game-core 526, server 89, client 128 — all green, typecheck clean. **Next: M5 (hardening & release)** — README, production build verification, reconnect torture test, deploy smoke test. Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
 
 ## OLLAMA MODELS PATH (do not skip)
 Models live at `F:\ollama\models` (moved off C: when it hit 233G/233G). Start serve with:
