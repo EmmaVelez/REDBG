@@ -9,6 +9,7 @@ import {
   explosivesGoToDiscard,
   knifeWeaponsUsedThisTurn,
   cardsOnDamageTakenDuringTurn,
+  applyHpLoss,
 } from './abilities';
 import { exploreDamage , resolveExplore } from './explore';
 import { applyAction } from './actions';
@@ -888,5 +889,20 @@ describe('cardsOnDamageTakenDuringTurn (Nightmare Ada L1)', () => {
     expect(cardsOnDamageTakenDuringTurn(abilities, true)).toBe(2);
     expect(cardsOnDamageTakenDuringTurn(abilities, false)).toBe(0);
     expect(cardsOnDamageTakenDuringTurn([], true)).toBe(0);
+  });
+});
+
+describe('applyHpLoss (Nightmare Ada L2)', () => {
+  it('replaces lethal damage with the set HP and leaves non-lethal damage alone', () => {
+    const abilities: readonly CharacterAbility[] = [{ kind: 'setHpToOnLethal', amount: 10, level: 2 }];
+    expect(applyHpLoss(abilities, 5, 20)).toBe(10);   // lethal -> replaced
+    expect(applyHpLoss(abilities, 10, 20)).toBe(10);  // lethal -> replaced
+    expect(applyHpLoss(abilities, 80, 20)).toBe(60);  // non-lethal -> normal
+    expect(applyHpLoss([], 5, 20)).toBe(0);           // no ability -> normal
+  });
+
+  it('does not revive an already downed character', () => {
+    const abilities: readonly CharacterAbility[] = [{ kind: 'setHpToOnLethal', amount: 10, level: 2 }];
+    expect(applyHpLoss(abilities, 0, 10, true)).toBe(0);
   });
 });

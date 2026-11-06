@@ -40,7 +40,7 @@ const DEFS: Record<string, CardDef> = {
   'ch-sheva': { id: 'ch-sheva', name: 'Sheva', type: 'character', set: 'premier', text: 'Sheva', copies: 1, maxHp: 80, level1At: 2, level2At: 4, abilities: [{ kind: 'exchangeHandWithInventoryTop', level: 1 }, { kind: 'ammoReqReduction', tag: 'rifle', amount: 20, level: 2 }] },
   'ch-barry': { id: 'ch-barry', name: 'Barry', type: 'character', set: 'premier', text: 'Barry', copies: 1, maxHp: 90, level1At: 2, level2At: 7, abilities: [{ kind: 'plusDamageThisTurn', amount: 5, level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'magnum', amount: 20, level: 2 }] },
   'ch-ada': { id: 'ch-ada', name: 'Ada', type: 'character', set: 'premier', text: 'Ada', copies: 1, maxHp: 80, level1At: 4, level2At: 8, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'actionBonus', amount: 40, level: 2 }] },
-  'ch-ada-n': { id: 'ch-ada-n', name: 'Ada (Nightmare)', type: 'character', set: 'nightmare', text: 'Ada (Nightmare)', copies: 1, maxHp: 70, level1At: 1, level2At: 10, abilities: [{ kind: 'cardsOnDamageTakenDuringTurn', amount: 2, level: 1 }] },
+  'ch-ada-n': { id: 'ch-ada-n', name: 'Ada (Nightmare)', type: 'character', set: 'nightmare', text: 'Ada (Nightmare)', copies: 1, maxHp: 70, level1At: 1, level2At: 10, abilities: [{ kind: 'cardsOnDamageTakenDuringTurn', amount: 2, level: 1 }, { kind: 'setHpToOnLethal', amount: 10, level: 2 }] },
   'ch-becky': { id: 'ch-becky', name: 'Rebecca', type: 'character', set: 'premier', text: 'Rebecca', copies: 1, maxHp: 70, level1At: 2, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'trashFromHandAtWill', level: 2 }] },
 };
 
@@ -234,6 +234,34 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Nightmare Ada L2: lethal damage sets HP to 10 instead of 0 (every time)', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cada', level: 2 as const, hp: 10, hand: ['w5'] } });
+  const s = applyAction(base, { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(s).hp).toBe(10);      // 10 - 20 attack would be 0 -> replaced with 10
+  expect(p0(s).downed).toBe(false);
+  expect(p0(s).dead).toBe(false);
+});
+
+test('Nightmare Ada L2: non-lethal damage is unaffected, and the ability is level-gated', () => {
+  const nonLethal = applyAction(baseState({ seat0: { characterInstanceId: 'cada', level: 2 as const, hp: 80, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(nonLethal).hp).toBe(60); // 80 - 20, no replacement
+  const locked = applyAction(baseState({ seat0: { characterInstanceId: 'cada', level: 1 as const, hp: 10, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(locked).hp).toBe(0);
+  expect(p0(locked).downed).toBe(true);
+});
+
+test('Nightmare Ada L2: reveal-time AoE lethal damage is replaced too', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cada', level: 2 as const, hp: 10, hand: ['w5'] } });
+  const guardianDef: CardDef = { id: 'ma-037', name: 'Guardian of Insanity', type: 'infected', set: 'premier', text: '', copies: 3, hp: 30, attack: 20, decorations: 2 };
+  const withGuardian = {
+    ...base,
+    cardDefs: { ...DEFS, 'ma-037': guardianDef },
+    cards: { ...base.cards, 'inf1': inst('inf1', 'ma-037') },
+  };
+  const s = applyAction(withGuardian, { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(s).hp).toBe(10);      // AoE 10 -> 0 -> 10, then attack 20 -> 0 -> 10
+  expect(p0(s).downed).toBe(false);
+});
 test('Nightmare Ada L1: no draw when the damage downs her', () => {
   const s = applyAction(baseState({ seat0: { characterInstanceId: 'cada', level: 1 as const, hp: 10, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).hp).toBe(0);

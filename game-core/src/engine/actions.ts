@@ -7,6 +7,7 @@ import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
   characterAbilities,
   cardsOnDamageTakenDuringTurn,
+  applyHpLoss,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -408,7 +409,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
               if (e.kind === 'damageCharacter') {
-                newPlayer = { ...newPlayer, hp: Math.max(newPlayer.hp - e.amount, 0) };
+                newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.amount, newPlayer.downed || newPlayer.dead) };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
               if (e.kind === 'unlimitedActionsThisTurn') {
@@ -449,7 +450,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 // If beginTurnTrashIfHealthAtMost already trashed, instanceId is gone from attached.
                 const trashed = !stillAttached && newPlayer.discard.includes(instanceId);
                 if (!trashed) {
-                  newPlayer = { ...newPlayer, hp: Math.max(newPlayer.hp - e.damage, 0) };
+                  newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.damage, newPlayer.downed || newPlayer.dead) };
                   const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: e.cards, rngState: rngAfterEffects });
                   newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
                   rngAfterEffects = d.rngState;
@@ -697,10 +698,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // MA-031 Proto Tyrant: on reveal, non-exploring chars with 50+ HP take 40.
       let revealHpDelta: Record<number, number> = {};
       if (revealedDef?.id === 'ma-037') {
-        state = { ...state, seats: state.seats.map(s => ({ ...s, hp: Math.max(0, (s.hp ?? 0) - 10) })) };
+        state = { ...state, seats: state.seats.map(s => ({ ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 10, s.downed || s.dead) })) };
       }
       if (revealedDef?.id === 'ma-031') {
-        state = { ...state, seats: state.seats.map(s => (s.seat === seat || (s.hp ?? 0) < 50) ? s : { ...s, hp: Math.max(0, (s.hp ?? 0) - 40) }) };
+        state = { ...state, seats: state.seats.map(s => (s.seat === seat || (s.hp ?? 0) < 50) ? s : { ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 40, s.downed || s.dead) }) };
       }
 
       let mansionDeck = rev.mansion.deck;
@@ -775,7 +776,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
         const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
-        let newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? Math.max(player.hp - 30, 0) : player.hp };
+        let newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead) : player.hp };
         // +30 damage collectively handled by not removing; for simplicity add to weaponDamageBonus? skip; damage already resolved via threshold only.
         return {
           ...state,
@@ -989,9 +990,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const hasDamageRedirect = characterAbilities(state, seat).some(a => a.kind === 'damageRedirectToPartner');
       const leadingIsPartner = !!player.partnerInstanceId && player.partnerLeading === true;
       const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
-      const newLeadingHp = (hasDamageRedirect && player.partnerInstanceId)
-        ? baseLeadingHp
-        : Math.max(baseLeadingHp - outcome.damageTaken, 0);
+      // Ada (Nightmare) L2: lethal damage sets her HP to 10 instead of 0 -
+      // only when she is the one taking the damage (never a leading partner).
+      const damageOnAda = !leadingIsPartner && !(hasDamageRedirect && player.partnerInstanceId);
+      const newLeadingHp = damageOnAda
+        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, outcome.damageTaken, player.downed || player.dead)
+        : baseLeadingHp;
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
       let hand: readonly string[] = handAfter;
@@ -1490,7 +1494,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const defeated = !!updatedState.flashGrenadeDefeatedInstanceId;
           const newPlayer = defeated
             ? { ...pe.newPlayer, decorations: pe.decorations, attached: [...pe.newPlayer.attached, pe.revealedInstanceId] }
-            : { ...pe.newPlayer, hp: Math.max(pe.newPlayer.hp - pe.damageTaken, 0) };
+            : { ...pe.newPlayer, hp: applyHpLoss(characterAbilities(state, pe.seat), pe.newPlayer.hp, pe.damageTaken, pe.newPlayer.downed || pe.newPlayer.dead) };
           return {
             ...updatedState,
             ...nextBase,

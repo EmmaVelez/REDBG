@@ -299,3 +299,26 @@ export function cardsOnDamageTakenDuringTurn(abilities: readonly CharacterAbilit
   }
   return draw;
 }
+
+/**
+ * Ada (Nightmare CH-043) L2: the HP to set when damage would reduce her to
+ * 0 or less (10), or undefined when she has no such ability.
+ */
+export function setHpToOnLethal(abilities: readonly CharacterAbility[]): number | undefined {
+  for (const a of abilities) {
+    if (a.kind === 'setHpToOnLethal') return a.amount;
+  }
+  return undefined;
+}
+
+/**
+ * Applies an HP loss, then Ada's L2 replacement: when the result would be
+ * 0 or less, set it to `amount` instead (user ruling: applies EVERY time).
+ * `seatDownedOrDead` skips the replacement so stray AoE damage cannot revive
+ * a downed Ada for free.
+ */
+export function applyHpLoss(abilities: readonly CharacterAbility[], hp: number, amount: number, seatDownedOrDead = false): number {
+  const next = Math.max(hp - amount, 0);
+  if (next > 0 || seatDownedOrDead) return next;
+  return setHpToOnLethal(abilities) ?? next;
+}
