@@ -423,6 +423,17 @@ export function exploreBonusIfAmmoAbove(
   return bonus;
 }
 
+/**
+ * Jill Valentine (Outbreak CH-025) L2: while her Infection Level is 0 she
+ * and her partner cannot be affected by any infection effects.
+ */
+export function isImmuneToInfectionEffects(
+  abilities: readonly CharacterAbility[],
+  infectionCards: readonly string[] | undefined,
+): boolean {
+  if ((infectionCards?.length ?? 0) !== 0) return false;
+  return abilities.some(a => a.kind === 'immuneToInfectionAtLevelZero');
+}
 /** HUNK (Outbreak CH-030) L2: +amount base damage when Health <= threshold. */
 export function baseDamageBonusIfHpAtMost(
   abilities: readonly CharacterAbility[],

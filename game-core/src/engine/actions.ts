@@ -19,6 +19,7 @@ import {
   plusDamageIfTwoOrMoreWeapons,
   exploreBonusIfAmmoAbove,
   baseDamageBonusIfHpAtMost,
+  isImmuneToInfectionEffects,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -1129,6 +1130,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let outbreakDeck = state.infectionDeck ?? [];
       const drawInfectionsFor = (seatIdx: number, count: number): void => {
         if (count <= 0) return;
+        const target = state.seats[seatIdx];
+        if (target === undefined) return;
+        // Jill Valentine (Outbreak) L2: at Infection Level 0 she is immune.
+        if (isImmuneToInfectionEffects(characterAbilities(state, seatIdx), target.infectionCards)) return;
         const arr = infectionBySeat.get(seatIdx) ?? [];
         for (let i = 0; i < count && outbreakDeck.length > 0; i++) {
           arr.push(outbreakDeck[0] as string);
@@ -1505,6 +1510,59 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'gainInfectionForGold': {
+              // Excella Gionne (Outbreak) L1: +1 Infection Level for +amount Gold.
+              const deck = state.infectionDeck ?? [];
+              const topInfection = deck[0];
+              const amount = (characterAbilities(state, seat).find(a => a.kind === 'gainInfectionForGold') as { amount: number } | undefined)?.amount ?? 0;
+              return {
+                ...state,
+                ...nextBase,
+                ...(state.infectionDeck !== undefined ? { infectionDeck: deck.slice(1) } : {}),
+                seats: state.seats.map(s => (s.seat === seat
+                  ? {
+                      ...player,
+                      infectionCards: topInfection !== undefined ? [...(player.infectionCards ?? []), topInfection] : (player.infectionCards ?? []),
+                      turnGold: player.turnGold + amount,
+                    }
+                  : s)),
+              };
+            }
+            case 'moveHandCardToTopOfInventory': {
+              // Leon S. Kennedy (Outbreak) L1: put a card from hand on top of the Inventory.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Put a card from your hand on top of your Inventory.',
+                    options: player.hand,
+                    payload: { kind: 'leonHandToInventoryTop' },
+                  },
+                ],
+              };
+            }
+            case 'discardForActionFromDiscard': {
+              // Leon S. Kennedy (Outbreak) L2: discard a card, then move an action
+              // card from the discard pile to your hand.
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Discard one card from your hand.',
+                    options: player.hand,
+                    payload: { kind: 'leonDiscardForAction' },
+                  },
+                ],
+              };
+            }
             case 'exchangeBuyForAction': {
               // Ada L2: spend the Buy for an extra Action.
               return {
@@ -1843,9 +1901,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               else if (e.kind === 'drag') targetFlags.cannotAttackSeatNextTurn = seat;
               else if (e.kind === 'devour') healSelf += e.heal;
               else if (e.kind === 'infectionIncrease') {
-                for (let i = 0; i < e.amount && infectionDeckAfter.length > 0; i++) {
-                  targetInfectionCards.push(infectionDeckAfter[0] as string);
-                  infectionDeckAfter = infectionDeckAfter.slice(1);
+                if (!isImmuneToInfectionEffects(characterAbilities(state, targetSeat), target.infectionCards)) {
+                  for (let i = 0; i < e.amount && infectionDeckAfter.length > 0; i++) {
+                    targetInfectionCards.push(infectionDeckAfter[0] as string);
+                    infectionDeckAfter = infectionDeckAfter.slice(1);
+                  }
                 }
               }
             }
@@ -1900,6 +1960,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (
             state.infectionDeck !== undefined &&
             player.isInfectedCharacter !== true &&
+            !isImmuneToInfectionEffects(characterAbilities(state, seat), player.infectionCards) &&
             ((player.exploredOrAttackedThisTurn === true && playedTVirus) ||
               (player.exploredOrAttackedThisTurn !== true))
           ) {
@@ -2242,6 +2303,114 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             options: [...remaining, 'DONE'],
             payload: { kind: 'discardAnyForAmmo', count: String(count + 1), amount: String(prompt.payload?.amount ?? '0') },
           }],
+        };
+      }
+      if (kind === 'turnStartDamageForExplore') {
+        // HUNK (Outbreak) L1: take the damage and gain +1 Explore.
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const dmg = Number(prompt.payload?.amount ?? '10');
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hp: player.hp - dmg, exploresLeft: player.exploresLeft + 1 }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'turnStartRevealActionsForCards') {
+        // Ada Wong (Outbreak) L2: reveal any number of action cards from hand,
+        // then draw 1 card per action card revealed.
+        const count = Number(prompt.payload?.count ?? '0');
+        if (chosenId === undefined || chosenId === 'DONE') {
+          if (count === 0) {
+            return { ...state, ...nextBase, prompts: newPrompts };
+          }
+          const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count, rngState: state.rngState });
+          return {
+            ...state,
+            ...nextBase,
+            rngState: d.rngState,
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : s)),
+            prompts: newPrompts,
+          };
+        }
+        const isAction = cardDef(state, chosenId)?.type === 'action';
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Reveal any number of action cards from your hand.',
+            options: [...player.hand.filter(id => cardDef(state, id)?.type === 'action'), 'DONE'],
+            payload: { kind: 'turnStartRevealActionsForCards', count: String(count + (isAction ? 1 : 0)) },
+          }],
+        };
+      }
+
+      if (kind === 'leonHandToInventoryTop') {
+        if (chosenId === undefined || !player.hand.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? {
+                ...player,
+                hand: player.hand.filter(id => id !== chosenId),
+                inventory: [chosenId, ...player.inventory],
+              }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'leonDiscardForAction') {
+        if (chosenId === undefined || !player.hand.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const afterDiscard: PlayerState = {
+          ...player,
+          hand: player.hand.filter(id => id !== chosenId),
+          discard: [...player.discard, chosenId],
+        };
+        const actionsInDiscard = afterDiscard.discard.filter(id => cardDef(state, id)?.type === 'action');
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? afterDiscard : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Move one action card from your discard pile to your hand.',
+            options: [...actionsInDiscard, 'Decline'],
+            payload: { kind: 'leonActionFromDiscard' },
+          }],
+        };
+      }
+
+      if (kind === 'leonActionFromDiscard') {
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? {
+                ...player,
+                discard: player.discard.filter(id => id !== chosenId),
+                hand: [...player.hand, chosenId],
+              }
+            : s)),
+          prompts: newPrompts,
         };
       }
       if (kind === 'injectionDiscard') {

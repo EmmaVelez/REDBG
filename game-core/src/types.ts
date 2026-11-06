@@ -323,7 +323,15 @@ export type CharacterAbility =
   | { readonly kind: "exploreBonusIfAmmoAbove"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Chris Redfield (Outbreak) L2
   | { readonly kind: "turnStartActionIfHpAtMost"; readonly threshold: number; readonly level: 1 | 2 } // Ada Wong (Outbreak) L1
   | { readonly kind: "baseDamageBonusIfHpAtMost"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // HUNK (Outbreak) L2
-  | { readonly kind: "discardAnyForAmmo"; readonly amount: number; readonly level: 1 | 2 }; // Chris Redfield (Outbreak) L1
+  | { readonly kind: "discardAnyForAmmo"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Outbreak) L1
+  | { readonly kind: "turnStartDecreaseInfection"; readonly level: 1 | 2 } // Jill Valentine (Outbreak) L1
+  | { readonly kind: "immuneToInfectionAtLevelZero"; readonly level: 1 | 2 } // Jill Valentine (Outbreak) L2
+  | { readonly kind: "gainInfectionForGold"; readonly amount: number; readonly level: 1 | 2 } // Excella Gionne (Outbreak) L1
+  | { readonly kind: "turnStartCardsIfInfectionAtLeast"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Excella Gionne (Outbreak) L2
+  | { readonly kind: "turnStartDamageForExplore"; readonly amount: number; readonly level: 1 | 2 } // HUNK (Outbreak) L1
+  | { readonly kind: "turnStartRevealActionsForCards"; readonly level: 1 | 2 } // Ada Wong (Outbreak) L2
+  | { readonly kind: "moveHandCardToTopOfInventory"; readonly level: 1 | 2 } // Leon S. Kennedy (Outbreak) L1
+  | { readonly kind: "discardForActionFromDiscard"; readonly level: 1 | 2 }; // Leon S. Kennedy (Outbreak) L2
 
 
 // ---------------------------------------------------------------------------

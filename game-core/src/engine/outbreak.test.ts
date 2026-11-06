@@ -465,6 +465,108 @@ describe('Outbreak mode', () => {
     const weaponDamage = weaponInHand !== undefined ? (s.cardDefs[s.cards[weaponInHand]?.cardId ?? '']?.damage ?? 0) : 0;
     expect(s.seats[1]!.hp - atk.seats[1]!.hp).toBe(weaponDamage + 30);
   });
+  test('CH-025 Jill Valentine L1: turn start decreases her Infection Level', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-025#1', level: 1, infectionCards: ['in-001#1', 'in-001#2', 'in-001#3'] }
+        : x)),
+    })), ['ch-025#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(next.seats[0]!.infectionCards).toHaveLength(2);
+    // the face-up Infection goes to the bottom of the Infection Deck
+    expect(next.infectionDeck?.[next.infectionDeck.length - 1]).toBe('in-001#3');
+  });
+
+  test('CH-025 Jill Valentine L2: at Infection Level 0 she is immune to infection effects', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-025#1', level: 2, infectionCards: [] } : x)),
+    })), ['ch-025#1']);
+    const after = applyAction(s, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]!.infectionCards).toHaveLength(0);
+    const plain = outbreakState();
+    expect(applyAction(plain, { type: 'endTurn', seat: 0 }).seats[0]!.infectionCards).toHaveLength(1);
+  });
+
+  test('CH-026 Leon S. Kennedy L1: put a card from hand on top of the inventory', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-026#1', level: 1, hand: [...x.hand, 'we-004#1'] } : x)),
+    })), ['ch-026#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    expect(pr(used).payload?.kind).toBe('leonHandToInventoryTop');
+    const p = pr(used);
+    const moved = applyAction(used, { type: 'chooseOption', seat: 0, promptId: p.id, option: p.options.indexOf('we-004#1') });
+    expect(moved.seats[0]!.hand).not.toContain('we-004#1');
+    expect(moved.seats[0]!.inventory[0]).toBe('we-004#1');
+  });
+
+  test('CH-026 Leon S. Kennedy L2: discard a card, then move an action card from discard to hand', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-026#1', level: 2, hand: [...x.hand, 'we-004#1'], discard: ['ac-001#1'] }
+        : x)),
+    })), ['ch-026#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    expect(pr(used).payload?.kind).toBe('leonDiscardForAction');
+    const p = pr(used);
+    const discarded = applyAction(used, { type: 'chooseOption', seat: 0, promptId: p.id, option: p.options.indexOf('we-004#1') });
+    expect(pr(discarded).payload?.kind).toBe('leonActionFromDiscard');
+    const q = pr(discarded);
+    const moved = applyAction(discarded, { type: 'chooseOption', seat: 0, promptId: q.id, option: 0 });
+    expect(moved.seats[0]!.hand).toContain('ac-001#1');
+    expect(moved.seats[0]!.discard).not.toContain('ac-001#1');
+  });
+
+  test('CH-021 Excella Gionne L1: +1 Infection Level for +20 Gold', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-021#1', level: 1 } : x)),
+    })), ['ch-021#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    expect(used.seats[0]!.infectionCards).toHaveLength(1);
+    expect(used.seats[0]!.turnGold).toBe(20);
+  });
+
+  test('CH-021 Excella Gionne L2: +3 cards at Infection Level 8 or higher', () => {
+    const cards8 = ['in-001#1', 'in-001#2', 'in-001#3', 'in-001#4', 'in-001#5', 'in-002#1', 'in-002#2', 'in-002#3'];
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-021#1', level: 2, infectionCards: [...cards8] } : x)),
+    })), ['ch-021#1']);
+    const before = s.seats[0]!.hand.length;
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(next.seats[0]!.hand.length).toBe(before + 3);
+  });
+
+  test('CH-030 Hunk L1: take 10 Damage at turn start for +1 Explore', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-030#1', level: 1, hp: 90 } : x)),
+    })), ['ch-030#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(pr(next).payload?.kind).toBe('turnStartDamageForExplore');
+    const p = pr(next);
+    const accepted = applyAction(next, { type: 'chooseOption', seat: 0, promptId: p.id, option: 0 });
+    expect(accepted.seats[0]!.hp).toBe(80);
+    expect(accepted.seats[0]!.exploresLeft).toBe(2);
+  });
+
+  test('CH-027 Ada Wong L2: reveal action cards for +1 card each', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-027#1', level: 2, hand: [...x.hand, 'ac-001#1'] } : x)),
+    })), ['ch-027#1', 'ac-001#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(pr(next).payload?.kind).toBe('turnStartRevealActionsForCards');
+    const p = pr(next);
+    const first = applyAction(next, { type: 'chooseOption', seat: 0, promptId: p.id, option: p.options.indexOf('ac-001#1') });
+    const q = pr(first);
+    const done = applyAction(first, { type: 'chooseOption', seat: 0, promptId: q.id, option: q.options.indexOf('DONE') });
+    expect(done.seats[0]!.hand.length).toBe(s.seats[0]!.hand.length + 1);
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,

@@ -34,6 +34,7 @@ function turnStartAbilityPrompts(
 
   const prompts: Prompt[] = [];
   const l1Text = charDef.levels?.find(l => l.level === 1)?.text ?? charDef.text;
+  const l2Text = charDef.levels?.find(l => l.level === 2)?.text ?? charDef.text;
 
   if (abilities.some(a => a.kind === 'gainKnifeAtTurnStart')) {
     const options: string[] = [];
@@ -91,6 +92,30 @@ function turnStartAbilityPrompts(
       text: l1Text,
       options: ['Reveal my hand', 'Decline'],
       payload: { kind: 'revealHandTwoTypes' },
+    });
+  }
+
+  // HUNK (Outbreak) L1: take 10 Damage at the beginning of the turn for +1 Explore.
+  const hunkL1 = abilities.find(a => a.kind === 'turnStartDamageForExplore');
+  const hunkAmount = hunkL1?.kind === 'turnStartDamageForExplore' ? hunkL1.amount : 10;
+  if (hunkL1 !== undefined) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l1Text,
+      options: ['Take 10 Damage for +1 Explore', 'Decline'],
+      payload: { kind: 'turnStartDamageForExplore', amount: String(hunkAmount) },
+    });
+  }
+
+  // Ada Wong (Outbreak) L2: reveal any number of action cards for +1 card each.
+  if (abilities.some(a => a.kind === 'turnStartRevealActionsForCards') && player.hand.length > 0) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l2Text,
+      options: [...player.hand, 'DONE'],
+      payload: { kind: 'turnStartRevealActionsForCards', count: '0' },
     });
   }
 
@@ -649,6 +674,31 @@ export function startTurn(state: GameState): GameState {
     };
   }
 
+  // Outbreak turn-start effects.
+  // Jill Valentine (CH-025) L1: decrease her Infection Level by 1 (the
+  // face-up Infection goes to the bottom of the Infection Deck).
+  let turnInfectionDeck = state.infectionDeck ?? [];
+  if (
+    turnPlayer.infectionCards !== undefined && turnPlayer.infectionCards.length > 0 &&
+    abilitiesForLevel(charDef?.abilities, turnPlayer.level).some(a => a.kind === 'turnStartDecreaseInfection')
+  ) {
+    const removedInfection = turnPlayer.infectionCards[turnPlayer.infectionCards.length - 1] as string;
+    turnPlayer = { ...turnPlayer, infectionCards: turnPlayer.infectionCards.slice(0, -1) };
+    turnInfectionDeck = [...turnInfectionDeck, removedInfection];
+  }
+  // Excella Gionne (CH-021) L2: +3 cards at turn start at Infection Level 8+.
+  let excellaDraw = 0;
+  for (const a of abilitiesForLevel(charDef?.abilities, turnPlayer.level)) {
+    if (a.kind === 'turnStartCardsIfInfectionAtLeast' && (turnPlayer.infectionCards?.length ?? 0) >= a.threshold) {
+      excellaDraw += a.amount;
+    }
+  }
+  if (excellaDraw > 0) {
+    const d = drawWithReshuffle({ deck: turnPlayer.inventory, discard: turnPlayer.discard, count: excellaDraw, rngState: nextRng });
+    turnPlayer = { ...turnPlayer, hand: [...turnPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+    nextRng = d.rngState;
+  }
+
   // "At beginning of your turn, may ..." character abilities prompt here —
   // before anything else can be played (the prompt-immediate gate blocks
   // other actions while it is open).
@@ -661,6 +711,7 @@ export function startTurn(state: GameState): GameState {
     rngState: nextRng,
     seats: state.seats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
     prompts: abilityPrompts.length > 0 ? [...state.prompts, ...abilityPrompts] : state.prompts,
+    ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
   };
 }
 
