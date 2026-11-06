@@ -561,7 +561,11 @@ export function startTurn(state: GameState): GameState {
         ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldAtTurnStart') as { amount: number }).amount
         : 0),
     healedFirstTimeThisTurn: herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'),
-    actionsLeft: (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0),
+    actionsLeft: (() => {
+      const base = (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0);
+      // IN-001 Claw caps the Actions available next turn.
+      return player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
+    })(),
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
@@ -592,6 +596,8 @@ export function startTurn(state: GameState): GameState {
     chrisAmmoDiscountTypes: undefined,
     skipNextTurn: undefined,
     noActionsNextTurn: undefined,
+    actionsCapNextTurn: undefined,
+    cannotAttackSeatNextTurn: undefined,
     playArea: [],
   };
 

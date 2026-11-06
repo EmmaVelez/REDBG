@@ -260,9 +260,25 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       // Infected Characters cannot attack other Infected Characters.
       if (player.isInfectedCharacter === true && target.isInfectedCharacter === true) {
         return { ok: false, reason: 'attack: infected cannot attack infected' };
+      }      // IN-005 Drag: the attacked character cannot attack back next turn.
+      if (player.cannotAttackSeatNextTurn === action.targetSeat) {
+        return { ok: false, reason: 'attack: Drag prevents attacking back' };
       }
       if (player.isInfectedCharacter === true) {
+        // Only Infected Characters may use Infection cards, and only from hand.
+        for (const iid of action.infectionCardIds ?? []) {
+          const idef = cardDef(state, iid);
+          if (idef === undefined || !idef.id.startsWith('in-')) {
+            return { ok: false, reason: 'attack: not an infection card' };
+          }
+          if (!player.hand.includes(iid)) {
+            return { ok: false, reason: 'attack: infection card not in hand' };
+          }
+        }
         return { ok: true };
+      }
+      if ((action.infectionCardIds ?? []).length > 0) {
+        return { ok: false, reason: 'attack: only infected characters use infections' };
       }
       const attackWeaponId = action.weaponInstanceId
         ?? player.hand.find(id => cardDef(state, id)?.type === 'weapon');

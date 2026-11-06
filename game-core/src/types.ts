@@ -238,7 +238,15 @@ export type ActionEffect =
   | { readonly kind: "higherPriorities" } // AC-028
   | { readonly kind: "returnedFavor" } // AC-030
   | { readonly kind: "partingWays" } // AC-029
-  | { readonly kind: "gatheringDarkness" }; // AC-031
+  | { readonly kind: "gatheringDarkness" } // AC-031
+  // --- Outbreak infection cards (IN-001..IN-007) ---
+  | { readonly kind: "infectionActionsNextTurn"; readonly actions: number } // IN-001 Claw
+  | { readonly kind: "virulentFrenzy" } // IN-002
+  | { readonly kind: "bileVomit" } // IN-003
+  | { readonly kind: "sloughArmor"; readonly amount: number } // IN-004 (reactive)
+  | { readonly kind: "drag" } // IN-005
+  | { readonly kind: "devour"; readonly heal: number } // IN-006
+  | { readonly kind: "infectionIncrease"; readonly amount: number }; // IN-007
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -417,6 +425,10 @@ export interface PlayerState {
   /** Outbreak: the Character died of the Infection and will reanimate as an
    *  Infected Character when its next turn comes around. */
   readonly pendingReanimate?: boolean;
+  /** Outbreak IN-001 Claw: cap on Actions next turn (default 1). */
+  readonly actionsCapNextTurn?: number;
+  /** Outbreak IN-005 Drag: this seat may not Attack the named seat next turn. */
+  readonly cannotAttackSeatNextTurn?: number;
   /** Outbreak: this seat Explored the Mansion or Attacked an Infected
    *  Character this turn (suppresses the end-of-turn Infection increase). */
   readonly exploredOrAttackedThisTurn?: boolean;
@@ -523,7 +535,7 @@ export type Action =
    *  revealing the Mansion). Non-Infected attackers must name a weapon.
    *  Infected attackers deal their base Damage.
    */
-  | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string }
+  | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string; readonly infectionCardIds?: readonly string[] }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }

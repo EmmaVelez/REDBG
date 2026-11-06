@@ -334,6 +334,69 @@ describe('Outbreak mode', () => {
     // Ammo x30 provides 30 ammo -> three Ammo x10
     expect(done.seats[1]!.hand.filter(id => id.includes('#g') && done.cards[id]?.cardId === 'am-001')).toHaveLength(3);
   });
+  // --- infection cards ---
+  test('IN-001 Claw: 10 damage and the target is limited to one Action next turn', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, isInfectedCharacter: true, characterInstanceId: 'ch-031#1', hp: 140, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-001#1'] }
+        : x)),
+    })), ['ch-031#1', 'in-001#1']);
+    const before = s.seats[1]!.hp;
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-001#1'] });
+    expect(atk.seats[1]!.hp).toBe(before - 10);
+    expect(atk.seats[1]!.actionsCapNextTurn).toBe(1);
+    const next = startTurn({ ...atk, activeSeat: 1 });
+    expect(next.seats[1]!.actionsLeft).toBe(1);
+    expect(next.seats[1]!.actionsCapNextTurn).toBeUndefined();
+  });
+
+  test('IN-006 Devour: 5 damage and heals the infected character', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, isInfectedCharacter: true, characterInstanceId: 'ch-031#1', hp: 100, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-006#1'] }
+        : x)),
+    })), ['ch-031#1', 'in-006#1']);
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-006#1'] });
+    expect(atk.seats[1]!.hp).toBe(s.seats[1]!.hp - 5);
+    expect(atk.seats[0]!.hp).toBe(120);
+  });
+
+  test('IN-007 Infection: the target gains 1 Infection Level', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, isInfectedCharacter: true, characterInstanceId: 'ch-031#1', hp: 140, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-007#1'] }
+        : x)),
+    })), ['ch-031#1', 'in-007#1']);
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-007#1'] });
+    expect(atk.seats[1]!.infectionCards).toHaveLength(1);
+    expect(atk.infectionDeck).toHaveLength(39);
+  });
+
+  test('IN-005 Drag: the attacked character cannot attack back next turn', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, isInfectedCharacter: true, characterInstanceId: 'ch-031#1', hp: 140, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-005#1'] }
+        : x)),
+    })), ['ch-031#1', 'in-005#1']);
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-005#1'] });
+    expect(atk.seats[1]!.cannotAttackSeatNextTurn).toBe(0);
+  });
+
+  test('IN-003 Bile Vomit: 5 damage plus 5 per other Bile Vomit used', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, isInfectedCharacter: true, characterInstanceId: 'ch-031#1', hp: 140, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-003#1', 'in-003#2'] }
+        : x)),
+    })), ['ch-031#1', 'in-003#1', 'in-003#2']);
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-003#1', 'in-003#2'] });
+    // 5 + 5 for each card, plus 5 per other Bile Vomit: 5+5 + 5+5 = 20
+    expect(atk.seats[1]!.hp).toBe(s.seats[1]!.hp - 20);
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,

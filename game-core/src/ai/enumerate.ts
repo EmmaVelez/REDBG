@@ -97,6 +97,11 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       if (infectedAttacker && target.isInfectedCharacter === true) continue;
       if (infectedAttacker) {
         generatedActions.push({ type: 'attack', seat, targetSeat: t });
+        // Infected attackers may also play any infection cards from hand.
+        const handInfections = player.hand.filter(id => state.cards[id]?.cardId.startsWith('in-'));
+        for (const iid of handInfections) {
+          generatedActions.push({ type: 'attack', seat, targetSeat: t, infectionCardIds: [iid] });
+        }
       } else {
         for (const wId of weaponsAvailable) {
           const cd = state.cardDefs[state.cards[wId]?.cardId ?? ''];

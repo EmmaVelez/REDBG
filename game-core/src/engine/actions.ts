@@ -1765,8 +1765,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           let turnAmmoAfter = player.turnAmmo;
 
           if (infectedAttacker) {
-            // Infected Characters deal their base Damage (Zombie A/B/C: 0/5/10).
+            // Infected Characters deal their base Damage (Zombie A/B/C: 0/5/10)
+            // plus any Infection cards they use.
             damage = attackerDef?.baseDamage ?? 0;
+            const infectionIds = action.infectionCardIds ?? [];
+            const bileUsed = infectionIds.filter(id => state.cards[id]?.cardId === 'in-003').length;
+            for (const iid of infectionIds) {
+              const idef = cardDef(state, iid);
+              if (idef === undefined) {
+                throw new Error('applyAction: attack: unknown infection card');
+              }
+              damage += idef.damage ?? 0;
+              if (idef.id === 'in-003') damage += 5 * Math.max(bileUsed - 1, 0);
+            }
+            newHand = player.hand.filter(id => !infectionIds.includes(id));
+            newDiscard = [...newDiscard, ...infectionIds];
           } else {
             const wId = weaponInstanceId ?? player.hand.find(id => cardDef(state, id)?.type === 'weapon');
             if (wId === undefined) {
@@ -1792,7 +1805,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           const targetDef = cardDef(state, target.characterInstanceId);
           const targetSurvives = target.hp - damage > 0;
-          const newTarget: PlayerState = { ...target, hp: target.hp - damage };
+          // Outbreak infection-card effects.
+          let infectionDeckAfter = state.infectionDeck ?? [];
+          let healSelf = 0;
+          let targetInfectionCards = [...(target.infectionCards ?? [])];
+          const targetFlags: { actionsCapNextTurn?: number; cannotAttackSeatNextTurn?: number } = {};
+          for (const iid of action.infectionCardIds ?? []) {
+            const idef = cardDef(state, iid);
+            for (const e of idef?.actionEffects ?? []) {
+              if (e.kind === 'infectionActionsNextTurn') targetFlags.actionsCapNextTurn = e.actions;
+              else if (e.kind === 'drag') targetFlags.cannotAttackSeatNextTurn = seat;
+              else if (e.kind === 'devour') healSelf += e.heal;
+              else if (e.kind === 'infectionIncrease') {
+                for (let i = 0; i < e.amount && infectionDeckAfter.length > 0; i++) {
+                  targetInfectionCards.push(infectionDeckAfter[0] as string);
+                  infectionDeckAfter = infectionDeckAfter.slice(1);
+                }
+              }
+            }
+          }
+          const newTarget: PlayerState = {
+            ...target,
+            hp: target.hp - damage,
+            infectionCards: targetInfectionCards,
+            ...targetFlags,
+          };
           let finalPlayer: PlayerState = {
             ...player,
             hand: newHand,
@@ -1800,6 +1837,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             discard: newDiscard,
             turnAmmo: turnAmmoAfter,
             exploresLeft: player.exploresLeft - 1,
+            ...(healSelf > 0 ? { hp: Math.min(player.hp + healSelf, player.maxHp) } : {}),
           };
           // An Infected Character that survives deals its base Damage back.
           if (targetSurvives && target.isInfectedCharacter === true) {
@@ -1813,6 +1851,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (s.seat === targetSeat) return newTarget;
               return s;
             }),
+            ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckAfter } : {}),
           };
         }
 
