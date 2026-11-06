@@ -709,6 +709,13 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 80%;
   text-align: center;
 }
+.mansion-door-card .card .card-top,
+.mansion-door-card .card .card-name,
+.mansion-door-card .card .card-stats,
+.mansion-door-card .card .card-bonus,
+.mansion-door-card .card .card-text {
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+}
 .mansion-door-card .card .card-name,
 .mansion-door-card .card .card-stats,
 .mansion-door-card .card .card-bonus,
@@ -716,6 +723,11 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 9px;
   line-height: 1.1;
   text-align: center;
+}
+.mansion-door-card .health-ring {
+  position: absolute;
+  top: 4%;
+  right: 4%;
 }
 .btn-primary {
   background: linear-gradient(180deg, #d8282f 0%, #8f1419 100%);

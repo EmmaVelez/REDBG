@@ -63,7 +63,7 @@ export function CardView({ def, compact = false, decorations, hp, maxHp, hideCos
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
         {def.type === 'infected' && def.hp !== undefined && (
-          <HealthRing hp={def.hp} maxHp={def.hp} size={36} />
+          <HealthRing hp={def.hp} maxHp={def.hp} size={27} />
         )}
         {!hideCost && <span className="card-cost" data-card-cost>{costText(def)}</span>}
       </div>
