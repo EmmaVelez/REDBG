@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { CardDef } from '@re/game-core';
 import { CardView } from './CardView';
+import { HealthRing } from './HealthRing';
 
 /**
  * Mansion-door reveal: shown after the owner explores and the fight resolves,
@@ -40,6 +41,14 @@ export function MansionReveal({ def, resultText, damage, weapons, onContinue }: 
         )}
         <div className="mansion-door-card">
           <CardView def={def} hideCost />
+          {isInfected && def.hp !== undefined && (
+            <span className="mansion-door-hp-ring">
+              <HealthRing hp={def.hp} maxHp={def.hp} size={40} strokeWidth={5} />
+            </span>
+          )}
+          {isInfected && def.attack !== undefined && (
+            <span className="mansion-door-atk" data-reveal-atk>{def.attack}</span>
+          )}
         </div>
         <span className="mansion-door-result">{resultText}</span>
         <button type="button" className="mansion-door-continue btn-primary" onClick={onContinue}>

@@ -1273,3 +1273,30 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 12px;
 }
 .explore-picker-actions { display: flex; gap: 6px; }
+
+.mansion-door-hp-ring {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mansion-door-atk {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  z-index: 2;
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
+}
+.mansion-door-card .card-text {
+  text-align: center;
+  position: absolute;
+  top: 80%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 88%;
+}
