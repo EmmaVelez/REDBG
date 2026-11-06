@@ -286,3 +286,16 @@ export function trashCardFromDiscardOnInfectedDefeat(abilities: readonly Charact
 export function discardActionCardFromHandForPlusTwoCards(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'discardActionCardFromHandForPlusTwoCards');
 }
+/**
+ * Ada (Nightmare CH-043) L1: during your turn, if she takes damage, you get
+ * +2 cards. `isSelfTurn` is false when the damaged seat is not the active
+ * player (e.g. an opponent's AoE reveal effect), which never triggers this.
+ */
+export function cardsOnDamageTakenDuringTurn(abilities: readonly CharacterAbility[], isSelfTurn: boolean): number {
+  if (!isSelfTurn) return 0;
+  let draw = 0;
+  for (const a of abilities) {
+    if (a.kind === 'cardsOnDamageTakenDuringTurn') draw += a.amount;
+  }
+  return draw;
+}

@@ -8,6 +8,7 @@ import {
   ammunitionCardBonus,
   explosivesGoToDiscard,
   knifeWeaponsUsedThisTurn,
+  cardsOnDamageTakenDuringTurn,
 } from './abilities';
 import { exploreDamage , resolveExplore } from './explore';
 import { applyAction } from './actions';
@@ -878,5 +879,14 @@ describe('Survival Knife (we-005): +5 per other Knife used this turn', () => {
     });
     // 10 + 5 + 5 (one other knife) = 20 >= hp 20 -> defeated
     expect(outcome.kind).toBe('defeated');
+  });
+});
+
+describe('cardsOnDamageTakenDuringTurn (Nightmare Ada L1)', () => {
+  it('draws the amount only during the seat’s own turn', () => {
+    const abilities: readonly CharacterAbility[] = [{ kind: 'cardsOnDamageTakenDuringTurn', amount: 2, level: 1 }];
+    expect(cardsOnDamageTakenDuringTurn(abilities, true)).toBe(2);
+    expect(cardsOnDamageTakenDuringTurn(abilities, false)).toBe(0);
+    expect(cardsOnDamageTakenDuringTurn([], true)).toBe(0);
   });
 });

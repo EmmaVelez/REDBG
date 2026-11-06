@@ -40,6 +40,7 @@ const DEFS: Record<string, CardDef> = {
   'ch-sheva': { id: 'ch-sheva', name: 'Sheva', type: 'character', set: 'premier', text: 'Sheva', copies: 1, maxHp: 80, level1At: 2, level2At: 4, abilities: [{ kind: 'exchangeHandWithInventoryTop', level: 1 }, { kind: 'ammoReqReduction', tag: 'rifle', amount: 20, level: 2 }] },
   'ch-barry': { id: 'ch-barry', name: 'Barry', type: 'character', set: 'premier', text: 'Barry', copies: 1, maxHp: 90, level1At: 2, level2At: 7, abilities: [{ kind: 'plusDamageThisTurn', amount: 5, level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'magnum', amount: 20, level: 2 }] },
   'ch-ada': { id: 'ch-ada', name: 'Ada', type: 'character', set: 'premier', text: 'Ada', copies: 1, maxHp: 80, level1At: 4, level2At: 8, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'actionBonus', amount: 40, level: 2 }] },
+  'ch-ada-n': { id: 'ch-ada-n', name: 'Ada (Nightmare)', type: 'character', set: 'nightmare', text: 'Ada (Nightmare)', copies: 1, maxHp: 70, level1At: 1, level2At: 10, abilities: [{ kind: 'cardsOnDamageTakenDuringTurn', amount: 2, level: 1 }] },
   'ch-becky': { id: 'ch-becky', name: 'Rebecca', type: 'character', set: 'premier', text: 'Rebecca', copies: 1, maxHp: 70, level1At: 2, level2At: 4, abilities: [{ kind: 'generic', level: 1 }, { kind: 'trashFromHandAtWill', level: 2 }] },
 };
 
@@ -59,7 +60,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -224,6 +225,28 @@ test('explore not defeated', () => {
   expect(s.mansionBottom).toEqual(['inf1']);
   expect(p0(s).attached).toEqual([]);
   expect(p0(s).decorations).toBe(0);
+});
+test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cada', level: 1 as const, hand: ['w5'], inventory: ['inv1', 'inv2', 'inv3', 'inv4', 'inv5', 'inv6', 'inv7', 'inv8'] } });
+  const s = applyAction(base, { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(s).hp).toBe(80);            // 100 - 20 attack from the Majini
+  expect(p0(s).hand.length).toBe(2);    // +2 drawn by the ability
+  expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
+});
+
+test('Nightmare Ada L1: no draw when the damage downs her', () => {
+  const s = applyAction(baseState({ seat0: { characterInstanceId: 'cada', level: 1 as const, hp: 10, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(s).hp).toBe(0);
+  expect(p0(s).downed).toBe(true);
+  expect(p0(s).hand.length).toBe(0); // downed characters have no hand; no cards lost at revive
+});
+test('Nightmare Ada L1: no draw at level 0 (ability locked) or without the ability', () => {
+  const locked = applyAction(baseState({ seat0: { characterInstanceId: 'cada', level: 0 as const, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(locked.seats[0]?.hp).toBe(80);
+  expect(p0(locked).hand.length).toBe(0);
+  const plain = applyAction(baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
+  expect(p0(plain).hp).toBe(80);
+  expect(p0(plain).hand.length).toBe(0);
 });
 
 test('explore downed', () => {

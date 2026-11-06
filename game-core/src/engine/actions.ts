@@ -6,6 +6,7 @@ import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
   characterAbilities,
+  cardsOnDamageTakenDuringTurn,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -112,7 +113,47 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number
       return { player: nextPlayer, rngState: nextRng };
     }
 
+/**
+ * Applies one validated action, then runs the damage-taken character hooks.
+ *
+ * Ada (Nightmare CH-043) L1 - "During your turn, if Ada takes damage, you get
+ * +2 cards" - is implemented here as a post-action pass instead of being
+ * sprinkled through each individual damage site: damage reaches a seat from
+ * many places (explore reveal, reveal-time infected effects, event cards,
+ * action effects), and the card only cares that the seat took damage while it
+ * was that seat's turn. One choke point covers every source and cannot drift
+ * out of sync when a new damage source is added.
+ */
 export function applyAction(state: GameState, action: Action): GameState {
+  return applyDamageTakenHooks(state, applyActionInternal(state, action));
+}
+
+function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
+  let state = next;
+  for (let i = 0; i < state.seats.length; i++) {
+    const seat = state.seats[i];
+    const before = prev.seats[i];
+    if (seat === undefined || before === undefined) continue;
+    if (seat.hp >= before.hp) continue;          // no damage this action
+    if (seat.seat !== state.activeSeat) continue; // only "during your turn"
+    // A downed character has no hand (revive redraws one); drawing here would
+    // silently drop the cards at revive, so the trigger is skipped instead.
+    if (seat.downed || seat.dead) continue;
+    const draw = cardsOnDamageTakenDuringTurn(characterAbilities(prev, seat.seat), true);
+    if (draw <= 0) continue;
+    const d = drawWithReshuffle({ deck: seat.inventory, discard: seat.discard, count: draw, rngState: state.rngState });
+    state = {
+      ...state,
+      rngState: d.rngState,
+      seats: state.seats.map(s => (s.seat === seat.seat
+        ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+        : s)),
+    };
+  }
+  return state;
+}
+
+function applyActionInternal(state: GameState, action: Action): GameState {
   if (action.type === 'startGame') {
     throw new Error('applyAction: startGame handled by game.ts setup');
   }
