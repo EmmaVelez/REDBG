@@ -1,4 +1,4 @@
-import type { GameState, Action, PlayerState, CardDef, WeaponEffect } from '../types';
+import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, sendToBottom, shuffleBack } from './mansion';
@@ -40,7 +40,7 @@ import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
 import { makeRng, shuffle } from '../util/rng';
 
-import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount } from './skill';
+import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard } from './skill';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -3223,14 +3223,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
 
       if (kind === 'healGreenHerb') {
+              // SK-004 Medic LV.1: +10 to any heal; SK-005 Medic LV.2: may trash
+              // 1 discard card when healing.
+              const healEffects = activeSkillEffects(state, seat);
+              const healBonus = skillHealAmountBonus(healEffects);
+              const withHealPrompts = (base: readonly Prompt[]): readonly Prompt[] => {
+                if (!skillHealTrashFromDiscard(healEffects) || player.discard.length === 0) return base;
+                return [...base, {
+                  id: `skill-heal-trash-${seat}-v${nextBase.version}`,
+                  seat,
+                  text: 'Medic LV.2: Trash 1 card from your Discard Pile.',
+                  options: [...player.discard, 'Decline'],
+                  payload: { kind: 'skillHealTrashFromDiscard' },
+                }];
+              };
               if (option === 0) {
                 return {
                   ...state,
                   ...nextBase,
                   seats: state.seats.map(s =>
-                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20, player.maxHp) } : s,
+                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp) } : s,
                   ),
-                  prompts: newPrompts,
+                  prompts: withHealPrompts(newPrompts),
                 };
               }
               // option === 1: Heal 60 requires a second Green Herb in hand; both
@@ -3241,9 +3255,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   ...state,
                   ...nextBase,
                   seats: state.seats.map(s =>
-                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20, player.maxHp) } : s,
+                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp) } : s,
                   ),
-                  prompts: newPrompts,
+                  prompts: withHealPrompts(newPrompts),
                 };
               }
               return {
@@ -3253,15 +3267,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   s.seat === seat
                     ? {
                         ...player,
-                        hp: Math.min(player.hp + 60, player.maxHp),
+                        hp: Math.min(player.hp + 60 + healBonus, player.maxHp),
                         hand: player.hand.filter(id => id !== otherHerb),
                       }
                     : s,
                 ),
                 removed: [...state.removed, otherHerb],
-                prompts: newPrompts,
+                prompts: withHealPrompts(newPrompts),
               };
             }
+
+      if (kind === 'skillHealTrashFromDiscard' && chosenId !== undefined && chosenId !== 'Decline') {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, discard: player.discard.filter(id => id !== chosenId) } : s)),
+          removed: [...state.removed, chosenId],
+          prompts: newPrompts,
+        };
+      }
 
       if (kind === 'takeOrBottom') {
               const instanceId = prompt.payload?.instanceId as string | undefined;
