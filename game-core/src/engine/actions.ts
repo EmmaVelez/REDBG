@@ -150,6 +150,9 @@ export function applyAction(state: GameState, action: Action): GameState {
                 weaponDamageBonusThisTurn += e.amount;
               }
             }
+            if (def.id === 'ac-023') {
+              weaponDamageBonusThisTurn += 20;
+            }
             // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the partner (if any) on play.
             let partnerAttached = played.player.partnerAttached ?? [];
             if ((def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020') && player.partnerInstanceId && partnerAttached.length < 2) {
@@ -162,8 +165,20 @@ export function applyAction(state: GameState, action: Action): GameState {
               newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
               ac015Rng = d.rngState;
             }
+            if (def.id === 'ac-024') {
+              const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 1, rngState: ac015Rng });
+              newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard, actionsLeft: newPlayer.actionsLeft + 1 };
+              ac015Rng = d.rngState;
+            }
+            if (def.id === 'ac-025') {
+              const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 2, rngState: ac015Rng });
+              newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+              ac015Rng = d.rngState;
+            }
+            if (def.id === 'ac-026') {
+              newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + 1 };
+            }
             if (def.id === 'ac-019' && newPlayer.hand.length > 0) {
-              // draw 1 immediately; trash choice handled via trashHandCard prompt
               const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 1, rngState: ac015Rng });
               newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
               ac015Rng = d.rngState;
@@ -200,6 +215,14 @@ export function applyAction(state: GameState, action: Action): GameState {
                   promptOptions = ['OK'];
                   break;
                 }
+        if (e.kind === 'weskersSecret') {
+          const top4 = state.mansionDeck.slice(0, 4);
+          if (top4.length > 0) {
+            promptKind = 'weskersSecretMansion';
+            promptOptions = [...top4, 'Decline'];
+          }
+          break;
+        }
                 if (e.kind === 'trashUpToTwoFromDiscard') {
                                   // Up to 2 choices: offer the whole discard, DONE ends the chain.
                                   if (player.discard.length > 0) {
@@ -542,9 +565,13 @@ export function applyAction(state: GameState, action: Action): GameState {
             }
           }
           const playAreaAfter = [...player.playArea, ...playedWeaponIds];
+          const toTrashAfterUse = weapons.filter(id => {
+            const def = cardDef(state, id);
+            return def?.weaponEffects?.some(e => e.kind === 'trashAfterUse');
+          });
           const removedAfter = toDiscardExplosives
             ? state.removed
-            : [...state.removed, ...explosiveIds];
+            : [...state.removed, ...explosiveIds, ...toTrashAfterUse];
           const discardAfterExplosives = toDiscardExplosives
             ? [...player.discard, ...explosiveIds]
             : player.discard;
@@ -597,7 +624,7 @@ export function applyAction(state: GameState, action: Action): GameState {
             const isX = w?.xAmmo === true;
             const assigned = isX ? Math.min(ammoByWeapon?.[instId ?? ''] ?? 0, w?.ammoCap ?? 999) : 0;
             return {
-              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0)),
+              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0)),
               ammoReq: isGatling ? 0 : isX ? assigned : ammoReqForWeapon(abilities, w),
               weaponEffects: w?.weaponEffects,
               tags: w?.weaponTags,
@@ -1320,6 +1347,15 @@ export function applyAction(state: GameState, action: Action): GameState {
       const kind = prompt.payload?.kind;
       const chosenId = prompt.options[option];
 
+      if (kind === 'weskersSecretMansion' && chosenId !== undefined) {
+        const top4 = state.mansionDeck.slice(0, 4);
+        const rest = state.mansionDeck.slice(4);
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, mansionDeck: [...rest, ...top4], prompts: newPrompts };
+        }
+        const remaining = top4.filter(id => id !== chosenId);
+        return { ...state, ...nextBase, mansionDeck: [chosenId, ...rest, ...remaining], prompts: newPrompts };
+      }
       if (kind === 'recoverWeaponFromDiscardToHand' && chosenId !== undefined) {
         if (chosenId === 'Decline') {
           return { ...state, ...nextBase, prompts: newPrompts };

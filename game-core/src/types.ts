@@ -64,7 +64,7 @@ export interface CardDef {
   readonly id: string;
   readonly name: string;
   readonly type: CardType;
-  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare';
+  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare' | 'outbreak';
   /** Human-readable rules text (for UI + reference). */
   readonly text: string;
   /** Copies of this card in the game (used when building piles). */
@@ -146,7 +146,12 @@ export type WeaponEffect =
   | { readonly kind: "gainGoldThisTurn"; readonly amount: number } // Machine Pistol
   | { readonly kind: "plusDamagePerWeaponTagInDiscard"; readonly tag: WeaponTag; readonly amount: number } // Gangster's Machine Gun
   | { readonly kind: "grantExploreAndSuppressLowHpInfected"; readonly hpThreshold: number; readonly trashAfterUse: boolean } // Flashbang
-  | { readonly kind: "plusDamagePerInfectedBattled"; readonly amount: number }; // Incendiary Grenade
+  | { readonly kind: "plusDamagePerInfectedBattled"; readonly amount: number } // Incendiary Grenade
+  | { readonly kind: "plusDamagePerNonItemGainedThisTurn"; readonly amount: number } // WE-026 Standard Sidearm
+  | { readonly kind: "plusDamagePerCardGainedThisTurn"; readonly amount: number } // WE-027 Samurai Edge
+  | { readonly kind: "moveLowHpInfectedToMansionTop"; readonly hpThreshold: number } // WE-028 Stun Rod
+  | { readonly kind: "plusDamageIfNightTime"; readonly amount: number }
+  | { readonly kind: "trashAfterUse" }; // WE-031 Night Scope Rocket Launcher
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -213,7 +218,13 @@ export type ActionEffect =
   | { readonly kind: "damagePerAdditionalAction"; readonly amount: number }
   | { readonly kind: "attachToCharacter" }
   | { readonly kind: "beginTurnTrashIfHealthAtMost"; readonly threshold: number }
-  | { readonly kind: "elseDamageAndDraw"; readonly damage: number; readonly cards: number };
+  | { readonly kind: "elseDamageAndDraw"; readonly damage: number; readonly cards: number }
+  | { readonly kind: "powerOfTVirus" } // AC-023
+  | { readonly kind: "iHaveThis" } // AC-024
+  | { readonly kind: "weskersSecret" } // AC-025
+  | { readonly kind: "injection" } // AC-026
+  | { readonly kind: "byAnyMeansNecessary" } // AC-027
+  | { readonly kind: "higherPriorities" }; // AC-028
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -361,6 +372,8 @@ export interface PlayerState {
   readonly hand: readonly string[];
   readonly discard: readonly string[];
   readonly playArea: readonly string[];
+  /** Instance ids of cards gained this turn (for WE-026 etc.). */
+  readonly gainedThisTurn?: readonly string[];
 
   /** Face-down (recovering): revives on own turn with -20 maxHp, skips it. */
   readonly downed: boolean;

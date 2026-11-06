@@ -47,6 +47,7 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     else if (dest === 'discard') newPlayer = { ...newPlayer, discard: [...newPlayer.discard, gainedId] };
     else if (dest === 'topInventory') newPlayer = { ...newPlayer, inventory: [gainedId, ...newPlayer.inventory] };
     else newPlayer = { ...newPlayer, inventory: [...newPlayer.inventory, gainedId] };
+    newPlayer = { ...newPlayer, gainedThisTurn: [...(newPlayer.gainedThisTurn ?? []), gainedId] };
   }
 
   s = {
