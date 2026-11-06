@@ -1563,6 +1563,63 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'gainSpecificWeaponIntoInventory': {
+              // Kevin Ryman (Outbreak) L1: shuffle a Samurai Edge from the
+              // Resource Area (or from outside the game) into the Inventory.
+              const cardId = (characterAbilities(state, seat).find(a => a.kind === 'gainSpecificWeaponIntoInventory') as { cardId: string } | undefined)?.cardId ?? 'we-027';
+              let gainedId = '';
+              const piles = { ...state.marketPiles };
+              for (const pile of Object.values(piles)) {
+                const top = pile.cards[0];
+                if (top !== undefined && state.cards[top]?.cardId === cardId) {
+                  gainedId = top;
+                  piles[pile.pileId] = { ...pile, cards: pile.cards.slice(1) };
+                  break;
+                }
+              }
+              let cards = state.cards;
+              if (gainedId === '') {
+                gainedId = `${cardId}#k${state.version}-${seat}`;
+                cards = { ...state.cards, [gainedId]: { instanceId: gainedId, cardId, location: { zone: 'inventory', index: 0, seat } } };
+              }
+              const mixed = shuffle(makeRng(state.rngState), [...player.inventory, gainedId]);
+              return {
+                ...state,
+                ...nextBase,
+                rngState: mixed.rng.s,
+                marketPiles: piles,
+                cards,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...player, inventory: mixed.value }
+                  : s)),
+              };
+            }
+            case 'movePlayAreaWeaponToInventoryTop': {
+              // Kevin Ryman (Outbreak) L2: move a Pistol from the Play Area to
+              // the top of the Inventory.
+              const tag = (characterAbilities(state, seat).find(a => a.kind === 'movePlayAreaWeaponToInventoryTop') as { tag: string } | undefined)?.tag ?? 'pistol';
+              const candidates = player.playArea.filter(id => {
+                const d = cardDef(state, id);
+                return d?.type === 'weapon' && (d.weaponTags ?? []).includes(tag as never);
+              });
+              if (candidates.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Move one Pistol weapon in your Play Area to the top of your Inventory.',
+                    options: candidates,
+                    payload: { kind: 'kevinPistolToInventoryTop' },
+                  },
+                ],
+              };
+            }
             case 'exchangeBuyForAction': {
               // Ada L2: spend the Buy for an extra Action.
               return {
@@ -2303,6 +2360,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             options: [...remaining, 'DONE'],
             payload: { kind: 'discardAnyForAmmo', count: String(count + 1), amount: String(prompt.payload?.amount ?? '0') },
           }],
+        };
+      }
+      if (kind === 'kevinPistolToInventoryTop') {
+        if (chosenId === undefined || !player.playArea.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? {
+                ...player,
+                playArea: player.playArea.filter(id => id !== chosenId),
+                inventory: [chosenId, ...player.inventory],
+              }
+            : s)),
+          prompts: newPrompts,
         };
       }
       if (kind === 'turnStartDamageForExplore') {

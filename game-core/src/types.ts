@@ -331,7 +331,9 @@ export type CharacterAbility =
   | { readonly kind: "turnStartDamageForExplore"; readonly amount: number; readonly level: 1 | 2 } // HUNK (Outbreak) L1
   | { readonly kind: "turnStartRevealActionsForCards"; readonly level: 1 | 2 } // Ada Wong (Outbreak) L2
   | { readonly kind: "moveHandCardToTopOfInventory"; readonly level: 1 | 2 } // Leon S. Kennedy (Outbreak) L1
-  | { readonly kind: "discardForActionFromDiscard"; readonly level: 1 | 2 }; // Leon S. Kennedy (Outbreak) L2
+  | { readonly kind: "discardForActionFromDiscard"; readonly level: 1 | 2 } // Leon S. Kennedy (Outbreak) L2
+  | { readonly kind: "gainSpecificWeaponIntoInventory"; readonly cardId: string; readonly level: 1 | 2 } // Kevin Ryman (Outbreak) L1
+  | { readonly kind: "movePlayAreaWeaponToInventoryTop"; readonly tag: string; readonly level: 1 | 2 }; // Kevin Ryman (Outbreak) L2
 
 
 // ---------------------------------------------------------------------------

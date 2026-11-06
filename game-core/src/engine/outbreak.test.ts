@@ -567,6 +567,29 @@ describe('Outbreak mode', () => {
     const done = applyAction(first, { type: 'chooseOption', seat: 0, promptId: q.id, option: q.options.indexOf('DONE') });
     expect(done.seats[0]!.hand.length).toBe(s.seats[0]!.hand.length + 1);
   });
+  test('CH-022 Kevin Ryman L1: shuffle a Samurai Edge into the inventory', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-022#1', level: 1 } : x)),
+    })), ['ch-022#1']);
+    const before = s.seats[0]!.inventory.length;
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    expect(used.seats[0]!.inventory.length).toBe(before + 1);
+    expect(used.seats[0]!.inventory.some(id => used.cards[id]?.cardId === 'we-027')).toBe(true);
+  });
+
+  test('CH-022 Kevin Ryman L2: move a Pistol from the Play Area to the top of the inventory', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-022#1', level: 2, playArea: [...x.playArea, 'we-009#1'] } : x)),
+    })), ['ch-022#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    expect(pr(used).payload?.kind).toBe('kevinPistolToInventoryTop');
+    const p = pr(used);
+    const moved = applyAction(used, { type: 'chooseOption', seat: 0, promptId: p.id, option: 0 });
+    expect(moved.seats[0]!.playArea).not.toContain('we-009#1');
+    expect(moved.seats[0]!.inventory[0]).toBe('we-009#1');
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,
