@@ -60,7 +60,8 @@ export function requiredAmmoForWeapons(
 export function passiveDamageBonus(
   abilities: readonly CharacterAbility[],
   weaponDefs: readonly (CardDef | undefined)[],
-  infectedFought: number
+  infectedFought: number,
+  handCount: number = 0
 ): number {
   let bonus = 0;
   for (const ability of abilities) {
@@ -80,6 +81,9 @@ export function passiveDamageBonus(
     }
     if (ability.kind === 'weaponPlusDamagePerInfectedFought') {
       bonus += ability.amount * Math.max(infectedFought, 0);
+    }
+    if (ability.kind === 'plusDamagePerCardInHand') {
+      bonus += ability.amount * Math.max(handCount, 0);
     }
     if (ability.kind === 'differentWeaponTypesDamageBonus') {
       const tags = new Set<string>();

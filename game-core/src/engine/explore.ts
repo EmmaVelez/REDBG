@@ -105,7 +105,7 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     tags: def?.weaponTags,
   }));
   const abilityDamage =
-    passiveDamageBonus(abilities, defs, 1) +
+    passiveDamageBonus(abilities, defs, 1, player.hand.length) +
     exploreBigHandBonus(abilities, state.seats) +
     exploreActionsBonus(
       abilities,

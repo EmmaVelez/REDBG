@@ -678,7 +678,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
           // fights exploreCount Infected in one attack).
           const abilityDamage =
-            passiveDamageBonus(abilities, weaponDefs, exploreCount) +
+            passiveDamageBonus(abilities, weaponDefs, exploreCount, player.hand.length) +
             exploreBigHandBonus(abilities, state.seats) +
             exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action');
           // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
