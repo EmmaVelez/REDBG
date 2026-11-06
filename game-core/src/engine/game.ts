@@ -470,6 +470,7 @@ export function startTurn(state: GameState): GameState {
       buysLeft: 0,
       exploresLeft: 1,
       exploredOrAttackedThisTurn: false,
+      gainedCardsGoToHand: false,
     };
     return {
       ...state,
@@ -529,7 +530,8 @@ export function startTurn(state: GameState): GameState {
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
       damageMultiplierThisTurn: undefined,
-    gainedThisTurn: [],
+      gainedThisTurn: [],
+      gainedCardsGoToHand: false,
       damagePerAdditionalActionThisTurn: 0,
       mustExplore: false,
       skipRewardPending: false,
@@ -633,6 +635,7 @@ export function startTurn(state: GameState): GameState {
       : {}),
     exploredOrAttackedThisTurn: false,
     gainedThisTurn: [],
+      gainedCardsGoToHand: false,
       damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,
     chrisAmmoDiscountTypes: undefined,

@@ -575,6 +575,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 rngAfterEffects = d.rngState;
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
+              if (e.kind === 'gainedCardsGoToHand') {
+                // AC-021 Gathering Forces: cards gained this turn go to hand.
+                newPlayer = { ...newPlayer, gainedCardsGoToHand: true };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
               if (e.kind === 'damageCharacter') {
                 newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.amount, newPlayer.downed || newPlayer.dead) };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
@@ -1422,26 +1427,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         } : s)),
         marketPiles,
       };
-      // Centralized gain: bought card moves to discard (or hand under Gathering Forces).
-      s = gainCard(s, { seat, cardId: (boughtDef?.id ?? boughtInstanceId.split('#')[0]) as string, destination: 'discard', reason: 'buy' });
-      // ensure instance id matches the actual bought instance rather than a new one
-      // (gainCard generated a new id; revert to use the popped market instance)
-      // Simpler: keep original behavior by appending boughtInstanceId directly.
-      // Roll back gainCard's added instance and use the popped one:
-      const gainedIds = Object.keys(s.cards).filter(k => k.startsWith((boughtDef?.id ?? '') + '#g'));
-      // Remove generated instances
-      const cards2 = { ...s.cards };
-      for (const gid of gainedIds) delete cards2[gid];
-      const seatPlayer = s.seats[seat] as PlayerState;
-      const cleanedPlayer = {
-        ...seatPlayer,
-        hand: seatPlayer.hand.filter(id => !gainedIds.includes(id)),
-        discard: seatPlayer.discard.filter(id => !gainedIds.includes(id)),
-      };
-      // append original bought instance
-      cleanedPlayer.discard = [...cleanedPlayer.discard, boughtInstanceId];
-      cards2[boughtInstanceId] = state.cards[boughtInstanceId] ?? { instanceId: boughtInstanceId, cardId: boughtDef?.id ?? '', location: { zone: 'discard', index: 0, seat } };
-      s = { ...s, cards: cards2, seats: s.seats.map(p => (p.seat === seat ? cleanedPlayer : p)) };
+      // Centralized gain: the bought instance moves from its market pile into
+      // the discard (or to hand under Gathering Forces). Passing instanceId
+      // keeps the physical card's identity instead of minting a duplicate.
+      s = gainCard(s, {
+        seat,
+        cardId: boughtDef?.id ?? (boughtInstanceId.split('#')[0] as string),
+        instanceId: boughtInstanceId,
+        destination: 'discard',
+        reason: 'buy',
+      });
 
       return s;
     }
@@ -1600,7 +1595,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // Kevin Ryman (Outbreak) L1: shuffle a Samurai Edge from the
               // Resource Area (or from outside the game) into the Inventory.
               const cardId = (characterAbilities(state, seat).find(a => a.kind === 'gainSpecificWeaponIntoInventory') as { cardId: string } | undefined)?.cardId ?? 'we-027';
-              let gainedId = '';
+              let gainedId: string | undefined = undefined;
               const piles = { ...state.marketPiles };
               for (const pile of Object.values(piles)) {
                 const top = pile.cards[0];
@@ -1610,22 +1605,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   break;
                 }
               }
-              let cards = state.cards;
-              if (gainedId === '') {
-                gainedId = `${cardId}#k${state.version}-${seat}`;
-                cards = { ...state.cards, [gainedId]: { instanceId: gainedId, cardId, location: { zone: 'inventory', index: 0, seat } } };
-              }
-              const mixed = shuffle(makeRng(state.rngState), [...player.inventory, gainedId]);
-              return {
-                ...state,
-                ...nextBase,
-                rngState: mixed.rng.s,
-                marketPiles: piles,
-                cards,
-                seats: state.seats.map(s => (s.seat === seat
-                  ? { ...player, inventory: mixed.value }
-                  : s)),
-              };
+              return gainCard(
+                { ...state, ...nextBase, marketPiles: piles },
+                {
+                  seat,
+                  cardId,
+                  instanceId: gainedId,
+                  destination: 'topInventory',
+                  shuffleIntoInventory: true,
+                  reason: 'ability',
+                },
+              );
             }
             case 'movePlayAreaWeaponToInventoryTop': {
               // Kevin Ryman (Outbreak) L2: move a Pistol from the Play Area to
@@ -2331,20 +2321,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const uniq = [...ammoDefsMap.values()];
         let target = uniq.filter(d => (d.cost ?? 0) >= targetCost).sort((a,b)=> (a.cost??0)-(b.cost??0))[0];
         if (!target) target = uniq.sort((a,b)=> (b.cost??0)-(a.cost??0))[0];
-        const gainedId = `${target.id}#g${nextBase.version}-${seat}`;
-        return {
+        let s: GameState = {
           ...state,
           ...nextBase,
           seats: state.seats.map(s =>
-            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId), discard: [...player.discard, gainedId] } : s,
+            s.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosenId) } : s,
           ),
-          cards: {
-            ...state.cards,
-            [gainedId]: { instanceId: gainedId, cardId: target.id, location: { zone: 'discard', index: 0, seat } },
-          },
           removed: [...state.removed, chosenId],
           prompts: newPrompts,
         };
+        return gainCard(s, { seat, cardId: target.id, destination: 'discard', reason: 'ability' });
       }
 
       if (kind === 'higherPriorities') {
@@ -2721,8 +2707,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (chosenId === undefined || chosenId === 'Decline') {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
-        const s = gainCard(state, { seat, cardId: cardDef(state, chosenId)?.id ?? '', destination: 'discard' });
-        return { ...s, ...nextBase, prompts: newPrompts };
+        const s = gainCard(
+          { ...state, ...nextBase },
+          { seat, cardId: cardDef(state, chosenId)?.id ?? '', destination: 'discard', reason: 'ability' },
+        );
+        return { ...s, prompts: newPrompts };
       }
 
       if (kind === 'gatheringDarkness') {
@@ -3127,24 +3116,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   e => e.kind === 'gainWeaponAndTrashToken'
                 );
                 if (grantEffect !== undefined && grantEffect.kind === 'gainWeaponAndTrashToken') {
-                  const grantedId = `${grantEffect.weaponCardId}#g${nextBase.version}-${seat}`;
-                  return {
+                  const granted: GameState = {
                     ...state,
                     ...nextBase,
-                    seats: state.seats.map(s =>
-                      s.seat === seat ? { ...player, discard: [...player.discard, grantedId] } : s,
-                    ),
-                    cards: {
-                      ...state.cards,
-                      [grantedId]: {
-                        instanceId: grantedId,
-                        cardId: grantEffect.weaponCardId,
-                        location: { zone: 'discard' as const, index: 0, seat },
-                      },
-                    },
                     removed: [...state.removed, instanceId],
                     prompts: newPrompts,
                   };
+                  return gainCard(granted, {
+                    seat,
+                    cardId: grantEffect.weaponCardId,
+                    destination: 'discard',
+                    reason: 'token',
+                  });
                 }
                 // Yellow Herb (plusMaxHp item): attaching to the character when
                 // gained via Explore — NOT to the discard pile. Raises max HP
@@ -3204,18 +3187,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 return { ...state, ...nextBase, prompts: newPrompts };
               }
               const [pileId, pile] = pileEntry;
-              return {
+              let afterPile: GameState = {
                 ...state,
                 ...nextBase,
-                seats: state.seats.map(s =>
-                  s.seat === seat ? { ...player, discard: [...player.discard, gainedId] } : s,
-                ),
                 marketPiles: {
                   ...state.marketPiles,
                   [pileId]: { pileId, cards: pile.cards.slice(1) },
                 },
                 prompts: newPrompts,
               };
+              const knifeDef = cardDef(state, gainedId);
+              afterPile = gainCard(afterPile, {
+                seat,
+                cardId: knifeDef?.id ?? (gainedId.split('#')[0] as string),
+                instanceId: gainedId,
+                destination: 'discard',
+                reason: 'turnStart',
+              });
+              return afterPile;
             }
 
       if (kind === 'exchangeHandWithInventoryTop') {

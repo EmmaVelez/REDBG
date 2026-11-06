@@ -1,5 +1,11 @@
 # Plan: Centralize Card-Gaining into a `gainCard` Engine Function
 
+> **Status: DONE (2026-11-06).** `gainCard` is the single writer of gained card
+> instances outside setup; all acquisition paths route through it. AC-021
+> Gathering Forces is now actually implemented (the `gainedCardsGoToHand` flag
+> used to be read but never set). Tests: `engine/gainCard.test.ts` (8),
+> `engine/gainHooks.test.ts` (4). See LEDGER.jsonl for the task entry.
+
 ## Goal
 
 Introduce a single pure engine function `gainCard(state, seat, cardId, destination, reason?)`

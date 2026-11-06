@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-10-16 ~07:15):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, **M3 ✅ COMPLETE 5/5 (T01 protocol, T02 rooms, T03 host, T04 ws server, T05 integration)**. **Next: M4 (client)**. Coder model: `gemma4:e4b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+**Current state (2026-11-06 ~14:45):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), **M4 ✅ client complete (M4-T11..T14)**. All 47 characters across Premier/Nightmare/Alliance/Outbreak have engine behaviour. **gainCard refactor ✅ done** (central gain pipeline + AC-021 Gathering Forces implemented). Suites: game-core 526, server 89, client 126 — all green, typecheck clean. **Next: M5 (hardening & release)** — README, production build verification, reconnect torture test, deploy smoke test. Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
 
 ## OLLAMA MODELS PATH (do not skip)
 Models live at `F:\ollama\models` (moved off C: when it hit 233G/233G). Start serve with:
@@ -17,7 +17,10 @@ Model inventory: gemma4:e4b (active coder), qwen2.5-coder:14b, qwen3.8:27b, qwen
   - **T03** `server/src/host.ts` (17 tests): `createHost(room)`, `start(seed)`, authoritative engine wrapper + per-seat `sanitize(state, viewerSeat)` views (hidden ids `hidden-N`, lengths preserved); spectator `viewerSeat -1` = all-hidden.
   - **T04** `server/src/ws.ts` (11 tests): `createGameServer({port, heartbeatMs, tokenFn, seedFn, rand})` — welcome+clientId+reconnectToken on connect, create/join/reconnect/spectate sessions, rooms↔hosts wiring, **bot auto-step loop after human actions**, heartbeat prune (0 disables), disconnect → `connected:false` + rebroadcast.
   - **T05** `server/src/integration.test.ts` (1 test): scripted 2-client real-WS game — lobby→seats→bot→start→multi-turn with sanitized per-seat views→out-of-turn rejection→reconnect→spectator all-hidden. Server suite **80 tests** (37+14+17+11+1); monorepo 25 test files green.
-- **M4 NEXT**: client (web UI wired to the ws server). PLAN.md is scope authority.
+- **M4 COMPLETE** — `client/` (Vite + React + TS): ws client w/ auto-reconnect, zustand store, CardView/Hand/Zones/Board/PlayerPanel/ActionBar/Lobby/GameLog, hotseat mode, animations, HealthRing, CharacterSkills. 126 client tests.
+- **Expansion sets COMPLETE** — Nightmare / Alliance / Outbreak card data + engine behaviour for all 47 characters (see ABILITY_AUDIT.md; 16 effect kinds still have zero engine refs).
+- **gainCard refactor COMPLETE** — `engine/gainCard.ts` is the single writer of gained instances; buy/token/ability/explore gains all route through it; AC-021 Gathering Forces implemented; `gainedCardsGoToHand` typed on PlayerState.
+- **M5 NEXT**: hardening & release (PLAN.md is scope authority) — README + run scripts, production build verification, reconnect torture test, deploy smoke test.
 
 ## Harness facts baked into tools/
 - orchestrate.py gate: coder -> tsc -> vitest -> feedback-retry (max 3) -> git commit + LEDGER. coder.py: DEFAULT_MODEL = "gemma4:e4b", timeout 1800s, num_predict 16384, num_ctx 32768.
@@ -34,5 +37,5 @@ Model inventory: gemma4:e4b (active coder), qwen2.5-coder:14b, qwen3.8:27b, qwen
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
 2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `b97dcbf` (M3-T05).
-3. M4: read PLAN.md M4 section; likely a web client (static HTML/TS or framework) over the ws protocol — decide scope with user or per PLAN.
+3. M5: read PLAN.md M5 section — README/run scripts, `npm run build` production bundle, reconnect torture test, deploy smoke test.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.

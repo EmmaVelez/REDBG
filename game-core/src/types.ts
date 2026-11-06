@@ -239,6 +239,7 @@ export type ActionEffect =
   | { readonly kind: "returnedFavor" } // AC-030
   | { readonly kind: "partingWays" } // AC-029
   | { readonly kind: "gatheringDarkness" } // AC-031
+  | { readonly kind: "gainedCardsGoToHand" } // AC-021 Gathering Forces: gains route to hand this turn
   // --- Outbreak infection cards (IN-001..IN-007) ---
   | { readonly kind: "infectionActionsNextTurn"; readonly actions: number } // IN-001 Claw
   | { readonly kind: "virulentFrenzy" } // IN-002
@@ -436,6 +437,9 @@ export interface PlayerState {
   readonly playArea: readonly string[];
   /** Instance ids of cards gained this turn (for WE-026 etc.). */
   readonly gainedThisTurn?: readonly string[];
+  /** AC-021 Gathering Forces: cards gained this turn go to hand, not discard.
+   *  Set when the card is played; cleared at the start of the next turn. */
+  readonly gainedCardsGoToHand?: boolean;
 
   /** Outbreak: the face-up Infection cards next to this Character. The
    *  Infection Level IS the number of these cards (rulebook). */
