@@ -213,7 +213,20 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           if (room.players.some(p => p.clientId === clientId && !p.isBot)) {
             session.clientId = clientId;
             session.roomCode = room.roomCode;
+            // One identity, one live socket: retire any previous connection
+            // for this player. Without this a stale socket still holds the
+            // session's clientId, so it can send actions as the player and —
+            // worse — its close handler marks the player disconnected even
+            // though the fresh socket is live.
+            const previous = byClient.get(clientId);
             byClient.set(clientId, ws);
+            if (previous !== undefined && previous !== ws) {
+              try {
+                previous.terminate();
+              } catch {
+                /* already closed */
+              }
+            }
             roomStore.setConnected(room.roomCode, clientId, true);
             broadcastRoomState(room.roomCode);
             broadcastGameViews(room.roomCode);
@@ -403,11 +416,19 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
     });
     ws.on('close', () => {
       sessions.delete(ws);
-      if (session.clientId !== null) byClient.delete(session.clientId);
-      if (session.roomCode !== null) {
-        watchersOf(session.roomCode).delete(ws);
-        if (session.clientId !== null && !session.isSpectator) {
-          disconnectPlayer(session.clientId, session.roomCode);
+      const clientId = session.clientId;
+      const roomCode = session.roomCode;
+      // Only the socket that CURRENTLY speaks for this identity may clear the
+      // routing entry or mark the player disconnected. A retired (stale)
+      // socket closing must not disturb the live one that replaced it.
+      const isCurrent = clientId !== null && byClient.get(clientId) === ws;
+      if (clientId !== null && isCurrent) {
+        byClient.delete(clientId);
+      }
+      if (roomCode !== null) {
+        watchersOf(roomCode).delete(ws);
+        if (clientId !== null && isCurrent && !session.isSpectator) {
+          disconnectPlayer(clientId, roomCode);
         }
       }
     });
