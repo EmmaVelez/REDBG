@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { CardDef } from '@re/game-core';
 import { CardView } from './CardView';
+import { cardArtUrl } from './cardArt';
 
 /**
  * Mansion-door reveal: shown after the owner explores and the fight resolves,
@@ -21,6 +22,7 @@ export interface MansionRevealProps {
 
 export function MansionReveal({ def, resultText, damage, weapons, onContinue }: MansionRevealProps): JSX.Element {
   const isInfected = def.type === 'infected';
+  const art = cardArtUrl(def.id);
   return (
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
@@ -38,7 +40,7 @@ export function MansionReveal({ def, resultText, damage, weapons, onContinue }: 
             </div>
           </div>
         )}
-        <div className="mansion-door-card" style={{ backgroundImage: `url(/card-art/${def.id.toUpperCase()}.svg)`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}>
+        <div className="mansion-door-card" style={{ backgroundImage: art ? `url(${art})` : undefined, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}>
           <CardView def={def} hideCost />
         </div>
         <span className="mansion-door-result">{resultText}</span>
