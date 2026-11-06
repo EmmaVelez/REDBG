@@ -335,7 +335,9 @@ export type CharacterAbility =
   | { readonly kind: "gainSpecificWeaponIntoInventory"; readonly cardId: string; readonly level: 1 | 2 } // Kevin Ryman (Outbreak) L1
   | { readonly kind: "movePlayAreaWeaponToInventoryTop"; readonly tag: string; readonly level: 1 | 2 } // Kevin Ryman (Outbreak) L2
   | { readonly kind: "discardWeaponToCopyEffects"; readonly level: 1 | 2 } // David King (Outbreak) L1
-  | { readonly kind: "knifeFromDiscardForExplore"; readonly level: 1 | 2 }; // David King (Outbreak) L2
+  | { readonly kind: "knifeFromDiscardForExplore"; readonly level: 1 | 2 } // David King (Outbreak) L2
+  | { readonly kind: "turnStartDiscardForInfection"; readonly level: 1 | 2 } // Rebecca Chambers (Outbreak) L1
+  | { readonly kind: "drawWhenOtherInfectionDecreases"; readonly level: 1 | 2 }; // Rebecca Chambers (Outbreak) L2
 
 
 // ---------------------------------------------------------------------------

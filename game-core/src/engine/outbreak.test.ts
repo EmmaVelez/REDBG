@@ -620,6 +620,58 @@ describe('Outbreak mode', () => {
     // Without a Knife in the explore, the discard pile is untouched.
     expect(exploreDamage(s, 0, ['we-003#1'])).toBe(5);
   });
+  test('CH-029 Rebecca Chambers L1: discard cards at turn start to lower her Infection Level', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-029#1', level: 1, infectionCards: ['in-001#1', 'in-001#2', 'in-001#3'] }
+        : x)),
+    })), ['ch-029#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(pr(next).payload?.kind).toBe('rebeccaDiscardForInfection');
+    const handBefore = next.seats[0]!.hand.length;
+    const first = next.seats[0]!.hand[0]!;
+    const a = applyAction(next, { type: 'chooseOption', seat: 0, promptId: pr(next).id, option: pr(next).options.indexOf(first) });
+    const p2 = pr(a);
+    const second = a.seats[0]!.hand[0]!;
+    const b = applyAction(a, { type: 'chooseOption', seat: 0, promptId: p2.id, option: p2.options.indexOf(second) });
+    const p3 = pr(b);
+    const done = applyAction(b, { type: 'chooseOption', seat: 0, promptId: p3.id, option: p3.options.indexOf('DONE') });
+    expect(done.seats[0]!.infectionCards).toHaveLength(1);
+    expect(done.seats[0]!.hand).toHaveLength(handBefore - 2);
+  });
+
+  test('CH-029 Rebecca Chambers L2: another character\'s Infection Level drop gives her +1 card', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => {
+        if (i === 0) return { ...x, characterInstanceId: 'ch-025#1', level: 1, infectionCards: ['in-001#1'] };
+        return { ...x, characterInstanceId: 'ch-029#1', level: 2 };
+      }),
+    })), ['ch-025#1', 'ch-029#1']);
+    const before = s.seats[1]!.hand.length;
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(next.seats[0]!.infectionCards).toHaveLength(0);
+    expect(next.seats[1]!.hand.length).toBe(before + 1);
+  });
+
+  test('CH-029 Rebecca Chambers L2: her own Infection Level drop does not draw', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, characterInstanceId: 'ch-029#1', level: 2, infectionCards: ['in-001#1', 'in-001#2'] }
+        : x)),
+    })), ['ch-029#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    const before = next.seats[0]!.hand.length;
+    const p = pr(next);
+    const first = next.seats[0]!.hand[0]!;
+    const a = applyAction(next, { type: 'chooseOption', seat: 0, promptId: p.id, option: p.options.indexOf(first) });
+    const p2 = pr(a);
+    const done = applyAction(a, { type: 'chooseOption', seat: 0, promptId: p2.id, option: p2.options.indexOf('DONE') });
+    expect(done.seats[0]!.infectionCards).toHaveLength(1);
+    expect(done.seats[0]!.hand.length).toBe(before - 1);
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,

@@ -20,6 +20,7 @@ import {
   exploreBonusIfAmmoAbove,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
+  applyInfectionDecreaseDraws,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -553,6 +554,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Apply simple ActionEffects not handled via prompts above.
             let seatsAfterEffects = state.seats.map(s => (s.seat === seat ? newPlayer : s));
             let rngAfterEffects = ac015Rng;
+            // Rebecca Chambers (Outbreak) L2: when an effect decreases another
+            // character's Infection Level, she gets +1 card. AC-027 (By Any Means
+            // Necessarily) is the card effect that lowers a level.
+            if ((newPlayer.infectionCards?.length ?? 0) < (player.infectionCards?.length ?? 0)) {
+              const withDraws = applyInfectionDecreaseDraws({ ...state, seats: seatsAfterEffects }, seat);
+              seatsAfterEffects = [...withDraws.seats];
+              rngAfterEffects = withDraws.rngState;
+            }
             for (const e of def.actionEffects ?? []) {
               if (e.kind === 'gainActions') {
                 newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + e.count };
@@ -2464,6 +2473,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           prompts: newPrompts,
         };
       }
+      if (kind === 'rebeccaDiscardForInfection') {
+        // Rebecca Chambers (Outbreak) L1: discard any number of cards from
+        // hand; her Infection Level drops by 1 per card discarded.
+        const count = Number(prompt.payload?.count ?? '0');
+        if (chosenId === undefined || chosenId === 'DONE') {
+          const lvl = player.infectionCards?.length ?? 0;
+          const remove = Math.min(count, lvl);
+          const removedInfections = (player.infectionCards ?? []).slice(lvl - remove);
+          const remainingInfections = (player.infectionCards ?? []).slice(0, lvl - remove);
+          const base: GameState = {
+            ...state,
+            ...nextBase,
+            ...(state.infectionDeck !== undefined
+              ? { infectionDeck: [...(state.infectionDeck ?? []), ...removedInfections] }
+              : {}),
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...s, infectionCards: remainingInfections }
+              : s)),
+            prompts: newPrompts,
+          };
+          if (remove > 0) return applyInfectionDecreaseDraws(base, seat);
+          return base;
+        }
+        const remaining = player.hand.filter(id => id !== chosenId);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: remaining, discard: [...player.discard, chosenId] }
+            : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Discard any number of cards from your hand to decrease Rebecca\'s Infection Level.',
+            options: [...remaining, 'DONE'],
+            payload: { kind: 'rebeccaDiscardForInfection', count: String(count + 1) },
+          }],
+        };
+      }
       if (kind === 'turnStartDamageForExplore') {
         // HUNK (Outbreak) L1: take the damage and gain +1 Explore.
         if (chosenId === 'Decline') {
@@ -2620,7 +2668,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         const lvl = player.infectionCards?.length ?? 0;
-        return {
+        const after: GameState = {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat
@@ -2633,6 +2681,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, instanceId],
           prompts: newPrompts,
         };
+        // Rebecca Chambers (Outbreak) L2: another character's Infection Level
+        // decreasing gives her +1 card.
+        return lvl > 0 ? applyInfectionDecreaseDraws(after, seat) : after;
       }
 
       if (kind === 'partingWays') {

@@ -3,7 +3,7 @@ import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { advanceTurn } from './turn';
-import { healAtTurnStart } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
 
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
@@ -116,6 +116,18 @@ function turnStartAbilityPrompts(
       text: l2Text,
       options: [...player.hand, 'DONE'],
       payload: { kind: 'turnStartRevealActionsForCards', count: '0' },
+    });
+  }
+
+  // Rebecca Chambers (Outbreak) L1: discard any number of cards from hand to
+  // decrease her Infection Level by 1 per card discarded.
+  if (abilities.some(a => a.kind === 'turnStartDiscardForInfection') && player.hand.length > 0) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l1Text,
+      options: [...player.hand, 'DONE'],
+      payload: { kind: 'rebeccaDiscardForInfection', count: '0' },
     });
   }
 
@@ -678,6 +690,7 @@ export function startTurn(state: GameState): GameState {
   // Jill Valentine (CH-025) L1: decrease her Infection Level by 1 (the
   // face-up Infection goes to the bottom of the Infection Deck).
   let turnInfectionDeck = state.infectionDeck ?? [];
+  let infectionDecreased = false;
   if (
     turnPlayer.infectionCards !== undefined && turnPlayer.infectionCards.length > 0 &&
     abilitiesForLevel(charDef?.abilities, turnPlayer.level).some(a => a.kind === 'turnStartDecreaseInfection')
@@ -685,6 +698,21 @@ export function startTurn(state: GameState): GameState {
     const removedInfection = turnPlayer.infectionCards[turnPlayer.infectionCards.length - 1] as string;
     turnPlayer = { ...turnPlayer, infectionCards: turnPlayer.infectionCards.slice(0, -1) };
     turnInfectionDeck = [...turnInfectionDeck, removedInfection];
+    infectionDecreased = true;
+  }
+  // Rebecca Chambers (CH-029) L2: another character's Infection Level
+  // decreasing gives her +1 card.
+  // Kept separate from state.seats so the final return below preserves the
+  // other seats' draws (Rebecca L2 draws for seats other than the active one).
+  let turnSeats: readonly PlayerState[] = state.seats;
+  if (infectionDecreased) {
+    const withDraws = applyInfectionDecreaseDraws(
+      { ...state, seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)) },
+      player.seat,
+    );
+    turnPlayer = withDraws.seats[state.activeSeat] as PlayerState;
+    turnSeats = withDraws.seats;
+    nextRng = withDraws.rngState;
   }
   // Excella Gionne (CH-021) L2: +3 cards at turn start at Infection Level 8+.
   let excellaDraw = 0;
@@ -709,7 +737,7 @@ export function startTurn(state: GameState): GameState {
     ...state,
     version: newVersion,
     rngState: nextRng,
-    seats: state.seats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
+    seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
     prompts: abilityPrompts.length > 0 ? [...state.prompts, ...abilityPrompts] : state.prompts,
     ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
   };

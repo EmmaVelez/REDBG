@@ -1,4 +1,5 @@
-import type { CharacterAbility, GameState, CardDef, WeaponTag } from '../types';
+import type { CharacterAbility, GameState, PlayerState, CardDef, WeaponTag } from '../types';
+import { drawWithReshuffle } from './deck';
 import { abilitiesForLevel } from './characters';
 
 /**
@@ -423,6 +424,43 @@ export function exploreBonusIfAmmoAbove(
   return bonus;
 }
 
+/**
+ * Rebecca Chambers (Outbreak CH-029) L2: when an effect decreases ANOTHER
+ * character's Infection Level, she gets +1 card. Returns the seats that
+ * should draw (never the character whose level dropped).
+ */
+export function seatsDrawingOnOtherInfectionDecrease(
+  state: GameState,
+  decreasedSeat: number,
+): readonly number[] {
+  const out: number[] = [];
+  for (const s of state.seats) {
+    if (s.seat === decreasedSeat || s.dead) continue;
+    const inst = state.cards[s.characterInstanceId];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    const has = (def?.abilities ?? []).some(a => a.kind === 'drawWhenOtherInfectionDecreases' && a.level <= s.level);
+    if (has) out.push(s.seat);
+  }
+  return out;
+}
+
+/** Apply Rebecca L2's +1 card for each qualifying seat. */
+export function applyInfectionDecreaseDraws(state: GameState, decreasedSeat: number): GameState {
+  let s = state;
+  for (const seatIdx of seatsDrawingOnOtherInfectionDecrease(s, decreasedSeat)) {
+    const p = s.seats[seatIdx] as PlayerState | undefined;
+    if (p === undefined) continue;
+    const d = drawWithReshuffle({ deck: p.inventory, discard: p.discard, count: 1, rngState: s.rngState });
+    s = {
+      ...s,
+      rngState: d.rngState,
+      seats: s.seats.map(x => (x.seat === seatIdx
+        ? { ...x, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+        : x)),
+    };
+  }
+  return s;
+}
 /**
  * Jill Valentine (Outbreak CH-025) L2: while her Infection Level is 0 she
  * and her partner cannot be affected by any infection effects.
