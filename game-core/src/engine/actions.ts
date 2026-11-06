@@ -307,6 +307,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             if (def.id === 'ac-026') {
               newPlayer = { ...newPlayer, actionsLeft: newPlayer.actionsLeft + 1 };
+            }            if (def.id === 'ac-027') {
+              // +2 Actions; "decrease by any amount, then increase by the
+              // same amount minus one" is a net -1 Infection Level.
+              const lvl = newPlayer.infectionCards?.length ?? 0;
+              newPlayer = {
+                ...newPlayer,
+                actionsLeft: newPlayer.actionsLeft + 2,
+                infectionCards: lvl > 0 ? (newPlayer.infectionCards ?? []).slice(0, -1) : [],
+              };
+            }
+            if (def.id === 'ac-030') {
+              // +2 cards, then attach this card to your character.
+              const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 2, rngState: ac015Rng });
+              newPlayer = {
+                ...newPlayer,
+                hand: [...newPlayer.hand, ...d.hand],
+                inventory: d.deck,
+                discard: d.discard,
+                playArea: newPlayer.playArea.filter(id => id !== instanceId),
+                attached: [...newPlayer.attached, instanceId],
+              };
+              ac015Rng = d.rngState;
             }
             if (def.id === 'ac-019' && newPlayer.hand.length > 0) {
               const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 1, rngState: ac015Rng });
@@ -317,6 +339,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let prompts = state.prompts;
       let promptKind: string | undefined;
       let promptOptions: readonly string[] | undefined;
+      let promptInstanceId: string | undefined;
       for (const e of def.actionEffects ?? []) {
         if (e.kind === 'recoverWeaponFromDiscardToHand') {
           const weaponsInDiscard = player.discard.filter(id => cardDef(state, id)?.type === 'weapon');
@@ -406,6 +429,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                   promptOptions = [...candidates];
                                 }
                                 break;
+                              }                              if (e.kind === 'higherPriorities') {
+                                promptKind = 'higherPriorities';
+                                promptOptions = ['+3 cards', '+2 actions'];
+                                break;
+                              }
+                              if (e.kind === 'powerOfTVirus') {
+                                promptKind = 'powerOfTVirus';
+                                promptOptions = ['Trash for +20 Gold', 'Decline'];
+                                promptInstanceId = instanceId;
+                                break;
+                              }
+                              if (e.kind === 'iHaveThis') {
+                                const costlyWeapons = played.player.hand.filter(id => {
+                                  const c = cardDef(state, id);
+                                  return c?.type === 'weapon' && (c.cost ?? 0) >= 50;
+                                });
+                                if (costlyWeapons.length > 0) {
+                                  promptKind = 'iHaveThis';
+                                  promptOptions = [...costlyWeapons, 'Decline'];
+                                }
+                                break;
                               }
                               }
                       if (promptKind !== undefined && promptOptions !== undefined) {
@@ -416,7 +460,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seat,
             text: def.text,
             options: promptOptions,
-            payload: { kind: promptKind },
+            payload: { kind: promptKind, ...(promptInstanceId !== undefined ? { instanceId: promptInstanceId } : {}) },
           },
         ];
       }
@@ -1764,10 +1808,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // the Character). Infected Characters cannot change their level.
           let infectionDeckOut = state.infectionDeck ?? [];
           const infectionCardsOut = [...(player.infectionCards ?? [])];
+          // AC-023 Power of the t-Virus: at end of turn, if the player
+          // explored or attacked an Infected Character, +1 Infection.
+          const playedTVirus = player.playArea.some(id => cardDef(state, id)?.id === 'ac-023');
           if (
             state.infectionDeck !== undefined &&
-            player.exploredOrAttackedThisTurn !== true &&
-            player.isInfectedCharacter !== true
+            player.isInfectedCharacter !== true &&
+            ((player.exploredOrAttackedThisTurn === true && playedTVirus) ||
+              (player.exploredOrAttackedThisTurn !== true))
           ) {
             const [topInfection, ...restInfections] = infectionDeckOut;
             if (topInfection !== undefined) {
@@ -2040,6 +2088,60 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'higherPriorities') {
+        // AC-028: choose +3 cards or +2 actions.
+        if (chosenId === '+3 cards') {
+          const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 3, rngState: state.rngState });
+          return {
+            ...state,
+            ...nextBase,
+            rngState: d.rngState,
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : s)),
+            prompts: newPrompts,
+          };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...player, actionsLeft: player.actionsLeft + 2 } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'powerOfTVirus') {
+        // AC-023: optionally trash this card for +20 Gold this turn.
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, turnGold: player.turnGold + 20, playArea: player.playArea.filter(id => id !== prompt.payload?.instanceId) }
+            : s)),
+          removed: [...state.removed, String(prompt.payload?.instanceId ?? '')],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'iHaveThis') {
+        // AC-024: reveal a weapon costing 50 or more from hand -> +1 card.
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
       if (kind === 'stealRevealedWeaponsFromOpponentsTopCards') {
               // Master of Unlocking chain: options are revealed weapon instance
               // ids + 'DONE'. Taking one moves it from the owner's inventory to

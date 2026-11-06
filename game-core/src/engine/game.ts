@@ -445,6 +445,21 @@ export function startTurn(state: GameState): GameState {
     };
   }
 
+  // AC-030 Returned Favor: at the beginning of your turn, if this card is
+  // attached to your character, you get +1 card, then discard this card.
+  if (player.attached.some(id => state.cards[id]?.cardId === 'ac-030')) {
+    const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+    const discarded = player.attached.filter(id => state.cards[id]?.cardId === 'ac-030');
+    const remaining = player.attached.filter(id => state.cards[id]?.cardId !== 'ac-030');
+    return startTurn({
+      ...state,
+      rngState: d.rngState,
+      seats: state.seats.map(s => (s.seat === player.seat
+        ? { ...s, attached: remaining, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: [...d.discard, ...discarded] }
+        : s)),
+    });
+  }
+
   if (player.downed) {
     const ch = revive({
       hp: player.hp,

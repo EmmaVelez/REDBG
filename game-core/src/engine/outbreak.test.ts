@@ -5,6 +5,17 @@ import { ALL_CARDS, OUTBREAK_PILES, OUTBREAK_MANSION } from '../data/cards';
 import { SCENARIOS } from '../data/cards';
 import type { GameState } from '../types';
 
+function withCards(st: GameState, ids: readonly string[]): GameState {
+  const cards = { ...st.cards };
+  for (const id of ids) {
+    const cardId = id.split("#")[0]!;
+    cards[id] = { instanceId: id, cardId, location: { zone: "hand", index: 0 } };
+  }
+  return { ...st, cards };
+}
+function pr(s: GameState): { id: string; payload?: Record<string, string>; options: string[]; seat: number } {
+  return s.prompts[0] as unknown as { id: string; payload?: Record<string, string>; options: string[]; seat: number };
+}
 function outbreakState(over: (s: GameState) => GameState = s => s): GameState {
   const base = setup(
     {
@@ -204,6 +215,73 @@ describe('Outbreak mode', () => {
     expect(explored.seats[0]!.infectionCards).toHaveLength(1);
     expect(explored.seats[0]!.attached).not.toContain('ma-053#1');
     expect(explored.mansionBottom).toContain('ma-053#1');
+  });
+  // --- action cards ---
+  test('AC-028 Higher Priorities: choose +3 cards or +2 actions', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'ac-028#1'] } : x)),
+    })), ['ac-028#1']);
+    const baseHand = s.seats[0]!.hand.length;
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-028#1' });
+    expect(pr(played).payload?.kind).toBe('higherPriorities');
+    const cards = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 0 });
+    expect(cards.seats[0]!.hand.length).toBe(baseHand - 1 + 3);
+    const actions = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 1 });
+    expect(actions.seats[0]!.actionsLeft).toBe(2);
+  });
+
+  test('AC-030 Returned Favor: +2 cards, attaches, then +1 card and discards itself next turn', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'ac-030#1'] } : x)),
+    })), ['ac-030#1']);
+    const baseHand = s.seats[0]!.hand.length;
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-030#1' });
+    expect(played.seats[0]!.attached).toContain('ac-030#1');
+    expect(played.seats[0]!.hand.length).toBe(baseHand - 1 + 2);
+    const next = startTurn({ ...played, activeSeat: 0 });
+    expect(next.seats[0]!.attached).not.toContain('ac-030#1');
+    expect(next.seats[0]!.discard).toContain('ac-030#1');
+  });
+
+  test('AC-027 By Any Means Necessary: +2 actions and a net -1 Infection Level', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, hand: [...x.hand, 'ac-027#1'], infectionCards: ['in-001#1', 'in-001#2', 'in-001#3'] }
+        : x)),
+    })), ['ac-027#1']);
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-027#1' });
+    expect(played.seats[0]!.actionsLeft).toBe(2); // 1 - 1 (play) + 2
+    expect(played.seats[0]!.infectionCards).toHaveLength(2);
+  });
+
+  test('AC-023 Power of the t-Virus: +20 damage and an optional +20 Gold trash', () => {
+    const s = outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'ac-023#1'], turnAmmo: 20 } : x)),
+    }));
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-023#1' });
+    expect(played.seats[0]!.weaponDamageBonusThisTurn).toBe(20);
+    expect(pr(played).payload?.kind).toBe('powerOfTVirus');
+    const trashed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 0 });
+    expect(trashed.seats[0]!.turnGold).toBe(20);
+    expect(trashed.seats[0]!.playArea).not.toContain('ac-023#1');
+  });
+
+  test('AC-023: exploring and ending the turn raises the Infection Level', () => {
+    const s = outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, hand: [...x.hand, 'ac-023#1', 'we-009#1'], turnAmmo: 20 }
+        : x)),
+    }));
+    const played = applyAction(s, { type: 'playActionCard', seat: 0, instanceId: 'ac-023#1' });
+    const declined = applyAction(played, { type: 'chooseOption', seat: 0, promptId: pr(played).id, option: 1 });
+    const explored = applyAction(declined, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    const after = applyAction(explored, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]!.infectionCards).toHaveLength(1);
   });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
