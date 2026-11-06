@@ -138,6 +138,73 @@ describe('Outbreak mode', () => {
     expect(after.seats[0]!.infectionCards).toHaveLength(0);
   });
 
+  // --- infected-card effects ---
+  function forceTop(st: GameState, instanceId: string): GameState {
+    return {
+      ...st,
+      mansionDeck: [instanceId, ...st.mansionDeck.filter(id => id !== instanceId)],
+    };
+  }
+
+  test('MA-042 Yawn: reveal raises the exploring character\'s Infection Level', () => {
+    const s = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20 } : x)),
+    }, 'ma-042#1'));
+    const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    // level 0 <= 5 -> +2
+    expect(explored.seats[0]!.infectionCards).toHaveLength(2);
+    // above the threshold -> +1
+    const high = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0
+        ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20, infectionCards: ['in-001#1', 'in-001#2', 'in-001#3', 'in-001#4', 'in-001#5', 'in-002#1'] }
+        : x)),
+    }, 'ma-042#1'));
+    const exploredHigh = applyAction(high, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(exploredHigh.seats[0]!.infectionCards).toHaveLength(7);
+  });
+
+  test('MA-043 Nemesis (2nd form): reveal raises every character\'s Infection Level', () => {
+    const s = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20 } : x)),
+    }, 'ma-043#1'));
+    const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(explored.seats[0]!.infectionCards).toHaveLength(1);
+    expect(explored.seats[1]!.infectionCards).toHaveLength(1);
+  });
+
+  test('MA-046 Web Spinner: not defeated raises the Infection Level by 1', () => {
+    const s = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20 } : x)),
+    }, 'ma-046#1'));
+    const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(explored.seats[0]!.infectionCards).toHaveLength(1);
+  });
+
+  test('MA-041 Tyrant T-002: not defeated raises the Infection Level by 1 + level and shuffles it back', () => {
+    const s = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20, level: 2 } : x)),
+    }, 'ma-041#1'));
+    const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(explored.seats[0]!.infectionCards).toHaveLength(3); // 1 + level 2
+    expect(explored.mansionDeck).toContain('ma-041#1');
+    expect(explored.seats[0]!.attached).not.toContain('ma-041#1');
+  });
+
+  test('MA-053 Lisa Trevor: defeated raises the Infection Level by 1 and goes to the Mansion bottom', () => {
+    const s = outbreakState(st => forceTop({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, hand: [...x.hand, 'we-029#1'], turnAmmo: 60 } : x)),
+    }, 'ma-053#1'));
+    const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-029#1'], exploreCount: 1 });
+    expect(explored.seats[0]!.infectionCards).toHaveLength(1);
+    expect(explored.seats[0]!.attached).not.toContain('ma-053#1');
+    expect(explored.mansionBottom).toContain('ma-053#1');
+  });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({
       ...st,

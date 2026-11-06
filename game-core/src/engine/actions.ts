@@ -1051,7 +1051,50 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      // Outbreak: infected-card effects. Reveal effects fire as soon as the
+      // Infected is revealed; the rest depend on the combat outcome.
+      const infectionBySeat = new Map<number, string[]>();
+      for (const s of state.seats) infectionBySeat.set(s.seat, [...(s.infectionCards ?? [])]);
+      let outbreakDeck = state.infectionDeck ?? [];
+      const drawInfectionsFor = (seatIdx: number, count: number): void => {
+        if (count <= 0) return;
+        const arr = infectionBySeat.get(seatIdx) ?? [];
+        for (let i = 0; i < count && outbreakDeck.length > 0; i++) {
+          arr.push(outbreakDeck[0] as string);
+          outbreakDeck = outbreakDeck.slice(1);
+        }
+        infectionBySeat.set(seatIdx, arr);
+      };
+      if (revealedDef?.type === 'infected') {
+        for (const e of revealedDef.infectedEffects ?? []) {
+          if (e.kind === 'onRevealInfectionIncrease') {
+            const lvl = infectionBySeat.get(seat)?.length ?? 0;
+            drawInfectionsFor(seat, lvl <= e.threshold ? e.lowAmount : e.highAmount);
+          } else if (e.kind === 'onRevealAllInfectionIncrease') {
+            for (const s of state.seats) {
+              if (!s.dead) drawInfectionsFor(s.seat, e.amount);
+            }
+          }
+        }
+      }
+      const withInfections = (p: PlayerState): PlayerState => ({
+        ...p,
+        infectionCards: infectionBySeat.get(p.seat) ?? p.infectionCards ?? [],
+      });
       if (outcome.kind === 'defeated') {
+        // Outbreak: on-defeat infection effects. MA-053 Lisa Trevor is not
+        // attached - it goes to the bottom of the Mansion instead.
+        let defeatedInfectionInc = 0;
+        let defeatedToBottom = false;
+        if (revealedDef?.type === 'infected') {
+          for (const e of revealedDef.infectedEffects ?? []) {
+            if (e.kind === 'onDefeatInfectionIncrease') {
+              defeatedInfectionInc += e.amount;
+              defeatedToBottom = e.toMansionBottom;
+            }
+          }
+        }
+        drawInfectionsFor(seat, defeatedInfectionInc);
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
         const charDef = cardDef(state, player.characterInstanceId);
         const level = charDef !== undefined ? levelForDecorations(charDef.level1At, charDef.level2At, decorations) : player.level;
@@ -1066,7 +1109,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   mustExplore: false,
                   decorations,
                   level,
-                  attached: [...player.attached, revealedInstanceId],
+                  attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId],
+                  infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 };
         const hasSkip = revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false;
         const hasNoActions = revealedDef?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false;
@@ -1079,6 +1123,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
             }]
           : state.prompts;
+        if (defeatedToBottom) {
+          const bottomed = sendToBottom({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId);
+          mansionDeck = bottomed.deck;
+          mansionBottom = bottomed.bottom;
+        }
         // Luis Sera (Nightmare) L2: on defeating an Infected, may move any
         // number of cards from the discard pile to the bottom of the Inventory.
         const luisPrompts = movesDiscardToInventoryOnDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
@@ -1106,12 +1155,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          seats: state.seats.map(s => (
+            s.seat === seat
+              ? newPlayer
+              : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] }
+          )),
           removed: removedAfter,
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
           prompts: carlosPrompts,
+          ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
       }
 
@@ -1159,11 +1213,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         inventory = flipResult.inventory;
       }
 
+      // Outbreak: not-defeated effects (MA-041 Tyrant T-002, MA-046 Web Spinner).
+      let outbreakShuffledBack = false;
+      if (revealedDef?.type === 'infected') {
+        for (const e of revealedDef.infectedEffects ?? []) {
+          if (e.kind === 'onNotDefeatedInfectionIncrease') {
+            drawInfectionsFor(seat, e.amount + e.perLevel * player.level);
+          } else if (e.kind === 'onNotDefeatedShuffleBack') {
+            const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
+            mansionDeck = shuffled.deck;
+            mansionBottom = shuffled.bottom;
+            outbreakShuffledBack = true;
+          }
+        }
+      }
+
       if (outcome.shuffleBack) {
         const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
         mansionDeck = shuffled.deck;
         mansionBottom = shuffled.bottom;
-      } else {
+      } else if (!outbreakShuffledBack) {
         const bottomed = sendToBottom({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId);
         mansionDeck = bottomed.deck;
         mansionBottom = bottomed.bottom;
@@ -1182,16 +1251,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               hp: newHp,
               ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
               downed,
+              infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
             };
 
       return {
         ...state,
         ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+        seats: state.seats.map(s => (
+          s.seat === seat
+            ? newPlayer
+            : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] }
+        )),
         removed: removedAfter,
         mansionDeck,
         mansionBottom,
         rngState: currentRng,
+        ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
     }
 

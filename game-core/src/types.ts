@@ -179,7 +179,13 @@ export type InfectedEffect =
   | { readonly kind: "onDefeatHealExploring"; readonly amount: number } // Ivy
   | { readonly kind: "onRevealBonusDamageIfCharacterDamaged"; readonly threshold: number; readonly amount: number } // Neptune
   | { readonly kind: "mostDecoratedLowersMaxHp"; readonly amount: number } // Hunter
-  | { readonly kind: "onRevealHealthPenaltyIfMultipleWeapons"; readonly count: number; readonly amount: number }; // Cerberus
+  | { readonly kind: "onRevealHealthPenaltyIfMultipleWeapons"; readonly count: number; readonly amount: number } // Cerberus
+  // --- Outbreak (MA-041..MA-053) ---
+  | { readonly kind: "onRevealInfectionIncrease"; readonly threshold: number; readonly lowAmount: number; readonly highAmount: number } // MA-042 Yawn
+  | { readonly kind: "onRevealAllInfectionIncrease"; readonly amount: number } // MA-043 Nemesis (2nd form)
+  | { readonly kind: "onNotDefeatedInfectionIncrease"; readonly amount: number; readonly perLevel: number } // MA-041 Tyrant T-002, MA-046 Web Spinner
+  | { readonly kind: "onNotDefeatedShuffleBack" } // MA-041 Tyrant T-002
+  | { readonly kind: "onDefeatInfectionIncrease"; readonly amount: number; readonly toMansionBottom: boolean }; // MA-053 Lisa Trevor
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
