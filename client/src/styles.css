@@ -158,66 +158,6 @@ h1, h2 { margin: 0 0 8px; }
 }
 .card-hidden { color: var(--muted); display: flex; align-items: center; justify-content: center; }
 
-/* --- card art: SVG scans from game-core/src/data/CARD-ART/<ID>.svg ---
- * The scans are art-only (their own decorative border, no printed text), so a
- * card with art uses the scan as its face and the text rows move onto a scrim
- * pinned to the bottom. Cards without art keep the plain placeholder frame. */
-.card-art-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 6px;
-}
-.card-has-art {
-  padding: 0 !important;
-  gap: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  overflow: hidden;
-}
-.card-has-art > *:not(.card-art-img) {
-  position: relative;
-  z-index: 1;
-}
-.card-has-art .card-top {
-  padding: 2px 4px 4px;
-  background: linear-gradient(180deg, rgba(8, 9, 12, 0.72), rgba(8, 9, 12, 0));
-}
-.card-has-art .card-name { margin-top: auto; }
-.card-has-art .card-name,
-.card-has-art .card-stats,
-.card-has-art .card-bonus,
-.card-has-art .card-text {
-  padding: 0 4px;
-  background: rgba(8, 9, 12, 0.72);
-}
-/* the art face is small: clamp the rules text, the hover popup shows it all */
-.card-has-art .card-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.hover-card-pop .card-has-art .card-text {
-  -webkit-line-clamp: unset;
-  display: block;
-  overflow: visible;
-}
-/* character cards: the art fills the portrait window, the frame stays */
-.card-portrait-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 15%;
-}
-.card-portrait-has-art::after { content: none; }
-
 /* per-type accents (matching the game's color language) */
 .card-weapon    { --card-accent: #8fa3b0; }
 .card-ammo      { --card-accent: #c9a227; }
@@ -763,11 +703,8 @@ h1, h2 { margin: 0 0 8px; }
   text-align: center;
 }
 .mansion-door-card .card .card-name {
-  text-align: center;
-}
-/* art cards pin their text block to the bottom via .card-has-art */
-.mansion-door-card .card:not(.card-has-art) .card-name {
   margin-top: 80%;
+  text-align: center;
 }
 .mansion-door-card .card .card-name,
 .mansion-door-card .card .card-stats,
@@ -1273,30 +1210,3 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 12px;
 }
 .explore-picker-actions { display: flex; gap: 6px; }
-
-.mansion-door-hp-ring {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.mansion-door-atk {
-  position: absolute;
-  bottom: 6px;
-  right: 8px;
-  z-index: 2;
-  color: #ef4444;
-  font-weight: 700;
-  font-size: 14px;
-  pointer-events: none;
-}
-.mansion-door-card .card-text {
-  text-align: center;
-  position: absolute;
-  top: 80%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 88%;
-}
