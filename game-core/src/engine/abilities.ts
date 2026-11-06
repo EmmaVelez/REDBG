@@ -387,6 +387,22 @@ export function weaponCostCap(abilities: readonly CharacterAbility[]): number | 
   return undefined;
 }
 
+/**
+ * Claire Redfield (Alliance CH-020) L1: +amount damage this turn when a
+ * Green Herb or Red Herb is trashed from hand.
+ */
+export function herbTrashDamageBonus(abilities: readonly CharacterAbility[]): number {
+  let amount = 0;
+  for (const a of abilities) {
+    if (a.kind === 'herbTrashDamageBonus') amount += a.amount;
+  }
+  return amount;
+}
+
+/** Claire Redfield (Alliance CH-020) L2: double all damage this turn. */
+export function hasDoubleDamageOnBothHerbs(abilities: readonly CharacterAbility[]): boolean {
+  return abilities.some(a => a.kind === 'doubleDamageOnBothHerbs');
+}
 /** Partner attach cap: 2 by default, Josh L2 adds 2. */
 export function partnerAttachCap(abilities: readonly CharacterAbility[]): number {
   let cap = 2;

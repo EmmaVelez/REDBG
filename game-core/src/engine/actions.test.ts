@@ -54,6 +54,9 @@ const DEFS: Record<string, CardDef> = {
   'ch-chris-a': { id: 'ch-chris-a', name: 'Chris Redfield (Alliance)', type: 'character', set: 'alliance', text: 'Chris (Alliance)', copies: 1, maxHp: 80, level1At: 3, level2At: 8, abilities: [{ kind: 'singleWeaponAmmoDiscount', amount: 20, level: 1 }, { kind: 'chosenWeaponTypeAmmoDiscount', amount: 20, level: 2 }] },
   'ch-jill-a': { id: 'ch-jill-a', name: 'Jill Valentine (Alliance)', type: 'character', set: 'alliance', text: 'Jill (Alliance)', copies: 1, maxHp: 90, level1At: 1, level2At: 6, abilities: [{ kind: 'partnerAttachedCountDamageBonus', amount: 10, threshold: 1, level: 1 }, { kind: 'offTurnFlashGrenadeLasPlagas', level: 2 }] },
   'ch-josh-a': { id: 'ch-josh-a', name: 'Josh Stone (Alliance)', type: 'character', set: 'alliance', text: 'Josh (Alliance)', copies: 1, maxHp: 80, level1At: 0, level2At: 4, abilities: [{ kind: 'weaponCostCap', maxCost: 50, level: 1 }, { kind: 'partnerAttachCapBonus', amount: 2, level: 2 }] },
+  'ch-claire-a': { id: 'ch-claire-a', name: 'Claire Redfield (Alliance)', type: 'character', set: 'alliance', text: 'Claire (Alliance)', copies: 1, maxHp: 80, level1At: 3, level2At: 7, abilities: [{ kind: 'herbTrashDamageBonus', amount: 20, level: 1 }, { kind: 'doubleDamageOnBothHerbs', level: 2 }] },
+  'it-001': { id: 'it-001', name: 'Green Herb', type: 'item', set: 'premier', text: 'Trash: heal 20, or trash with another Green Herb to heal 60.', copies: 6, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
+  'it-004': { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: 'Trash: heal yourself and your partner to full Health.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
   'we-expensive': { id: 'we-expensive', name: 'Bolt-Action Rifle', type: 'weapon', set: 'premier', text: 'Rifle', copies: 1, cost: 60, ammoReq: 30, damage: 20 },
   'we-017': { id: 'we-017', name: 'Flash Grenade', type: 'weapon', set: 'alliance', text: 'Flash Grenade', copies: 1, cost: 20, ammoReq: 0, damage: 0, weaponTags: ['explosive'] },
   'ma-025': { id: 'ma-025', name: 'Duvalia (Las Plagas)', type: 'infected', set: 'alliance', text: '', copies: 2, hp: 60, attack: 40, decorations: 5, plagas: true },
@@ -80,7 +83,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
-      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'),
+      'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'), 'cclaire': inst('cclaire', 'ch-claire-a'), 'rh1': inst('rh1', 'it-004'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
@@ -254,6 +257,36 @@ test('Nightmare Ada L1: damage during your turn draws 2 cards', () => {
   expect(p0(s).inventory.length).toBe(6); // 8 - 2 drawn
 });
 
+test('Alliance Claire L1: +20 damage when a herb is trashed from hand', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cclaire', level: 1 as const, hand: ['gh1', 'w1'], turnAmmo: 100 } });
+  const played = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'gh1' });
+  const promptId = played.prompts[played.prompts.length - 1]?.id ?? '';
+  const s = applyAction(played, { type: 'chooseOption', seat: 0, promptId, option: 0 });
+  expect(s.seats[0]!.weaponDamageBonusThisTurn).toBe(20);
+  expect(exploreDamage(s, 0, ['w1'])).toBe(30); // 10 base + 20
+});
+
+test('Alliance Claire L2: double damage when both herbs are trashed', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cclaire', level: 2 as const, hand: ['rh1', 'gh1', 'w1'], turnAmmo: 100 } });
+  const s = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'rh1' });
+  expect(s.seats[0]!.damageMultiplierThisTurn).toBe(2);
+  expect(s.seats[0]!.weaponDamageBonusThisTurn).toBe(20); // L1 still applies
+  expect(exploreDamage(s, 0, ['w1'])).toBe(60); // (10 + 20) * 2
+  // a character without the abilities gets neither
+  const plain = baseState({ seat0: { characterInstanceId: 'c0', level: 2 as const, hand: ['rh1', 'gh1', 'w1'], turnAmmo: 100 } });
+  const p = applyAction(plain, { type: 'playItem', seat: 0, instanceId: 'rh1' });
+  expect(p.seats[0]!.damageMultiplierThisTurn).toBeUndefined();
+  expect(p.seats[0]!.weaponDamageBonusThisTurn).toBe(0);
+});
+
+test('Alliance Claire: damage multiplier resets at the start of the next turn', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'cclaire', level: 2 as const, hand: ['rh1', 'gh1', 'w1'], turnAmmo: 100 } });
+  const s = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'rh1' });
+  expect(s.seats[0]!.damageMultiplierThisTurn).toBe(2);
+  const next = startTurn({ ...s, activeSeat: 0 });
+  expect(next.seats[0]!.damageMultiplierThisTurn).toBeUndefined();
+  expect(next.seats[0]!.weaponDamageBonusThisTurn).toBe(0);
+});
 test('Alliance Josh L1: cannot explore with weapons costing 50 or more', () => {
   const base = baseState({ seat0: { characterInstanceId: 'cjosh', level: 1 as const, hand: ['w1', 'wex'], turnAmmo: 100 } });
   expect(validateAction(base, { type: 'explore', seat: 0, weapons: ['wex'], exploreCount: 1 }).ok).toBe(false);

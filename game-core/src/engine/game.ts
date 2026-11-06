@@ -293,6 +293,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       buysLeft: 1,
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
+      damageMultiplierThisTurn: undefined,
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       attached: [],
@@ -412,6 +413,7 @@ export function startTurn(state: GameState): GameState {
       buysLeft: 1,
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
+      damageMultiplierThisTurn: undefined,
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       mustExplore: false,
@@ -495,6 +497,7 @@ export function startTurn(state: GameState): GameState {
         ? 1
         : 0),
     weaponDamageBonusThisTurn: 0,
+    damageMultiplierThisTurn: undefined,
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,

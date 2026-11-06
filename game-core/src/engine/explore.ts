@@ -26,6 +26,8 @@ export interface DamageParams {
   readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>;
   /** Number of Infected battled this turn (Incendiary Grenade). */
   readonly infectedBattledThisTurn?: number;
+  /** Claire Redfield (Alliance) L2: multiplies the final damage. */
+  readonly damageMultiplier?: number;
 }
 
 export function requiredAmmo(weapons: readonly ExploreWeapon[]): number {
@@ -81,7 +83,7 @@ export function computeDamage(params: DamageParams): number {
     }
   }
 
-  return damage;
+  return Math.round(damage * (params.damageMultiplier ?? 1));
 }
 
 /**
@@ -143,6 +145,7 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     inventoryCount: player.inventory.length,
     discardWeaponTagCounts,
     bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus,
+    damageMultiplier: player.damageMultiplierThisTurn ?? 1,
   });
 }
 
@@ -152,8 +155,8 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[] }): ExploreOutcome {
-  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities } = params;
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number }): ExploreOutcome {
+  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
 
@@ -162,7 +165,7 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
   }
 
   const revealBonus = revealHighHpInfectedBonusDamage(characterAbilities ?? [], revealed.hp ?? 0);
-  const damage = computeDamage({ weapons, ammo, bonusDamage: bonusDamage + revealBonus, knifeUsesEarlierThisTurn, ammoCardsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts });
+  const damage = computeDamage({ weapons, ammo, bonusDamage: bonusDamage + revealBonus, knifeUsesEarlierThisTurn, ammoCardsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, damageMultiplier });
 
   // instantKillAtOrBelowHp: if revealed infected HP <= threshold, instant defeat.
   const instantKill = weapons.some(w =>

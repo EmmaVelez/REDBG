@@ -13,6 +13,8 @@ import {
   chosenWeaponTypeAmmoDiscount,
   partnerAttachedDamageBonus,
   partnerAttachCap,
+  herbTrashDamageBonus,
+  hasDoubleDamageOnBothHerbs,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -42,6 +44,13 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
 function isGreenHerb(state: GameState, instanceId: string): boolean {
   return (
     cardDef(state, instanceId)?.itemEffects?.some(e => e.kind === 'healFixed20OrTrashWithSecondFor60') ??
+    false
+  );
+}
+/** True when the instance is a Red Herb (the only card with this effect). */
+function isRedHerb(state: GameState, instanceId: string): boolean {
+  return (
+    cardDef(state, instanceId)?.itemEffects?.some(e => e.kind === 'healSelfAndPartnerToFull') ??
     false
   );
 }
@@ -508,6 +517,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                           }
                         }
                       }
+                // Claire Redfield (Alliance): L1 +amount damage when a Green or
+                // Red Herb is trashed from hand; L2 double damage when both are.
+                const claireAbilities = characterAbilities(state, seat);
+                const claireBonus = herbTrashDamageBonus(claireAbilities);
+                const claireDoubleDamage = hasDoubleDamageOnBothHerbs(claireAbilities);
+                const trashedHerbKinds = new Set(def.itemEffects?.map(e => e.kind) ?? []);
+                const trashedGreen = trashedHerbKinds.has('healFixed20OrTrashWithSecondFor60');
+                const trashedRed = trashedHerbKinds.has('healSelfAndPartnerToFull');
                 if (promptKind !== undefined) {
                   // Heal 60 is only legal when the player still holds another Green
                   // Herb in hand (the played one is already gone). Both are trashed.
@@ -524,7 +541,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   ];
                 }
 
-      const newPlayer: PlayerState = { ...played.player, hp, maxHp };
+      const newPlayer: PlayerState = {
+        ...played.player,
+        hp,
+        maxHp,
+        weaponDamageBonusThisTurn:
+          (played.player.weaponDamageBonusThisTurn ?? 0) + ((trashedGreen || trashedRed) ? claireBonus : 0),
+        ...(trashedRed && trashGreenHerbId !== undefined && claireDoubleDamage
+          ? { damageMultiplierThisTurn: (played.player.damageMultiplierThisTurn ?? 1) * 2 }
+          : {}),
+      };
       // Red Herb: trash green herb + heal partner to full.
       let finalRemoved = newRemoved;
       let finalSeats = state.seats.map(s => (s.seat === seat ? newPlayer : s));
@@ -893,6 +919,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities),
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
+              damageMultiplier: player.damageMultiplierThisTurn ?? 1,
             });
 
       if (outcome.kind === 'insufficientAmmo') {

@@ -292,7 +292,9 @@ export type CharacterAbility =
   | { readonly kind: "partnerAttachedCountDamageBonus"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Jill Valentine (Alliance) L1: +amount damage when exploring if her partner has <= threshold cards attached
   | { readonly kind: "offTurnFlashGrenadeLasPlagas"; readonly level: 1 | 2 } // Jill Valentine (Alliance) L2: on an opponent's Las Plagas reveal, may trash a Flash Grenade to defeat it
   | { readonly kind: "weaponCostCap"; readonly maxCost: number; readonly level: 1 | 2 } // Josh Stone (Alliance) L1: cannot use weapons costing maxCost or more
-  | { readonly kind: "partnerAttachCapBonus"; readonly amount: number; readonly level: 1 | 2 }; // Josh Stone (Alliance) L2: partner may attach amount extra cards
+  | { readonly kind: "partnerAttachCapBonus"; readonly amount: number; readonly level: 1 | 2 } // Josh Stone (Alliance) L2: partner may attach amount extra cards
+  | { readonly kind: "herbTrashDamageBonus"; readonly amount: number; readonly level: 1 | 2 } // Claire Redfield (Alliance) L1: +amount damage this turn when a Green/Red Herb is trashed
+  | { readonly kind: "doubleDamageOnBothHerbs"; readonly level: 1 | 2 }; // Claire Redfield (Alliance) L2: double all damage this turn when a Green and a Red Herb are both trashed
 
 
 // ---------------------------------------------------------------------------
@@ -348,6 +350,8 @@ export interface PlayerState {
   readonly exploresLeft: number;
   /** Temporary per-turn combat bonus (Deadly Aim etc.). */
   readonly weaponDamageBonusThisTurn: number;
+  /** Claire Redfield (Alliance) L2: multiplies all damage dealt this turn. */
+  readonly damageMultiplierThisTurn?: number;
   /** Vengeful Intention etc: damage added per additional action played this turn. */
   readonly damagePerAdditionalActionThisTurn?: number;
   /** AC-022 Desperate Forces: chosen weapon types get +10 damage this turn. */
