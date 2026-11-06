@@ -347,3 +347,27 @@ export function healAtTurnStart(abilities: readonly CharacterAbility[]): number 
   }
   return heal;
 }
+
+/**
+ * Chris Redfield (Alliance CH-019) L1: -amount ammo requirement, but only
+ * when the explore uses exactly one weapon.
+ */
+export function singleWeaponAmmoDiscount(abilities: readonly CharacterAbility[]): number {
+  let amount = 0;
+  for (const a of abilities) {
+    if (a.kind === 'singleWeaponAmmoDiscount') amount += a.amount;
+  }
+  return amount;
+}
+
+/**
+ * Chris Redfield (Alliance CH-019) L2: -amount ammo requirement for weapons
+ * whose type is in the player's chosen set.
+ */
+export function chosenWeaponTypeAmmoDiscount(abilities: readonly CharacterAbility[]): number {
+  let amount = 0;
+  for (const a of abilities) {
+    if (a.kind === 'chosenWeaponTypeAmmoDiscount') amount += a.amount;
+  }
+  return amount;
+}

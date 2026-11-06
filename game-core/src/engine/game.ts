@@ -498,6 +498,7 @@ export function startTurn(state: GameState): GameState {
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
     desperateForcesTypes: undefined,
+    chrisAmmoDiscountTypes: undefined,
     skipNextTurn: undefined,
     noActionsNextTurn: undefined,
     playArea: [],

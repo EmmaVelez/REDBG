@@ -307,7 +307,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'inventoryBottomToTop':
         case 'gainAmmoX10ForGold':
         case 'discardToHandIfTenPlus':
-        case 'discardCardForHealAndDamage': {
+        case 'discardCardForHealAndDamage':
+        case 'chosenWeaponTypeAmmoDiscount': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -341,6 +342,15 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
+            }
+          }
+          if (ability.kind === 'chosenWeaponTypeAmmoDiscount') {
+            const hasTypedWeapon = [...player.hand, ...player.playArea].some(id => {
+              const d = cardDef(state, id);
+              return d?.type === 'weapon' && !!d.weaponType;
+            });
+            if (!hasTypedWeapon) {
+              return { ok: false, reason: 'useCharacterAbility: no weapon type available' };
             }
           }
           if (ability.kind === 'discardCardForHealAndDamage') {

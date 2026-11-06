@@ -9,6 +9,8 @@ import {
   cardsOnDamageTakenDuringTurn,
   applyHpLoss,
   movesDiscardToInventoryOnDefeat,
+  singleWeaponAmmoDiscount,
+  chosenWeaponTypeAmmoDiscount,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -585,8 +587,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
           // Passive abilities can reduce the cost (Leon L1 pistols, Sheva L2 rifles).
           const abilities = characterAbilities(state, seat);
+          // Chris Redfield (Alliance): L1 -20 ammo when using exactly one
+          // weapon; L2 -20 ammo for the weapon types he chose this turn.
+          const chrisSingleDiscount = weapons.length === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
+          const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
+          const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
           const requiredAmmo = weapons.reduce((sum, weaponId) => {
-            return sum + ammoReqForWeapon(abilities, cardDef(state, weaponId));
+            const w = cardDef(state, weaponId);
+            return sum + Math.max(ammoReqForWeapon(abilities, w) - chrisSingleDiscount - (w?.weaponType !== undefined && chrisTypeDiscountTypes.includes(w.weaponType) ? chrisTypeDiscount : 0), 0);
           }, 0);
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
@@ -668,7 +676,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const assigned = isX ? Math.min(ammoByWeapon?.[instId ?? ''] ?? 0, w?.ammoCap ?? 999) : 0;
             return {
               damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0)),
-              ammoReq: isGatling ? 0 : isX ? assigned : ammoReqForWeapon(abilities, w),
+              ammoReq: isGatling ? 0 : isX ? assigned : Math.max(ammoReqForWeapon(abilities, w) - chrisSingleDiscount - (w?.weaponType !== undefined && chrisTypeDiscountTypes.includes(w.weaponType) ? chrisTypeDiscount : 0), 0),
               weaponEffects: w?.weaponEffects,
               tags: w?.weaponTags,
             };
@@ -1300,6 +1308,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'chosenWeaponTypeAmmoDiscount': {
+              // Chris (Alliance) L2: choose a weapon type present in hand/play
+              // area; its weapons require 20 less ammo this turn.
+              const candidateWeapons = [...player.hand, ...player.playArea]
+                .map(id => cardDef(state, id))
+                .filter((d): d is CardDef => !!d && d.type === 'weapon' && !!d.weaponType);
+              const types = [...new Set(candidateWeapons.map(d => d.weaponType as string))];
+              if (types.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Choose a weapon type: its weapons require 20 less ammo this turn.',
+                    options: [...types, 'Decline'],
+                    payload: { kind: 'chrisAmmoDiscountType' },
+                  },
+                ],
+              };
+            }
             case 'discardCardForHealAndDamage': {
               // Steve (Alliance) L2: discard the named card from hand -> recover
               // heal HP (capped) and gain +damage base damage this turn.
@@ -1796,6 +1829,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'chrisAmmoDiscountType') {
+        // Chris (Alliance) L2: record the chosen weapon type for this turn.
+        const chosen = prompt.options[option];
+        if (chosen === 'Decline' || chosen === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...player, chrisAmmoDiscountTypes: [...(player.chrisAmmoDiscountTypes ?? []), chosen] } : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
       if (kind === 'discardToHandIfTenPlus') {
         // Billy (Alliance) L2: the chosen discard card moves to the hand.
         const chosen = prompt.options[option];

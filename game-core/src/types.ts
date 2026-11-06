@@ -286,7 +286,9 @@ export type CharacterAbility =
   | { readonly kind: "discardToHandIfTenPlus"; readonly threshold: number; readonly level: 1 | 2 } // Billy Coen (Alliance) L2: during turn, if discard >= threshold, move one discard card to hand
   | { readonly kind: "plusDamagePerCardInHand"; readonly amount: number; readonly level: 1 | 2 } // Jack Krauser (Alliance) L2: +amount damage for every card in his hand
   | { readonly kind: "healAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // Steve Burnside (Alliance) L1: recover amount HP at the start of each turn
-  | { readonly kind: "discardCardForHealAndDamage"; readonly cardId: string; readonly heal: number; readonly damage: number; readonly level: 1 | 2 }; // Steve Burnside (Alliance) L2: discard the named card from hand -> heal and +damage this turn
+  | { readonly kind: "discardCardForHealAndDamage"; readonly cardId: string; readonly heal: number; readonly damage: number; readonly level: 1 | 2 } // Steve Burnside (Alliance) L2: discard the named card from hand -> heal and +damage this turn
+  | { readonly kind: "singleWeaponAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // Chris Redfield (Alliance) L1: -amount ammo requirement when using exactly one weapon
+  | { readonly kind: "chosenWeaponTypeAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 }; // Chris Redfield (Alliance) L2: -amount ammo requirement for a chosen weapon type
 
 
 // ---------------------------------------------------------------------------
@@ -346,6 +348,8 @@ export interface PlayerState {
   readonly damagePerAdditionalActionThisTurn?: number;
   /** AC-022 Desperate Forces: chosen weapon types get +10 damage this turn. */
   readonly desperateForcesTypes?: readonly string[];
+  /** Chris Redfield (Alliance) L2: weapon types with a reduced ammo requirement this turn. */
+  readonly chrisAmmoDiscountTypes?: readonly string[];
   /** Skip the next turn entirely (Executioner). */
   readonly skipNextTurn?: boolean;
   /** Cannot play Actions next turn (Zombie Female). */

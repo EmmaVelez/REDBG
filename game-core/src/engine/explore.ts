@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount } from './abilities';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -98,9 +98,12 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     const inst = state.cards[id];
     return inst === undefined ? undefined : state.cardDefs[inst.cardId];
   });
+  const chrisSingleDiscount = (weaponIds?.length ?? 0) === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
+  const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
+  const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
   const weapons: ExploreWeapon[] = defs.map(def => ({
     damage: def?.damage ?? 0,
-    ammoReq: ammoReqForWeapon(abilities, def),
+    ammoReq: Math.max(ammoReqForWeapon(abilities, def) - chrisSingleDiscount - (def?.weaponType !== undefined && chrisTypeDiscountTypes.includes(def.weaponType) ? chrisTypeDiscount : 0), 0),
     weaponEffects: def?.weaponEffects,
     tags: def?.weaponTags,
   }));
