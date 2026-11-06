@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { setup, startTurn, checkWin } from './game';
+import { exploreDamage } from './explore';
 import { applyAction } from './actions';
 import { ALL_CARDS, OUTBREAK_PILES, OUTBREAK_MANSION } from '../data/cards';
 import { SCENARIOS } from '../data/cards';
@@ -396,6 +397,73 @@ describe('Outbreak mode', () => {
     const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-003#1', 'in-003#2'] });
     // 5 + 5 for each card, plus 5 per other Bile Vomit: 5+5 + 5+5 = 20
     expect(atk.seats[1]!.hp).toBe(s.seats[1]!.hp - 20);
+  });
+  // --- Outbreak characters ---
+  test('CH-024 Mark Wilkins L1: +10 damage when using two or more weapons', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-024#1', level: 1, hand: [...x.hand, 'we-009#1', 'we-004#1'], turnAmmo: 20 } : x)),
+    })), ['ch-024#1']);
+    expect(exploreDamage(s, 0, ['we-009#1', 'we-004#1'])).toBe(10 + 5 + 10); // Handgun + Knife + Mark L1
+    expect(exploreDamage(s, 0, ['we-009#1'])).toBe(10);
+  });
+
+  test('CH-024 Mark Wilkins L2: +10 damage to Melee weapons', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-024#1', level: 2, hand: [...x.hand, 'we-004#1'], turnAmmo: 0 } : x)),
+    })), ['ch-024#1']);
+    expect(exploreDamage(s, 0, ['we-004#1'])).toBe(5 + 10); // Combat Knife is a Melee weapon
+  });
+
+  test('CH-028 Chris Redfield L1: discard any number for +20 Ammo each', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-028#1', level: 1, hand: [...x.hand, 'we-004#1', 'we-009#1'], turnAmmo: 0 } : x)),
+    })), ['ch-028#1']);
+    const used = applyAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 });
+    expect(pr(used).payload?.kind).toBe('discardAnyForAmmo');
+    const d1 = applyAction(used, { type: 'chooseOption', seat: 0, promptId: pr(used).id, option: 0 });
+    const d2 = applyAction(d1, { type: 'chooseOption', seat: 0, promptId: pr(d1).id, option: 0 });
+    const donePrompt = pr(d2);
+    const done = applyAction(d2, { type: 'chooseOption', seat: 0, promptId: donePrompt.id, option: donePrompt.options.indexOf('DONE') });
+    expect(done.seats[0]!.turnAmmo).toBe(40);
+  });
+
+  test('CH-028 Chris Redfield L2: +20 explore damage with over 100 ammo', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-028#1', level: 2, hand: [...x.hand, 'we-009#1'], turnAmmo: 120 } : x)),
+    })), ['ch-028#1']);
+    expect(exploreDamage(s, 0, ['we-009#1'])).toBe(10 + 20);
+    const poor = { ...s, seats: s.seats.map((x, i) => (i === 0 ? { ...x, turnAmmo: 100 } : x)) };
+    expect(exploreDamage(poor, 0, ['we-009#1'])).toBe(10);
+  });
+
+  test('CH-027 Ada Wong L1: +1 action at turn start when health is 30 or less', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => (i === 0 ? { ...x, characterInstanceId: 'ch-027#1', hp: 30, level: 1 } : x)),
+    })), ['ch-027#1']);
+    const next = startTurn({ ...s, activeSeat: 0 });
+    expect(next.seats[0]!.actionsLeft).toBe(2);
+    const healthy = { ...s, seats: s.seats.map((x, i) => (i === 0 ? { ...x, hp: 31 } : x)) };
+    expect(startTurn({ ...healthy, activeSeat: 0 }).seats[0]!.actionsLeft).toBe(1);
+  });
+
+  test('CH-030 Hunk L2: +30 base damage at 10 or less health', () => {
+    const s = withCards(outbreakState(st => ({
+      ...st,
+      seats: st.seats.map((x, i) => {
+        if (i === 0) return { ...x, characterInstanceId: 'ch-030#1', level: 2, hp: 10, maxHp: 90, exploresLeft: 1 };
+        return x;
+      }),
+    })), ['ch-030#1']);
+    const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1 });
+    // Non-Infected attackers still use a weapon; Hunk's +30 is base Damage on top.
+    const weaponInHand = s.seats[0]!.hand.find(id => s.cardDefs[s.cards[id]?.cardId ?? '']?.type === 'weapon');
+    const weaponDamage = weaponInHand !== undefined ? (s.cardDefs[s.cards[weaponInHand]?.cardId ?? '']?.damage ?? 0) : 0;
+    expect(s.seats[1]!.hp - atk.seats[1]!.hp).toBe(weaponDamage + 30);
   });
   test('the game ends when Tyrant T-002 is defeated', () => {
     const s = outbreakState(st => ({

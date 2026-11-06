@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove } from './abilities';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -117,7 +117,9 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
       player.playArea.map(id => state.cards[id]?.cardId).map(cid => state.cardDefs[cid ?? '']?.type ?? ''),
       t => t === 'action'
     ) +
-    partnerAttachedDamageBonus(abilities, player.partnerAttached);
+    partnerAttachedDamageBonus(abilities, player.partnerAttached) +
+    plusDamageIfTwoOrMoreWeapons(abilities, defs.length) +
+    exploreBonusIfAmmoAbove(abilities, player.turnAmmo);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;

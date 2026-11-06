@@ -16,6 +16,9 @@ import {
   herbTrashDamageBonus,
   hasDoubleDamageOnBothHerbs,
   hasPerfectExploreReward,
+  plusDamageIfTwoOrMoreWeapons,
+  exploreBonusIfAmmoAbove,
+  baseDamageBonusIfHpAtMost,
   ammoReqForWeapon,
   passiveDamageBonus,
   exploreGoldBonus,
@@ -443,6 +446,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                 promptInstanceId = instanceId;
                                 break;
                               }
+
                               if (e.kind === 'injection') {
                                 promptKind = 'injectionDiscard';
                                 promptOptions = [...played.player.hand, 'DONE'];
@@ -856,7 +860,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             passiveDamageBonus(abilities, weaponDefs, exploreCount, player.hand.length) +
             exploreBigHandBonus(abilities, state.seats) +
             exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action') +
-            partnerAttachedDamageBonus(abilities, player.partnerAttached);
+            partnerAttachedDamageBonus(abilities, player.partnerAttached) +
+            plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
+            exploreBonusIfAmmoAbove(abilities, player.turnAmmo);
           // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
           const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
             const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
@@ -1480,6 +1486,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'discardAnyForAmmo': {
+              // Chris Redfield (Outbreak) L1: discard any number of cards from
+              // hand, then gain +amount Ammo for each card discarded.
+              const amount = (characterAbilities(state, seat).find(a => a.kind === 'discardAnyForAmmo') as { amount: number } | undefined)?.amount ?? 0;
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Discard any number of cards from your hand for Ammo.',
+                    options: [...player.hand, 'DONE'],
+                    payload: { kind: 'discardAnyForAmmo', count: '0', amount: String(amount) },
+                  },
+                ],
+              };
+            }
             case 'exchangeBuyForAction': {
               // Ada L2: spend the Buy for an extra Action.
               return {
@@ -1767,7 +1792,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (infectedAttacker) {
             // Infected Characters deal their base Damage (Zombie A/B/C: 0/5/10)
             // plus any Infection cards they use.
-            damage = attackerDef?.baseDamage ?? 0;
+            damage = (attackerDef?.baseDamage ?? 0) + baseDamageBonusIfHpAtMost(characterAbilities(state, seat), player.hp);
             const infectionIds = action.infectionCardIds ?? [];
             const bileUsed = infectionIds.filter(id => state.cards[id]?.cardId === 'in-003').length;
             for (const iid of infectionIds) {
@@ -1794,7 +1819,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               throw new Error('applyAction: attack: insufficient ammo');
             }
             turnAmmoAfter = player.turnAmmo - req;
-            damage = computeDamage({ weapons: [{ damage: wDef.damage ?? 0, ammoReq: req }], ammo: turnAmmoAfter, bonusDamage: 0 });
+            damage = computeDamage({ weapons: [{ damage: wDef.damage ?? 0, ammoReq: req }], ammo: turnAmmoAfter, bonusDamage: 0 })
+              + baseDamageBonusIfHpAtMost(characterAbilities(state, seat), player.hp);
             if (player.hand.includes(wId)) {
               newHand = player.hand.filter(id => id !== wId);
               newDiscard = [...newDiscard, wId];
@@ -2187,6 +2213,37 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'discardAnyForAmmo') {
+        // Chris Redfield (Outbreak) L1: discard any number of cards from hand,
+        // then gain +amount Ammo for each card discarded.
+        const count = Number(prompt.payload?.count ?? '0');
+        if (chosenId === undefined || chosenId === 'DONE') {
+          const amount = Number(prompt.payload?.amount ?? '0');
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...player, turnAmmo: player.turnAmmo + amount * count }
+              : s)),
+            prompts: newPrompts,
+          };
+        }
+        const remaining = player.hand.filter(id => id !== chosenId);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: remaining, discard: [...player.discard, chosenId] }
+            : s)),
+          prompts: [...newPrompts, {
+            id: 'p' + (newPrompts.length + 1),
+            seat,
+            text: 'Discard any number of cards from your hand for Ammo.',
+            options: [...remaining, 'DONE'],
+            payload: { kind: 'discardAnyForAmmo', count: String(count + 1), amount: String(prompt.payload?.amount ?? '0') },
+          }],
+        };
+      }
       if (kind === 'injectionDiscard') {
         // AC-026 Injection: discard any number, then draw the same amount,
         // then optionally trash this card for -1 Infection Level.

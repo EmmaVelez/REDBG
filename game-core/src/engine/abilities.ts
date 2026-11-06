@@ -399,6 +399,41 @@ export function herbTrashDamageBonus(abilities: readonly CharacterAbility[]): nu
   return amount;
 }
 
+/** Mark Wilkins (Outbreak CH-024) L1: +amount damage when using threshold+ weapons. */
+export function plusDamageIfTwoOrMoreWeapons(
+  abilities: readonly CharacterAbility[],
+  weaponCount: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'plusDamageIfTwoOrMoreWeapons' && weaponCount >= a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}
+
+/** Chris Redfield (Outbreak CH-028) L2: +amount explore damage when ammo > threshold. */
+export function exploreBonusIfAmmoAbove(
+  abilities: readonly CharacterAbility[],
+  ammo: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'exploreBonusIfAmmoAbove' && ammo > a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}
+
+/** HUNK (Outbreak CH-030) L2: +amount base damage when Health <= threshold. */
+export function baseDamageBonusIfHpAtMost(
+  abilities: readonly CharacterAbility[],
+  hp: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'baseDamageBonusIfHpAtMost' && hp <= a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}
 /** Carlos Oliveira (Alliance CH-011) L2: perfect-explore reward. */
 export function hasPerfectExploreReward(abilities: readonly CharacterAbility[]): boolean {
   return abilities.some(a => a.kind === 'perfectExploreReward');

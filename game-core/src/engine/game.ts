@@ -564,7 +564,12 @@ export function startTurn(state: GameState): GameState {
     actionsLeft: (() => {
       const base = (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0);
       // IN-001 Claw caps the Actions available next turn.
-      return player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
+      const capped = player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
+      // Ada Wong (Outbreak CH-027) L1: +1 Action at turn start when Health is
+      // at or below the threshold.
+      const adaBonus = abilitiesForLevel(charDef?.abilities, player.level)
+        .filter(a => a.kind === 'turnStartActionIfHpAtMost' && player.hp <= a.threshold).length;
+      return capped + adaBonus;
     })(),
     buysLeft: 1,
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
