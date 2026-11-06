@@ -1,6 +1,17 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-06 ~15:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), **M4 ✅ client complete (M4-T11..T14)**. All 47 characters across Premier/Nightmare/Alliance/Outbreak have engine behaviour. **gainCard refactor ✅ done** (central gain pipeline + AC-021 Gathering Forces implemented). **Card art ✅ wired** (`CARD-ART/*.svg` → CardView; stale `client/public/card-art/` copy deleted). Suites: game-core 526, server 89, client 128 — all green, typecheck clean. **Next: M5 (hardening & release)** — README, production build verification, reconnect torture test, deploy smoke test. Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+**Current state (2026-11-06 ~16:25):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 in progress: T01 ✅ README + run scripts, T02 ✅ production build + deploy smoke test, T03 ✅ reconnect torture test, T04 ✅ full-game bot soak.** All 47 characters have engine behaviour. Suites: **game-core 533, server 96, client 128** — all green, typecheck clean. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found). Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+
+**M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
+1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
+2. Starting-deck instance ids collided across seats (all four players held `am-001#1..#7`), so `state.cards` could name only one of four physical cards.
+3. Revive used a plain `draw`, so a downed character with a short inventory returned with <5 cards (rulebook: draw 5, reshuffle) and the redraw destroyed cards an effect had given a downed player.
+4. A card listed by two piles (alliance `we-004`) registered the same instances twice — one card in two piles.
+5. Prompts built from an empty zone had ZERO options, gating every action behind "resolve pending prompt first" → deadlock. New `engine/prompts.ts` `dropEmptyPrompts` choke point.
+6. Outbreak reanimation dropped the Play Area, destroying every card played that turn.
+7. The greedy bot skipped every turn forever on PR-002 Jill (held→owned revaluation + phantom turn pools) — games never ended.
+
+**User pushed 3 UI commits mid-session** (8e812d9..72b00bc: radial health gauge on revealed mansion cards) — rebased cleanly on top of.
 
 ## OLLAMA MODELS PATH (do not skip)
 Models live at `F:\ollama\models` (moved off C: when it hit 233G/233G). Start serve with:
@@ -32,10 +43,16 @@ Model inventory: gemma4:e4b (active coder), qwen2.5-coder:14b, qwen3.8:27b, qwen
 - **Background `npm start -w server` orphan trap:** killing the npm background process (process_manage kill) kills the npm/cmd wrapper but ORPHANS the actual node child, which keeps holding port 1724 → next `npm start` dies with EADDRINUSE. Cleanup: `netstat -ano | grep 1724` → `powershell Stop-Process -Id <pid> -Force`. `.gitignore` node_modules; never `git add -A` with stray smoke/probe files.
 
 ## Test-helper lesson (integration tests)
-`nextWithTimeout` racing `next()` leaves a stale waiter that EATS the next real message — any timeout-based ws test helper needs a cancellable waiter that unregisters on cancel (see `nextCancel` in server/src/integration.test.ts). Also: waitFor predicates over queued broadcasts must include the discriminator you actually care about (e.g. `activeSeat === 0 && turnNumber >= 2`, else stale turn-1 views match).
+`nextWithTimeout` racing `next()` leaves a stale waiter that EATS the next real message — any timeout-based ws test helper needs a cancellable waiter that unregisters on cancel (see `nextCancel` in server/src/testHelpers.ts, shared by integration.test.ts and reconnect.test.ts). Also: waitFor predicates over queued broadcasts must include the discriminator you actually care about (e.g. `activeSeat === 0 && turnNumber >= 2`, else stale turn-1 views match).
+
+## Soak lessons (M5-T04)
+- The soak's conservation invariant is `zones ∪ removed ∪ characterInstances == keys(state.cards)`; CHARACTER instances are registered by setup but intentionally live outside every zone, so they must be accounted for separately (filter by `cardDefs[cardId].type === 'character'`, NOT by an id prefix — promo `pr-002#1` is a character).
+- Instance-id collisions are invisible to gameplay (nothing reads `cards[id].location` yet) but poison every conservation audit. When a soak goes red on conservation, check for a shared id across seats/piles before touching the engine logic.
+- Audit EVERY zone transition for scoring arbitrage (see the local-llm-coder skill's `ai-evaluator-tuning.md`): hand cards score at held value, discard/inventory at owned value, so any effect that SHIPS cards manufactures points. `clampDiscardToHeld` is the remedy, and it must be applied to any simulation whose action ends the turn (endTurn AND a skip option) — otherwise the bot loops on the free transition forever.
+- A stall seed is not automatically a regression: bisect by reverting ONE change and re-measuring (the RNG stream shifts with any reshuffle change, so pinned seeds move). `git stash` + re-run the probe is the fastest attribution.
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `b97dcbf` (M3-T05).
-3. M5: read PLAN.md M5 section — README/run scripts, `npm run build` production bundle, reconnect torture test, deploy smoke test.
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `efbb111` (M5-T04).
+3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
