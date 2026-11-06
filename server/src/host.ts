@@ -136,7 +136,6 @@ const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
         return undefined;
       }
       const action = chooseBotAction(state, state.activeSeat, difficulty, () => 0.5);
-      console.log('[host] stepBot activeSeat=', state.activeSeat, 'action=', action.type);
       let next = applyAction(state, action);
       if (action.type === 'endTurn') {
         next = startTurn(next);

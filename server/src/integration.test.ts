@@ -293,12 +293,16 @@ describe('M3-T05 integration: scripted 2-client game over real WebSockets', () =
   // explored with 9 stars'): the game can END on a bot's action inside
   // advanceBots (bot defeats Uroboros / last human dies). The old code only
   // checked the HUMAN action's result for gameOver, so the ending was never
-  // broadcast — every client sat on 'Waiting for Bot N…' forever. Seed 109
-  // reproduces: with the human always endTurn-ing, the game ends on a bot
-  // step at turn ~131 with uroborosDefeated.
+  // broadcast — every client sat on 'Waiting for Bot N…' forever.
+  // Seed 19 reproduces: with the human always endTurn-ing, the game ends on a
+  // bot step at turn ~15 with uroborosDefeated. (Seed 109 was the original
+  // repro, but bot-policy/mansion-deck changes since then made it a stall
+  // seed — the game no longer ends there within the 400-turn budget. Many
+  // seeds stall; the point of this test is the broadcast path, so pin one
+  // that reliably ends on a bot step.)
   it('broadcasts gameOver when the game ends during a bot step', async () => {
     // pin the engine seed: host.start(Math.floor(random() * 2 ** 31))
-    const server = startServer({ rand: () => 109 / 2 ** 31 });
+    const server = startServer({ rand: () => 19 / 2 ** 31 });
 
     const host = connect(server);
     await open(host);
