@@ -1398,6 +1398,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const defeatedDecorations = multiResult.defeated ? infectedTargets.reduce((s, d) => s + (d?.decorations ?? 0), 0) : 0;
         let newPlayer = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations });
         // remove event + any defeated infected from game (simplified: remove all revealed)
+        // WE-028 Stun Rod: while your character is battling two or more
+        // Infected, you may move one of them with 20 or less Health to the top
+        // of the Mansion.
+        const stunRodUsed = weapons.some(id => cardDef(state, id)?.weaponEffects?.some(
+          e => e.kind === 'moveLowHpInfectedToMansionTop') === true);
+        const stunThreshold = weapons.reduce((m, id) => {
+          const eff = cardDef(state, id)?.weaponEffects?.find(e => e.kind === 'moveLowHpInfectedToMansionTop');
+          return eff !== undefined && eff.kind === 'moveLowHpInfectedToMansionTop' ? eff.hpThreshold : m;
+        }, 20);
+        const revealedInfectedIds: string[] = [];
+        if (cardDef(state, revealedInstanceId)?.type === 'infected') revealedInfectedIds.push(revealedInstanceId);
+        if (cardDef(state, secondId)?.type === 'infected') revealedInfectedIds.push(secondId);
+        const stunCandidates = revealedInfectedIds.filter(id => {
+          const d = cardDef(state, id);
+          return d !== undefined && (d.hp ?? 0) <= stunThreshold;
+        });
+        const stunPrompts: Prompt[] = stunRodUsed && revealedInfectedIds.length >= 2 && stunCandidates.length > 0
+          ? [{
+              id: `stunRod-${seat}-v${state.version}`,
+              seat,
+              text: 'Stun Rod: move one of these Infected to the top of the Mansion?',
+              options: [...stunCandidates, 'Decline'],
+              payload: { kind: 'stunRodChooseInfected' },
+            }]
+          : [];
         const removedIds = [revealedInstanceId, secondId];
         // shuffle non-infected back to bottom
         const toShuffleBack = [revealedInstanceId, secondId].filter(id => {
@@ -1417,7 +1442,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
-          prompts: state.prompts,
+          prompts: [...state.prompts, ...stunPrompts],
         };
       }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
@@ -1825,6 +1850,29 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ...p,
         infectionCards: infectionBySeat.get(p.seat) ?? p.infectionCards ?? [],
       });
+      // MA-036 Reaper: "If not defeated with damage equal to its health, trash
+      // 1 card with the highest cost attached to your partner." Only an exact
+      // defeat (damage dealt === the Infected's health) avoids the penalty.
+      const reaperEffect = revealedDef?.infectedEffects?.some(
+        e => e.kind === 'trashHighestCostAttachedOnPartnerIfNotExactDefeat') ?? false;
+      let reaperPartnerAttached: readonly string[] = player.partnerAttached ?? [];
+      let reaperTrashed: readonly string[] = [];
+      if (reaperEffect && revealedDef !== undefined) {
+        const exactDefeat = outcome.kind === 'defeated' && outcome.damage === outcome.hp;
+        if (!exactDefeat) {
+          const attached = [...(player.partnerAttached ?? [])];
+          let bestId: string | undefined;
+          let bestCost = -1;
+          for (const id of attached) {
+            const cost = cardDef(state, id)?.cost ?? 0;
+            if (cost > bestCost) { bestCost = cost; bestId = id; }
+          }
+          if (bestId !== undefined) {
+            reaperPartnerAttached = attached.filter(id => id !== bestId);
+            reaperTrashed = [bestId];
+          }
+        }
+      }
       if (outcome.kind === 'defeated') {
         // Outbreak: on-defeat infection effects. MA-053 Lisa Trevor is not
         // attached - it goes to the bottom of the Mansion instead.
@@ -1897,6 +1945,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   pendingSkillEffects: undefined,
                   pendingBackstab: undefined,
                   attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
+                  partnerAttached: reaperPartnerAttached,
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 });
         const hasSkip = !infectedEffectNegated && (revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
@@ -1965,13 +2014,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'leonTrashForGain' },
             }]
           : maskPrompts;
+        // MA-030 Cephalo (Las Plagas): on defeat, choose a player who must
+        // Explore on their next turn.
+        const cephaloPrompt: Prompt | undefined = revealedDef?.infectedEffects?.some(
+          e => e.kind === 'mustExploreNextTurnOnDefeat') && !infectedEffectNegated
+          ? {
+              id: 'p' + (leonPrompts.length + 1),
+              seat,
+              text: 'Cephalo: choose a player. That player must Explore on their next turn.',
+              options: state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
+              payload: { kind: 'cephaloChoosePlayer' },
+            }
+          : undefined;
+        const cephaloPrompts = cephaloPrompt !== undefined ? [...leonPrompts, cephaloPrompt] : leonPrompts;
         // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
         const zombieBDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
         // Mercenaries: on-defeat infected effects + character/weapon abilities
         // (MA-073/074/088/093/094/096/098, CH-047 Chris, WE-044/045/050).
         let defeatFxState: GameState = {
           ...state,
-          removed: removedAfter,
+          removed: [...removedAfter, ...reaperTrashed.filter(id => !removedAfter.includes(id))],
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
         };
         const defeatFxPrompts: Prompt[] = [];
@@ -2004,7 +2066,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: defeatFxState.rngState,
-          prompts: [...leonPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
+          prompts: [...cephaloPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
       }
@@ -2093,6 +2155,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       }
 
+      // MA-025 Duvalia (Las Plagas): "When this infected kills a character, the
+      // player with the most decorations gains five Ammo x 10 cards." A pending
+      // Resuscitate means the character is not killed yet.
+      const duvaliaEffect = revealedDef?.infectedEffects?.find(
+        e => e.kind === 'onKillGainAmmoX10ToMostDecorated');
+      if (duvaliaEffect !== undefined && duvaliaEffect.kind === 'onKillGainAmmoX10ToMostDecorated' &&
+          !infectedEffectNegated && newLeadingHp <= 0 && !resuscitatePending) {
+        const alive = state.seats.filter(s => !s.dead && !s.downed);
+        if (alive.length > 0) {
+          const maxDeco = Math.max(...alive.map(s => s.decorations));
+          const tied = alive.filter(s => s.decorations === maxDeco);
+          const bestHp = Math.max(...tied.map(s => s.hp));
+          const chosen = tied.filter(s => s.hp === bestHp).map(s => s.seat)[0];
+          if (chosen !== undefined) state = gainAmmoX10(state, chosen, duvaliaEffect.count);
+        }
+      }
+
       // Outbreak: not-defeated effects (MA-041 Tyrant T-002, MA-046 Web Spinner).
       let outbreakShuffledBack = false;
       if (revealedDef?.type === 'infected') {
@@ -2129,6 +2208,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               pendingSkillEffects: undefined,
               pendingBackstab: undefined,
               ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
+              partnerAttached: reaperPartnerAttached,
               ...(partnerDied
                 ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined }
                 : {}),
@@ -2138,13 +2218,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const removedFinal = partnerDied
         ? [...removedAfter, ...afterPartnerDeath.removed.filter(id => !removedAfter.includes(id))]
         : removedAfter;
+      const removedWithReaper = [...removedFinal, ...reaperTrashed.filter(id => !removedFinal.includes(id))];
 
       // Mercenaries: not-defeated infected effects (MA-075/078/079/082/090).
       // Applied on top of the post-explore player so max-HP / inventory / ammo
       // changes are not overwritten by the explore's own updates.
       state = {
         ...afterPartnerDeath,
-        removed: removedFinal,
+        removed: removedWithReaper,
         mansionDeck,
         mansionBottom,
         seats: afterPartnerDeath.seats.map(s => (s.seat === seat ? newPlayer : s)),
@@ -2925,12 +3006,54 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             }
           }
+          // IN-002 Virulent Frenzy: "Look at the top three cards of your
+          // inventory. Trash all non-infection cards. Move the rest to the top
+          // of your inventory in any order."
+          const virulentFrenzyUsed = (action.infectionCardIds ?? []).some(
+            id => state.cards[id]?.cardId === 'in-002');
+          let frenzyInventory = player.inventory;
+          let frenzyTrashed: string[] = [];
+          let frenzyInfections: string[] = [];
+          let frenzyPrompts: Prompt[] = [];
+          if (virulentFrenzyUsed) {
+            const top3 = player.inventory.slice(0, 3);
+            frenzyTrashed = top3.filter(id => !state.cards[id]?.cardId.startsWith('in-'));
+            frenzyInfections = top3.filter(id => state.cards[id]?.cardId.startsWith('in-'));
+            frenzyInventory = player.inventory.filter(id => !frenzyTrashed.includes(id) && !frenzyInfections.includes(id));
+            if (frenzyInfections.length > 0) {
+              frenzyPrompts = [{
+                id: `virulentFrenzy-${seat}-v${state.version}`,
+                seat,
+                text: 'Virulent Frenzy: put the Infection cards on top of your Inventory, in any order.',
+                options: [...frenzyInfections],
+                payload: { kind: 'virulentFrenzyOrder', remaining: frenzyInfections.join(','), placed: '' },
+              }];
+            }
+          }
+          // IN-004 Slough Armor: "When your infected character is attacked, you
+          // may discard this card from your hand. If you do, reduce the damage
+          // of one weapon being used by 20." The attack reducer is atomic, so
+          // the engine auto-takes the beneficial option (documented limitation).
+          const sloughArmorId = target.isInfectedCharacter === true
+            ? target.hand.find(id => state.cards[id]?.cardId === 'in-004')
+            : undefined;
+          const sloughArmorEffect = sloughArmorId !== undefined
+            ? cardDef(state, sloughArmorId)?.actionEffects?.find(e => e.kind === 'sloughArmor')
+            : undefined;
+          const sloughReduction = sloughArmorEffect !== undefined && sloughArmorEffect.kind === 'sloughArmor'
+            ? sloughArmorEffect.amount
+            : 0;
+          if (sloughReduction > 0) {
+            damage = Math.max(damage - sloughReduction, 0);
+          }
           // MA-054o Kevlar Jacket: the target's jacket absorbs this damage.
           const kevlar = applyDamageWithKevlar(state, targetSeat, damage);
           state = kevlar.state;
           const newTarget: PlayerState = {
             ...target,
             hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, kevlar.damage, target.downed || target.dead),
+            hand: sloughArmorId !== undefined ? target.hand.filter(id => id !== sloughArmorId) : target.hand,
+            discard: sloughArmorId !== undefined ? [...target.discard, sloughArmorId] : target.discard,
             infectionCards: targetInfectionCards,
             ...targetFlags,
           };
@@ -2939,6 +3062,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             hand: newHand,
             playArea: newPlayArea,
             discard: newDiscard,
+            inventory: frenzyInventory,
             turnAmmo: turnAmmoAfter,
             exploresLeft: player.exploresLeft - 1,
             ...(healSelf > 0 ? { hp: Math.min(player.hp + healSelf, player.maxHp) } : {}),
@@ -2963,21 +3087,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             return s;
           });
+          const removedAfterAttack = [...state.removed, ...trashedWeaponIds, ...frenzyTrashed]
+            .filter((id, i, arr) => arr.indexOf(id) === i);
           const postAttackState: GameState = {
             ...state,
             ...nextBase,
             seats: seatsAfter,
-            ...(trashedWeaponIds.length > 0
-              ? { removed: [...state.removed, ...trashedWeaponIds.filter(id => !state.removed.includes(id))] }
-              : {}),
+            ...(removedAfterAttack.length > state.removed.length ? { removed: removedAfterAttack } : {}),
             ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckAfter } : {}),
           };
           // Built from the POST-attack state so it only offers cards still in hand.
           const zombieBAttackPrompts = infectionIncreased ? zombieBPrompts(postAttackState, targetSeat, state.version) : [];
+          const attackPrompts = [...frenzyPrompts, ...zombieBAttackPrompts];
           return {
             ...postAttackState,
-            ...(zombieBAttackPrompts.length > 0
-              ? { prompts: [...state.prompts, ...zombieBAttackPrompts] }
+            ...(attackPrompts.length > 0
+              ? { prompts: [...state.prompts, ...attackPrompts] }
               : {}),
           };
         }
@@ -4085,6 +4210,71 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Wesker L2: the chosen player must Explore on their next turn
         // (startTurn grants +1 Explore; validate blocks their endTurn until
         // they do; exploring clears the obligation).
+        const targetSeat = Number(prompt.options[option]);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'virulentFrenzyOrder') {
+        // IN-002 Virulent Frenzy: the player orders the looked-at Infection
+        // cards on top of their Inventory (selection order = top to bottom).
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === '') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const remaining = String(prompt.payload?.remaining ?? '').split(',').filter(Boolean).filter(id => id !== chosen);
+        const placed = String(prompt.payload?.placed ?? '').split(',').filter(Boolean);
+        const newPlaced = [...placed, chosen];
+        const inv = [...newPlaced, ...player.inventory.filter(id => !newPlaced.includes(id))];
+        const base: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, inventory: inv } : s)),
+        };
+        if (remaining.length === 0) return { ...base, prompts: newPrompts };
+        return {
+          ...base,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:${remaining.length}`,
+            seat,
+            text: prompt.text,
+            options: [...remaining],
+            payload: { kind: 'virulentFrenzyOrder', remaining: remaining.join(','), placed: newPlaced.join(',') },
+          }],
+        };
+      }
+
+      if (kind === 'stunRodChooseInfected') {
+        // WE-028 Stun Rod: move one of the battled Infected to the top of the
+        // Mansion.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        if (state.cards[chosen] === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => ({ ...s, attached: s.attached.filter(id => id !== chosen) })),
+          mansionDeck: [chosen, ...state.mansionDeck.filter(id => id !== chosen)],
+          mansionBottom: state.mansionBottom.filter(id => id !== chosen),
+          removed: state.removed.filter(id => id !== chosen),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'cephaloChoosePlayer') {
+        // MA-030 Cephalo (Las Plagas): the chosen player must Explore on their
+        // next turn (same obligation mechanism as Wesker L2).
         const targetSeat = Number(prompt.options[option]);
         if (Number.isNaN(targetSeat)) {
           return { ...state, ...nextBase, prompts: newPrompts };

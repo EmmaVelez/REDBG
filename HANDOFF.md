@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~12:40):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** Suites: **game-core 685, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+**Current state (2026-11-07 ~13:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** Suites: **game-core 694, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
@@ -241,6 +241,42 @@ Two pre-existing defects surfaced while soak-testing these and are fixed here:
   The card now leaves the Play Area when it attaches.
 
 New `engine/rulesText.test.ts` (19 tests) covers all 14 cards.
+
+## Last dead effect kinds implemented (2026-11-07)
+
+Every `InfectedEffect` / `WeaponEffect` kind is now read by the engine. The
+remaining cards (MA-025/030/036, WE-028, IN-002/004) plus a re-check of the
+three that were only ever prompt/id-handled (AC-049, AC-035, AC-038).
+
+- **MA-025 Duvalia** — `onKillGainAmmoX10ToMostDecorated`: when its attack
+  reduces the leading character to 0 Health (and no Resuscitate is pending),
+  the most-decorated player (ties: most Health, then lowest seat) gains 5
+  Ammo x10. Implemented in the explore not-defeated branch.
+- **MA-030 Cephalo** — `mustExploreNextTurnOnDefeat`: on defeat, a
+  `cephaloChoosePlayer` prompt; the chosen seat gets `mustExplore` (the same
+  obligation Wesker L2 uses, so `startTurn` grants the extra Explore and
+  `validateAction` blocks their `endTurn` until they explore).
+- **MA-036 Reaper** — `trashHighestCostAttachedOnPartnerIfNotExactDefeat`:
+  unless the Infected is defeated with damage exactly equal to its health
+  (underkill **or** overkill both count as "not exact"), the highest-cost card
+  attached to the exploring player's partner is trashed.
+- **WE-028 Stun Rod** — `moveLowHpInfectedToMansionTop`: while battling two or
+  more Infected (the Collapsing Floor Traps multi-explore), a
+  `stunRodChooseInfected` prompt moves one with `<= hpThreshold` Health to the
+  top of the Mansion.
+- **IN-002 Virulent Frenzy** — `virulentFrenzy`: on use, the top three
+  Inventory cards are looked at, non-Infection cards are trashed, and a chained
+  `virulentFrenzyOrder` prompt lets the player put the Infection cards back on
+  top in any order.
+- **IN-004 Slough Armor** — `sloughArmor`: when the player's Infected Character
+  is attacked, the armor is discarded from hand and the damage is reduced by
+  its `amount`. The attack reducer is atomic, so the engine auto-takes the
+  beneficial option (same documented limitation as the Kevlar Jacket).
+
+New `engine/deadKinds.test.ts` (9 tests). The only kinds still unread by the
+engine are unused union members in `types.ts`
+(`plusDamagePerOtherKnifeUsedThisTurn`, `plusDamageWhenUsingMultipleWeapons`,
+`gainAction`, `lookAtMansionTop`) — no card carries them.
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
