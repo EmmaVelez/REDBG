@@ -77,6 +77,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   // card's level text when resolvable.
   const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   const weaponAbilities = legal.filter((a): a is Extract<Action, { type: 'useWeaponAbility' }> => a.type === 'useWeaponAbility' && a.seat === seat);
+  const attachedItems = legal.filter((a): a is Extract<Action, { type: 'removeAttachedItem' }> => a.type === 'removeAttachedItem' && a.seat === seat);
   const player = state.seats[seat];
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
@@ -244,6 +245,20 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             title={defForInstance(state, a.instanceId)?.name ?? 'Activate weapon effect'}
           >
             Weapon: {defForInstance(state, a.instanceId)?.name ?? 'Activate'}
+          </button>
+        ))}
+
+        {attachedItems.map(a => (
+          <button
+            key={`attached-item-${a.instanceId}`}
+            type="button"
+            className="ability-button"
+            data-attached-item={a.instanceId}
+            onClick={() => onAction(a)}
+            disabled={disabled}
+            title={defForInstance(state, a.instanceId)?.name ?? 'Remove attached item'}
+          >
+            Item: {defForInstance(state, a.instanceId)?.name ?? 'Remove'}
           </button>
         ))}
 

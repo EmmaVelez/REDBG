@@ -2,6 +2,7 @@ import type { CardDef, CardBonuses } from '../types';
 import { ALLIANCE_CARDS } from './alliance';
 import { OUTBREAK_CARDS } from './outbreak';
 import { MERCENARIES_CARDS } from './mercenaries';
+import { NIGHTMARE_CARDS } from './nightmare';
 
 export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   // Characters
@@ -210,7 +211,7 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
   { pileId: 'sub', cardIds: ['we-003'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape' | 'outbreak' | 'mercenaries';
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape' | 'outbreak' | 'mercenaries' | 'nightmare';
 
 export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
   // Basic Resources (Alliance rulebook ch. V)
@@ -397,6 +398,8 @@ export interface ScenarioDef {
   /** Outbreak mode: infection levels, Infection Deck, Infected Characters. */
   readonly outbreak?: boolean;
   readonly mansionCards?: ReadonlyArray<{ cardId: string; count: number }>;
+  /** Nightmare: the Infected whose defeat ends the game. */
+  readonly winInfectedCardId?: string;
 }
 
 
@@ -489,6 +492,72 @@ export const MERCENARIES_SCENARIO_DEF = {
 };
 
 
+/**
+ * Nightmare scenario (RE4 manual): the Basic Resources plus the Nightmare
+ * weapon and action piles. The Mansion is built from the Nightmare infected
+ * and items (MA-054..MA-072); Osmund Saddler (MA-054) is the win condition.
+ */
+export const NIGHTMARE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  // Basic Resources
+  { pileId: 'am10', cardIds: ['am-001'] },
+  { pileId: 'am20', cardIds: ['am-002'] },
+  { pileId: 'am30', cardIds: ['am-003'] },
+  { pileId: 'herb', cardIds: ['it-001'] },
+  { pileId: 'hg', cardIds: ['we-009', 'we-010'] },
+  { pileId: 'kn', cardIds: ['we-004', 'we-005'] },
+  // Nightmare weapons
+  { pileId: 'silver-ghost', cardIds: ['we-032', 'we-033'] },
+  { pileId: 'mine-thrower', cardIds: ['we-034'] },
+  { pileId: 'broken-butterfly', cardIds: ['we-035'] },
+  { pileId: 'single-shot', cardIds: ['we-036', 'we-037'] },
+  { pileId: 'machine-pistol', cardIds: ['we-038', 'we-039'] },
+  { pileId: 'flashbang', cardIds: ['we-040'] },
+  { pileId: 'grenades', cardIds: ['we-041', 'we-042'] },
+  // Nightmare actions
+  { pileId: 'lonewolf', cardIds: ['ac-032'] },
+  { pileId: 'high-value', cardIds: ['ac-033'] },
+  { pileId: 'rcpd', cardIds: ['ac-034'] },
+  { pileId: 'pda', cardIds: ['ac-035'] },
+  { pileId: 'toe-to-toe', cardIds: ['ac-036'] },
+  { pileId: 'a-gift', cardIds: ['ac-037'] },
+  { pileId: 'mind-control', cardIds: ['ac-038'] },
+  { pileId: 'long-awaited-dawn', cardIds: ['ac-039'] },
+  { pileId: 'vengeful', cardIds: ['ac-040'] },
+  { pileId: 'symbol-of-evil', cardIds: ['ac-041'] },
+];
+
+/** Nightmare mansion deck (MA-054..MA-072 at their printed copies). */
+export const NIGHTMARE_MANSION: ReadonlyArray<{ cardId: string; count: number }> = [
+  { cardId: 'ma-054', count: 1 },
+  { cardId: 'ma-055', count: 1 },
+  { cardId: 'ma-056', count: 2 },
+  { cardId: 'ma-057', count: 1 },
+  { cardId: 'ma-058', count: 3 },
+  { cardId: 'ma-059', count: 3 },
+  { cardId: 'ma-060', count: 2 },
+  { cardId: 'ma-061', count: 2 },
+  { cardId: 'ma-062', count: 3 },
+  { cardId: 'ma-063', count: 3 },
+  { cardId: 'ma-064', count: 3 },
+  { cardId: 'ma-065', count: 2 },
+  { cardId: 'ma-066', count: 2 },
+  { cardId: 'ma-067', count: 2 },
+  { cardId: 'ma-068', count: 2 },
+  { cardId: 'ma-069', count: 3 },
+  { cardId: 'ma-070', count: 2 },
+  { cardId: 'ma-071', count: 2 },
+  { cardId: 'ma-072', count: 1 },
+];
+
+export const NIGHTMARE_SCENARIO_DEF = {
+  id: 'nightmare' as ScenarioId,
+  name: 'Nightmare',
+  description: 'The Nightmare expansion scenario (RE4) — Nightmare weapons and actions, with a Mansion built from the Nightmare infected. Defeat Osmund Saddler to win.',
+  piles: NIGHTMARE_PILES,
+  mansionCards: NIGHTMARE_MANSION,
+  winInfectedCardId: 'ma-054',
+};
+
 export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
   const found = SCENARIOS.find(s => s.id === id);
   if (found === undefined) {
@@ -542,6 +611,7 @@ export const SCENARIOS = [
   PARTNERS_IN_ESCAPE_SCENARIO_DEF,
   OUTBREAK_SCENARIO_DEF,
   MERCENARIES_SCENARIO_DEF,
+  NIGHTMARE_SCENARIO_DEF,
 ];
 
 /**
@@ -556,10 +626,10 @@ export const SCENARIOS = [
   * cost 50 / ammoReq 0 / damage 10. Telescopic Sight Rifle (we-019) is an
   * Alliance-exclusive rifle with a bottom-reveal mechanic.
  */
-export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS, ...MERCENARIES_CARDS];
+export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS, ...MERCENARIES_CARDS, ...NIGHTMARE_CARDS];
 
 /** Scenarios played with the FULL database (Premier + Alliance + Outbreak). */
-const EXPANSION_SCENARIOS: ReadonlySet<ScenarioId> = new Set(['alliance', 'partnersInEscape', 'outbreak', 'mercenaries']);
+const EXPANSION_SCENARIOS: ReadonlySet<ScenarioId> = new Set(['alliance', 'partnersInEscape', 'outbreak', 'mercenaries', 'nightmare']);
 
 export function isExpansionScenario(id: ScenarioId): boolean {
   return EXPANSION_SCENARIOS.has(id);

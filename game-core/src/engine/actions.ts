@@ -33,6 +33,9 @@ import {
   exploreBigHandBonus,
   exploreActionsBonus,
   knifeWeaponsUsedThisTurn,
+  exploreOnInfectedDefeat,
+  trashCardFromDiscardOnInfectedDefeat,
+  trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -43,6 +46,8 @@ import { makeRng, shuffle } from '../util/rng';
 
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
+
+import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -396,6 +401,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let promptKind: string | undefined;
       let promptOptions: readonly string[] | undefined;
       let promptInstanceId: string | undefined;
+      let promptExtra: Readonly<Record<string, string | number>> | undefined;
       for (const e of def.actionEffects ?? []) {
         if (e.kind === 'recoverWeaponFromDiscardToHand') {
           const weaponsInDiscard = player.discard.filter(id => cardDef(state, id)?.type === 'weapon');
@@ -469,20 +475,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                               if (e.kind === 'chooseOtherPlayerRevealHand') {
                                 const others = state.seats.filter(s => s.seat !== seat && !s.dead);
                                 if (others.length > 0) {
+                                  const maxCostEffect = def.actionEffects?.find(x => x.kind === 'chooseActionCardCostAtMost');
+                                  const maxCost = maxCostEffect && maxCostEffect.kind === 'chooseActionCardCostAtMost' ? maxCostEffect.maxCost : 70;
                                   promptKind = 'chooseOtherPlayerRevealHand';
                                   promptOptions = [...others.map(s => String(s.seat))];
+                                  promptExtra = { maxCost: String(maxCost) };
                                 }
                                 break;
                               }
-                              if (e.kind === 'chooseActionCardCostAtMost') {
-                                const maxCost = e.maxCost;
-                                const candidates = played.player.hand.filter(id => {
-                                  const c = cardDef(state, id);
-                                  return c?.type === 'action' && (c.cost ?? 0) <= maxCost;
-                                });
-                                if (candidates.length > 0) {
-                                  promptKind = 'chooseActionCardCostAtMost';
-                                  promptOptions = [...candidates];
+                              if (e.kind === 'lookAtTopInventory') {
+                                // AC-035 PDA: look at the top N inventory cards.
+                                const top = played.player.inventory.slice(0, e.count);
+                                if (top.length > 0) {
+                                  promptKind = 'pdaLook';
+                                  promptOptions = [...top, 'None'];
+                                  promptExtra = { looked: top.join(',') };
                                 }
                                 break;
                               }                              if (e.kind === 'higherPriorities') {
@@ -582,7 +589,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seat,
             text: def.text,
             options: promptOptions,
-            payload: { kind: promptKind, instanceId },
+            payload: { kind: promptKind, instanceId, ...(promptExtra ?? {}) },
           },
         ];
       }
@@ -719,6 +726,53 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 if (!trashed) {
                   newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.damage, newPlayer.downed || newPlayer.dead) };
                   const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: e.cards, rngState: rngAfterEffects });
+                  newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+                  rngAfterEffects = d.rngState;
+                  seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+                }
+              }
+              // --- Nightmare actions (AC-032..AC-041) ---
+              if (e.kind === 'gainAmmo') {
+                newPlayer = { ...newPlayer, turnAmmo: newPlayer.turnAmmo + e.amount };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'discardInventory') {
+                newPlayer = { ...newPlayer, discard: [...newPlayer.discard, ...newPlayer.inventory], inventory: [] };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'gainGoldAndAmmoPerInventoryCard') {
+                const n = newPlayer.inventory.length;
+                newPlayer = { ...newPlayer, turnGold: newPlayer.turnGold + e.gold * n, turnAmmo: newPlayer.turnAmmo + e.ammo * n };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'discardInventoryUntilWeaponToHand') {
+                const inv = newPlayer.inventory;
+                let count = 0;
+                let found: string | undefined;
+                while (count < inv.length) {
+                  const id = inv[count];
+                  if (id === undefined) break;
+                  const d = cardDef(state, id);
+                  if (d?.type === 'weapon') { found = id; break; }
+                  count += 1;
+                }
+                if (found !== undefined) {
+                  const discarded = inv.slice(0, count);
+                  newPlayer = {
+                    ...newPlayer,
+                    inventory: inv.slice(count + 1),
+                    discard: [...newPlayer.discard, ...discarded],
+                    hand: [...newPlayer.hand, found],
+                  };
+                } else {
+                  newPlayer = { ...newPlayer, discard: [...newPlayer.discard, ...inv], inventory: [] };
+                }
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'drawCardsPerInventoryDivisor') {
+                const n = Math.floor(newPlayer.inventory.length / e.divisor);
+                if (n > 0) {
+                  const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: n, rngState: rngAfterEffects });
                   newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
                   rngAfterEffects = d.rngState;
                   seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
@@ -888,7 +942,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
     case 'explore': {
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
-          const player = state.seats[seat] as PlayerState;
+          let player = state.seats[seat] as PlayerState;
 
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
           // Passive abilities can reduce the cost (Leon L1 pistols, Sheva L2 rifles).
@@ -921,7 +975,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const playAreaAfter = [...player.playArea, ...playedWeaponIds];
           const toTrashAfterUse = weapons.filter(id => {
             const def = cardDef(state, id);
-            return def?.weaponEffects?.some(e => e.kind === 'trashAfterUse');
+            return def?.weaponEffects?.some(e =>
+              e.kind === 'trashAfterUse' ||
+              (e.kind === 'grantExploreAndSuppressLowHpInfected' && e.trashAfterUse === true));
           });
           const removedAfter = toDiscardExplosives
             ? state.removed
@@ -934,8 +990,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const grantedExplores = weapons.reduce((sum, id) => {
             const def = cardDef(state, id);
             const eff = def?.weaponEffects?.find(e => e.kind === 'grantExplores');
-            return sum + (eff && eff.kind === 'grantExplores' ? eff.amount : 0);
+            const flash = def?.weaponEffects?.find(e => e.kind === 'grantExploreAndSuppressLowHpInfected');
+            return sum + (eff && eff.kind === 'grantExplores' ? eff.amount : 0) + (flash !== undefined ? 1 : 0);
           }, 0);
+
+          // Nightmare: weapon effects that fire when the weapon is used
+          // (WE-032/033 Silver Ghost / Punisher, WE-036/037 rifles, WE-038).
+          const nightmareGains = nightmareWeaponGains(weapons, state);
+          const nightmarePrompts = nightmareWeaponPrompts(state, seat, weapons);
+          if (nightmarePrompts.length > 0) {
+            state = { ...state, prompts: [...state.prompts, ...nightmarePrompts] };
+          }
 
           const weaponDefs = weapons.map(id => cardDef(state, id));
           // plusDamagePerActionPlayedThisTurn: +amount per Action card in play area this turn.
@@ -1029,6 +1094,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs);
+          // Lonewolf (AC-032): +amount explore damage per card in the discard
+          // pile, while its action card is in the play area this turn.
+          const perDiscardCardBonus = player.playArea.reduce((sum, id) => {
+            const cd = cardDef(state, id);
+            return sum + (cd?.actionEffects ?? []).reduce((a, e) =>
+              e.kind === 'onExploreWeaponDamagePerDiscardCard' ? a + e.amount * player.discard.length : a, 0);
+          }, 0);
+          // Ammo cards in the play area (WE-034 Mine Thrower).
+          const ammoCardsInPlayArea = playAreaAfter.filter(id => cardDef(state, id)?.type === 'ammunition').length;
           // AC-014 Star-Crossed Duo: if partner is leading with this attached, +10 damage.
           const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
             const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
@@ -1113,6 +1187,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealFx.prompts.length > 0) {
         state = { ...state, prompts: [...state.prompts, ...revealFx.prompts] };
       }
+
+      // Nightmare: on-reveal infected effects (MA-061 Militia Rocket Launcher,
+      // MA-068 Hunter).
+      const nightmareRevealFx = infectedEffectNegated
+        ? { state, prompts: [] as Prompt[] }
+        : applyNightmareRevealEffects(state, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
+      state = nightmareRevealFx.state;
+      // Re-read the exploring seat: reveal effects may have changed its Health
+      // or max Health (MA-061 / MA-068), and the branches below must not
+      // overwrite those with the pre-reveal snapshot.
+      player = state.seats[seat] as PlayerState;
+      if (nightmareRevealFx.prompts.length > 0) {
+        state = { ...state, prompts: [...state.prompts, ...nightmareRevealFx.prompts] };
+      }
       if (revealFx.zeroDamageWeaponIds.length > 0) {
         const zero = new Set(revealFx.zeroDamageWeaponIds);
         for (let i = 0; i < exploreWeapons.length; i++) {
@@ -1127,6 +1215,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let mansionDeck = rev.mansion.deck;
       let mansionBottom = rev.mansion.bottom;
       let currentRng = state.rngState;
+
+      // Applies the Nightmare on-use weapon gains (+cards/+actions/+gold) to a
+      // post-explore seat. Drawn cards come off the top of the inventory.
+      const applyNightmareGains = (p: PlayerState): PlayerState => {
+        if (nightmareGains.cards === 0 && nightmareGains.actions === 0 && nightmareGains.gold === 0) return p;
+        let np = { ...p, actionsLeft: p.actionsLeft + nightmareGains.actions, turnGold: p.turnGold + nightmareGains.gold };
+        if (nightmareGains.cards > 0) {
+          const d = drawWithReshuffle({ deck: np.inventory, discard: np.discard, count: nightmareGains.cards, rngState: currentRng });
+          currentRng = d.rngState;
+          np = { ...np, hand: [...np.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        }
+        return np;
+      };
       const rngShuffle = (items: readonly string[]): string[] => {
         const r = shuffle(makeRng(currentRng), items);
         currentRng = r.rng.s;
@@ -1135,7 +1236,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-040') {
         // Laser Targeting Device: +1 Explore, remove card.
-        const newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + 1, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false };
+        const newPlayer: PlayerState = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + 1, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false });
         return {
           ...state,
           ...nextBase,
@@ -1168,7 +1269,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           })),
         });
         const defeatedDecorations = multiResult.defeated ? infectedTargets.reduce((s, d) => s + (d?.decorations ?? 0), 0) : 0;
-        let newPlayer = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations };
+        let newPlayer = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations });
         // remove event + any defeated infected from game (simplified: remove all revealed)
         const removedIds = [revealedInstanceId, secondId];
         // shuffle non-infected back to bottom
@@ -1196,7 +1297,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
         const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
-        let newPlayer: PlayerState = { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead) : player.hp };
+        let newPlayer: PlayerState = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead) : player.hp });
         // +30 damage collectively handled by not removing; for simplicity add to weaponDamageBonus? skip; damage already resolved via threshold only.
         return {
           ...state,
@@ -1205,6 +1306,51 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...removedAfter, revealedInstanceId],
           mansionDeck,
           mansionBottom,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
+
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ma-072') {
+        // P.R.L. 412: reveal the top Mansion card. If it is an Infected, the
+        // player with the fewest Decorations automatically defeats it; either
+        // way the P.R.L. 412 is removed. A non-Infected reveal is shuffled back
+        // into the Mansion together with the P.R.L. 412.
+        const rev2 = revealTop({ deck: mansionDeck, bottom: mansionBottom });
+        const secondId = rev2.revealedInstanceId;
+        const secondDef = cardDef(state, secondId);
+        mansionDeck = rev2.mansion.deck;
+        mansionBottom = rev2.mansion.bottom;
+        if (secondDef?.type === 'infected') {
+          // One Infected can only be Defeated by one Player, so a tie for the
+          // fewest Decorations is broken the same way the game's victory
+          // condition breaks a Decoration tie: most Health, then lowest seat.
+          const alive = state.seats.filter(x => !x.dead);
+          const min = alive.length > 0 ? Math.min(...alive.map(x => x.decorations)) : 0;
+          const tied = alive.filter(x => x.decorations === min);
+          const bestHp = tied.length > 0 ? Math.max(...tied.map(x => x.hp)) : 0;
+          const chosenSeat = tied.filter(x => x.hp === bestHp).map(x => x.seat)[0] ?? -1;
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(x => (x.seat === chosenSeat
+              ? { ...x, decorations: x.decorations + (secondDef.decorations ?? 0), attached: [...x.attached, secondId] }
+              : x)),
+            removed: [...removedAfter, revealedInstanceId],
+            mansionDeck,
+            mansionBottom,
+            rngState: currentRng,
+            prompts: state.prompts,
+          };
+        }
+        const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, secondId, rngShuffle);
+        const shuffled2 = shuffleBack(shuffled, revealedInstanceId, rngShuffle);
+        return {
+          ...state,
+          ...nextBase,
+          removed: removedAfter,
+          mansionDeck: shuffled2.deck,
+          mansionBottom: shuffled2.bottom,
           rngState: currentRng,
           prompts: state.prompts,
         };
@@ -1308,7 +1454,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         return {
           ...state,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
+          seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
           removed: removedAfter,
           mansionDeck,
           mansionBottom,
@@ -1330,7 +1476,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus,
+              ammoCardsInPlayArea,
               revealed: revealedDef,
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
@@ -1338,6 +1485,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               attachedInfectedCount: player.attached.length,
               sameNameAttachedCount,
               characterXp: player.xp ?? 0,
+              characterAbilities: abilities,
+              actionsInPlayArea: player.playArea.filter(id => cardDef(state, id)?.type === 'action').length,
+              inventoryCount: player.inventory.length,
+              characterDamage: Math.max(player.maxHp - player.hp, 0),
             });
 
       if (outcome.kind === 'insufficientAmmo') {
@@ -1517,12 +1668,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
         const charDef = cardDef(state, player.characterInstanceId);
         const level = charDef !== undefined ? levelForDecorations(charDef.level1At, charDef.level2At, decorations) : player.level;
-        const newPlayer: PlayerState = {
+        const sergeiExploreBonus = exploreOnInfectedDefeat(abilities);
+        const newPlayer: PlayerState = applyNightmareGains({
                   ...player,
                   hand: handAfter,
                   playArea: playAreaAfter,
                   discard: discardAfterExplosives,
-                  exploresLeft,
+                  exploresLeft: exploresLeft + sergeiExploreBonus + grantedExplores,
                   turnAmmo: turnAmmoAfter,
                   turnGold: turnGoldAfter,
                   mustExplore: false,
@@ -1533,7 +1685,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   pendingBackstab: undefined,
                   attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
-                };
+                });
         const hasSkip = !infectedEffectNegated && (revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
         const hasNoActions = !infectedEffectNegated && (revealedDef?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false);
         const defeatPrompts = (hasSkip || hasNoActions)
@@ -1578,6 +1730,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'perfectExploreReward' },
             }]
           : luisPrompts;
+        // Mysterious Mask (Nightmare) L1: on defeating an Infected, may trash a
+        // card from the discard pile.
+        const maskPrompts = trashCardFromDiscardOnInfectedDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+          ? [...carlosPrompts, {
+              id: 'p' + (carlosPrompts.length + 1),
+              seat,
+              text: 'Mysterious Mask: trash a card from your Discard Pile.',
+              options: [...newPlayer.discard, 'Decline'],
+              payload: { kind: 'maskTrashDiscard' },
+            }]
+          : carlosPrompts;
+        // Leon S. Kennedy (Nightmare) L1: on defeating an Infected, may trash a
+        // discard card then gain one costing up to 20 more.
+        const leonPrompts = trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+          ? [...maskPrompts, {
+              id: 'p' + (maskPrompts.length + 1),
+              seat,
+              text: 'Leon: trash a card from your Discard Pile, then gain a card costing up to 20 more than it.',
+              options: [...newPlayer.discard, 'Decline'],
+              payload: { kind: 'leonTrashForGain' },
+            }]
+          : maskPrompts;
         // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
         const zombieBDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
         // Mercenaries: on-defeat infected effects + character/weapon abilities
@@ -1598,6 +1772,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const onDefeatFx = applyMercenariesOnDefeatAbilities(defeatFxState, mercCtx);
         defeatFxState = onDefeatFx.state;
         defeatFxPrompts.push(...onDefeatFx.prompts);
+
+        // Nightmare: on-defeat infected effects (MA-055 Bitores Mendez,
+        // MA-057 Jack Krauser, MA-063 Zombie Security Guard, MA-066 Ivy).
+        const nightmareDefeatFx = applyNightmareDefeatEffects(defeatFxState, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
+        defeatFxState = nightmareDefeatFx.state;
+        defeatFxPrompts.push(...nightmareDefeatFx.prompts);
         // MA-092 reveal gains apply AFTER the explore's own seat updates.
         for (const g of revealGains) defeatFxState = gainCopy(defeatFxState, g.seat, g.cardId);
         return {
@@ -1611,7 +1791,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: defeatFxState.rngState,
-          prompts: [...carlosPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
+          prompts: [...leonPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
       }
@@ -1717,13 +1897,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // and any XP on it are Removed from the Game.
       const partnerDied = leadingIsPartner && newLeadingHp <= 0;
       const afterPartnerDeath = partnerDied ? removePartnerSkill(state, seat) : state;
-      const newPlayer: PlayerState = {
+      const newPlayer: PlayerState = applyNightmareGains({
               ...player,
               hand,
               playArea: playAreaAfter,
               discard,
               inventory,
-              exploresLeft,
+              exploresLeft: exploresLeft + grantedExplores,
               turnAmmo: turnAmmoAfter,
               turnGold: turnGoldAfter,
               mustExplore: false,
@@ -1737,7 +1917,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 : {}),
               downed,
               infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
-            };
+            });
       const removedFinal = partnerDied
         ? [...removedAfter, ...afterPartnerDeath.removed.filter(id => !removedAfter.includes(id))]
         : removedAfter;
@@ -1761,6 +1941,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (notDefeatedFx.prompts.length > 0) {
         state = { ...state, prompts: [...state.prompts, ...notDefeatedFx.prompts] };
       }
+
+      // Nightmare: on-not-defeated infected effects (MA-054 Osmund Saddler).
+      const nightmareNotDefeatedFx = applyNightmareNotDefeatedEffects(state, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
+      state = nightmareNotDefeatedFx.state;
       // MA-092 reveal gains apply AFTER the explore's own seat updates.
       for (const g of revealGains) state = gainCopy(state, g.seat, g.cardId);
 
@@ -1792,6 +1976,36 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
+    }
+
+    case 'removeAttachedItem': {
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      const def = cardDef(state, instanceId);
+      const effect = (def?.itemEffects ?? []).find(e => e.kind === 'attachThenRemoveForCardsAndGold');
+      if (def === undefined || effect === undefined || effect.kind !== 'attachThenRemoveForCardsAndGold') {
+        return { ...state, ...nextBase };
+      }
+      if (!player.attached.includes(instanceId)) return { ...state, ...nextBase };
+      let s: GameState = {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, attached: x.attached.filter(id => id !== instanceId), turnGold: x.turnGold + effect.gold }
+          : x)),
+        removed: [...state.removed, instanceId],
+      };
+      if (effect.cards > 0) {
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: effect.cards, rngState: s.rngState });
+        s = {
+          ...s,
+          rngState: d.rngState,
+          seats: s.seats.map(x => (x.seat === seat
+            ? { ...x, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : x)),
+        };
+      }
+      return s;
     }
 
     case 'buy': {
@@ -1928,6 +2142,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     payload: { kind: 'lookAtMansionTop' },
                   },
                 ],
+              };
+            }
+            case 'discardActionCardFromHandForPlusTwoCards': {
+              // Mysterious Mask (Nightmare) L2: discard one Action card from
+              // hand for +2 cards.
+              const actionsInHand = player.hand.filter(id => cardDef(state, id)?.type === 'action');
+              if (actionsInHand.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [...state.prompts, {
+                  id: promptId,
+                  seat,
+                  text: 'Mysterious Mask: discard one Action card from your hand for +2 cards.',
+                  options: [...actionsInHand, 'Decline'],
+                  payload: { kind: 'maskDiscardActionForCards' },
+                }],
               };
             }
             case 'trashFromHandAtWill': {
@@ -3872,12 +4105,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   payload: { kind: 'skillHealTrashFromDiscard' },
                 }];
               };
+              // CH-037 Josh Stone L1: +gold the first time he is healed this turn.
+              const joshGold = ((): number => {
+                if (player.healedFirstTimeThisTurn) return 0;
+                const ab = characterAbilities(state, seat).find(a => a.kind === 'goldOnFirstHealThisTurn') as
+                  | { amount: number }
+                  | undefined;
+                return ab?.amount ?? 0;
+              })();
               if (option === 0) {
                 return {
                   ...state,
                   ...nextBase,
                   seats: state.seats.map(s =>
-                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp) } : s,
+                    s.seat === seat
+                      ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp), turnGold: player.turnGold + joshGold, healedFirstTimeThisTurn: true }
+                      : s,
                   ),
                   prompts: withHealPrompts(newPrompts),
                 };
@@ -3964,6 +4207,34 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                           }
                         : s,
                     ),
+                    prompts: newPrompts,
+                  };
+                }
+                // Nightmare: MA-070 Treasure Map — attach to the character
+                // instead of the discard pile.
+                const attachEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'attachThenRemoveForCardsAndGold');
+                if (attachEffect !== undefined && attachEffect.kind === 'attachThenRemoveForCardsAndGold') {
+                  return {
+                    ...state,
+                    ...nextBase,
+                    seats: state.seats.map(s =>
+                      s.seat === seat ? { ...player, attached: [...player.attached, instanceId] } : s,
+                    ),
+                    prompts: newPrompts,
+                  };
+                }
+                // Nightmare: MA-071 Hidden Treasure — +gold +buy, then remove.
+                const treasureEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'gainGoldAndBuyThenRemove');
+                if (treasureEffect !== undefined && treasureEffect.kind === 'gainGoldAndBuyThenRemove') {
+                  return {
+                    ...state,
+                    ...nextBase,
+                    seats: state.seats.map(s =>
+                      s.seat === seat
+                        ? { ...player, turnGold: player.turnGold + treasureEffect.gold, buysLeft: player.buysLeft + treasureEffect.buys }
+                        : s,
+                    ),
+                    removed: [...state.removed, instanceId],
                     prompts: newPrompts,
                   };
                 }
@@ -4296,39 +4567,44 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const count = Number(prompt.payload?.count ?? '2');
         const cards = String(prompt.payload?.cards ?? '');
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
-        const targetPrompt = (accumulated: string): Prompt => ({
+        // The outcome may have moved the discard to the Inventory since the
+        // prompt was created (e.g. the exploring Character was Downed by this
+        // Infected's attack). Only cards still in the Discard Pile are movable.
+        const liveDiscard = player.discard;
+        const accumulated = cards.split(',').filter(Boolean).filter(id => liveDiscard.includes(id));
+        const targetPrompt = (live: readonly string[]): Prompt => ({
           id: `${prompt.id}:target`,
           seat,
           text: 'Choose the Player with the highest Decorations to receive the moved cards.',
           options: targets.split(',').filter(Boolean),
-          payload: { kind: 'ma080ChooseTarget', cards: accumulated },
+          payload: { kind: 'ma080ChooseTarget', cards: live.join(',') },
         });
-        if (chosen === 'DONE') {
-          if (cards === '') return { ...state, ...nextBase, prompts: newPrompts };
-          return { ...state, ...nextBase, prompts: [...newPrompts, targetPrompt(cards)] };
+        if (chosen === 'DONE' || !liveDiscard.includes(chosen)) {
+          if (accumulated.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+          return { ...state, ...nextBase, prompts: [...newPrompts, targetPrompt(accumulated)] };
         }
-        const newCards = cards === '' ? chosen : `${cards},${chosen}`;
-        const n = newCards.split(',').filter(Boolean).length;
-        const remaining = player.discard.filter(id => !newCards.split(',').includes(id));
-        if (n >= count || remaining.length === 0) {
+        const newCards = [...accumulated, chosen];
+        const remaining = liveDiscard.filter(id => !newCards.includes(id));
+        if (newCards.length >= count || remaining.length === 0) {
           return { ...state, ...nextBase, prompts: [...newPrompts, targetPrompt(newCards)] };
         }
         return {
           ...state,
           ...nextBase,
           prompts: [...newPrompts, {
-            id: `${prompt.id}:c${n}`,
+            id: `${prompt.id}:c${newCards.length}`,
             seat,
             text: prompt.text,
             options: [...remaining, 'DONE'],
-            payload: { kind: 'ma080ChooseCard', targets, count: String(count), cards: newCards },
+            payload: { kind: 'ma080ChooseCard', targets, count: String(count), cards: newCards.join(',') },
           }],
         };
       }
 
       if (kind === 'ma080ChooseTarget') {
         const chosen = prompt.options[option];
-        const cards = String(prompt.payload?.cards ?? '').split(',').filter(Boolean);
+        const cards = String(prompt.payload?.cards ?? '').split(',').filter(Boolean)
+          .filter(id => state.seats[seat]?.discard.includes(id));
         if (chosen === undefined || cards.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
         return {
@@ -4583,6 +4859,313 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }),
           prompts: newPrompts,
         };
+      }
+
+      // --- Nightmare: WE-036 Single Shot Rifle w/Scope ---
+      // The exploring player chose a target; that player now discards a card.
+      if (kind === 'we036ChoosePlayer') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const targetSeat = Number(chosen);
+        const target = state.seats[targetSeat];
+        if (target === undefined || target.hand.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:discard`,
+            seat: targetSeat,
+            text: 'Single Shot Rifle w/Scope: discard a card from your hand.',
+            options: [...target.hand],
+            payload: { kind: 'we036Discard' },
+          }],
+        };
+      }
+
+      if (kind === 'we036Discard' || kind === 'we037Discard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: s.hand.filter(id => id !== chosen), discard: [...s.discard, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      // --- Nightmare: MA-057 Jack Krauser — gain the top card from a pile. ---
+      if (kind === 'ma057ChoosePile') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const pile = state.marketPiles[chosen];
+        const top = pile?.cards[0];
+        if (pile === undefined || top === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const topDef = cardDef(state, top);
+        const s: GameState = {
+          ...state,
+          ...nextBase,
+          marketPiles: { ...state.marketPiles, [chosen]: { ...pile, cards: pile.cards.slice(1) } },
+        };
+        return gainCard({ ...s, prompts: newPrompts }, {
+          seat,
+          cardId: topDef?.id ?? (top.split('#')[0] as string),
+          instanceId: top,
+          destination: 'discard',
+          reason: 'explore',
+        });
+      }
+
+      // --- Nightmare: CH-040 Mysterious Mask L1 / CH-042 Leon L1 ---
+      if (kind === 'maskTrashDiscard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, discard: s.discard.filter(id => id !== chosen) } : s)),
+          removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'leonTrashForGain') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const def = cardDef(state, chosen);
+        const maxCost = (def?.cost ?? 0) + 20;
+        const s: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, discard: x.discard.filter(id => id !== chosen) } : x)),
+          removed: [...state.removed, chosen],
+        };
+        const candidates = Object.values(s.marketPiles)
+          .map(p => p.cards[0])
+          .filter((id): id is string => id !== undefined)
+          .filter(id => (cardDef(s, id)?.cost ?? 0) <= maxCost);
+        if (candidates.length === 0) return { ...s, prompts: newPrompts };
+        return {
+          ...s,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:gain`,
+            seat,
+            text: `Leon: gain a card costing up to ${maxCost}.`,
+            options: [...candidates, 'Decline'],
+            payload: { kind: 'leonGainCard' },
+          }],
+        };
+      }
+
+      if (kind === 'leonGainCard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const pileEntry = Object.entries(state.marketPiles).find(([, p]) => p.cards[0] === chosen);
+        if (pileEntry === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const [pileId, pile] = pileEntry;
+        const s: GameState = {
+          ...state,
+          marketPiles: { ...state.marketPiles, [pileId]: { ...pile, cards: pile.cards.slice(1) } },
+        };
+        return gainCard({ ...s, ...nextBase, prompts: newPrompts }, {
+          seat,
+          cardId: cardDef(state, chosen)?.id ?? (chosen.split('#')[0] as string),
+          instanceId: chosen,
+          destination: 'discard',
+          reason: 'ability',
+        });
+      }
+
+      if (kind === 'maskDiscardActionForCards') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const discarded: PlayerState = { ...player, hand: player.hand.filter(id => id !== chosen), discard: [...player.discard, chosen] };
+        const d = drawWithReshuffle({ deck: discarded.inventory, discard: discarded.discard, count: 2, rngState: state.rngState });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...discarded, hand: [...discarded.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      // --- Nightmare: CH-036 Luis Sera L1 / CH-041 Wesker L1 / CH-035 Sergei L1 ---
+      if (kind === 'luisPlusOneCard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'No') return { ...state, ...nextBase, prompts: newPrompts };
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+        const drawn: PlayerState = { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        // "discard one card if you have 10 or fewer cards in your discard pile"
+        if (drawn.discard.length <= 10 && drawn.hand.length > 0) {
+          return {
+            ...state,
+            ...nextBase,
+            rngState: d.rngState,
+            seats: state.seats.map(s => (s.seat === seat ? drawn : s)),
+            prompts: [...newPrompts, {
+              id: `${prompt.id}:discard`,
+              seat,
+              text: 'Luis Sera: discard one card.',
+              options: [...drawn.hand],
+              payload: { kind: 'luisDiscardOne' },
+            }],
+          };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat ? drawn : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'luisDiscardOne') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: s.hand.filter(id => id !== chosen), discard: [...s.discard, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'weskerPlusOneCard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'No') return { ...state, ...nextBase, prompts: newPrompts };
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'sergeiSelfDamage') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const ab = characterAbilities(state, seat).find(a => a.kind === 'optionalSelfDamageForDamageThisTurn') as
+          | { damage: number; amount: number }
+          | undefined;
+        if (ab === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, ab.damage, player.downed || player.dead);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hp: newHp, weaponDamageBonusThisTurn: (s.weaponDamageBonusThisTurn ?? 0) + ab.amount }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      // --- Nightmare: AC-035 PDA — trash one of the looked-at cards, then
+      // return the rest to the top or bottom of the inventory. ---
+      if (kind === 'pdaLook') {
+        const chosen = prompt.options[option];
+        const looked = String(prompt.payload?.looked ?? '').split(',').filter(Boolean);
+        const trashed = chosen !== undefined && chosen !== 'None' ? chosen : undefined;
+        const remaining = looked.filter(id => id !== trashed);
+        let s = state;
+        if (trashed !== undefined) {
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat ? { ...x, inventory: x.inventory.filter(id => id !== trashed) } : x)),
+            removed: [...s.removed, trashed],
+          };
+        }
+        if (remaining.length === 0) return { ...s, ...nextBase, prompts: newPrompts };
+        return {
+          ...s,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:return`,
+            seat,
+            text: 'PDA: return the other looked-at cards to the top or bottom of your inventory.',
+            options: ['Top', 'Bottom'],
+            payload: { kind: 'pdaReturn', remaining: remaining.join(','), first: remaining[0] ?? '' },
+          }],
+        };
+      }
+
+      if (kind === 'pdaReturn') {
+        const chosen = prompt.options[option];
+        const first = String(prompt.payload?.first ?? '');
+        const rest = String(prompt.payload?.remaining ?? '').split(',').filter(Boolean).filter(id => id !== first);
+        if (first === '') return { ...state, ...nextBase, prompts: newPrompts };
+        const s = {
+          ...state,
+          seats: state.seats.map(x => (x.seat === seat
+            ? (chosen === 'Top'
+              ? { ...x, inventory: [first, ...x.inventory.filter(id => id !== first)] }
+              : { ...x, inventory: [...x.inventory.filter(id => id !== first), first] })
+            : x)),
+        };
+        if (rest.length === 0) return { ...s, ...nextBase, prompts: newPrompts };
+        return {
+          ...s,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:return`,
+            seat,
+            text: 'PDA: return the other looked-at cards to the top or bottom of your inventory.',
+            options: ['Top', 'Bottom'],
+            payload: { kind: 'pdaReturn', remaining: rest.join(','), first: rest[0] ?? '' },
+          }],
+        };
+      }
+
+      // --- Nightmare: AC-038 Mind Control — choose a player, then an Action
+      // card from their hand; they discard it and you copy its bonuses and
+      // effects twice. ---
+      if (kind === 'chooseOtherPlayerRevealHand') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const targetSeat = Number(chosen);
+        const target = state.seats[targetSeat];
+        const maxCost = Number(prompt.payload?.maxCost ?? '70');
+        const candidates = (target?.hand ?? []).filter(id => {
+          const c = cardDef(state, id);
+          return c?.type === 'action' && (c.cost ?? 0) <= maxCost;
+        });
+        if (candidates.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:card`,
+            seat,
+            text: `Mind Control: choose an Action card with a cost of ${maxCost} or less from ${target?.name ?? 'that Player'}'s hand.`,
+            options: [...candidates],
+            payload: { kind: 'chooseActionCardCostAtMost', targetSeat: String(targetSeat) },
+          }],
+        };
+      }
+
+      if (kind === 'chooseActionCardCostAtMost') {
+        const chosen = prompt.options[option];
+        const targetSeat = Number(prompt.payload?.targetSeat ?? '');
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const def = cardDef(state, chosen);
+        const s = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === targetSeat
+            ? { ...x, hand: x.hand.filter(id => id !== chosen), discard: [...x.discard, chosen] }
+            : x)),
+        };
+        return { ...applyMindControlCopy(s, seat, def), prompts: newPrompts };
       }
 
       if (kind === 'ac044Discard') {

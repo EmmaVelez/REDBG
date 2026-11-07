@@ -227,7 +227,7 @@ function turnStartAbilityPrompts(
   return prompts;
 }
 
-export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>, mansionCards?: ReadonlyArray<{ cardId: string; count: number }>): GameState {
+export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }>, mansionCards?: ReadonlyArray<{ cardId: string; count: number }>, winInfectedCardId?: string): GameState {
   const defsById = new Map(cards.map(c => [c.id, c]));
   const cardDefs: Record<string, CardDef> = {};
   for (const c of cards) cardDefs[c.id] = c;
@@ -490,6 +490,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     winners: [],
     log: [],
     ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
+    ...(winInfectedCardId !== undefined ? { endInfectedCardId: winInfectedCardId } : {}),
   };
 
   if (setup.skillSystem !== true) {

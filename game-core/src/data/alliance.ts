@@ -165,8 +165,4 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ac-020', name: 'Cornered', type: 'action', set: 'alliance', text: 'Attach this card to your partner if you have one. At the beginning of your turn, if there are two Cornered cards attached to your partner, trash both. Then, gain 3 cards with a total combined cost of 100 or less gold and move them to the top of your inventory in any order.', copies: 5, cost: 30 },
   { id: 'ac-021', name: 'Gathering Forces', type: 'action', set: 'alliance', text: 'You get +20 gold, +1 action, and +1 buy. Any cards you gain this turn go to your hand instead of your discard pile.', copies: 5, cost: 90, bonuses: { gold: 20, actions: 1, buys: 1 }, actionEffects: [{ kind: 'gainedCardsGoToHand' }] },
   { id: 'ac-022', name: 'Desperate Forces', type: 'action', set: 'alliance', text: 'You get +20 ammo and +1 action. Choose a weapon type. All weapons of that type get +10 damage this turn.', copies: 5, cost: 70, bonuses: { ammo: 20, actions: 1 } },
-  { id: 'ac-032', name: 'Silver Ghost', type: 'action', set: 'alliance', text: '+1 card, +1 action.', copies: 4, cost: 30, bonuses: { cards: 1, actions: 1 } },
-  { id: 'ac-033', name: 'Punisher', type: 'action', set: 'alliance', text: '+2 cards, +1 action.', copies: 1, cost: 70, bonuses: { cards: 2, actions: 1 } },
-  { id: 'ac-040', name: 'Flashbang', type: 'action', set: 'alliance', text: '+1 explore. Non-Explosive Infected deal 0 damage.', copies: 5, cost: 20, bonuses: { explores: 1 } },
-  { id: 'ac-050', name: 'Mercenaries Item', type: 'action', set: 'alliance', text: '+20 gold.', copies: 3, cost: 50, bonuses: { gold: 20 } },
 ];

@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-06 ~16:25):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 in progress: T01 ✅ README + run scripts, T02 ✅ production build + deploy smoke test, T03 ✅ reconnect torture test, T04 ✅ full-game bot soak.** All 47 characters have engine behaviour. Suites: **game-core 533, server 96, client 128** — all green, typecheck clean. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found). Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+**Current state (2026-11-07 ~08:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅ commit `974540a`. Nightmare (50 cards) ✅ — data + engine + scenario, all 50 cards implemented, new `engine/nightmare.test.ts` (55 tests).** Suites: **game-core 658, server 131, client 96** — all green, typecheck clean, client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found). Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
@@ -81,6 +81,28 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
    "worth 0 Decorations while in a Combo Pile by itself" is applied to the
    base engine's attached-Infected list via `decorationDelta` (a lone MA-077
    adds 0; attaching another Infected restores its 3).
+1b. **Nightmare expansion — DONE** (this session). All 50 cards (10 characters
+   CH-034..043, 11 weapons WE-032..042, 16 infected MA-054..069, 2 items
+   MA-070/071, 1 event MA-072, 10 actions AC-032..041) are encoded with
+   machine-readable effects and implemented. Sources: `docs/rules/nightmare/
+   RE4_Rulebook.pdf` (official manual) + wiki card scans + the Master Card
+   List xls. New `engine/nightmare.ts` (reveal / defeat / not-defeated /
+   weapon-gain / weapon-prompt / Mind-Control copy entry points), a
+   `nightmare` scenario (23 piles, Nightmare mansion, win = MA-054 Osmund
+   Saddler), and `engine/nightmare.test.ts` (55 tests). Engine fixes found by
+   the new tests/soak: `resolveExplore` was missing the params the Nightmare
+   reveal effects read (`characterAbilities`, `actionsInPlayArea`,
+   `inventoryCount`, `characterDamage`, `ammoCardsInPlayArea`,
+   `infectedBattledThisTurn`); the explore branches overwrote the exploring
+   seat's post-reveal HP/max-HP (MA-061/MA-068); `grantedExplores` was only
+   applied on the non-infected branch (WE-040 Flashbang); MA-057 Jack Krauser
+   gained the pile's top card WITHOUT popping it (duplicate instance); the
+   P.R.L. 412 tied-defeat attached one Infected to every tied player
+   (duplicate) — now broken by most Health then lowest seat; the MA-080
+   resolver moved cards that a down had already swept into the Inventory
+   (duplicate); the Luis/Wesker/Sergei turn-start prompts had no resolvers
+   (silently dropped); Josh Stone's heal gold only fired on the turn-start
+   herb heal, not on playing a herb.
 2. **Skill System — remaining known limitations** (gaps 2-4 closed):
    the reactive Skills (SK-008/010/012) are armed *before* the triggering event
    rather than reacted to at the moment of it, and SK-010/012 cover the
@@ -92,9 +114,7 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 3. Hotseat (pass-and-play) does not yet expose the Skill System toggle.
 4. `sim.ts` / the soak do not drive the draft (skillSystem is off there).
 5. **Outbreak Infected Characters done** (CH-031/032/033, verbatim text + abilities).
-   Still open from the audit: the 52 data-only Mercenaries cards (8 characters with
-   `{kind:'generic'}` abilities, 8 weapons, 10 actions, 26 infected), the whole
-   Nightmare set (50 placeholder cards, not imported into `ALL_CARDS`), the
+   The Nightmare set is now DONE (see 1b). Still open from the audit: the
    unreachable Alliance infected (`ma-025/030/036` — no Alliance mansion exists),
    and the reachable unconsumed effects `we-028 Stun Rod`
    (`moveLowHpInfectedToMansionTop`), `in-002 Virulent Frenzy`, `in-004 Slough Armor`.

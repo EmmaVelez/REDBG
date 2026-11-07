@@ -205,6 +205,16 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   }
 
+  // --- 6d. removeAttachedItem (Nightmare MA-070 Treasure Map) ---
+  for (const instanceId of player.attached) {
+    const cardData = state.cards[instanceId];
+    if (!cardData) continue;
+    const def = state.cardDefs[cardData.cardId];
+    if ((def?.itemEffects ?? []).some(e => e.kind === 'attachThenRemoveForCardsAndGold')) {
+      generatedActions.push({ type: 'removeAttachedItem', seat, instanceId });
+    }
+  }
+
   // --- 7. endTurn ---
   generatedActions.push({ type: 'endTurn', seat });
 

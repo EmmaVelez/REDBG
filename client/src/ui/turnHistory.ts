@@ -36,6 +36,7 @@ const VERBS: Record<Action['type'], string> = {
   moveXp: 'moved XP onto a Skill',
   useSkill: 'used a Skill',
   useWeaponAbility: 'activated a weapon effect',
+  removeAttachedItem: 'removed an attached item',
 };
 
 function cardName(state: GameState, instanceId: string | undefined): string | null {

@@ -789,6 +789,7 @@ export type Action =
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */
   | { readonly type: "useSkill"; readonly seat: number; readonly skillInstanceId: string }
+  | { readonly type: "removeAttachedItem"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "chooseOption"; readonly seat: number; readonly promptId: string; readonly option: number };
 
 export interface GameSetup {

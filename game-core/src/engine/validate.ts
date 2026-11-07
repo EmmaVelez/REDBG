@@ -396,7 +396,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'gainSpecificWeaponIntoInventory':
         case 'movePlayAreaWeaponToInventoryTop':
         case 'discardWeaponToCopyEffects':
-        case 'choosePlayerIncreaseAmmoReqNextTurn': {
+        case 'choosePlayerIncreaseAmmoReqNextTurn':
+        case 'discardActionCardFromHandForPlusTwoCards': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -494,6 +495,33 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           return { ok: false, reason: 'useCharacterAbility: passive ability' };
       }
 
+    case 'removeAttachedItem': {
+      // Nightmare: MA-070 Treasure Map — remove an attached Item from the game.
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'removeAttachedItem: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `removeAttachedItem: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'removeAttachedItem: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'removeAttachedItem: not your turn' };
+      }
+      const itemDef = cardDef(state, action.instanceId);
+      if (itemDef === undefined || itemDef.type !== 'item') {
+        return { ok: false, reason: 'removeAttachedItem: unknown item' };
+      }
+      if (!player.attached.includes(action.instanceId)) {
+        return { ok: false, reason: 'removeAttachedItem: not attached to your character' };
+      }
+      const removable = (itemDef.itemEffects ?? []).some(e => e.kind === 'attachThenRemoveForCardsAndGold');
+      if (!removable) {
+        return { ok: false, reason: 'removeAttachedItem: item is not removable' };
+      }
+      return { ok: true };
+    }
     case 'useWeaponAbility': {
       // Mercenaries: manual weapon effects (WE-043/046/049).
       if (state.phase !== 'main') {

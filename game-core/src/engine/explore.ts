@@ -187,8 +187,8 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number }): ExploreOutcome {
-  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp } = params;
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number }): ExploreOutcome {
+  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp, infectedBattledThisTurn } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
 
@@ -197,7 +197,7 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
   }
 
   const revealBonus = revealHighHpInfectedBonusDamage(characterAbilities ?? [], revealed.hp ?? 0);
-  const damage = computeDamage({ weapons, ammo, bonusDamage: bonusDamage + revealBonus, knifeUsesEarlierThisTurn, ammoCardsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, damageMultiplier });
+  const damage = computeDamage({ weapons, ammo, bonusDamage: bonusDamage + revealBonus, knifeUsesEarlierThisTurn, ammoCardsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, damageMultiplier, infectedBattledThisTurn: infectedBattledThisTurn ?? (revealed.type === 'infected' ? 1 : 0) });
 
   // instantKillAtOrBelowHp: if revealed infected HP <= threshold, instant defeat.
   const instantKill = weapons.some(w =>

@@ -58,6 +58,8 @@ export function playBotGame(config: SimConfig): SimResult {
     config.mansionCards ??
     (scenarioDef as { mansionCards?: ReadonlyArray<{ cardId: string; count: number }> } | undefined)
       ?.mansionCards;
+  const winInfectedCardId =
+    (scenarioDef as { winInfectedCardId?: string } | undefined)?.winInfectedCardId;
 
   // Build players array
   const players = config.difficulties.map((d, i) => ({
@@ -73,7 +75,7 @@ export function playBotGame(config: SimConfig): SimResult {
     partnerMode: config.partnerMode,
   };
 
-  const initialState = setup(setupConfig, cards, piles, mansionCards);
+  const initialState = setup(setupConfig, cards, piles, mansionCards, winInfectedCardId);
   const rand = rngFromSeed(config.seed);
 
   return playBotGameFrom(initialState, config.difficulties, rand, config.maxActions);

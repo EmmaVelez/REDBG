@@ -183,7 +183,7 @@ test('setup with battleHardenedVeteran piles offers Deadly Aim, Merchant and maj
 });
 
 test('SCENARIOS registry includes all scenarios', () => {
-  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance', 'partnersInEscape', 'outbreak', 'mercenaries']);
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance', 'partnersInEscape', 'outbreak', 'mercenaries', 'nightmare']);
   for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }
@@ -192,6 +192,7 @@ test('SCENARIOS registry includes all scenarios', () => {
   // listing one card would register the SAME instances twice)
   expect(pilesForScenario('alliance')).toHaveLength(61);
   expect(pilesForScenario('mercenaries')).toHaveLength(18);
+  expect(pilesForScenario('nightmare')).toHaveLength(23);
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {
