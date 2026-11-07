@@ -387,7 +387,11 @@ export type CharacterAbility =
   | { readonly kind: "discardWeaponToCopyEffects"; readonly level: 1 | 2 } // David King (Outbreak) L1
   | { readonly kind: "knifeFromDiscardForExplore"; readonly level: 1 | 2 } // David King (Outbreak) L2
   | { readonly kind: "turnStartDiscardForInfection"; readonly level: 1 | 2 } // Rebecca Chambers (Outbreak) L1
-  | { readonly kind: "drawWhenOtherInfectionDecreases"; readonly level: 1 | 2 }; // Rebecca Chambers (Outbreak) L2
+  | { readonly kind: "drawWhenOtherInfectionDecreases"; readonly level: 1 | 2 } // Rebecca Chambers (Outbreak) L2
+  // Outbreak Infected Characters (reanimated players)
+  | { readonly kind: "zombieAAoEOnAttack"; readonly amount: number; readonly level: 1 | 2 } // CH-031 Zombie A: other non-infected characters take damage when it attacks
+  | { readonly kind: "zombieBInfectionIncrease"; readonly level: 1 | 2 } // CH-032 Zombie B: trash an infection card to raise a character's level by 1 more
+  | { readonly kind: "zombieCTurnStartInfectionSwap"; readonly level: 1 | 2 }; // CH-033 Zombie C: swap a hand infection card with the top of the Infection Deck
 
 
 // ---------------------------------------------------------------------------
@@ -645,6 +649,8 @@ export interface GameState {
     readonly revealedInstanceId: string;
     readonly outcome: 'defeated' | 'notDefeated';
     readonly decorations: number;
+    /** Decorations gained from the defeated Infected (applied on resolution). */
+    readonly decorationDelta: number;
     readonly damageTaken: number;
     readonly newPlayer: PlayerState;
     readonly mansionDeck: readonly string[];

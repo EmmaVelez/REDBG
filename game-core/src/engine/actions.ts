@@ -49,7 +49,35 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
   return state.cardDefs[inst.cardId];
 }
 
-/** True when the instance is a Green Herb (the only card with this effect). */
+/**
+ * CH-032 Zombie B: "When a character's infection level increases by 1 or more
+ * due to an effect, you may trash an infection card from your hand. If you do,
+ * increase that character's infection level by 1 more."
+ *
+ * Returns one prompt per Zombie B player who can react to `affectedSeat`'s
+ * increase. The reaction is resolved by trashing an infection card from their
+ * hand and drawing a fresh infection onto the affected character.
+ */
+function zombieBPrompts(state: GameState, affectedSeat: number, version: number): Prompt[] {
+  const out: Prompt[] = [];
+  const affectedName = state.seats[affectedSeat]?.name ?? 'A character';
+  for (const s of state.seats) {
+    if (s.dead || s.isInfectedCharacter !== true) continue;
+    if (!characterAbilities(state, s.seat).some(a => a.kind === 'zombieBInfectionIncrease')) continue;
+    const infectionInHand = s.hand.filter(id => state.cards[id]?.cardId.startsWith('in-'));
+    if (infectionInHand.length === 0) continue;
+    out.push({
+      id: `zombie-b-${s.seat}-${version}`,
+      seat: s.seat,
+      text: `${affectedName}'s Infection Level increased. Trash an Infection card from your hand to increase it by 1 more?`,
+      options: [...infectionInHand, 'Decline'],
+      payload: { kind: 'zombieBInfectionIncrease', targetSeat: String(affectedSeat) },
+    });
+  }
+  return out;
+}
+
+/** True when the instance is the Green Herb (the only card with this effect). */
 function isGreenHerb(state: GameState, instanceId: string): boolean {
   return (
     cardDef(state, instanceId)?.itemEffects?.some(e => e.kind === 'healFixed20OrTrashWithSecondFor60') ??
@@ -1192,6 +1220,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             revealedInstanceId,
             outcome: pendingOutcome,
             decorations: pendingDecorations,
+            decorationDelta: outcome.kind === 'defeated' ? (revealedDef.decorations ?? 0) : 0,
             damageTaken: pendingDamageTaken,
             newPlayer: pendingPlayer,
             mansionDeck,
@@ -1228,6 +1257,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const infectedEffectRedirectSeat = infectedReaction.redirectSeat;
       /** The seat an Infected effect should actually affect. */
       const infectedEffectSeat = (): number => infectedEffectRedirectSeat ?? seat;
+      // CH-032 Zombie B: characters whose Infection Level just rose.
+      const zombieBAffected: number[] = [];
       if (revealedDef?.type === 'infected') {
         for (const e of revealedDef.infectedEffects ?? []) {
           if (e.kind === 'onRevealInfectionIncrease') {
@@ -1235,13 +1266,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const targetSeat = infectedEffectSeat();
             const lvl = infectionBySeat.get(targetSeat)?.length ?? 0;
             drawInfectionsFor(targetSeat, lvl <= e.threshold ? e.lowAmount : e.highAmount);
+            zombieBAffected.push(targetSeat);
           } else if (e.kind === 'onRevealAllInfectionIncrease') {
             if (infectedEffectNegated) continue;
             if (infectedEffectRedirectSeat !== undefined) {
               drawInfectionsFor(infectedEffectRedirectSeat, e.amount);
+              zombieBAffected.push(infectedEffectRedirectSeat);
             } else {
               for (const s of state.seats) {
-                if (!s.dead) drawInfectionsFor(s.seat, e.amount);
+                if (!s.dead) {
+                  drawInfectionsFor(s.seat, e.amount);
+                  zombieBAffected.push(s.seat);
+                }
               }
             }
           }
@@ -1266,6 +1302,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         if (!infectedEffectNegated) {
           drawInfectionsFor(infectedEffectSeat(), defeatedInfectionInc);
+          if (defeatedInfectionInc > 0) zombieBAffected.push(infectedEffectSeat());
         }
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
         const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
@@ -1332,6 +1369,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'perfectExploreReward' },
             }]
           : luisPrompts;
+        // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
+        const zombieBDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
         return {
           ...state,
           ...nextBase,
@@ -1344,7 +1383,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
-          prompts: carlosPrompts,
+          prompts: zombieBDefeatedPrompts.length > 0 ? [...carlosPrompts, ...zombieBDefeatedPrompts] : carlosPrompts,
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
       }
@@ -1417,6 +1456,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (e.kind === 'onNotDefeatedInfectionIncrease') {
             if (infectedEffectNegated) continue;
             drawInfectionsFor(infectedEffectSeat(), e.amount + e.perLevel * player.level);
+            zombieBAffected.push(infectedEffectSeat());
           } else if (e.kind === 'onNotDefeatedShuffleBack') {
             const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
             mansionDeck = shuffled.deck;
@@ -1463,6 +1503,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const removedFinal = partnerDied
         ? [...removedAfter, ...afterPartnerDeath.removed.filter(id => !removedAfter.includes(id))]
         : removedAfter;
+      // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
+      const zombieBNotDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
 
       return {
         ...afterPartnerDeath,
@@ -1476,6 +1518,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         mansionDeck,
         mansionBottom,
         rngState: currentRng,
+        ...(zombieBNotDefeatedPrompts.length > 0
+          ? { prompts: [...afterPartnerDeath.prompts, ...zombieBNotDefeatedPrompts] }
+          : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
     }
@@ -2134,15 +2179,35 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (targetSurvives && target.isInfectedCharacter === true) {
             finalPlayer = { ...finalPlayer, hp: finalPlayer.hp - (targetDef?.baseDamage ?? 0) };
           }
-          return {
+          // CH-031 Zombie A: when this infected character attacks, all other
+          // non-infected characters that are not being attacked take damage.
+          const aoeAmount = characterAbilities(state, seat)
+            .filter(a => a.kind === 'zombieAAoEOnAttack')
+            .reduce((sum, a) => (a.kind === 'zombieAAoEOnAttack' ? sum + a.amount : sum), 0);
+          // CH-032 Zombie B reacts to the target's Infection Level rising.
+          const infectionIncreased = targetInfectionCards.length > (target.infectionCards ?? []).length;
+          const seatsAfter: readonly PlayerState[] = state.seats.map(s => {
+            if (s.seat === seat) return finalPlayer;
+            if (s.seat === targetSeat) return newTarget;
+            // CH-031 Zombie A: other non-infected characters take damage.
+            if (aoeAmount > 0 && s.isInfectedCharacter !== true && !s.dead) {
+              return { ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp, aoeAmount, s.downed || s.dead) };
+            }
+            return s;
+          });
+          const postAttackState: GameState = {
             ...state,
             ...nextBase,
-            seats: state.seats.map(s => {
-              if (s.seat === seat) return finalPlayer;
-              if (s.seat === targetSeat) return newTarget;
-              return s;
-            }),
+            seats: seatsAfter,
             ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckAfter } : {}),
+          };
+          // Built from the POST-attack state so it only offers cards still in hand.
+          const zombieBAttackPrompts = infectionIncreased ? zombieBPrompts(postAttackState, targetSeat, state.version) : [];
+          return {
+            ...postAttackState,
+            ...(zombieBAttackPrompts.length > 0
+              ? { prompts: [...state.prompts, ...zombieBAttackPrompts] }
+              : {}),
           };
         }
 
@@ -2474,17 +2539,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // SK-008 Luck LV.2: a declared reaction negates this Damage.
           const neg = defeated ? { state: updatedState, negated: false } : consumeNegateDamage(updatedState, pe.seat);
           const baseState = neg.state;
+          // Apply the combat OUTCOME to the seat's CURRENT state. The saved
+          // `newPlayer` snapshot is stale — the exploring player may have kept
+          // acting while the reactive prompt was open — and restoring it would
+          // silently discard those changes (cards orphaned, pools reverted).
+          const currentSeat = baseState.seats[pe.seat] ?? pe.newPlayer;
           const newPlayer = defeated
-            ? { ...pe.newPlayer, decorations: pe.decorations, attached: [...pe.newPlayer.attached, pe.revealedInstanceId] }
-            : { ...pe.newPlayer, hp: applyHpLoss(characterAbilities(baseState, pe.seat), pe.newPlayer.hp, neg.negated ? 0 : pe.damageTaken, pe.newPlayer.downed || pe.newPlayer.dead) };
+            ? { ...currentSeat, decorations: currentSeat.decorations + pe.decorationDelta, attached: [...currentSeat.attached, pe.revealedInstanceId] }
+            : { ...currentSeat, hp: applyHpLoss(characterAbilities(baseState, pe.seat), currentSeat.hp, neg.negated ? 0 : pe.damageTaken, currentSeat.downed || currentSeat.dead) };
+          // The Infected's own fate likewise applies to the CURRENT deck (it
+          // may have changed while the prompt was open).
+          const bottomed = defeated
+            ? { deck: baseState.mansionDeck, bottom: baseState.mansionBottom }
+            : sendToBottom({ deck: baseState.mansionDeck, bottom: baseState.mansionBottom }, pe.revealedInstanceId);
           return {
             ...baseState,
             ...nextBase,
             seats: baseState.seats.map(s => (s.seat === pe.seat ? newPlayer : s)),
             removed: defeated ? [...baseState.removed, pe.revealedInstanceId] : baseState.removed,
-            mansionDeck: pe.mansionDeck,
-            mansionBottom: pe.mansionBottom,
-            rngState: pe.rngState,
+            mansionDeck: bottomed.deck,
+            mansionBottom: bottomed.bottom,
             pendingExplore: undefined,
             flashGrenadeDefeatedInstanceId: undefined,
             prompts: newPrompts,
@@ -2750,6 +2824,57 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat
             ? { ...player, hp: player.hp - dmg, exploresLeft: player.exploresLeft + 1 }
             : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'zombieBInfectionIncrease') {
+        // CH-032 Zombie B: trash an infection card from hand; the affected
+        // character's Infection Level rises by 1 more.
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(prompt.payload?.targetSeat);
+        const deck = state.infectionDeck ?? [];
+        const added = deck[0];
+        if (!Number.isInteger(targetSeat) || added === undefined || !player.hand.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => {
+            if (s.seat === seat) {
+              return { ...s, hand: s.hand.filter(id => id !== chosenId), discard: [...s.discard, chosenId] };
+            }
+            if (s.seat === targetSeat) {
+              return { ...s, infectionCards: [...(s.infectionCards ?? []), added] };
+            }
+            return s;
+          }),
+          infectionDeck: deck.slice(1),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'zombieCTurnStartInfectionSwap') {
+        // CH-033 Zombie C: move one infection card from hand to the bottom of
+        // the Infection Deck, then take the top card of the deck into hand.
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const deck = state.infectionDeck ?? [];
+        const top = deck[0];
+        if (top === undefined || !player.hand.includes(chosenId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: [...s.hand.filter(id => id !== chosenId), top] }
+            : s)),
+          infectionDeck: [...deck.slice(1), chosenId],
           prompts: newPrompts,
         };
       }

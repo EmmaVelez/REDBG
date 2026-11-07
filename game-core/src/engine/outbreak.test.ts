@@ -682,3 +682,93 @@ describe('Outbreak mode', () => {
     expect(checkWin(s).endReason).toBe('scenarioInfectedDefeated');
   });
 });
+
+describe('Outbreak Infected Characters (Zombie A/B/C)', () => {
+  /** Three-seat Outbreak game with `seat` reanimated as the given zombie. */
+  function zombieState(cardId: string, seat: number, over?: (s: GameState) => GameState): GameState {
+    const base = setup(
+      {
+        seed: 7,
+        players: [
+          { name: 'A', controller: 'human' },
+          { name: 'B', controller: 'human' },
+          { name: 'C', controller: 'human' },
+        ],
+        scenario: 'outbreak',
+      },
+      ALL_CARDS,
+      OUTBREAK_PILES,
+      OUTBREAK_MANSION,
+    );
+    const instanceId = `${cardId}#z`;
+    const withZombie: GameState = {
+      ...base,
+      cards: { ...base.cards, [instanceId]: { instanceId, cardId, location: { zone: 'hand', index: 0 } } },
+      seats: base.seats.map((p, i) => (i === seat
+        ? { ...p, characterInstanceId: instanceId, isInfectedCharacter: true, hp: 140, maxHp: 140, level: 2 as const }
+        : p)),
+    };
+    return over ? over(withZombie) : withZombie;
+  }
+
+  /** Register instance ids AND put them in `seat`'s hand. */
+  function withHand(s: GameState, seat: number, ids: readonly string[]): GameState {
+    const cards = { ...s.cards };
+    ids.forEach((id, i) => {
+      const cardId = id.split('#')[0]!;
+      cards[id] = { instanceId: id, cardId, location: { zone: 'hand', index: i } };
+    });
+    return {
+      ...s,
+      cards,
+      seats: s.seats.map((p, i) => (i === seat ? { ...p, hand: [...p.hand, ...ids] } : p)),
+    };
+  }
+
+  test('Zombie A: attacking deals 10 damage to other non-infected characters', () => {
+    const s = zombieState('ch-031', 0);
+    const before = s.seats.map(x => x.hp);
+    const next = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1 });
+    // Zombie A's own base damage is 0, so the target is untouched...
+    expect(next.seats[1]?.hp).toBe(before[1]);
+    // ...but the third character (not being attacked) takes the AoE.
+    expect(next.seats[2]?.hp).toBe(before[2]! - 10);
+    expect(next.seats[0]?.hp).toBe(before[0]);
+  });
+
+  test('Zombie B: may trash an infection card to raise the affected character\'s level by 1 more', () => {
+    let s = zombieState('ch-032', 0, st => withHand(st, 0, ['in-007#1', 'in-001#1']));
+    s = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-007#1'] });
+    const prompt = s.prompts.find(p => p.payload?.kind === 'zombieBInfectionIncrease');
+    expect(prompt).toBeDefined();
+    const before = s.seats[1]?.infectionCards?.length ?? 0;
+    expect(before).toBe(1);
+    s = applyAction(s, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    expect(s.seats[1]?.infectionCards?.length).toBe(before + 1);
+    expect(s.seats[0]?.hand).not.toContain('in-001#1');
+    expect(s.seats[0]?.discard).toContain('in-001#1');
+  });
+
+  test('Zombie B: declining leaves the level unchanged', () => {
+    let s = zombieState('ch-032', 0, st => withHand(st, 0, ['in-007#1', 'in-001#1']));
+    s = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, infectionCardIds: ['in-007#1'] });
+    const prompt = s.prompts.find(p => p.payload?.kind === 'zombieBInfectionIncrease');
+    const before = s.seats[1]?.infectionCards?.length ?? 0;
+    s = applyAction(s, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: prompt!.options.length - 1 });
+    expect(s.seats[1]?.infectionCards?.length).toBe(before);
+  });
+
+  test('Zombie C: turn-start swap moves a hand infection to the deck bottom and draws the top', () => {
+    const s = zombieState('ch-033', 0, st => withHand(st, 0, ['in-002#1']));
+    const top = s.infectionDeck?.[0];
+    expect(top).toBeDefined();
+    const started = startTurn(s);
+    const prompt = started.prompts.find(p => p.payload?.kind === 'zombieCTurnStartInfectionSwap');
+    expect(prompt).toBeDefined();
+    const resolved = applyAction(started, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    expect(resolved.seats[0]?.hand).toContain(top as string);
+    expect(resolved.seats[0]?.hand).not.toContain('in-002#1');
+    const deck = resolved.infectionDeck ?? [];
+    expect(deck[deck.length - 1]).toBe('in-002#1');
+  });
+});

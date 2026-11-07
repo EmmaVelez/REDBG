@@ -195,6 +195,22 @@ function turnStartAbilityPrompts(
     }
   }
 
+  // CH-033 Zombie C: at the beginning of your turn, may move one infection card
+  // from hand to the bottom of the Infection Deck, then take the top card of
+  // the Infection Deck into hand.
+  if (abilities.some(a => a.kind === 'zombieCTurnStartInfectionSwap')) {
+    const infectionInHand = player.hand.filter(id => state.cards[id]?.cardId.startsWith('in-'));
+    if (infectionInHand.length > 0 && (state.infectionDeck?.length ?? 0) > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: l1Text,
+        options: [...infectionInHand, 'Decline'],
+        payload: { kind: 'zombieCTurnStartInfectionSwap' },
+      });
+    }
+  }
+
   return prompts;
 }
 
@@ -534,6 +550,9 @@ function startTurnInternal(state: GameState): GameState {
       characterInstanceId: instanceId,
       hp: zMaxHp,
       maxHp: zMaxHp,
+      // Infected Characters derive their level from Decorations like any other
+      // Character (Zombie A/B/C gate at 0, so they always have their ability).
+      level: levelForDecorations(zDef?.level1At, zDef?.level2At, player.decorations),
       dead: false,
       downed: false,
       isInfectedCharacter: true,

@@ -90,9 +90,16 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
    have an engine consumer.
 3. Hotseat (pass-and-play) does not yet expose the Skill System toggle.
 4. `sim.ts` / the soak do not drive the draft (skillSystem is off there).
+5. **Outbreak Infected Characters done** (CH-031/032/033, verbatim text + abilities).
+   Still open from the audit: the 52 data-only Mercenaries cards (8 characters with
+   `{kind:'generic'}` abilities, 8 weapons, 10 actions, 26 infected), the whole
+   Nightmare set (50 placeholder cards, not imported into `ALL_CARDS`), the
+   unreachable Alliance infected (`ma-025/030/036` — no Alliance mansion exists),
+   and the reachable unconsumed effects `we-028 Stun Rod`
+   (`moveLowHpInfectedToMansionTop`), `in-002 Virulent Frenzy`, `in-004 Slough Armor`.
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Skill System gaps 2-4 commit.
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Outbreak Infected Characters commit.
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
