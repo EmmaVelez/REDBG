@@ -71,15 +71,16 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 3 of 5); the toggle applies to any scenario.
 
 **Pending:**
-1. **Mercenaries card EFFECTS are data-only** (commit `966df34`). All 86 cards
-   exist with verbatim stats/text and the `mercenaries` scenario is wired into
-   `ALL_CARDS` + the registry, but only `IT-005` (`healToFull`) and the AM
-   bonuses are machine-readable — the 8 character abilities are `{kind:'generic'}`
-   no-ops and every weapon/action/infected effect is text-only. Next: encode +
-   implement them (characters first: Krauser turn-start, HUNK/Wesker damage
-   reduction, Claire buy-for-ammo, Chris on-defeat trash, Jill manual target,
-   Rebecca on-buy, Barry on-defeat reveal; then the weapon/action/infected
-   effects).
+1. **Mercenaries card EFFECTS — DONE** (commit `974540a`). All 52 data-only
+   cards (8 characters, 8 weapons, 10 actions, 26 infected) are now encoded +
+   implemented. `engine/mercenaries.ts` holds the effect entry points
+   (reveal / defeat / not-defeated / on-defeat abilities) and `engine/ammo.ts`
+   centralises the Ammo Requirement math. New tests:
+   `engine/mercenaries.test.ts` (49, one per card). Known limitation: the
+   Mercenary Mode team/combo/timer rules are out of scope, so MA-077's
+   "worth 0 Decorations while in a Combo Pile by itself" is applied to the
+   base engine's attached-Infected list via `decorationDelta` (a lone MA-077
+   adds 0; attaching another Infected restores its 3).
 2. **Skill System — remaining known limitations** (gaps 2-4 closed):
    the reactive Skills (SK-008/010/012) are armed *before* the triggering event
    rather than reacted to at the moment of it, and SK-010/012 cover the
@@ -100,6 +101,6 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Outbreak Infected Characters commit.
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Mercenaries effects commit (`974540a`).
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
