@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 707, server 96, client 141** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
+**Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 710, server 97, client 141** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
 
 **ACTIONBAR PROMPT UI + FALLBACK (2026-11-07, commit c035cab):** the ActionBar is the single
 prompt renderer. It now renders EVERY queued prompt for the seat (not just the first), labels
@@ -8,6 +8,14 @@ options by kind (XP amounts → "N XP", seats → player names, card ids → car
 an "Other actions" fallback that renders any legal action the rest of the UI does not expose —
 currently Outbreak `attack` and Alliance `attachToPartner`, which were legal with NO UI.
 Browser-verified: an Outbreak attack deals its damage and spends the Explore. Client 141.
+
+**SKILL SYSTEM DRAFT FIX (2026-11-07, commit 3abcefc):** starting a game with skills on a base
+scenario used to lock the game (the draft dealt empty hands → no prompt → deadlock). Now
+`cardsForScenario(id, { skillSystem })` adds the 30 Skill cards on ANY scenario, `setup()` falls
+back to the main phase if they are absent, the new `seatAwaitingAction()` drives the server bot
+loop + `stepBot` + the pass-and-play hand-off during the draft, and pass-and-play gained a Skill
+System toggle. Browser-verified: a server room (1 human + 3 bots) drafts 5 rounds + keeps 3 with
+the human participating, and a 2-player pass-and-play hands the device between picks.
 
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
