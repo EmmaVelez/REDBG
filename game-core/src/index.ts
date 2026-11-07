@@ -16,6 +16,7 @@ export { PREMIER_CARDS, FIRST_TIMER_PILES, CLASSIC_HORROR_PILES, SPY_GAMES_PILES
 export { ALLIANCE_CARDS } from "./data/alliance";
 export { NIGHTMARE_CARDS } from "./data/nightmare";
 export { OUTBREAK_CARDS } from "./data/outbreak";
+export { MERCENARIES_CARDS } from "./data/mercenaries";
 export type { ScenarioId, ScenarioDef } from "./data/cards";
 export { chooseBotAction } from "./ai/bot";
 export { enumerateLegalActions } from "./ai/enumerate";

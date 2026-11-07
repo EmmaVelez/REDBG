@@ -4,7 +4,8 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
+
 import { skillCardDefs, draftPrompt, turnStartSkillEffects } from './skill';
 
 /**
@@ -431,7 +432,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   // Mercenaries Skill System: build the 30-card Skill deck (one copy each),
   // shuffle it, and deal 5 cards to each seat. The pass-left draft then runs
   // as a sequence of chooseOption prompts (see engine/skill.ts).
-  const skillDefs = skillCardDefs(cards);
+  const skillDefs = setup.skillSystem === true ? skillCardDefs(cards) : [];
   const skillIds: string[] = [];
   for (const def of skillDefs) {
     for (let j = 0; j < def.copies; j++) {

@@ -1,6 +1,7 @@
 import type { CardDef, CardBonuses } from '../types';
 import { ALLIANCE_CARDS } from './alliance';
 import { OUTBREAK_CARDS } from './outbreak';
+import { MERCENARIES_CARDS } from './mercenaries';
 
 export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   // Characters
@@ -209,7 +210,7 @@ export const BATTLE_HARDENED_VETERAN_PILES: ReadonlyArray<{ pileId: string; card
   { pileId: 'sub', cardIds: ['we-003'] }
 ];
 
-export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape' | 'outbreak';
+export type ScenarioId = 'firstTimer' | 'classicHorror' | 'spyGames' | 'whaddyaBuyin' | 'battleHardenedVeteran' | 'alliance' | 'partnersInEscape' | 'outbreak' | 'mercenaries';
 
 export const ALLIANCE_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
   // Basic Resources (Alliance rulebook ch. V)
@@ -420,6 +421,88 @@ export const STANDARD_MANSION_DECK: ReadonlyArray<{ cardId: string; count: numbe
   { cardId: 'it-002', count: 3 },
 ];
 
+/**
+ * Mercenaries scenario (RE5 manual): the Mercenaries Basic Resources (Ammo
+ * x10/x20/x30, First Aid Spray, Custom Standard Sidearm, Reliable Blade) plus
+ * the Mercenaries weapon and action piles. The Mansion is built from the
+ * Mercenaries infected (MA-073..MA-098).
+ */
+export const MERCENARIES_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'am10', cardIds: ['am-005'] },
+  { pileId: 'am20', cardIds: ['am-006'] },
+  { pileId: 'am30', cardIds: ['am-007'] },
+  { pileId: 'spray', cardIds: ['it-005'] },
+  { pileId: 'sidearm', cardIds: ['we-049'] },
+  { pileId: 'blade', cardIds: ['we-050'] },
+  { pileId: 'ibex', cardIds: ['we-043'] },
+  { pileId: 'shotgun', cardIds: ['we-044'] },
+  { pileId: 'mg', cardIds: ['we-045'] },
+  { pileId: 'magnum', cardIds: ['we-046'] },
+  { pileId: 'rifle', cardIds: ['we-047'] },
+  { pileId: 'bow', cardIds: ['we-048'] },
+  { pileId: 'anticipation', cardIds: ['ac-047'] },
+  { pileId: 'backstab', cardIds: ['ac-048'] },
+  { pileId: 'coup', cardIds: ['ac-045'] },
+  { pileId: 'teargas', cardIds: ['ac-051'] },
+  { pileId: 'boundless', cardIds: ['ac-044'] },
+  { pileId: 'battlehardened', cardIds: ['ac-049'] },
+];
+
+/** Mercenaries mansion deck (all MA-073..MA-098 at their printed copies). */
+export const MERCENARIES_MANSION: ReadonlyArray<{ cardId: string; count: number }> = [
+  { cardId: 'ma-073', count: 3 },
+  { cardId: 'ma-074', count: 3 },
+  { cardId: 'ma-075', count: 2 },
+  { cardId: 'ma-076', count: 3 },
+  { cardId: 'ma-077', count: 1 },
+  { cardId: 'ma-078', count: 1 },
+  { cardId: 'ma-079', count: 3 },
+  { cardId: 'ma-080', count: 2 },
+  { cardId: 'ma-081', count: 3 },
+  { cardId: 'ma-082', count: 2 },
+  { cardId: 'ma-083', count: 3 },
+  { cardId: 'ma-084', count: 3 },
+  { cardId: 'ma-085', count: 3 },
+  { cardId: 'ma-086', count: 3 },
+  { cardId: 'ma-087', count: 3 },
+  { cardId: 'ma-088', count: 3 },
+  { cardId: 'ma-089', count: 3 },
+  { cardId: 'ma-090', count: 3 },
+  { cardId: 'ma-091', count: 3 },
+  { cardId: 'ma-092', count: 3 },
+  { cardId: 'ma-093', count: 3 },
+  { cardId: 'ma-094', count: 3 },
+  { cardId: 'ma-095', count: 3 },
+  { cardId: 'ma-096', count: 3 },
+  { cardId: 'ma-097', count: 3 },
+  { cardId: 'ma-098', count: 3 },
+  // Uroboros Aheri gives the Story Mode win condition (defeat it to win).
+  { cardId: 'ma-010', count: 1 },
+];
+
+export const MERCENARIES_SCENARIO_DEF = {
+  id: 'mercenaries' as ScenarioId,
+  name: 'Mercenaries',
+  description: 'The Mercenaries expansion scenario — Mercenaries Basic Resources, weapons and actions, with a Mansion built from the Mercenaries infected.',
+  piles: MERCENARIES_PILES,
+  mansionCards: MERCENARIES_MANSION,
+};
+
+
+export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
+  const found = SCENARIOS.find(s => s.id === id);
+  if (found === undefined) {
+    throw new Error(`unknown scenario: ${String(id)}`);
+  }
+  return found.piles;
+}
+
+export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
+  { cardId: 'am-001', count: 7 },
+  { cardId: 'we-009', count: 1 },
+  { cardId: 'we-004', count: 2 }
+];
+
 export const SCENARIOS = [
   {
     id: 'firstTimer',
@@ -458,20 +541,7 @@ export const SCENARIOS = [
   ALLIANCE_SCENARIO_DEF,
   PARTNERS_IN_ESCAPE_SCENARIO_DEF,
   OUTBREAK_SCENARIO_DEF,
-];
-
-export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
-  const found = SCENARIOS.find(s => s.id === id);
-  if (found === undefined) {
-    throw new Error(`unknown scenario: ${String(id)}`);
-  }
-  return found.piles;
-}
-
-export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
-  { cardId: 'am-001', count: 7 },
-  { cardId: 'we-009', count: 1 },
-  { cardId: 'we-004', count: 2 }
+  MERCENARIES_SCENARIO_DEF,
 ];
 
 /**
@@ -486,10 +556,10 @@ export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
   * cost 50 / ammoReq 0 / damage 10. Telescopic Sight Rifle (we-019) is an
   * Alliance-exclusive rifle with a bottom-reveal mechanic.
  */
-export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS];
+export const ALL_CARDS: ReadonlyArray<CardDef> = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS, ...MERCENARIES_CARDS];
 
 /** Scenarios played with the FULL database (Premier + Alliance + Outbreak). */
-const EXPANSION_SCENARIOS: ReadonlySet<ScenarioId> = new Set(['alliance', 'partnersInEscape', 'outbreak']);
+const EXPANSION_SCENARIOS: ReadonlySet<ScenarioId> = new Set(['alliance', 'partnersInEscape', 'outbreak', 'mercenaries']);
 
 export function isExpansionScenario(id: ScenarioId): boolean {
   return EXPANSION_SCENARIOS.has(id);

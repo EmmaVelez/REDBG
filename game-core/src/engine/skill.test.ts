@@ -3,7 +3,7 @@ import type { GameState } from '../types';
 import { setup } from './game';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
-import { FIRST_TIMER_PILES, STANDARD_MANSION_DECK, PREMIER_CARDS } from '../data/cards';
+import { FIRST_TIMER_PILES, STANDARD_MANSION_DECK, PREMIER_CARDS, pilesForScenario, MERCENARIES_MANSION } from '../data/cards';
 import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { isSkillActive } from './skill';
 
@@ -40,6 +40,51 @@ function runDraft(state: ReturnType<typeof setup>): ReturnType<typeof setup> {
   }
   return s;
 }
+
+describe('Mercenaries card data', () => {
+  const MERC = MERCENARIES_CARDS;
+
+  it('contains the full printed inventory (86 cards)', () => {
+    const count = (t: string) => MERC.filter(c => c.type === t).length;
+    expect(count('character')).toBe(8);
+    expect(count('weapon')).toBe(8);
+    expect(count('action')).toBe(10);
+    expect(count('infected')).toBe(26);
+    expect(count('ammunition')).toBe(3);
+    expect(count('item')).toBe(1);
+    expect(count('skill')).toBe(30);
+    expect(MERC).toHaveLength(86);
+  });
+
+  it('has unique ids following the printed numbering scheme', () => {
+    const ids = MERC.map(c => c.id);
+    expect(new Set(ids).size).toBe(MERC.length);
+    for (const c of MERC) {
+      expect(c.id).toMatch(/^(ch|we|ac|ma|am|it|sk)-\d{3}$/);
+      expect(c.set).toBe('mercenaries');
+      expect(c.copies).toBeGreaterThanOrEqual(1);
+      expect(c.text).not.toBe('');
+    }
+  });
+
+  it('gives every Mercenaries character a single level with a gate', () => {
+    for (const c of MERC.filter(c => c.type === 'character')) {
+      expect(c.maxHp, `${c.id} maxHp`).toBeGreaterThan(0);
+      expect(c.level1At, `${c.id} level1At`).toBeGreaterThan(0);
+      expect(c.level2At, `${c.id} has no L2`).toBeUndefined();
+      expect(c.levels).toHaveLength(1);
+      expect(c.levels?.[0]?.level).toBe(1);
+      expect(c.abilities?.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('uses the Mercenaries scenario piles and a full mansion', () => {
+    expect(pilesForScenario('mercenaries')).toHaveLength(18);
+    const mansion = MERCENARIES_MANSION.map(m => m.cardId);
+    expect(new Set(mansion).size).toBe(mansion.length);
+    expect(mansion).toContain('ma-010'); // Uroboros = the Story Mode win condition
+  });
+});
 
 describe('Mercenaries Skill System', () => {
   it('exposes exactly 30 unique skill cards', () => {

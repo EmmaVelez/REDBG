@@ -110,7 +110,7 @@ function assertSane(state: GameState, scenario: ScenarioId): void {
 describe('M5-T04 full-game bot soak', () => {
   test('every scenario plays a full game with conserved, sane, terminating state', () => {
     const scenarioIds = SCENARIOS.map(s => s.id as ScenarioId);
-    expect(scenarioIds).toHaveLength(8);
+    expect(scenarioIds).toHaveLength(9);
 
     let natural = 0;
     let total = 0;

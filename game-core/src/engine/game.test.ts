@@ -183,7 +183,7 @@ test('setup with battleHardenedVeteran piles offers Deadly Aim, Merchant and maj
 });
 
 test('SCENARIOS registry includes all scenarios', () => {
-  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance', 'partnersInEscape', 'outbreak']);
+  expect(SCENARIOS.map(s => s.id)).toEqual(['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran', 'alliance', 'partnersInEscape', 'outbreak', 'mercenaries']);
   for (const id of ['firstTimer', 'classicHorror', 'spyGames', 'whaddyaBuyin', 'battleHardenedVeteran'] as const) {
     expect(pilesForScenario(id)).toHaveLength(18);
   }
@@ -191,6 +191,7 @@ test('SCENARIOS registry includes all scenarios', () => {
   // pile that duplicated knife-plain's Combat Knife was removed; two piles
   // listing one card would register the SAME instances twice)
   expect(pilesForScenario('alliance')).toHaveLength(61);
+  expect(pilesForScenario('mercenaries')).toHaveLength(18);
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {
