@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~11:10):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** Suites: **game-core 666, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+**Current state (2026-11-07 ~12:40):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** Suites: **game-core 685, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
@@ -184,6 +184,63 @@ Character is dead." Outbreak adds that a face-down Character is out of the game
 - New `engine/downed.test.ts` (8 tests): attack downs, attached cards stay,
   revive (-20 max HP / heal / draw 5 / turn skipped), permanent defeat at 20 max
   HP, cannot be attacked, no Infection rise, idempotent, out-of-game action ban.
+
+## Rules-text-only cards implemented (2026-11-07)
+
+Every card whose rules text had no engine encoding now behaves. New effect
+kinds in `types.ts`, a new `engine/outbreak.ts`, and a Blowback Pistol discard
+step in the client's explore picker.
+
+- **WE-001 Grenade** — `trashAfterUse`; trashed after an explore (already) and
+  now also after an Attack.
+- **WE-018 / WE-018g Grenade Launcher** — `explosivesToDiscardInsteadOfTrash`:
+  every Explosive used in that explore goes to the discard pile, not `removed`.
+- **WE-019 Telescopic Sight Rifle** — `revealFromMansionBottom`: new
+  `revealBottom()` in `engine/mansion.ts` (bottom pile first, else the deck's
+  last card).
+- **WE-021 Triple Barreled Shotgun** — `grantExplores: 2` +
+  `plusDamagePerInfectedBattled: 10`.
+- **WE-025 Blowback Pistol** — `discardPistolsForDamage`: the explore action
+  takes `discardedPistols`; validated (must be Pistol-tagged weapons in hand,
+  not one of the weapons being used) and worth +10 damage each. Client renders
+  a discard-Pistols step in the explore picker.
+- **WE-030 Hand Cannon** — `trashAmmoFromPlayAreaOnUse` (trashes one Ammunition
+  from the play area) + `cannotAttach` on `CardDef` (the `attachToCharacter`
+  effect refuses it).
+- **MA-045 Wasp** — `onRevealFlatDamageToExploringCharacters`: 20 damage to the
+  exploring character on reveal.
+- **MA-047 Reinforced Zombie** — `reduceLevel2DecorationRequirement`: the
+  Level-2 Decoration gate drops by 1 per copy attached, applied in the defeat
+  path's level recomputation.
+- **MA-048 Crimson Head** — `onRevealBonusIfZombieAttached`: +10 HP / +10 Damage
+  when the exploring character has an attached Infected with "Zombie" in its
+  name; folded into `resolveExplore`'s revealed card.
+- **MA-049 Reinforced Licker** — `onRevealZeroAmmoWeaponsDealNoDamage`: 0-ammo
+  weapons contribute no damage to that explore.
+- **MA-054o Kevlar Jacket** — `attachAndPreventDamageByMovingToMansionBottom`:
+  attaches on Take; `applyDamageWithKevlar` absorbs the next damage and moves it
+  to the Mansion bottom (explore damage, attack damage, MA-045 and the traps).
+  The engine auto-takes the beneficial option — the alternative (a prompt at
+  every damage site) would need the damage held across the prompt, which the
+  reducer does not support. The jacket leaves play either way, so it cannot
+  absorb a second hit.
+- **MA-055o Antivirus** — `antivirusReduceInfectionOrRemove`: resolved on reveal
+  (never through Take) — optional -3 Infection at level 6+, then move to the
+  Mansion bottom or remove. Cured Infection cards go to the bottom of the
+  Infection Deck.
+- **MA-056o Laser Trap / MA-057o Rock Trap** — 20 damage per distinct card type
+  in the play area / 10 per Action card, then removed from the game.
+
+Two pre-existing defects surfaced while soak-testing these and are fixed here:
+- `startTurn`'s reanimation cleared `attached`, orphaning the character's
+  cards. Per the rulebook ("Remove ... all non-Infected cards that were
+  attached"), non-Infected attachments now go to `removed` and Infected ones
+  stay attached to the reanimated Character.
+- `playActionCard` left AC-013/014/020 in the Play Area **and** the partner's
+  attachments, so the card was duplicated when the Play Area was discarded.
+  The card now leaves the Play Area when it attaches.
+
+New `engine/rulesText.test.ts` (19 tests) covers all 14 cards.
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.

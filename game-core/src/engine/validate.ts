@@ -256,6 +256,25 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             if (player.turnAmmo < requiredAmmo) {
               return { ok: false, reason: 'explore: insufficient ammo' };
             }
+            // WE-025 Blowback Pistol: the discarded cards must be Pistol weapons
+            // in hand, and at least one used weapon must carry the effect.
+            const blowbackArmed = action.weapons.some(id =>
+              cardDef(state, id)?.weaponEffects?.some(e => e.kind === 'discardPistolsForDamage') === true);
+            for (const pid of action.discardedPistols ?? []) {
+              if (!player.hand.includes(pid)) {
+                return { ok: false, reason: `explore: discarded Pistol not in hand: ${pid}` };
+              }
+              const pdef = cardDef(state, pid);
+              if (pdef?.type !== 'weapon' || !(pdef.weaponTags ?? []).includes('pistol')) {
+                return { ok: false, reason: `explore: not a Pistol card: ${pid}` };
+              }
+              if (action.weapons.includes(pid)) {
+                return { ok: false, reason: `explore: cannot discard a weapon being used: ${pid}` };
+              }
+            }
+            if (!blowbackArmed && (action.discardedPistols ?? []).length > 0) {
+              return { ok: false, reason: 'explore: no Blowback Pistol in use' };
+            }
             return { ok: true };
 
     case 'attack':

@@ -68,6 +68,23 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const combo = evaluateExploreCombo(state, seat, selected);
   const canExplore = explores.length > 0 && prompt === undefined;
 
+  // WE-025 Blowback Pistol: "Discard any number of 'Pistol' cards from hand to
+  // play. +10 damage per card discarded." Offered only while a Blowback Pistol
+  // is part of the selected explore.
+  const blowbackArmed = selected.some(id => defForInstance(state, id)?.weaponEffects?.some(
+    e => e.kind === 'discardPistolsForDamage') === true);
+  const pistolOptions = blowbackArmed
+    ? (state.seats[seat]?.hand ?? []).filter(id => {
+        const def = defForInstance(state, id);
+        return def?.type === 'weapon' && (def.weaponTags ?? []).includes('pistol') && !selected.includes(id);
+      })
+    : [];
+  const [discardPistols, setDiscardPistols] = useState<readonly string[]>([]);
+
+  const toggleDiscardPistol = (instanceId: string): void => {
+    setDiscardPistols(prev => (prev.includes(instanceId) ? prev.filter(id => id !== instanceId) : [...prev, instanceId]));
+  };
+
   const toggleWeapon = (instanceId: string): void => {
     setSelected(prev => (prev.includes(instanceId) ? prev.filter(id => id !== instanceId) : [...prev, instanceId]));
   };
@@ -166,6 +183,23 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           {combo.reason !== null && (
             <div className="explore-picker-reason" data-explore-reason>{combo.reason}</div>
           )}
+          {blowbackArmed && pistolOptions.length > 0 && (
+            <div className="explore-picker-pistols" data-explore-pistols>
+              <div className="explore-picker-pistols-title">
+                Blowback Pistol: discard Pistols for +10 damage each
+              </div>
+              {pistolOptions.map(id => (
+                <label key={id} className="explore-option">
+                  <input
+                    type="checkbox"
+                    checked={discardPistols.includes(id)}
+                    onChange={() => toggleDiscardPistol(id)}
+                  />
+                  <span className="explore-option-name">{defForInstance(state, id)?.name ?? id}</span>
+                </label>
+              ))}
+            </div>
+          )}
           <div className="explore-picker-actions">
             <button type="button" disabled={disabled} onClick={() => setSelected(weaponOptions.map(o => o.instanceId))}>
               Select all
@@ -201,7 +235,13 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
               data-weapons={selected.length}
               disabled={disabled || !combo.legal}
               title={combo.legal ? `${combo.damage} damage, ${combo.ammo} ammo` : (combo.reason ?? undefined)}
-              onClick={() => onAction({ type: 'explore', seat, weapons: selected, exploreCount: 1 })}
+              onClick={() => onAction({
+                type: 'explore',
+                seat,
+                weapons: selected,
+                exploreCount: 1,
+                ...(discardPistols.length > 0 ? { discardedPistols: discardPistols } : {}),
+              })}
             >
               {pickerOpen ? 'Explore selected' : 'Explore'}
             </button>

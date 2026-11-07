@@ -228,6 +228,14 @@ export function explosivesGoToDiscard(abilities: readonly CharacterAbility[]): b
   return abilities.some(a => a.kind === 'explosivesGoToDiscardInsteadOfTrash');
 }
 
+/**
+ * WE-030 Hand Cannon: "This card cannot be attached to characters." Any effect
+ * that would attach it must leave it where it is instead.
+ */
+export function canAttachToCharacter(def: CardDef | undefined): boolean {
+  return def?.cannotAttach !== true;
+}
+
 /** True when the weapon def is an explosive (tagged). */
 export function actionBonus(
   abilities: readonly CharacterAbility[],

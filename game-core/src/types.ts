@@ -90,6 +90,9 @@ export interface CardDef {
   readonly ammoCap?: number;
   /** X-weapon: ammo assigned = damage. */
   readonly xAmmo?: boolean;
+  /** Rulebook: "This card cannot be attached to characters." The engine
+   *  refuses to attach it (WE-030 Hand Cannon). */
+  readonly cannotAttach?: boolean;
   readonly weaponTags?: readonly WeaponTag[]; // e.g. "explosive" (Jill synergy)
   /** Weapon category type (e.g. "handgun", "shotgun") — used by Desperate Forces (AC-022). */
   readonly weaponType?: string;
@@ -178,7 +181,12 @@ export type WeaponEffect =
   | { readonly kind: "plusDamageIfNoActionsInPlayArea"; readonly amount: number } // WE-048 Hunting Bow
   | { readonly kind: "cannotPlayActionsWhileInPlayArea" } // WE-048 Hunting Bow
   | { readonly kind: "selfPlusDamageTrashAtTurnEnd"; readonly amount: number } // WE-049 Custom Standard Sidearm
-  | { readonly kind: "onDefeatOptionalGoldTrashAtTurnEnd"; readonly amount: number }; // WE-050 Reliable Blade
+  | { readonly kind: "onDefeatOptionalGoldTrashAtTurnEnd"; readonly amount: number } // WE-050 Reliable Blade
+  // --- Outbreak / Premiere rules-text gaps ---
+  | { readonly kind: "explosivesToDiscardInsteadOfTrash" } // WE-018/we-018g Grenade Launcher
+  | { readonly kind: "revealFromMansionBottom" } // WE-019 Telescopic Sight Rifle
+  | { readonly kind: "discardPistolsForDamage"; readonly amount: number } // WE-025 Blowback Pistol
+  | { readonly kind: "trashAmmoFromPlayAreaOnUse"; readonly count: number } // WE-030 Hand Cannon
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -230,7 +238,12 @@ export type InfectedEffect =
   | { readonly kind: "onDefeatDrawCardAtEndOfTurn"; readonly count: number } // MA-093 Los Ganados (Handscythe)
   | { readonly kind: "onDefeatTrashCardFromAnyDiscard" } // MA-094 Los Ganados (Pitchfork)
   | { readonly kind: "onDefeatGiveDamageToAnyCharacter"; readonly amount: number } // MA-096 Los Illuminados (Bow)
-  | { readonly kind: "onDefeatMoveHandOrDiscardToPlayerDiscard" }; // MA-098 Base Majini (Shield)
+  | { readonly kind: "onDefeatMoveHandOrDiscardToPlayerDiscard" } // MA-098 Base Majini (Shield)
+  // --- Outbreak rules-text gaps (MA-045..MA-049) ---
+  | { readonly kind: "onRevealFlatDamageToExploringCharacters"; readonly amount: number } // MA-045 Wasp
+  | { readonly kind: "reduceLevel2DecorationRequirement"; readonly amount: number } // MA-047 Reinforced Zombie
+  | { readonly kind: "onRevealBonusIfZombieAttached"; readonly hp: number; readonly damage: number } // MA-048 Crimson Head
+  | { readonly kind: "onRevealZeroAmmoWeaponsDealNoDamage" } // MA-049 Reinforced Licker
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
@@ -238,7 +251,10 @@ export type ItemEffect =
   | { readonly kind: "healSelfAndPartnerToFull" }                            // Red Herb IT-004
   | { readonly kind: "plusMaxHp"; readonly amount: number }                  // Yellow Herb (Mansion only): +amount max HP
   | { readonly kind: "attachThenRemoveForCardsAndGold"; readonly cards: number; readonly gold: number } // Treasure Map
-  | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number }; // Hidden Treasure
+  | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number } // Hidden Treasure
+  // --- Outbreak items (MA-054o..MA-055o) ---
+  | { readonly kind: "attachAndPreventDamageByMovingToMansionBottom" } // MA-054o Kevlar Jacket
+  | { readonly kind: "antivirusReduceInfectionOrRemove"; readonly threshold: number; readonly amount: number }; // MA-055o Antivirus
 
 export type ActionEffect =
   | { readonly kind: "allWeaponsPlusDamageThisTurn"; readonly amount: number } // Deadly Aim: +10
@@ -771,7 +787,7 @@ export type Action =
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
-  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>> }
+  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[] }
   /** Outbreak: spend 1 Explore to Attack another Character (instead of
    *  revealing the Mansion). Non-Infected attackers must name a weapon.
    *  Infected attackers deal their base Damage.

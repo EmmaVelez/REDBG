@@ -22,7 +22,7 @@ export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   { id: 'ch-010', name: 'Rebecca Chambers', type: 'character', set: 'premier', text: 'Cards you trash via effects may go to other players\' discard piles instead.', copies: 1, level1At: 2, level2At: 4, maxHp: 70, levels: [{ level: 1, text: 'Cards you trash via effects may go to other players\' discard piles instead.' }, { level: 2, text: 'You may trash cards from hand whenever you please.' }], abilities: [{ kind: 'trashRedirectToPlayerDiscard', level: 1 }, { kind: 'trashFromHandAtWill', level: 2 }] },
 
   // Weapons
-  { id: 'we-001', name: 'Grenade', type: 'weapon', set: 'premier', text: 'No ammo. Deals 15 damage. Trashed after use.', weaponType: 'explosive', copies: 5, cost: 40, ammoReq: 0, damage: 15, weaponTags: ['explosive'] },
+  { id: 'we-001', name: 'Grenade', type: 'weapon', set: 'premier', text: 'No ammo. Deals 15 damage. Trashed after use.', weaponType: 'explosive', copies: 5, cost: 40, ammoReq: 0, damage: 15, weaponTags: ['explosive'], weaponEffects: [{ kind: 'trashAfterUse' }] },
   { id: 'we-002', name: 'Longbow', type: 'weapon', set: 'premier', text: 'No ammo. Deals 25 damage.', weaponType: 'bow', copies: 5, cost: 110, ammoReq: 0, damage: 25, weaponTags: ['gun'] },
   { id: 'we-003', name: 'Submission', type: 'weapon', set: 'premier', text: 'Melee. +5 damage if you have 80 or more Health.', copies: 5, cost: 20, ammoReq: 0, damage: 5, weaponTags: ['melee'], weaponEffects: [{ kind: 'plusDamageIfSelfHpAtLeast', hp: 80, amount: 5 }] },
   { id: 'we-004', name: 'Combat Knife', type: 'weapon', set: 'premier', text: 'Free, no ammo. Deals 5 damage.', weaponType: 'knife', copies: 11, cost: 0, ammoReq: 0, damage: 5, weaponTags: ['melee', 'knife'] },

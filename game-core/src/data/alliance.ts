@@ -38,21 +38,21 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   // WEAPONS - PISTOLS
   // ========================================================================
   
-  { id: 'we-025', name: 'Blowback Pistol', type: 'weapon', set: 'alliance', text: 'Discard any number of "Pistol" cards from hand to play. +10 damage per card discarded.', weaponType: 'handgun', copies: 5, cost: 40, ammoReq: 30, damage: 20, weaponTags: ['gun', 'pistol'], weaponEffects: [] },
-  { id: 'we-018', name: 'Grenade Launcher [F. Grenade]', type: 'weapon', set: 'alliance', text: 'All Explosives go to discard instead of trash. Requires ammo. Deals 20 damage.', weaponType: 'explosive', copies: 1, cost: 80, ammoReq: 0, damage: 20, weaponTags: ['explosive'], weaponEffects: [] },
+  { id: 'we-025', name: 'Blowback Pistol', type: 'weapon', set: 'alliance', text: 'Discard any number of "Pistol" cards from hand to play. +10 damage per card discarded.', weaponType: 'handgun', copies: 5, cost: 40, ammoReq: 30, damage: 20, weaponTags: ['gun', 'pistol'], weaponEffects: [{ kind: 'discardPistolsForDamage', amount: 10 }] },
+  { id: 'we-018', name: 'Grenade Launcher [F. Grenade]', type: 'weapon', set: 'alliance', text: 'All Explosives go to discard instead of trash. Requires ammo. Deals 20 damage.', weaponType: 'explosive', copies: 1, cost: 80, ammoReq: 0, damage: 20, weaponTags: ['explosive'], weaponEffects: [{ kind: 'explosivesToDiscardInsteadOfTrash' }] },
   
   // ========================================================================
   // WEAPONS - SHOTGUNS
   // ========================================================================
   
   { id: 'we-020', name: 'Riot Shotgun', type: 'weapon', set: 'alliance', text: 'You get +1 explore this turn. Requires 60 ammo. Deals 45 damage.', copies: 7, cost: 70, ammoReq: 60, damage: 45, weaponTags: ['gun', 'shotgun'], weaponEffects: [{ kind: 'grantExplores', amount: 1 }] },
-  { id: 'we-021', name: 'Triple Barreled Shotgun', type: 'weapon', set: 'alliance', text: 'You get +2 explore this turn. +10 damage for each Infected being battled.', weaponType: 'shotgun', copies: 1, cost: 90, ammoReq: 80, damage: 50, weaponTags: ['gun', 'shotgun'], weaponEffects: [] },
+  { id: 'we-021', name: 'Triple Barreled Shotgun', type: 'weapon', set: 'alliance', text: 'You get +2 explore this turn. +10 damage for each Infected being battled.', weaponType: 'shotgun', copies: 1, cost: 90, ammoReq: 80, damage: 50, weaponTags: ['gun', 'shotgun'], weaponEffects: [{ kind: 'grantExplores', amount: 2 }, { kind: 'plusDamagePerInfectedBattled', amount: 10 }] },
   
   // ========================================================================
   // WEAPONS - RIFLES
   // ========================================================================
   
-  { id: 'we-019', name: 'Telescopic Sight Rifle', type: 'weapon', set: 'alliance', text: 'When exploring, reveal cards from BOTTOM of Mansion instead of top. Requires 50 ammo. Deals 30 damage.', weaponType: 'rifle', copies: 7, cost: 50, ammoReq: 50, damage: 30, weaponTags: ['gun', 'rifle'], weaponEffects: [] },
+  { id: 'we-019', name: 'Telescopic Sight Rifle', type: 'weapon', set: 'alliance', text: 'When exploring, reveal cards from BOTTOM of Mansion instead of top. Requires 50 ammo. Deals 30 damage.', weaponType: 'rifle', copies: 7, cost: 50, ammoReq: 50, damage: 30, weaponTags: ['gun', 'rifle'], weaponEffects: [{ kind: 'revealFromMansionBottom' }] },
   
   // ========================================================================
   // WEAPONS - MACHINE GUNS
@@ -71,7 +71,7 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   // ========================================================================
   
   { id: 'we-017', name: 'Flash Grenade', type: 'weapon', set: 'alliance', text: 'Next "Las Plagas" revealed is defeated. Move low HP Infected to bottom of mansion. Trashes after use. No ammo.', weaponType: 'explosive', copies: 5, cost: 20, ammoReq: 0, damage: 0, weaponTags: ['explosive'], weaponEffects: [] },
-  { id: 'we-018g', name: 'Grenade Launcher', type: 'weapon', set: 'alliance', text: 'All Explosives go to discard instead of trash. Requires ammo. Deals 20 damage.', weaponType: 'explosive', copies: 1, cost: 80, ammoReq: 0, damage: 20, weaponTags: ['explosive'], weaponEffects: [] },
+  { id: 'we-018g', name: 'Grenade Launcher', type: 'weapon', set: 'alliance', text: 'All Explosives go to discard instead of trash. Requires ammo. Deals 20 damage.', weaponType: 'explosive', copies: 1, cost: 80, ammoReq: 0, damage: 20, weaponTags: ['explosive'], weaponEffects: [{ kind: 'explosivesToDiscardInsteadOfTrash' }] },
   
   // ========================================================================
   // WEAPONS - BOW

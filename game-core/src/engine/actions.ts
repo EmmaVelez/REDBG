@@ -1,8 +1,9 @@
 import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
-import { revealTop, sendToBottom, shuffleBack } from './mansion';
+import { revealTop, revealBottom, sendToBottom, shuffleBack } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
+import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
   characterAbilities,
@@ -28,6 +29,7 @@ import {
   actionBonus,
   trashEffectBonus,
   explosivesGoToDiscard,
+  canAttachToCharacter,
   isExplosive,
   infectedDamageReduction,
   exploreBigHandBonus,
@@ -397,12 +399,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (def.id === 'ac-023') {
               weaponDamageBonusThisTurn += 20;
             }
-            // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the partner (if any) on play.
+            // AC-013 Partners / AC-014 Star-Crossed Duo: attach this card to the
+            // partner (if any) on play. The card leaves the Play Area — it is
+            // now attached, and leaving a copy in both zones would duplicate it
+            // when the Play Area is discarded at end of turn.
+            const attachesToPartner = (def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020')
+              && player.partnerInstanceId !== undefined
+              && (played.player.partnerAttached ?? []).length < partnerAttachCap(characterAbilities(state, seat));
             let partnerAttached = played.player.partnerAttached ?? [];
-            if ((def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020') && player.partnerInstanceId && partnerAttached.length < partnerAttachCap(characterAbilities(state, seat))) {
+            if (attachesToPartner) {
               partnerAttached = [...partnerAttached, instanceId];
             }
-            let newPlayer: PlayerState = { ...played.player, partnerAttached, weaponDamageBonusThisTurn, turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def) };
+            let newPlayer: PlayerState = {
+              ...played.player,
+              playArea: attachesToPartner
+                ? played.player.playArea.filter(id => id !== instanceId)
+                : played.player.playArea,
+              partnerAttached,
+              weaponDamageBonusThisTurn,
+              turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def),
+            };
             let ac015Rng = played.rngState;
             if (def.id === 'ac-015' && !player.partnerInstanceId) {
               const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 2, rngState: ac015Rng });
@@ -764,7 +780,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   if (updated) newPlayer = updated as PlayerState;
                 }
               }
-              if (e.kind === 'attachToCharacter') {
+              if (e.kind === 'attachToCharacter' && canAttachToCharacter(def)) {
                 newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
@@ -1011,14 +1027,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const requiredAmmo = requiredAmmoForExplore(state, seat, weapons);
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
-          const handAfter = player.hand.filter(id => !weapons.includes(id));
+          // WE-025 Blowback Pistol: "Discard any number of 'Pistol' cards from
+          // hand to play. +10 damage per card discarded." The discarded cards
+          // arrive on the explore action (see validateAction).
+          const discardedPistols = action.discardedPistols ?? [];
+          const blowbackPerCard = weapons.reduce((sum, id) => {
+            const eff = cardDef(state, id)?.weaponEffects?.find(e => e.kind === 'discardPistolsForDamage');
+            return sum + (eff !== undefined && eff.kind === 'discardPistolsForDamage' ? eff.amount : 0);
+          }, 0);
+          const blowbackBonus = blowbackPerCard * discardedPistols.length;
+
+          const handAfter = player.hand.filter(id => !weapons.includes(id) && !discardedPistols.includes(id));
+          const discardAfterPistols: string[] = [...player.discard, ...discardedPistols];
           // Leon L2 pistol reuse: a pistol already in the play area stays there
           // (it was not just moved from hand); only fresh weapons get added below.
           const freshWeapons = weapons.filter(id => !player.playArea.includes(id));
           // Explosive weapons are trashed after use (all-explosives rule);
-          // Jill L2 sends them to her discard pile instead. Non-explosives
-          // stay in the play area until end-of-turn cleanup.
-          const toDiscardExplosives = explosivesGoToDiscard(abilities);
+          // Jill L2 sends them to her discard pile instead. WE-018/we-018g
+          // Grenade Launcher does the same for every Explosive used this turn.
+          const toDiscardExplosives = explosivesGoToDiscard(abilities)
+            || weapons.some(id => cardDef(state, id)?.weaponEffects?.some(
+              e => e.kind === 'explosivesToDiscardInsteadOfTrash') === true);
           const explosiveIds: string[] = [];
           const playedWeaponIds: string[] = [];
           for (const id of freshWeapons) {
@@ -1028,7 +1057,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               playedWeaponIds.push(id);
             }
           }
-          const playAreaAfter = [...player.playArea, ...playedWeaponIds];
+          let playAreaAfter = [...player.playArea, ...playedWeaponIds];
+          // WE-030 Hand Cannon: "Trash one ammunition from your play area."
+          const trashAmmoCount = weapons.reduce((sum, id) => {
+            const eff = cardDef(state, id)?.weaponEffects?.find(e => e.kind === 'trashAmmoFromPlayAreaOnUse');
+            return sum + (eff !== undefined && eff.kind === 'trashAmmoFromPlayAreaOnUse' ? eff.count : 0);
+          }, 0);
+          const trashedAmmo: string[] = [];
+          for (let i = 0; i < trashAmmoCount; i++) {
+            const idx = playAreaAfter.findIndex(id => cardDef(state, id)?.type === 'ammunition');
+            if (idx < 0) break;
+            trashedAmmo.push(playAreaAfter[idx] as string);
+            playAreaAfter = [...playAreaAfter.slice(0, idx), ...playAreaAfter.slice(idx + 1)];
+          }
           const toTrashAfterUse = weapons.filter(id => {
             const def = cardDef(state, id);
             return def?.weaponEffects?.some(e =>
@@ -1036,11 +1077,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               (e.kind === 'grantExploreAndSuppressLowHpInfected' && e.trashAfterUse === true));
           });
           const removedAfter = toDiscardExplosives
-            ? state.removed
-            : [...state.removed, ...explosiveIds, ...toTrashAfterUse];
+            ? [...state.removed, ...trashedAmmo]
+            : [...state.removed, ...explosiveIds, ...toTrashAfterUse, ...trashedAmmo];
           const discardAfterExplosives = toDiscardExplosives
-            ? [...player.discard, ...explosiveIds]
-            : player.discard;
+            ? [...discardAfterPistols, ...explosiveIds]
+            : discardAfterPistols;
           const exploresLeft = player.exploresLeft - exploreCount;
           // grantExplores weapon effect: +explores when this weapon is used.
           const grantedExplores = weapons.reduce((sum, id) => {
@@ -1169,7 +1210,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // Wesker L1: exploring grants +Gold for the turn.
           const turnGoldAfter = player.turnGold + exploreGoldBonus(abilities);
 
-      const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
+      // WE-019 Telescopic Sight Rifle: reveal from the BOTTOM of the Mansion.
+      const revealFromBottom = weapons.some(id => cardDef(state, id)?.weaponEffects?.some(
+        e => e.kind === 'revealFromMansionBottom') === true);
+      const rev = revealFromBottom
+        ? revealBottom({ deck: state.mansionDeck, bottom: state.mansionBottom })
+        : revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
 
@@ -1257,8 +1303,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (nightmareRevealFx.prompts.length > 0) {
         state = { ...state, prompts: [...state.prompts, ...nightmareRevealFx.prompts] };
       }
-      if (revealFx.zeroDamageWeaponIds.length > 0) {
-        const zero = new Set(revealFx.zeroDamageWeaponIds);
+
+      // Outbreak: on-reveal infected effects (MA-045 Wasp, MA-048 Crimson Head,
+      // MA-049 Reinforced Licker).
+      const outbreakRevealFx = (revealedDef === undefined || infectedEffectNegated)
+        ? { state, prompts: [] as Prompt[], zeroDamageWeaponIds: [] as string[], revealedHpBonus: 0, revealedAttackBonus: 0, movedToBottom: [] as string[] }
+        : applyOutbreakRevealEffects(state, {
+            seat,
+            revealedInstanceId,
+            revealedDef: revealedDef as CardDef,
+            weapons,
+            attached: player.attached,
+          });
+      state = outbreakRevealFx.state;
+      if (outbreakRevealFx.prompts.length > 0) {
+        state = { ...state, prompts: [...state.prompts, ...outbreakRevealFx.prompts] };
+      }
+      // Re-read the exploring seat: MA-045 can lower its Health.
+      player = state.seats[seat] as PlayerState;
+
+      const zeroDamageIds = [...revealFx.zeroDamageWeaponIds, ...outbreakRevealFx.zeroDamageWeaponIds];
+      if (zeroDamageIds.length > 0) {
+        const zero = new Set(zeroDamageIds);
         for (let i = 0; i < exploreWeapons.length; i++) {
           const wid = weapons[i];
           if (wid !== undefined && zero.has(wid)) {
@@ -1270,6 +1336,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
       let mansionDeck = rev.mansion.deck;
       let mansionBottom = rev.mansion.bottom;
+      // MA-054o Kevlar Jacket: the reveal handlers may have moved an attached
+      // jacket to the bottom of the Mansion; fold those into the local pile.
+      for (const id of outbreakRevealFx.movedToBottom) {
+        if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+      }
       let currentRng = state.rngState;
 
       // Applies the Nightmare on-use weapon gains (+cards/+actions/+gold) to a
@@ -1412,6 +1483,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      // Outbreak traps: MA-056o Laser Trap / MA-057o Rock Trap. Both damage the
+      // exploring character based on the play area, then leave the game.
+      if (revealedDef?.type === 'event' && (revealedDef.id === 'ma-056o' || revealedDef.id === 'ma-057o')) {
+        const playAreaTypes = playAreaAfter.map(id => cardDef(state, id)?.type ?? '');
+        const actionCardsInPlayArea = playAreaAfter.filter(id => cardDef(state, id)?.type === 'action').length;
+        const trapDamage = outbreakTrapDamage(revealedDef, playAreaTypes, actionCardsInPlayArea);
+        let trapPlayer: PlayerState = applyNightmareGains({
+          ...player,
+          hand: handAfter,
+          playArea: playAreaAfter,
+          discard: discardAfterExplosives,
+          exploresLeft: exploresLeft + grantedExplores,
+          turnAmmo: turnAmmoAfter,
+          turnGold: turnGoldAfter,
+          mustExplore: false,
+        });
+        if (trapDamage > 0 && !trapPlayer.dead && !trapPlayer.downed) {
+          const kevlarTrap = applyDamageWithKevlar(state, seat, trapDamage);
+          state = kevlarTrap.state;
+          for (const id of kevlarTrap.movedIds) {
+            if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+          }
+          trapPlayer = {
+            ...trapPlayer,
+            hp: applyHpLoss(characterAbilities(state, seat), trapPlayer.hp, kevlarTrap.damage, trapPlayer.downed || trapPlayer.dead),
+          };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? trapPlayer : s)),
+          removed: [...removedAfter, revealedInstanceId],
+          mansionDeck,
+          mansionBottom,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
+
       // Reactive trash window: if a Las Plagas infected is revealed, eligible
       // players (Jill L2 with Flash Grenade in hand) may react.
       const isLasPlagas = revealedDef?.type === 'infected' && revealedDef?.plagas === true;
@@ -1497,6 +1607,38 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       }
       if (revealedDef?.type !== 'infected') {
+        // Outbreak: MA-055o Antivirus resolves on reveal — the card is either
+        // moved to the bottom of the Mansion or removed from the game, so it
+        // never enters the Take/Send-to-bottom choice.
+        const antivirusEffect = (revealedDef?.itemEffects ?? []).find(e => e.kind === 'antivirusReduceInfectionOrRemove');
+        if (antivirusEffect !== undefined && antivirusEffect.kind === 'antivirusReduceInfectionOrRemove') {
+          const antivirusPrompts: Prompt[] = [];
+          if ((player.infectionCards?.length ?? 0) >= antivirusEffect.threshold) {
+            antivirusPrompts.push({
+              id: `antivirus-decrease-${seat}-v${state.version}`,
+              seat,
+              text: `Antivirus: decrease your Infection Level by ${antivirusEffect.amount}?`,
+              options: ['Decrease', 'Decline'],
+              payload: { kind: 'antivirusDecrease', instanceId: revealedInstanceId },
+            });
+          }
+          antivirusPrompts.push({
+            id: `antivirus-fate-${seat}-v${state.version}`,
+            seat,
+            text: 'Antivirus: move this card to the bottom of the Mansion or remove it from the game?',
+            options: ['Move to bottom of Mansion', 'Remove from game'],
+            payload: { kind: 'antivirusFate', instanceId: revealedInstanceId },
+          });
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
+            removed: removedAfter,
+            mansionDeck,
+            mansionBottom,
+            prompts: [...reactivePrompts, ...antivirusPrompts],
+          };
+        }
         const prompts = [
           ...reactivePrompts,
           {
@@ -1532,9 +1674,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const outcome = resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus,
               ammoCardsInPlayArea,
-              revealed: revealedDef,
+              revealed: {
+                ...revealedDef,
+                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus,
+                attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus,
+              },
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
               damageMultiplier: player.damageMultiplierThisTurn ?? 1,
@@ -1723,7 +1869,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
           activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
         const charDef = cardDef(state, player.characterInstanceId);
-        const level = charDef !== undefined ? levelForDecorations(charDef.level1At, charDef.level2At, decorations) : player.level;
+        // MA-047 Reinforced Zombie: while attached, the character's Decoration
+        // requirement for Level 2 is reduced by `amount` per copy attached.
+        let level2At = charDef?.level2At ?? 0;
+        for (const aid of newAttachedIds) {
+          const ai = state.cards[aid];
+          const ad = ai === undefined ? undefined : state.cardDefs[ai.cardId];
+          const eff = ad?.infectedEffects?.find(e => e.kind === 'reduceLevel2DecorationRequirement');
+          if (eff !== undefined && eff.kind === 'reduceLevel2DecorationRequirement') level2At -= eff.amount;
+        }
+        const level = charDef !== undefined
+          ? levelForDecorations(charDef.level1At, Math.max(level2At, charDef.level1At ?? 0), decorations)
+          : player.level;
         const sergeiExploreBonus = exploreOnInfectedDefeat(abilities);
         const newPlayer: PlayerState = applyNightmareGains({
                   ...player,
@@ -1883,8 +2040,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
         ? skillLethal
         : rawSkillDamage;
+      // MA-054o Kevlar Jacket: the jacket absorbs this damage and is moved to
+      // the bottom of the Mansion.
+      const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
+      state = kevlar.state;
       const newLeadingHp = damageOnAda
-        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, effectiveSkillDamage, player.downed || player.dead)
+        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
         : baseLeadingHp;
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
@@ -2695,6 +2856,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           let newPlayArea = player.playArea;
           let newDiscard = player.discard;
           let turnAmmoAfter = player.turnAmmo;
+          const trashedWeaponIds: string[] = [];
 
           if (infectedAttacker) {
             // Infected Characters deal their base Damage (Zombie A/B/C: 0/5/10)
@@ -2728,12 +2890,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             turnAmmoAfter = player.turnAmmo - req;
             damage = computeDamage({ weapons: [{ damage: wDef.damage ?? 0, ammoReq: req }], ammo: turnAmmoAfter, bonusDamage: 0 })
               + baseDamageBonusIfHpAtMost(characterAbilities(state, seat), player.hp);
+            // WE-001 Grenade: "Trashed after use" — it also leaves the game when
+            // used to Attack, not just when Exploring.
+            const trashWeaponAfterUse = wDef?.weaponEffects?.some(e => e.kind === 'trashAfterUse') === true;
             if (player.hand.includes(wId)) {
               newHand = player.hand.filter(id => id !== wId);
-              newDiscard = [...newDiscard, wId];
+              newDiscard = trashWeaponAfterUse ? newDiscard : [...newDiscard, wId];
             } else if (player.playArea.includes(wId)) {
               newPlayArea = player.playArea.filter(id => id !== wId);
             }
+            if (trashWeaponAfterUse) trashedWeaponIds.push(wId);
           }
 
           const targetDef = cardDef(state, target.characterInstanceId);
@@ -2759,9 +2925,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             }
           }
+          // MA-054o Kevlar Jacket: the target's jacket absorbs this damage.
+          const kevlar = applyDamageWithKevlar(state, targetSeat, damage);
+          state = kevlar.state;
           const newTarget: PlayerState = {
             ...target,
-            hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, damage, target.downed || target.dead),
+            hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, kevlar.damage, target.downed || target.dead),
             infectionCards: targetInfectionCards,
             ...targetFlags,
           };
@@ -2798,6 +2967,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ...state,
             ...nextBase,
             seats: seatsAfter,
+            ...(trashedWeaponIds.length > 0
+              ? { removed: [...state.removed, ...trashedWeaponIds.filter(id => !state.removed.includes(id))] }
+              : {}),
             ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckAfter } : {}),
           };
           // Built from the POST-attack state so it only offers cards still in hand.
@@ -4304,6 +4476,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     prompts: newPrompts,
                   };
                 }
+                // Outbreak: MA-054o Kevlar Jacket — attach to the character
+                // instead of the discard pile.
+                const kevlarEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'attachAndPreventDamageByMovingToMansionBottom');
+                if (kevlarEffect !== undefined && kevlarEffect.kind === 'attachAndPreventDamageByMovingToMansionBottom') {
+                  return {
+                    ...state,
+                    ...nextBase,
+                    seats: state.seats.map(s =>
+                      s.seat === seat ? { ...player, attached: [...player.attached, instanceId] } : s,
+                    ),
+                    prompts: newPrompts,
+                  };
+                }
+                // Outbreak: MA-055o Antivirus is resolved on reveal (see the
+                // non-Infected reveal branch above), never through Take.
                 return {
                   ...state,
                   ...nextBase,
@@ -4321,6 +4508,40 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   prompts: newPrompts,
                 };
               }
+            }
+
+            if (kind === 'antivirusDecrease') {
+              // MA-055o Antivirus: remove `amount` Infection cards from the
+              // exploring character. The cured cards go to the BOTTOM of the
+              // Infection Deck (the deck is a closed system).
+              const instanceId = prompt.payload?.instanceId as string | undefined;
+              const takenDef = instanceId !== undefined ? cardDef(state, instanceId) : undefined;
+              const eff = (takenDef?.itemEffects ?? []).find(e => e.kind === 'antivirusReduceInfectionOrRemove');
+              if (option === 0 && eff !== undefined && eff.kind === 'antivirusReduceInfectionOrRemove') {
+                const cards = [...(player.infectionCards ?? [])];
+                const keep = Math.max(cards.length - eff.amount, 0);
+                const remaining = cards.slice(0, keep);
+                const cured = cards.slice(keep);
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s => (s.seat === seat ? { ...s, infectionCards: remaining } : s)),
+                  ...(state.infectionDeck !== undefined ? { infectionDeck: [...state.infectionDeck, ...cured] } : {}),
+                  prompts: newPrompts,
+                };
+              }
+              return { ...state, ...nextBase, prompts: newPrompts };
+            }
+
+            if (kind === 'antivirusFate') {
+              const instanceId = prompt.payload?.instanceId as string | undefined;
+              if (option === 0 && instanceId !== undefined) {
+                return { ...state, ...nextBase, mansionBottom: [...state.mansionBottom, instanceId], prompts: newPrompts };
+              }
+              if (option === 1 && instanceId !== undefined) {
+                return { ...state, ...nextBase, removed: [...state.removed, instanceId], prompts: newPrompts };
+              }
+              return { ...state, ...nextBase, prompts: newPrompts };
             }
 
             if (kind === 'gainKnifeAtTurnStart') {

@@ -559,6 +559,12 @@ function startTurnInternal(state: GameState): GameState {
     const zMaxHp = zDef?.maxHp ?? 100;
     const instanceId = `${zombieId}#${player.seat + 1}`;
     const d = drawWithReshuffle({ deck: player.inventory, discard: [], count: 5, rngState: pick.rng.s });
+    // Rulebook: "Remove your Character card from the Game, along with all
+    // non-Infected cards that were attached to that Character." Infected
+    // attachments stay attached to the reanimated Character (and keep their
+    // Decorations); the rest leave the game.
+    const attachedInfected = player.attached.filter(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'infected');
+    const attachedRemoved = player.attached.filter(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type !== 'infected');
     const newPlayer: PlayerState = {
       ...player,
       characterInstanceId: instanceId,
@@ -575,7 +581,7 @@ function startTurnInternal(state: GameState): GameState {
       inventory: d.deck,
       discard: d.discard,
       playArea: [],
-      attached: [],
+      attached: attachedInfected,
       infectionCards: [],
       turnAmmo: 0,
       turnGold: 0,
@@ -593,6 +599,7 @@ function startTurnInternal(state: GameState): GameState {
         [instanceId]: { instanceId, cardId: zombieId, location: { zone: 'hand' as CardZone, index: 0 } },
       },
       seats: state.seats.map(s => (s.seat === player.seat ? newPlayer : s)),
+      removed: [...state.removed, ...attachedRemoved],
     };
   }
 
