@@ -71,12 +71,15 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 3 of 5); the toggle applies to any scenario.
 
 **Pending:**
-1. **The rest of the Mercenaries card data** (8 characters CH-044..051, 8 weapons
-   WE-043..050, 10 actions AC-042..051, 26 infected MA-073..098, AM-005..007,
-   IT-005). The card scans are in `docs/rules/mercenaries/scans-merc/` (gitignored).
-   OCR results are arriving via subagents; transcribe them into
-   `data/mercenaries.ts`, add a Mercenaries scenario/piles if desired, and wire
-   the set into `ALL_CARDS` + `cardsForScenario`.
+1. **Mercenaries card EFFECTS are data-only** (commit `966df34`). All 86 cards
+   exist with verbatim stats/text and the `mercenaries` scenario is wired into
+   `ALL_CARDS` + the registry, but only `IT-005` (`healToFull`) and the AM
+   bonuses are machine-readable — the 8 character abilities are `{kind:'generic'}`
+   no-ops and every weapon/action/infected effect is text-only. Next: encode +
+   implement them (characters first: Krauser turn-start, HUNK/Wesker damage
+   reduction, Claire buy-for-ammo, Chris on-defeat trash, Jill manual target,
+   Rebecca on-buy, Barry on-defeat reveal; then the weapon/action/infected
+   effects).
 2. **Unconsumed skill kinds:** `copyActivatedSkills` (SK-009),
    `negateDamageRemoveXp` (SK-008), `negateInfectedEffectRemoveXp` (SK-010),
    `redirectInfectedEffectRemoveXp` (SK-012), `healTrashFromDiscard` (SK-005),
@@ -87,6 +90,6 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `efbb111` (M5-T04).
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `966df34` (Mercenaries card data).
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
