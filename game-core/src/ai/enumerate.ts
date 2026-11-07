@@ -95,7 +95,7 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     const infectedAttacker = player.isInfectedCharacter === true;
     for (let t = 0; t < state.seats.length; t++) {
       const target = state.seats[t];
-      if (target === undefined || t === seat || target.dead) continue;
+      if (target === undefined || t === seat || target.dead || target.downed) continue;
       if (infectedAttacker && target.isInfectedCharacter === true) continue;
       if (infectedAttacker) {
         generatedActions.push({ type: 'attack', seat, targetSeat: t });

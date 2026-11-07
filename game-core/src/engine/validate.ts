@@ -56,6 +56,21 @@ export function validateAction(state: GameState, action: Action): ValidationResu
     }
   }
 
+  // Outbreak: "A face down Character is considered to be out of the game."
+  // A downed Character cannot start actions; its turn is consumed by the
+  // revive in startTurn, and this guard also covers a Character downed
+  // mid-turn by its own action (the hand is gone, so there is nothing to do
+  // but end the turn). chooseOption stays legal so pending prompts resolve.
+  if (
+    action.type !== 'startGame' &&
+    action.type !== 'chooseOption' &&
+    action.type !== 'endTurn' &&
+    player !== undefined &&
+    player.downed
+  ) {
+    return { ok: false, reason: `${action.type}: player is downed` };
+  }
+
   switch (action.type) {
     case 'startGame':
       if (state.phase !== 'setup') {
@@ -253,6 +268,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (player.dead) {
         return { ok: false, reason: 'attack: player is dead' };
       }
+      // Outbreak: a face-down Character is out of the game and cannot act.
+      if (player.downed) {
+        return { ok: false, reason: 'attack: player is downed' };
+      }
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'attack: not your turn' };
       }
@@ -265,6 +284,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       if (target.dead) {
         return { ok: false, reason: 'attack: target is dead' };
+      }
+      // Outbreak: a face-down Character cannot be targeted by effects.
+      if (target.downed) {
+        return { ok: false, reason: 'attack: target is downed' };
       }
       if (player.exploresLeft < 1) {
         return { ok: false, reason: 'attack: no explores left' };
@@ -428,7 +451,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             return { ok: false, reason: 'useCharacterAbility: hand is empty' };
           }
           if (ability.kind === 'forceExploreOtherPlayer') {
-            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
             }
@@ -469,14 +492,14 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             // Nightmare Wesker L2: needs EXACTLY one other living player at
             // 30 or less HP (the L1 condition), and that player must have a
             // card to discard.
-            const lowHpOthers = state.seats.filter(s => s.seat !== action.seat && !s.dead && (s.hp ?? 0) <= 30);
+            const lowHpOthers = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed && (s.hp ?? 0) <= 30);
             const target = lowHpOthers.length === 1 ? lowHpOthers[0] : undefined;
             if (target === undefined || target.hand.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: needs exactly one other player with 30 or less HP and a card in hand' };
             }
           }
           if (ability.kind === 'choosePlayerIncreaseAmmoReqNextTurn') {
-            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
             }

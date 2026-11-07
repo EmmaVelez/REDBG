@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~10:15):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** Suites: **game-core 658, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+**Current state (2026-11-07 ~11:10):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** Suites: **game-core 666, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
@@ -159,8 +159,34 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
 mechanic is not wired into the damage path — `flipDown` is imported into
 actions.ts but never called, so a character at 0 HP keeps taking turns.
 
+## Downed / revive wiring (2026-11-07)
+
+Closed the gap above. Rulebook: "If a Character's Health is reduced to 0 or
+less ... Turn the Character face down and shuffle together all the cards in your
+Hand and Discard Pile into your Inventory ... All cards currently attached to
+your Character remain attached. When your turn comes around, turn your Character
+face up. Reduce the maximum Health ... by 20, draw 5 new cards ... and skip this
+turn. If your Character's Maximum Health is 0 or less at this point, your
+Character is dead." Outbreak adds that a face-down Character is out of the game
+(cannot be targeted, Infection Level cannot rise).
+
+- `engine/actions.ts`: new `applyDownedHooks` choke point runs after EVERY action
+  and downs any seat at `<= 0` Health (hand+discard shuffled into the Inventory,
+  attached cards kept). The explore path still applies the down inline because
+  AC-050 Resuscitate intercepts it; the hook skips already-downed seats.
+- `engine/validate.ts`: a downed Character cannot start actions (only
+  `endTurn` / `chooseOption`), cannot attack, and cannot be attacked.
+- Out-of-game targeting: every "choose another player" prompt, the reactive
+  trash windows, the end-of-turn "all characters" infection increase and the
+  Wesker/Rebecca/force-explore ability targets now exclude downed seats, as do
+  the bot's attack enumeration and `useCharacterAbility` validation.
+- End-of-turn Infection increase skips downed Characters.
+- New `engine/downed.test.ts` (8 tests): attack downs, attached cards stay,
+  revive (-20 max HP / heal / draw 5 / turn skipped), permanent defeat at 20 max
+  HP, cannot be attacked, no Infection rise, idempotent, out-of-game action ban.
+
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect a clean tree at the duplicate-id resolution commit.
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect a clean tree at the downed/revive wiring commit.
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.

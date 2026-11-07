@@ -115,7 +115,7 @@ function trashRedirectPrompt(
   if (!characterAbilities(state, seat).some(a => a.kind === 'trashRedirectToPlayerDiscard')) {
     return prompts;
   }
-  const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+  const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
   if (others.length === 0) return prompts;
   const def = cardDef(state, trashedId);
   return [
@@ -173,6 +173,62 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number
     }
 
 /**
+ * Choke point: a Character whose Health is reduced to 0 or less is downed.
+ *
+ * Rulebook ("Penalty for Losing all Your Character's Health"): turn the
+ * Character face down and shuffle the Hand and Discard Pile into the
+ * Inventory; cards attached to the Character stay attached. The Character
+ * revives at the start of its next turn (see `startTurn`), losing 20 max
+ * Health, and is permanently defeated if that drops max Health to 0 or less.
+ * Outbreak adds that a face-down Character is out of the game: it cannot be
+ * targeted by effects and its Infection Level cannot rise.
+ *
+ * Runs after EVERY action so no damage source (explore reveal, reveal-time
+ * infected effect, event card, action effect, attack) can be missed. The
+ * explore path applies the down inline first because AC-050 Resuscitate can
+ * intercept it; this hook skips seats that are already downed.
+ */
+function applyDownedHooks(next: GameState): GameState {
+  let state = next;
+  for (const seat of state.seats) {
+    if (seat.dead || seat.downed || seat.hp > 0) continue;
+    let rngState = state.rngState;
+    const flipResult = flipDown(
+      {
+        hp: 0,
+        maxHp: seat.maxHp,
+        decorations: seat.decorations,
+        level: seat.level,
+        downed: seat.downed,
+        dead: seat.dead,
+        hand: seat.hand,
+        discard: seat.discard,
+        inventory: seat.inventory,
+      },
+      (items) => {
+        const r = shuffle(makeRng(rngState), items);
+        rngState = r.rng.s;
+        return r.value;
+      },
+    );
+    state = {
+      ...state,
+      rngState,
+      seats: state.seats.map(s => (s.seat === seat.seat
+        ? {
+            ...s,
+            downed: flipResult.downed,
+            hand: flipResult.hand,
+            discard: flipResult.discard,
+            inventory: flipResult.inventory,
+          }
+        : s)),
+    };
+  }
+  return state;
+}
+
+/**
  * Applies one validated action, then runs the damage-taken character hooks.
  *
  * Ada (Nightmare CH-043) L1 - "During your turn, if Ada takes damage, you get
@@ -184,7 +240,7 @@ function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number
  * out of sync when a new damage source is added.
  */
 export function applyAction(state: GameState, action: Action): GameState {
-  const next = applyDamageTakenHooks(state, applyActionInternal(state, action));
+  const next = applyDownedHooks(applyDamageTakenHooks(state, applyActionInternal(state, action)));
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
   return dropEmptyPrompts(applyOutbreakHooks(state, next, action));
@@ -473,7 +529,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                 }
                                 // negateWeaponCost40OrLessFromHand: v1 reactive no-op, no prompt
                               if (e.kind === 'chooseOtherPlayerRevealHand') {
-                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
                                 if (others.length > 0) {
                                   const maxCostEffect = def.actionEffects?.find(x => x.kind === 'chooseActionCardCostAtMost');
                                   const maxCost = maxCostEffect && maxCostEffect.kind === 'chooseActionCardCostAtMost' ? maxCostEffect.maxCost : 70;
@@ -515,7 +571,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                 break;
                               }
                               if (e.kind === 'gatheringDarkness') {
-                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
                                 if (others.length > 0) {
                                   promptKind = 'gatheringDarkness';
                                   promptOptions = [...others.map(s => String(s.seat))];
@@ -535,7 +591,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                               }
                               // --- Mercenaries actions ---
                               if (e.kind === 'choosePlayerDiscardWeaponForDamage') {
-                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
                                 if (others.length > 0) {
                                   promptKind = 'ac043ChoosePlayer';
                                   promptOptions = [...others.map(s => String(s.seat))];
@@ -566,7 +622,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                 break;
                               }
                               if (e.kind === 'choosePlayerForBackstab') {
-                                const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+                                const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
                                 if (others.length > 0) {
                                   promptKind = 'ac048ChoosePlayer';
                                   promptOptions = [...others.map(s => String(s.seat))];
@@ -607,7 +663,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // AC-017 Fierce Battle: choose another player to give +1 card.
       let finalPrompts = prompts;
       if (def.id === 'ac-017') {
-        const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
         if (others.length > 0) {
           finalPrompts = [
             ...prompts,
@@ -1363,7 +1419,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let reactivePrompts = state.prompts;
       if (isLasPlagas) {
         const eligibleSeats = state.seats.filter(s => {
-          if (s.seat === seat || s.dead) return false;
+          if (s.seat === seat || s.dead || s.downed) return false;
           // Jill (Brainwashed) L2 — driven by the ability, not the card id,
           // so the data decides who may react.
           if (!characterAbilities(state, s.seat).some(a => a.kind === 'offTurnFlashGrenadeLasPlagas')) return false;
@@ -1395,7 +1451,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // eligible players (holding ac-018) may trash it to give +20 HP to the revealed infected.
       const isAnyInfected = revealedDef?.type === 'infected';
       let ac018Eligible = state.seats.filter(s => {
-        if (s.seat === seat || s.dead) return false;
+        if (s.seat === seat || s.dead || s.downed) return false;
         return s.hand.some(id => {
           const ci = state.cards[id];
           const cd = ci ? state.cardDefs[ci.cardId] : undefined;
@@ -1424,7 +1480,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Exploring Character.
       const ac042Eligible = revealedDef?.type === 'infected'
         ? state.seats.filter(s => {
-            if (s.seat === seat || s.dead) return false;
+            if (s.seat === seat || s.dead || s.downed) return false;
             return s.hand.some(id => cardDef(state, id)?.id === 'ac-042');
           })
         : [];
@@ -1503,7 +1559,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetSeat = player.pendingBackstab.targetSeat;
         state = { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, pendingBackstab: undefined } : s)) };
         const target = state.seats[targetSeat];
-        if (target !== undefined && !target.dead) {
+        if (target !== undefined && !target.dead && !target.downed) {
           const skillIds = (target.skills ?? []).filter(id => (state.cards[id]?.xp ?? 0) >= 1);
           if (skillIds.length > 0) {
             state = { ...state, prompts: [...state.prompts, {
@@ -1521,7 +1577,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // outcome: Las Plagas (Flash Grenade) or AC-042 Fight or Flight.
       const lasPlagasDefer = revealedDef?.type === 'infected' && revealedDef?.plagas === true &&
         state.seats.some(s => {
-          if (s.seat === seat || s.dead) return false;
+          if (s.seat === seat || s.dead || s.downed) return false;
           if (!characterAbilities(state, s.seat).some(a => a.kind === 'offTurnFlashGrenadeLasPlagas')) return false;
           return s.hand.some(id => {
             const ci = state.cards[id];
@@ -1610,7 +1666,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               zombieBAffected.push(infectedEffectRedirectSeat);
             } else {
               for (const s of state.seats) {
-                if (!s.dead) {
+                if (!s.dead && !s.downed) {
                   drawInfectionsFor(s.seat, e.amount);
                   zombieBAffected.push(s.seat);
                 }
@@ -1697,7 +1753,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 : 'Choose a player.',
               options: infectedEffectRedirectSeat !== undefined
                 ? [String(infectedEffectRedirectSeat)]
-                : state.seats.filter(s => !s.dead).map(s => String(s.seat)),
+                : state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
               payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
             }]
           : state.prompts;
@@ -2065,7 +2121,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // CH-050 Rebecca Chambers (Mercenaries) L1: "When you buy a card, you may
       // move that card to another player's discard pile."
       if (characterAbilities(s, seat).some(a => a.kind === 'buyRedirectToPlayerDiscard')) {
-        const others = s.seats.filter(x => x.seat !== seat && !x.dead);
+        const others = s.seats.filter(x => x.seat !== seat && !x.dead && !x.downed);
         if (others.length > 0) {
           return {
             ...s,
@@ -2365,7 +2421,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'giveOneCardToPlayerThenMaybeAnother': {
               // PR-009 Rebecca L1: choose another player (+1 card), then maybe
               // a second gift.
-              const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
               return {
                 ...state,
                 ...nextBase,
@@ -2401,7 +2457,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'forceExploreOtherPlayer': {
               // Wesker L2: choose another player; they get +1 Explore and must
               // Explore on their next turn (choice resolved via prompt).
-              const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
               return {
                 ...state,
                 ...nextBase,
@@ -2543,7 +2599,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // prompt is addressed to THEIR seat and resolved out of turn
               // by that player's client (same pattern as the reactive trash
               // window).
-              const lowHpOthers = state.seats.filter(s => s.seat !== seat && !s.dead && (s.hp ?? 0) <= 30);
+              const lowHpOthers = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed && (s.hp ?? 0) <= 30);
               const target = lowHpOthers.length === 1 ? lowHpOthers[0] : undefined;
               if (target === undefined || target.hand.length === 0) {
                 return { ...state, ...nextBase };
@@ -2567,7 +2623,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // CH-048 Jill Valentine (Mercenaries) L1: choose a player; all of
               // the weapons they use on their next turn require +amount Ammo.
               const amount = ability.kind === 'choosePlayerIncreaseAmmoReqNextTurn' ? ability.amount : 10;
-              const others = state.seats.filter(s => s.seat !== seat && !s.dead);
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
               if (others.length === 0) {
                 return { ...state, ...nextBase };
               }
@@ -2782,6 +2838,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (
             state.infectionDeck !== undefined &&
             player.isInfectedCharacter !== true &&
+            // Outbreak: a face-down Character is out of the game, so its
+            // Infection Level cannot be raised for any reason.
+            !player.downed &&
             !isImmuneToInfectionEffects(characterAbilities(state, seat), player.infectionCards) &&
             ((player.exploredOrAttackedThisTurn === true && playedTVirus) ||
               (player.exploredOrAttackedThisTurn !== true))
@@ -3810,7 +3869,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 };
               }
               // Find the opponent whose inventory top is the chosen weapon.
-              const owner = state.seats.find(s => s.seat !== seat && !s.dead && s.inventory[0] === chosenId);
+              const owner = state.seats.find(s => s.seat !== seat && !s.dead && !s.downed && s.inventory[0] === chosenId);
               if (owner === undefined) {
                 // Weapon vanished (defensive) — drop the chain.
                 return {
@@ -4027,7 +4086,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           prompts: newPrompts,
         };
         // Second gift: same choices, chain prompt.
-        const others = gifted.seats.filter(s => s.seat !== seat && !s.dead);
+        const others = gifted.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
         return {
           ...gifted,
           prompts: [
@@ -4665,7 +4724,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'ma088ChooseCard') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
-        const others = state.seats.filter(s => s.seat !== seat && !s.dead).map(s => String(s.seat));
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed).map(s => String(s.seat));
         if (others.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
         return {
           ...state,
@@ -4721,7 +4780,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'ma098ChooseCard') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
-        const others = state.seats.filter(s => s.seat !== seat && !s.dead).map(s => String(s.seat));
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed).map(s => String(s.seat));
         if (others.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
         return {
           ...state,
@@ -4785,7 +4844,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'we044ChooseCard') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
-        const others = state.seats.filter(s => s.seat !== seat && !s.dead).map(s => String(s.seat));
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed).map(s => String(s.seat));
         if (others.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
         return {
           ...state,
