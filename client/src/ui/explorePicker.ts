@@ -6,6 +6,7 @@ import {
   remainingWeaponUses,
   exploreDamage,
   requiredAmmoForWeapons,
+  isPartnerWeapon,
 } from '@re/game-core';
 import { defForInstance } from './cards';
 
@@ -31,6 +32,8 @@ export interface ExploreWeaponOption {
   readonly reusable: boolean;
   /** Uses still available this turn beyond those already spent. */
   readonly remainingUses: number;
+  /** True when the weapon is attached to the seat's Partner (Alliance). */
+  readonly partner: boolean;
 }
 
 /** Weapons the seat may use in an explore right now, with display metadata. */
@@ -44,6 +47,7 @@ export function exploreWeaponOptions(state: GameState, seat: number): readonly E
       ammo: requiredAmmoForWeapons(state, seat, [instanceId], wid => defForInstance(state, wid) ?? undefined),
       reusable: canReuseWeapon(state, seat, instanceId),
       remainingUses: remainingWeaponUses(state, seat, instanceId),
+      partner: isPartnerWeapon(state, seat, instanceId),
     };
   });
 }
@@ -55,9 +59,10 @@ export function legalExplores(state: GameState, seat: number): readonly ExploreA
   );
 }
 
-/** Stable key for a weapon-id set, so selections can be compared to legal combos. */
-function comboKey(weaponIds: readonly string[]): string {
-  return [...weaponIds].sort().join('|');
+/** Stable key for a weapon-id set + explore count, so selections can be
+ *  compared to legal combos. */
+function comboKey(weaponIds: readonly string[], exploreCount: number): string {
+  return `${exploreCount}:${[...weaponIds].sort().join('|')}`;
 }
 
 /**
@@ -84,6 +89,18 @@ export function bestExploreCombo(state: GameState, seat: number): readonly strin
   return best.weapons;
 }
 
+/** Explore counts the player may pick for one explore action (1..pool, and
+ *  never more than the Mansion can reveal). */
+export function exploreCountOptions(state: GameState, seat: number): readonly number[] {
+  const player = state.seats[seat];
+  if (player === undefined) return [1];
+  const mansionSize = state.mansionDeck.length + state.mansionBottom.length;
+  const max = Math.max(1, Math.min(player.exploresLeft, mansionSize));
+  const out: number[] = [];
+  for (let i = 1; i <= max; i++) out.push(i);
+  return out;
+}
+
 export interface ComboEvaluation {
   /** Damage the engine would deal with this exact weapon set. */
   readonly damage: number;
@@ -99,6 +116,7 @@ export function evaluateExploreCombo(
   state: GameState,
   seat: number,
   weaponIds: readonly string[],
+  exploreCount = 1,
 ): ComboEvaluation {
   const damage = exploreDamage(state, seat, weaponIds);
   const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined);
@@ -106,7 +124,7 @@ export function evaluateExploreCombo(
   if (weaponIds.length === 0) {
     return { damage: 0, ammo: 0, legal: false, reason: 'Select at least one weapon.' };
   }
-  const isLegal = legalExplores(state, seat).some(e => comboKey(e.weapons) === comboKey(weaponIds));
+  const isLegal = legalExplores(state, seat).some(e => comboKey(e.weapons, e.exploreCount) === comboKey(weaponIds, exploreCount));
   if (isLegal) {
     return { damage, ammo, legal: true, reason: null };
   }
@@ -117,6 +135,14 @@ export function evaluateExploreCombo(
       ammo,
       legal: false,
       reason: `Not enough ammo — needs ${ammo}, you have ${player.turnAmmo}.`,
+    };
+  }
+  if (player !== undefined && exploreCount > player.exploresLeft) {
+    return {
+      damage,
+      ammo,
+      legal: false,
+      reason: `Not enough explores — needs ${exploreCount}, you have ${player.exploresLeft}.`,
     };
   }
   return { damage, ammo, legal: false, reason: 'That weapon combination is not legal.' };

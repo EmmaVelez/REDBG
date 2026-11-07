@@ -283,9 +283,44 @@ export interface MultiExploreTarget {
   readonly infectedEffects?: readonly InfectedEffect[];
 }
 
-export function resolveMultiExplore(params: { readonly damage: number; readonly revealed: readonly MultiExploreTarget[]; readonly attachedInfectedCount?: number }): { readonly defeated: boolean; readonly combinedHp: number; readonly combinedAttack: number; readonly shuffleBackCards: readonly string[] } {
-  const { damage, revealed, attachedInfectedCount } = params;
-  const count = attachedInfectedCount ?? 0;
+/**
+ * Resolve a MULTI-EXPLORE engagement: N revealed Infected battled as one
+ * combined fight (rulebook "Extra Explore"). The player's total Damage is
+ * compared against the combined Health; on failure the player takes the
+ * combined Damage.
+ *
+ * Every combat-affecting on-reveal Infected effect is applied per revealed
+ * card, so a batch behaves like N overlapping single battles pooled into one.
+ * `weapons`/`ammo`/character context are optional so the MA-039 event (which
+ * only passes the pooled damage) keeps working unchanged.
+ */
+export function resolveMultiExplore(params: {
+  readonly damage: number;
+  readonly revealed: readonly MultiExploreTarget[];
+  readonly attachedInfectedCount?: number;
+  readonly ammo?: number;
+  readonly weapons?: readonly ExploreWeapon[];
+  readonly characterDamage?: number;
+  readonly characterXp?: number;
+  readonly sameNameAttachedCount?: number;
+  readonly inventoryCount?: number;
+  readonly actionsInPlayArea?: number;
+  readonly damageReduction?: number;
+}): {
+  readonly defeated: boolean;
+  readonly combinedHp: number;
+  readonly combinedAttack: number;
+  readonly shuffleBackCards: readonly string[];
+  readonly blockedByCannotDefeat: boolean;
+  readonly effectiveDamage: number;
+} {
+  const { revealed } = params;
+  const count = params.attachedInfectedCount ?? 0;
+  const weapons = params.weapons ?? [];
+  const ammo = params.ammo ?? 0;
+  let damage = params.damage;
+  let blockedByCannotDefeat = false;
+
   // buffOtherRevealedInfected (Albert Wesker): each revealed infected with this
   // effect buffs all OTHER revealed infected by +hp HP and +damage damage.
   const hpBuffFor = (i: number) => revealed.reduce((acc, t, j) => {
@@ -299,25 +334,50 @@ export function resolveMultiExplore(params: { readonly damage: number; readonly 
     return e ? acc + e.damage : acc;
   }, 0);
 
-  const combinedHp = revealed.reduce((sum, target, i) => {
+  let combinedHp = 0;
+  let combinedAttack = 0;
+  for (let i = 0; i < revealed.length; i++) {
+    const target = revealed[i];
+    if (target === undefined) continue;
     let hp = target.hp + hpBuffFor(i);
+    let atk = target.attack + dmgBuffFor(i);
     if (target.infectedEffects?.some(e => e.kind === 'plusHpIfAttackedWithAnotherInfected') && revealed.length > 1) {
       hp += 20;
     }
     const selfBoost = target.infectedEffects?.find(e => e.kind === 'plusHpAndDamagePerAttachedInfected') as { kind: 'plusHpAndDamagePerAttachedInfected'; amount: number } | undefined;
-    if (selfBoost) hp += selfBoost.amount * count;
-    return sum + hp;
-  }, 0);
-  const combinedAttack = revealed.reduce((sum, target, i) => {
-    let atk = target.attack + dmgBuffFor(i);
-    const selfBoost = target.infectedEffects?.find(e => e.kind === 'plusHpAndDamagePerAttachedInfected') as { kind: 'plusHpAndDamagePerAttachedInfected'; amount: number } | undefined;
-    if (selfBoost) atk += selfBoost.amount * count;
-    return sum + atk;
-  }, 0);
-  const defeated = damage >= combinedHp;
+    if (selfBoost) { hp += selfBoost.amount * count; atk += selfBoost.amount * count; }
+    const sameName = target.infectedEffects?.find(e => e.kind === 'onRevealPlusHpPerSameNameAttached') as { kind: 'onRevealPlusHpPerSameNameAttached'; amount: number } | undefined;
+    if (sameName) hp += sameName.amount * (params.sameNameAttachedCount ?? 0);
+    const attachedExploring = target.infectedEffects?.find(e => e.kind === 'onRevealPlusHpPerAttachedToExploring') as { kind: 'onRevealPlusHpPerAttachedToExploring'; amount: number } | undefined;
+    if (attachedExploring) hp += attachedExploring.amount * count;
+    const hpPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealHealthPenaltyIfMultipleWeapons') as { kind: 'onRevealHealthPenaltyIfMultipleWeapons'; amount: number; count: number } | undefined;
+    if (hpPenalty && weapons.length >= hpPenalty.count) hp -= hpPenalty.amount;
+    const xpPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealDamagePenaltyIfCharacterXpAtLeast') as { kind: 'onRevealDamagePenaltyIfCharacterXpAtLeast'; amount: number; threshold: number } | undefined;
+    if (xpPenalty && (params.characterXp ?? 0) >= xpPenalty.threshold) atk -= xpPenalty.amount;
+    const ammoBonus = target.infectedEffects?.find(e => e.kind === 'plusDamagePerFull10AmmoOfAttacker') as { kind: 'plusDamagePerFull10AmmoOfAttacker'; amount: number } | undefined;
+    if (ammoBonus) damage += ammoBonus.amount * Math.floor(ammo / 10);
+    const weaponPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealWeaponDamagePenalty') as { kind: 'onRevealWeaponDamagePenalty'; amount: number } | undefined;
+    if (weaponPenalty) damage -= weaponPenalty.amount * weapons.length;
+    const charDamageBonus = target.infectedEffects?.find(e => e.kind === 'onRevealBonusDamageIfCharacterDamaged') as { kind: 'onRevealBonusDamageIfCharacterDamaged'; amount: number; threshold: number } | undefined;
+    if (charDamageBonus && (params.characterDamage ?? 0) >= charDamageBonus.threshold) damage += charDamageBonus.amount;
+    const cannotInv = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (params.inventoryCount ?? 0) <= e.count) ?? false;
+    const cannotAct = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfActionsAtLeast' && (params.actionsInPlayArea ?? 0) >= e.count) ?? false;
+    if (cannotInv || cannotAct) blockedByCannotDefeat = true;
+    combinedHp += hp;
+    combinedAttack += atk;
+  }
+
+  const defeated = !blockedByCannotDefeat && damage >= combinedHp;
   const shuffleBackCards = revealed
     .filter(target => target.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle') ?? false)
     .map(target => target.cardId);
 
-  return { defeated, combinedHp, combinedAttack, shuffleBackCards };
+  return {
+    defeated,
+    combinedHp,
+    combinedAttack: Math.max(combinedAttack, 0),
+    shuffleBackCards,
+    blockedByCannotDefeat,
+    effectiveDamage: damage,
+  };
 }

@@ -13,7 +13,7 @@ import { Zones } from './Zones';
 import { PlayerPanel } from './PlayerPanel';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
-import { bestExploreCombo, evaluateExploreCombo, exploreWeaponOptions } from './explorePicker';
+import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions } from './explorePicker';
 import { Lobby } from './Lobby';
 import { GameLog } from './GameLog';
 import { defForInstance, typeLabel, statLine, costText } from './cards';
@@ -562,6 +562,67 @@ describe('ActionBar (T07)', () => {
     expect(html1).toContain('data-ability-index="0"');
     expect(html1).toContain('Ability:');
     expect(html1).toContain('+5 damage');
+  });
+
+  it('explore count options are bounded by the pool and the Mansion', () => {
+    const state = twoPlayerState();
+    const armed = {
+      ...state,
+      seats: state.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 30, exploresLeft: 5 } : s)),
+    };
+    // The starting Mansion has fewer than 5 cards in this fixture, so the cap
+    // is the Mansion size, not the pool.
+    const options = exploreCountOptions(armed, 0);
+    expect(options[0]).toBe(1);
+    expect(options.length).toBe(Math.min(5, armed.mansionDeck.length + armed.mansionBottom.length));
+    expect(options.length).toBeGreaterThan(1);
+  });
+
+  it('evaluateExploreCombo rejects an explore count above the pool', () => {
+    const state = twoPlayerState();
+    const handgunInst = state.seats[0]?.hand.find(id => state.cards[id]?.cardId === 'we-009');
+    expect(handgunInst).toBeDefined();
+    const armed = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 30, exploresLeft: 2 } : s)) };
+    const result = evaluateExploreCombo(armed, 0, [handgunInst as string], 3);
+    expect(result.legal).toBe(false);
+    expect(result.reason).toContain('Not enough explores');
+    // The same combo with a legal count is fine.
+    expect(evaluateExploreCombo(armed, 0, [handgunInst as string], 2).legal).toBe(true);
+  });
+
+  it('explore picker marks a partner-attached weapon and keeps it out of the hand', () => {
+    const state = twoPlayerState();
+    const partnerInst = 'we-004#77';
+    const withPartner = {
+      ...state,
+      cards: { ...state.cards, [partnerInst]: { instanceId: partnerInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
+      seats: state.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: 'ch-002#p1', partnerAttached: [partnerInst], turnAmmo: 30 }
+        : s)),
+    };
+    const options = exploreWeaponOptions(withPartner, 0);
+    const opt = options.find(o => o.instanceId === partnerInst);
+    expect(opt).toBeDefined();
+    expect(opt?.partner).toBe(true);
+    // The partner weapon is offered even though it is not in the hand.
+    expect(withPartner.seats[0]?.hand).not.toContain(partnerInst);
+  });
+
+  it('renders the explore-count selector and the partner leader toggle', () => {
+    const state = twoPlayerState();
+    const partnerInst = 'we-004#77';
+    const armed = {
+      ...state,
+      cards: { ...state.cards, [partnerInst]: { instanceId: partnerInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
+      seats: state.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: 'ch-002#p1', partnerAttached: [partnerInst], turnAmmo: 30, exploresLeft: 3 }
+        : s)),
+    };
+    const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
+    expect(html).toContain('data-explore-count');
+    expect(html).toContain('data-explore-count-option="2"');
+    expect(html).toContain('data-explore-leader');
+    expect(html).toContain('data-leader-option="partner"');
   });
 });
 

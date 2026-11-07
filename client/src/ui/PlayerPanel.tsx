@@ -65,9 +65,12 @@ export function PlayerPanel({ state, seat, isMe = false }: PlayerPanelProps): JS
         )}
         {partnerDef !== null && (
           <div className="player-character-card player-partner-card" data-partner-character-card data-anim-zone="attached">
-            <HoverCard def={partnerDef} decorations={0} hp={player.hp} maxHp={player.maxHp}>
-              <CardView def={partnerDef} compact decorations={0} hp={player.hp} maxHp={player.maxHp} />
+            <HoverCard def={partnerDef} decorations={0} hp={player.partnerHp ?? player.hp} maxHp={player.partnerMaxHp ?? player.maxHp}>
+              <CardView def={partnerDef} compact decorations={0} hp={player.partnerHp ?? player.hp} maxHp={player.partnerMaxHp ?? player.maxHp} />
             </HoverCard>
+            <span className="player-partner-hp" data-partner-hp>
+              HP {player.partnerHp ?? player.hp}/{player.partnerMaxHp ?? player.maxHp}
+            </span>
             <span className="player-partner-attached">Attached {player.partnerAttached?.length ?? 0}</span>
           </div>
         )}

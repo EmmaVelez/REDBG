@@ -71,9 +71,21 @@ export function canReuseWeapon(state: GameState, seat: number, weaponId: string)
 }
 
 /**
+ * True when this weapon instance is attached to the seat's Partner (Alliance
+ * Partner Modification). Attached weapons join the explore attack but are NOT
+ * moved to the play area, trashed, or removed by use — they stay attached.
+ */
+export function isPartnerWeapon(state: GameState, seat: number, weaponId: string): boolean {
+  const player = state.seats[seat];
+  if (player === undefined) return false;
+  return (player.partnerAttached ?? []).includes(weaponId);
+}
+
+/**
  * Weapons the seat can use in an explore right now: hand weapons first, then
- * any play-area weapon an ability lets them use again (Leon L2 pistols).
- * Deduped and order-stable so the action bar can render it directly.
+ * any play-area weapon an ability lets them use again (Leon L2 pistols), then
+ * the Partner's attached weapons (Alliance). Deduped and order-stable so the
+ * action bar can render it directly.
  */
 export function explorableWeapons(state: GameState, seat: number): readonly string[] {
   const player = state.seats[seat];
@@ -83,5 +95,9 @@ export function explorableWeapons(state: GameState, seat: number): readonly stri
   const fromPlayArea = player.playArea.filter(
     id => !seen.has(id) && weaponDef(state, id)?.type === 'weapon' && canReuseWeapon(state, seat, id),
   );
-  return [...fromHand, ...fromPlayArea];
+  for (const id of fromPlayArea) seen.add(id);
+  const fromPartner = (player.partnerAttached ?? []).filter(
+    id => !seen.has(id) && weaponDef(state, id)?.type === 'weapon',
+  );
+  return [...fromHand, ...fromPlayArea, ...fromPartner];
 }

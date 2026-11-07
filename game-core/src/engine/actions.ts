@@ -1,8 +1,9 @@
 import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
-import { revealTop, revealBottom, sendToBottom, shuffleBack } from './mansion';
+import { revealTop, revealBottom, sendToBottom, shuffleBack, deckCount } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
+import type { MultiExploreTarget } from './explore';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
@@ -1015,6 +1016,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
     case 'explore': {
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
           let player = state.seats[seat] as PlayerState;
+          // Alliance Partner Modification: the leader is chosen before the
+          // reveal (action.leader); the persisted partnerLeading flag is the
+          // fallback for older clients that set it via chooseExploreLeader.
+          const exploreLeader: 'main' | 'partner' =
+            action.leader ?? (player.partnerLeading === true ? 'partner' : 'main');
 
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
           // Passive abilities can reduce the cost (Leon L1 pistols, Sheva L2 rifles).
@@ -1039,9 +1045,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           const handAfter = player.hand.filter(id => !weapons.includes(id) && !discardedPistols.includes(id));
           const discardAfterPistols: string[] = [...player.discard, ...discardedPistols];
+          // Alliance Partner Modification: weapons attached to the Partner take
+          // part in the explore but stay attached — they are never moved to the
+          // play area, trashed, or removed by use.
+          const partnerWeaponSet = new Set(player.partnerAttached ?? []);
           // Leon L2 pistol reuse: a pistol already in the play area stays there
           // (it was not just moved from hand); only fresh weapons get added below.
-          const freshWeapons = weapons.filter(id => !player.playArea.includes(id));
+          const freshWeapons = weapons.filter(id => !player.playArea.includes(id) && !partnerWeaponSet.has(id));
           // Explosive weapons are trashed after use (all-explosives rule);
           // Jill L2 sends them to her discard pile instead. WE-018/we-018g
           // Grenade Launcher does the same for every Explosive used this turn.
@@ -1071,6 +1081,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             playAreaAfter = [...playAreaAfter.slice(0, idx), ...playAreaAfter.slice(idx + 1)];
           }
           const toTrashAfterUse = weapons.filter(id => {
+            if (partnerWeaponSet.has(id)) return false;
             const def = cardDef(state, id);
             return def?.weaponEffects?.some(e =>
               e.kind === 'trashAfterUse' ||
@@ -1210,6 +1221,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // Wesker L1: exploring grants +Gold for the turn.
           const turnGoldAfter = player.turnGold + exploreGoldBonus(abilities);
 
+      // RNG threading for the explore (single- and multi-explore share these).
+      let currentRng = state.rngState;
+      // Applies the Nightmare on-use weapon gains (+cards/+actions/+gold) to a
+      // post-explore seat. Drawn cards come off the top of the inventory.
+      const applyNightmareGains = (p: PlayerState): PlayerState => {
+        if (nightmareGains.cards === 0 && nightmareGains.actions === 0 && nightmareGains.gold === 0) return p;
+        let np = { ...p, actionsLeft: p.actionsLeft + nightmareGains.actions, turnGold: p.turnGold + nightmareGains.gold };
+        if (nightmareGains.cards > 0) {
+          const d = drawWithReshuffle({ deck: np.inventory, discard: np.discard, count: nightmareGains.cards, rngState: currentRng });
+          currentRng = d.rngState;
+          np = { ...np, hand: [...np.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        }
+        return np;
+      };
+      const rngShuffle = (items: readonly string[]): string[] => {
+        const r = shuffle(makeRng(currentRng), items);
+        currentRng = r.rng.s;
+        return r.value;
+      };
+
       // WE-019 Telescopic Sight Rifle: reveal from the BOTTOM of the Mansion.
       const revealFromBottom = weapons.some(id => cardDef(state, id)?.weaponEffects?.some(
         e => e.kind === 'revealFromMansionBottom') === true);
@@ -1218,6 +1249,572 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
+      // -----------------------------------------------------------------
+      // MULTI-EXPLORE (exploreCount > 1)
+      // Rulebook "Extra Explore": reveal N cards one at a time and battle ALL
+      // revealed Infected as ONE combined engagement — the player's total
+      // Damage is compared against the combined Health; on failure the player
+      // takes the combined Damage and every undefeated Infected goes to the
+      // bottom of the Mansion.
+      //
+      // KNOWN LIMITATION: the off-turn reactive windows (Jill's Flash Grenade
+      // vs a Las Plagas reveal, AC-018 Uroboros Injection, AC-042 Fight or
+      // Flight) are single-explore only; a multi-explore does not offer them.
+      // -----------------------------------------------------------------
+      if (exploreCount > 1) {
+        const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
+        let mDeck = rev.mansion.deck;
+        let mBottom = rev.mansion.bottom;
+        const revealedIds: string[] = [revealedInstanceId];
+        for (let i = 1; i < exploreCount; i++) {
+          const r = revealFromBottom
+            ? revealBottom({ deck: mDeck, bottom: mBottom })
+            : revealTop({ deck: mDeck, bottom: mBottom });
+          revealedIds.push(r.revealedInstanceId);
+          mDeck = r.mansion.deck;
+          mBottom = r.mansion.bottom;
+        }
+
+        // Events that reveal MORE Mansion cards (MA-039 x2, MA-072 x1): the
+        // extra cards join the same engagement. Non-Infected cards revealed by
+        // those events are shuffled back, not offered take/bottom.
+        const eventIdsToRemove: string[] = [];
+        const expansionIds: string[] = [];
+        const shuffleBackIds: string[] = [];
+        let laserTargeting = false;
+        const barrelIds: string[] = [];
+        const trapIds: string[] = [];
+        let expanding = true;
+        while (expanding) {
+          expanding = false;
+          for (const id of [...revealedIds]) {
+            const d = cardDef(state, id);
+            if (d?.type !== 'event' || eventIdsToRemove.includes(id)) continue;
+            if (d.id === 'ma-039') {
+              eventIdsToRemove.push(id);
+              for (let k = 0; k < 2 && deckCount({ deck: mDeck, bottom: mBottom }) > 0; k++) {
+                const r = revealTop({ deck: mDeck, bottom: mBottom });
+                revealedIds.push(r.revealedInstanceId);
+                expansionIds.push(r.revealedInstanceId);
+                mDeck = r.mansion.deck;
+                mBottom = r.mansion.bottom;
+              }
+              expanding = true;
+            } else if (d.id === 'ma-072') {
+              eventIdsToRemove.push(id);
+              if (deckCount({ deck: mDeck, bottom: mBottom }) > 0) {
+                const r = revealTop({ deck: mDeck, bottom: mBottom });
+                revealedIds.push(r.revealedInstanceId);
+                expansionIds.push(r.revealedInstanceId);
+                mDeck = r.mansion.deck;
+                mBottom = r.mansion.bottom;
+              }
+              expanding = true;
+            } else if (d.id === 'ma-038' || d.id === 'ma-056o' || d.id === 'ma-057o' || d.id === 'ma-040') {
+              eventIdsToRemove.push(id);
+              if (d.id === 'ma-038') barrelIds.push(id);
+              else if (d.id === 'ma-040') laserTargeting = true;
+              else trapIds.push(id);
+            }
+          }
+        }
+
+        const infectedEntries: Array<{ id: string; def: CardDef }> = [];
+        const nonInfectedIds: string[] = [];
+        for (const id of revealedIds) {
+          if (eventIdsToRemove.includes(id)) continue;
+          const d = cardDef(state, id);
+          if (d === undefined) continue;
+          if (d.type === 'infected') infectedEntries.push({ id, def: d });
+          else if (expansionIds.includes(id)) shuffleBackIds.push(id);
+          else nonInfectedIds.push(id);
+        }
+
+        // ---- Reveal effects for EVERY revealed Infected ----
+        let revealPrompts: Prompt[] = [];
+        const revealGains: Array<{ seat: number; cardId: string }> = [];
+        const zeroDamageIds: string[] = [];
+        const negatedIds = new Set<string>();
+        let redirectSeat: number | undefined;
+        const targets: MultiExploreTarget[] = [];
+        for (const { id, def } of infectedEntries) {
+          // MA-037 Guardian of Insanity: each character takes 10 damage.
+          if (def.id === 'ma-037') {
+            for (const s of state.seats) {
+              const neg = consumeNegateDamage(state, s.seat);
+              state = neg.state;
+              if (neg.negated) continue;
+              const reduce = characterAbilities(state, s.seat).reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+              const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(10 - reduce, 0), s.downed || s.dead);
+              state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
+            }
+          }
+          // MA-031 Proto Tyrant: non-exploring chars with 50+ HP take 40.
+          if (def.id === 'ma-031') {
+            for (const s of state.seats) {
+              if (s.seat === seat || (s.hp ?? 0) < 50) continue;
+              const neg = consumeNegateDamage(state, s.seat);
+              state = neg.state;
+              if (neg.negated) continue;
+              const reduce = characterAbilities(state, s.seat).reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+              const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(40 - reduce, 0), s.downed || s.dead);
+              state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
+            }
+          }
+          // Mercenaries: Toughness/Luck/redirect reaction is consumed per card.
+          const reaction = consumeInfectedEffectReaction(state, seat);
+          state = reaction.state;
+          if (reaction.negated) negatedIds.add(id);
+          redirectSeat = reaction.redirectSeat;
+          let hpBonus = 0;
+          let atkBonus = 0;
+          if (!reaction.negated) {
+            const ctx = { seat, revealedInstanceId: id, revealedDef: def, weapons, handAfter, attachedInfectedCount: player.attached.length, characterXp: player.xp ?? 0 };
+            const r1 = applyMercenariesRevealEffects(state, ctx);
+            state = r1.state;
+            revealPrompts.push(...r1.prompts);
+            zeroDamageIds.push(...r1.zeroDamageWeaponIds);
+            revealGains.push(...r1.gains);
+            const r2 = applyNightmareRevealEffects(state, { seat, revealedInstanceId: id, revealedDef: def, weapons });
+            state = r2.state;
+            revealPrompts.push(...r2.prompts);
+            const r3 = applyOutbreakRevealEffects(state, { seat, revealedInstanceId: id, revealedDef: def, weapons, attached: player.attached });
+            state = r3.state;
+            revealPrompts.push(...r3.prompts);
+            zeroDamageIds.push(...r3.zeroDamageWeaponIds);
+            hpBonus = r3.revealedHpBonus;
+            atkBonus = r3.revealedAttackBonus;
+            for (const bid of r3.movedToBottom) {
+              if (!mBottom.includes(bid)) mBottom = [...mBottom, bid];
+            }
+          }
+          targets.push({ cardId: def.id, hp: (def.hp ?? 0) + hpBonus, attack: (def.attack ?? 0) + atkBonus, infectedEffects: def.infectedEffects });
+        }
+
+        // MA-081/MA-049: weapons whose damage is zeroed for this explore.
+        if (zeroDamageIds.length > 0) {
+          const zero = new Set(zeroDamageIds);
+          for (let i = 0; i < exploreWeapons.length; i++) {
+            const wid = weapons[i];
+            if (wid !== undefined && zero.has(wid)) {
+              const w = exploreWeapons[i];
+              if (w !== undefined) exploreWeapons[i] = { ...w, damage: 0, weaponEffects: [] };
+            }
+          }
+        }
+
+        // ---- Total Damage (weapons are used ONCE for the whole batch) ----
+        let pendingSkillDamage = 0;
+        const highHpCount = infectedEntries.filter(({ def }) => (def.hp ?? 0) >= 40).length;
+        for (const pe of player.pendingSkillEffects ?? []) {
+          if (pe.kind === 'giantKillingPlusDamage') pendingSkillDamage += pe.amount * highHpCount;
+          else if (pe.kind === 'giantKillingAllWeaponsPlusDamage') pendingSkillDamage += pe.amount * weapons.length * highHpCount;
+          else if (pe.kind === 'reversalBonusPerCharacterDamage') pendingSkillDamage += Math.max(player.maxHp - player.hp, 0);
+          else if (pe.kind === 'removeXpForWeaponDamage') pendingSkillDamage += pe.amount * 10;
+        }
+        const sameNameAttachedCount = infectedEntries.length > 0
+          ? state.seats.reduce((sum, s) => sum + (s.dead ? 0 : s.attached.filter(aid => state.cards[aid]?.cardId === infectedEntries[0]?.def.id).length), 0)
+          : 0;
+        const damage = computeDamage({
+          weapons: exploreWeapons,
+          ammo: ammoForEffects,
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus,
+          knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
+          ammoCardsInPlayArea,
+          inventoryCount: player.inventory.length,
+          damageMultiplier: player.damageMultiplierThisTurn ?? 1,
+        });
+
+        // MA-040 Laser Targeting Device: every revealed Infected is defeated.
+        const multi = laserTargeting
+          ? { defeated: true, combinedHp: 0, combinedAttack: 0, shuffleBackCards: [] as string[], blockedByCannotDefeat: false, effectiveDamage: damage }
+          : resolveMultiExplore({
+              damage,
+              revealed: targets,
+              attachedInfectedCount: player.attached.length,
+              ammo: ammoForEffects,
+              weapons: exploreWeapons,
+              characterDamage: Math.max(player.maxHp - player.hp, 0),
+              characterXp: player.xp ?? 0,
+              sameNameAttachedCount,
+              inventoryCount: player.inventory.length,
+              actionsInPlayArea: player.playArea.filter(pid => cardDef(state, pid)?.type === 'action').length,
+            });
+        const defeated = multi.defeated;
+        const defeatedIds = defeated ? infectedEntries.map(e => e.id) : [];
+        const undefeatedEntries = defeated ? [] : infectedEntries;
+        // ---- Outbreak infection tracking ----
+        const infectionBySeat = new Map<number, string[]>();
+        for (const s of state.seats) infectionBySeat.set(s.seat, [...(s.infectionCards ?? [])]);
+        let outbreakDeck = state.infectionDeck ?? [];
+        const drawInfectionsFor = (seatIdx: number, count: number): void => {
+          if (count <= 0) return;
+          const target = state.seats[seatIdx];
+          if (target === undefined) return;
+          if (isImmuneToInfectionEffects(characterAbilities(state, seatIdx), target.infectionCards)) return;
+          const arr = infectionBySeat.get(seatIdx) ?? [];
+          for (let i = 0; i < count && outbreakDeck.length > 0; i++) {
+            arr.push(outbreakDeck[0] as string);
+            outbreakDeck = outbreakDeck.slice(1);
+          }
+          infectionBySeat.set(seatIdx, arr);
+        };
+        const infectedEffectSeat = (): number => redirectSeat ?? seat;
+        const zombieBAffected: number[] = [];
+        // ---- Outcome ----
+        const outcomePrompts: Prompt[] = [...revealPrompts];
+        const removedIds: string[] = [...removedAfter, ...eventIdsToRemove];
+        const chainAttachedIds: string[] = [];
+        let decorations = player.decorations;
+        let level = player.level;
+        let xp = player.xp ?? 0;
+        let exploresLeftAfter = exploresLeft + grantedExplores + (laserTargeting ? 1 : 0);
+        let partnerAttached = player.partnerAttached ?? [];
+        const reaperTrashed: string[] = [];
+        let newLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
+        let downed = false;
+        let resuscitatePending = false;
+        const resuscitatePrompts: Prompt[] = [];
+        if (defeated) {
+          for (const { id, def } of infectedEntries) {
+            if (!negatedIds.has(id)) {
+              for (const e of def.infectedEffects ?? []) {
+                if (e.kind === 'onDefeatInfectionIncrease') {
+                  drawInfectionsFor(infectedEffectSeat(), e.amount);
+                  zombieBAffected.push(infectedEffectSeat());
+                }
+              }
+            }
+            // Barry Burton: chain-defeat lower-HP Infected from the Mansion top.
+            const barryAbility = abilities.find(a => a.kind === 'onDefeatChainLowerHp');
+            if (barryAbility !== undefined && barryAbility.kind === 'onDefeatChainLowerHp' &&
+                (def.hp ?? 0) <= barryAbility.hpThreshold) {
+              let lastHp = def.hp ?? 0;
+              while (mDeck.length > 0) {
+                const topId = mDeck[0];
+                if (topId === undefined) break;
+                const topDef = cardDef(state, topId);
+                if (topDef?.type !== 'infected') break;
+                if ((topDef.hp ?? 0) >= lastHp) break;
+                mDeck = mDeck.slice(1);
+                chainAttachedIds.push(topId);
+                lastHp = topDef.hp ?? 0;
+              }
+            }
+            // MA-036 Reaper: trash the highest-cost card attached to the partner
+            // unless this Infected was defeated with exact damage.
+            if (def.infectedEffects?.some(e => e.kind === 'trashHighestCostAttachedOnPartnerIfNotExactDefeat')) {
+              const exactDefeat = multi.effectiveDamage === multi.combinedHp;
+              if (!exactDefeat) {
+                const attached = [...partnerAttached];
+                let bestId: string | undefined;
+                let bestCost = -1;
+                for (const aid of attached) {
+                  const cost = cardDef(state, aid)?.cost ?? 0;
+                  if (cost > bestCost) { bestCost = cost; bestId = aid; }
+                }
+                if (bestId !== undefined) {
+                  partnerAttached = attached.filter(aid => aid !== bestId);
+                  reaperTrashed.push(bestId);
+                }
+              }
+            }
+          }
+          // Decorations for every defeated Infected (Combo Pile aware), including
+          // any Barry-chain attachments revealed by the batch.
+          const allAttached = [...player.attached, ...defeatedIds, ...chainAttachedIds];
+          decorations = player.decorations + decorationDelta(state, player.attached, allAttached);
+          // Level-up thresholds (MA-047 reduces the L2 requirement).
+          const charDef = cardDef(state, player.characterInstanceId);
+          let level2At = charDef?.level2At ?? 0;
+          for (const aid of allAttached) {
+            const ad = state.cards[aid] === undefined ? undefined : state.cardDefs[state.cards[aid]?.cardId ?? ''];
+            const eff = ad?.infectedEffects?.find(e => e.kind === 'reduceLevel2DecorationRequirement');
+            if (eff !== undefined && eff.kind === 'reduceLevel2DecorationRequirement') level2At -= eff.amount;
+          }
+          level = charDef !== undefined
+            ? levelForDecorations(charDef.level1At, Math.max(level2At, charDef.level1At ?? 0), decorations)
+            : player.level;
+          // Sergei L2: +Explores per Infected defeated.
+          exploresLeftAfter += exploreOnInfectedDefeat(abilities) * defeatedIds.length;
+          // XP: +1 per explore action (+1 more per high-Decoration Infected).
+          const maximizerXp = activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration')
+            ? defeatedIds.filter(id => (cardDef(state, id)?.decorations ?? 0) >= 2).length
+            : 0;
+          xp = (player.xp ?? 0) + 1 + maximizerXp;
+          // On-defeat "may" prompts, one set per defeated Infected.
+          for (const { id } of infectedEntries) {
+            const hasSkip = !negatedIds.has(id) && (cardDef(state, id)?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
+            const hasNoActions = !negatedIds.has(id) && (cardDef(state, id)?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false);
+            if (hasSkip || hasNoActions) {
+              outcomePrompts.push({
+                id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+                seat,
+                text: redirectSeat !== undefined
+                  ? `This Infected's effect is redirected to ${state.seats[redirectSeat]?.name ?? 'another Player'}.`
+                  : 'Choose a player.',
+                options: redirectSeat !== undefined
+                  ? [String(redirectSeat)]
+                  : state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
+                payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
+              });
+            }
+          }
+          if (movesDiscardToInventoryOnDefeat(abilities) && player.discard.length > 0) {
+            outcomePrompts.push({
+              id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+              seat,
+              text: 'Move any number of cards from your discard to the bottom of your Inventory.',
+              options: [...player.discard, 'DONE'],
+              payload: { kind: 'luisSeraDiscardToInventory' },
+            });
+          }
+          if (hasPerfectExploreReward(abilities) && multi.effectiveDamage === multi.combinedHp && player.discard.length > 0) {
+            outcomePrompts.push({
+              id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+              seat,
+              text: 'Take one card from your Discard Pile into your hand.',
+              options: [...player.discard],
+              payload: { kind: 'perfectExploreReward' },
+            });
+          }
+          if (trashCardFromDiscardOnInfectedDefeat(abilities) && player.discard.length > 0) {
+            outcomePrompts.push({
+              id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+              seat,
+              text: 'Mysterious Mask: trash a card from your Discard Pile.',
+              options: [...player.discard, 'Decline'],
+              payload: { kind: 'maskTrashDiscard' },
+            });
+          }
+          if (trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat(abilities) && player.discard.length > 0) {
+            outcomePrompts.push({
+              id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+              seat,
+              text: 'Leon: trash a card from your Discard Pile, then gain a card costing up to 20 more than it.',
+              options: [...player.discard, 'Decline'],
+              payload: { kind: 'leonTrashForGain' },
+            });
+          }
+          if (infectedEntries.some(({ id, def }) => !negatedIds.has(id) && def.infectedEffects?.some(e => e.kind === 'mustExploreNextTurnOnDefeat'))) {
+            outcomePrompts.push({
+              id: `p${state.prompts.length + outcomePrompts.length + 1}`,
+              seat,
+              text: 'Cephalo: choose a player. That player must Explore on their next turn.',
+              options: state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
+              payload: { kind: 'cephaloChoosePlayer' },
+            });
+          }
+        } else {
+          // ---- Not defeated: the LEADING character takes the combined Damage ----
+          const hunkReduction = abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+          const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
+            ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
+            : 0;
+          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction;
+          const damageSkillEffects = activeSkillEffects(state, seat);
+          const negateConsumption = consumeNegateDamage(state, seat);
+          state = negateConsumption.state;
+          const skillReduction = skillDamageReduction(damageSkillEffects);
+          const giantThreshold = skillGiantKillingThreshold(damageSkillEffects);
+          const skillSuppressed = giantThreshold !== undefined &&
+            undefeatedEntries.length > 0 &&
+            undefeatedEntries.every(({ def }) => (def.hp ?? 0) >= giantThreshold);
+          const skillLethal = skillLethalReplacementAmount(damageSkillEffects);
+          const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
+          const damageOnAda = !leadingIsPartner && player.partnerInstanceId === undefined;
+          const rawSkillDamage = (skillSuppressed || negateConsumption.negated)
+            ? 0
+            : Math.max(multi.combinedAttack - damageReduction - skillReduction, 0);
+          const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
+            ? skillLethal
+            : rawSkillDamage;
+          const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
+          state = kevlar.state;
+          newLeadingHp = damageOnAda
+            ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
+            : baseLeadingHp - kevlar.damage;
+          for (const { id, def } of undefeatedEntries) {
+            if (negatedIds.has(id)) continue;
+            for (const e of def.infectedEffects ?? []) {
+              if (e.kind === 'onNotDefeatedInfectionIncrease') {
+                drawInfectionsFor(infectedEffectSeat(), e.amount + e.perLevel * player.level);
+                zombieBAffected.push(infectedEffectSeat());
+              }
+            }
+          }
+        }
+        // MA-038 Explosive Barrel / MA-056o / MA-057o traps.
+        for (const id of barrelIds) {
+          if (damage >= 80) {
+            const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead);
+            state = { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, hp: newHp } : x)) };
+          } else {
+            exploresLeftAfter += 1;
+          }
+        }
+        for (const id of trapIds) {
+          const trapDef = cardDef(state, id);
+          if (trapDef === undefined) continue;
+          const playAreaTypes = playAreaAfter.map(pid => cardDef(state, pid)?.type ?? '');
+          const actionCount = playAreaAfter.filter(pid => cardDef(state, pid)?.type === 'action').length;
+          const trapDamage = outbreakTrapDamage(trapDef, playAreaTypes, actionCount);
+          if (trapDamage > 0) {
+            const kevlarTrap = applyDamageWithKevlar(state, seat, trapDamage);
+            state = kevlarTrap.state;
+            for (const bid of kevlarTrap.movedIds) {
+              if (!mBottom.includes(bid)) mBottom = [...mBottom, bid];
+            }
+            const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, kevlarTrap.damage, player.downed || player.dead);
+            state = { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, hp: newHp } : x)) };
+          }
+        }
+
+        // ---- Card disposition ----
+        const newHp = leadingIsPartner ? player.hp : newLeadingHp;
+        const partnerDied = leadingIsPartner && newLeadingHp <= 0;
+        const afterPartnerDeath = partnerDied ? removePartnerSkill(state, seat) : state;
+        // Non-Infected reveals get a take/bottom choice; MA-039/072 extras shuffle back.
+        const nonInfectedPrompts: Prompt[] = nonInfectedIds.map((id, i) => ({
+          id: `p${state.prompts.length + outcomePrompts.length + i + 1}`,
+          seat,
+          text: cardDef(state, id)?.text ?? '',
+          options: ['Take', 'Send to bottom of Mansion'],
+          payload: { kind: 'takeOrBottom', instanceId: id },
+        }));
+        for (const id of undefeatedEntries.map(e => e.id)) {
+          const def = cardDef(state, id);
+          const shuffles = (def?.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle')) ?? false;
+          if (shuffles) {
+            const shuffled = shuffleBack({ deck: mDeck, bottom: mBottom }, id, rngShuffle);
+            mDeck = shuffled.deck;
+            mBottom = shuffled.bottom;
+          } else {
+            const bottomed = sendToBottom({ deck: mDeck, bottom: mBottom }, id);
+            mDeck = bottomed.deck;
+            mBottom = bottomed.bottom;
+          }
+        }
+        for (const id of shuffleBackIds) {
+          const shuffled = shuffleBack({ deck: mDeck, bottom: mBottom }, id, rngShuffle);
+          mDeck = shuffled.deck;
+          mBottom = shuffled.bottom;
+        }
+        // ---- Defeat / not-defeated effect hooks (per card) ----
+        let fxState: GameState = {
+          ...afterPartnerDeath,
+          removed: [...removedIds, ...reaperTrashed.filter(id => !removedIds.includes(id))],
+          mansionDeck: mDeck,
+          mansionBottom: mBottom,
+        };
+        const defeatFxPrompts: Prompt[] = [];
+        for (const { id, def } of infectedEntries) {
+          const ctx = { seat, revealedInstanceId: id, revealedDef: def, weapons, handAfter, attachedInfectedCount: player.attached.length, characterXp: player.xp ?? 0 };
+          if (defeated) {
+            const r = applyMercenariesDefeatEffects(fxState, ctx);
+            fxState = r.state;
+            defeatFxPrompts.push(...r.prompts);
+            const rn = applyNightmareDefeatEffects(fxState, { seat, revealedInstanceId: id, revealedDef: def, weapons });
+            fxState = rn.state;
+            defeatFxPrompts.push(...rn.prompts);
+          } else {
+            const r = applyMercenariesNotDefeatedEffects(fxState, ctx);
+            fxState = r.state;
+            defeatFxPrompts.push(...r.prompts);
+            if (r.infectedShuffledBack) {
+              const shuffled = shuffleBack({ deck: fxState.mansionDeck, bottom: fxState.mansionBottom }, id, rngShuffle);
+              fxState = { ...fxState, mansionDeck: shuffled.deck, mansionBottom: shuffled.bottom };
+            }
+            const rn = applyNightmareNotDefeatedEffects(fxState, { seat, revealedInstanceId: id, revealedDef: def, weapons });
+            fxState = rn.state;
+            defeatFxPrompts.push(...rn.prompts);
+          }
+        }
+        mDeck = fxState.mansionDeck;
+        mBottom = fxState.mansionBottom;
+
+        // Downed handling for a surviving leader.
+        let handOut: readonly string[] = handAfter;
+        let discardOut: readonly string[] = discardAfterExplosives;
+        let inventoryOut: readonly string[] = player.inventory;
+        if (newHp <= 0 && !defeated) {
+          const resuscitateHolders = state.seats.filter(s => !s.dead &&
+            [...s.hand, ...s.playArea].some(pid => state.cards[pid]?.cardId === 'ac-050'));
+          if (resuscitateHolders.length > 0) {
+            resuscitatePending = true;
+            for (const s of resuscitateHolders) {
+              resuscitatePrompts.push({
+                id: `resuscitate-${s.seat}-${state.version}`,
+                seat: s.seat,
+                text: `${player.name} would be reduced to 0 Health. Trash Resuscitate to set their Health to 10 instead?`,
+                options: [...s.hand.filter(pid => state.cards[pid]?.cardId === 'ac-050'), ...s.playArea.filter(pid => state.cards[pid]?.cardId === 'ac-050'), 'Decline'],
+                payload: { kind: 'resuscitate', targetSeat: String(seat) },
+              });
+            }
+          } else {
+            const flipResult = flipDown(
+              {
+                hp: newHp,
+                maxHp: player.maxHp,
+                decorations,
+                level,
+                downed: false,
+                dead: false,
+                hand: handAfter,
+                discard: discardAfterExplosives,
+                inventory: player.inventory,
+              },
+              rngShuffle,
+            );
+            downed = flipResult.downed;
+            handOut = flipResult.hand;
+            discardOut = flipResult.discard;
+            inventoryOut = flipResult.inventory;
+          }
+        }
+
+        const newPlayer: PlayerState = applyNightmareGains({
+          ...player,
+          hand: handOut,
+          playArea: playAreaAfter,
+          discard: discardOut,
+          inventory: inventoryOut,
+          exploresLeft: exploresLeftAfter,
+          turnAmmo: turnAmmoAfter,
+          turnGold: turnGoldAfter,
+          mustExplore: false,
+          decorations,
+          level,
+          xp,
+          pendingSkillEffects: undefined,
+          pendingBackstab: undefined,
+          attached: defeated ? [...player.attached, ...defeatedIds, ...chainAttachedIds] : player.attached,
+          partnerAttached,
+          infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
+          hp: resuscitatePending ? 10 : newHp,
+          ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
+          ...(partnerDied ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined } : {}),
+          downed,
+        });
+        for (const g of revealGains) fxState = gainCopy(fxState, g.seat, g.cardId);
+        const zombieBPromptsOut = zombieBAffected.flatMap(seatIdx => zombieBPrompts(fxState, seatIdx, fxState.version));
+        return {
+          ...fxState,
+          ...nextBase,
+          seats: fxState.seats.map(s => (s.seat === seat ? newPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
+          mansionDeck: mDeck,
+          mansionBottom: mBottom,
+          rngState: fxState.rngState,
+          prompts: [...fxState.prompts, ...outcomePrompts, ...defeatFxPrompts, ...nonInfectedPrompts, ...resuscitatePrompts, ...zombieBPromptsOut],
+          ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
+          ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
+        };
+      }
+
+
+
+
+
 
       // Mercenaries: explore-time "can" Skills declared this turn. Their damage
       // is added to this explore; the declarations are consumed afterwards.
@@ -1341,25 +1938,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       for (const id of outbreakRevealFx.movedToBottom) {
         if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
       }
-      let currentRng = state.rngState;
-
-      // Applies the Nightmare on-use weapon gains (+cards/+actions/+gold) to a
-      // post-explore seat. Drawn cards come off the top of the inventory.
-      const applyNightmareGains = (p: PlayerState): PlayerState => {
-        if (nightmareGains.cards === 0 && nightmareGains.actions === 0 && nightmareGains.gold === 0) return p;
-        let np = { ...p, actionsLeft: p.actionsLeft + nightmareGains.actions, turnGold: p.turnGold + nightmareGains.gold };
-        if (nightmareGains.cards > 0) {
-          const d = drawWithReshuffle({ deck: np.inventory, discard: np.discard, count: nightmareGains.cards, rngState: currentRng });
-          currentRng = d.rngState;
-          np = { ...np, hand: [...np.hand, ...d.hand], inventory: d.deck, discard: d.discard };
-        }
-        return np;
-      };
-      const rngShuffle = (items: readonly string[]): string[] => {
-        const r = shuffle(makeRng(currentRng), items);
-        currentRng = r.rng.s;
-        return r.value;
-      };
 
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-040') {
         // Laser Targeting Device: +1 Explore, remove card.
@@ -2080,7 +2658,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // a partner, redirect the damage to his partner instead (partner absorbs
       // it; Hunk takes none). Automatic redirect when a partner is present.
       const hasDamageRedirect = characterAbilities(state, seat).some(a => a.kind === 'damageRedirectToPartner');
-      const leadingIsPartner = !!player.partnerInstanceId && player.partnerLeading === true;
+      const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
       const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
       // Ada (Nightmare) L2: lethal damage sets her HP to 10 instead of 0 -
       // only when she is the one taking the damage (never a leading partner).
@@ -2108,7 +2686,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       state = kevlar.state;
       const newLeadingHp = damageOnAda
         ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
-        : baseLeadingHp;
+        : Math.max(baseLeadingHp - kevlar.damage, 0);
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
       let hand: readonly string[] = handAfter;

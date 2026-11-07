@@ -1,6 +1,33 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~13:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** Suites: **game-core 694, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+**Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 706, server 96, client 135** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+
+**MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
+- **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
+  picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by
+  `deckCount(mansionDeck+mansionBottom)`). The engine reveals N cards one at a time and battles ALL revealed
+  Infected as ONE combined engagement — total Damage vs combined Health; on failure the player takes the combined
+  Damage and every undefeated Infected goes to the bottom (or shuffles back per its own effect). All defeated
+  Infected attach and their Decorations sum.
+- `resolveMultiExplore` (`engine/explore.ts`) now applies every per-card on-reveal combat effect and returns
+  `blockedByCannotDefeat` + `effectiveDamage`. The multi path in `engine/actions.ts` loops the reveal/defeat/
+  not-defeated hooks per card (MA-037/031 AoE, Mercenaries/Nightmare/Outbreak reveal + defeat + not-defeated,
+  Toughness/Luck/redirect consumption, Outbreak infection increases, Barry chain, MA-036 Reaper, on-defeat "may"
+  prompts, decorations/level/XP, partner HP/death). MA-038/040/056o/057o resolve; MA-039/072 expand the batch;
+  non-Infected reveals get take/bottom prompts.
+- **Partner Modification explore fixed.** Partner-attached weapons now join the explore (`explorableWeapons` +
+  new `isPartnerWeapon`, validation allows them). They are NOT moved to the play area, trashed, or removed, and are
+  once-per-turn (`remainingWeaponUses`). The leader is chosen on the explore action (`action.leader ?:
+  partnerLeading`) and the leading character takes the damage. Also fixed a PRE-EXISTING single-explore bug: a
+  leading partner never actually lost Health (`baseLeadingHp` was assigned unchanged); it is now
+  `max(baseLeadingHp - damage, 0)`.
+- **AI**: `enumerateLegalActions` offers `exploreCount` 1 and all-in for every weapon combo (intermediate counts are
+  human-only via the picker). **Client**: `explorePicker.exploreCountOptions`, partner flags on weapon options, an
+  explore-count selector + Main/Partner leader toggle in `ActionBar`, and `PlayerPanel` shows the partner's own HP.
+- **Known limitation**: the off-turn reactive windows (Jill's Flash Grenade vs a Las Plagas reveal, AC-018 Uroboros
+  Injection, AC-042 Fight or Flight) are single-explore only; a multi-explore does not offer them.
+- Tests: `game-core/src/engine/multiExplore.test.ts` (12) + 4 client tests. Gates: typecheck 0 (3 workspaces),
+  game-core 706, server 96, client 135, vite build OK, soak green.
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.

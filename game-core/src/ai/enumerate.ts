@@ -80,12 +80,19 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
           if (weapon !== undefined) combo.push(weapon);
         }
       }
-      generatedActions.push({
-        type: 'explore',
-        seat,
-        weapons: combo,
-        exploreCount: 1,
-      });
+      // Multi-explore (rulebook "Extra Explore"): the bot considers spending
+      // 1 Explore and spending its whole pool (all-in). Intermediate counts are
+      // legal for humans via the picker; the bot's 1-ply evaluation only needs
+      // the two extremes to weigh single vs combined battles.
+      const exploreCounts: readonly number[] = player.exploresLeft > 1 ? [1, player.exploresLeft] : [1];
+      for (const exploreCount of exploreCounts) {
+        generatedActions.push({
+          type: 'explore',
+          seat,
+          weapons: combo,
+          exploreCount,
+        });
+      }
     }
 
   // --- 4c. attack (Outbreak) ---

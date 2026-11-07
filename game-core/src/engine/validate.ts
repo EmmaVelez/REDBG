@@ -1,8 +1,9 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
-import { canReuseWeapon, explorableWeapons } from './weaponReuse';
+import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
+import { deckCount } from './mansion';
 
 /** True when the seat's character has the given ability kind (level-gated). */
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
@@ -219,6 +220,22 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (player.exploresLeft < 1) {
         return { ok: false, reason: 'explore: no explores left' };
       }
+      // Multi-explore (rulebook "Extra Explore"): the player chooses how many
+      // of their remaining Explores this action spends. exploreCount is the
+      // number of Mansion cards revealed and battled as ONE combined
+      // engagement, so it is bounded by both the pool and the Mansion size.
+      if (!Number.isInteger(action.exploreCount) || action.exploreCount < 1) {
+        return { ok: false, reason: 'explore: bad explore count' };
+      }
+      if (action.exploreCount > player.exploresLeft) {
+        return { ok: false, reason: 'explore: not enough explores' };
+      }
+      if (action.exploreCount > deckCount({ deck: state.mansionDeck, bottom: state.mansionBottom })) {
+        return { ok: false, reason: 'explore: mansion too small' };
+      }
+      if (action.leader === 'partner' && player.partnerInstanceId === undefined) {
+        return { ok: false, reason: 'explore: no partner' };
+      }
       if (action.weapons.length === 0) {
         return { ok: false, reason: 'explore: no weapons' };
       }
@@ -238,9 +255,17 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       for (const weaponId of action.weapons) {
               // Weapon-reuse abilities (Leon L2 pistolsTwicePerTurn): a weapon
               // already in the play area may be used again this turn. Shared
-              // rule — see engine/weaponReuse.ts.
-              if (!player.hand.includes(weaponId) && !canReuseWeapon(state, action.seat, weaponId)) {
+              // rule — see engine/weaponReuse.ts. Alliance Partner
+              // Modification: a weapon attached to the Partner may also be
+              // used (it stays attached; it is not moved or trashed).
+              if (!player.hand.includes(weaponId) && !canReuseWeapon(state, action.seat, weaponId) && !isPartnerWeapon(state, action.seat, weaponId)) {
                 return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
+              }
+              // A Partner's attached weapon stays attached, so the normal
+              // "left hand -> play area" once-per-turn limit would not apply;
+              // enforce it explicitly (reuse abilities still extend it).
+              if (isPartnerWeapon(state, action.seat, weaponId) && remainingWeaponUses(state, action.seat, weaponId) < 1) {
+                return { ok: false, reason: `explore: weapon already used: ${weaponId}` };
               }
               const weaponCardDef = cardDef(state, weaponId);
               if (weaponCardDef === undefined) {

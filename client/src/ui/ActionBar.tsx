@@ -7,6 +7,7 @@ import { defForInstance } from './cards';
 import {
   bestExploreCombo,
   evaluateExploreCombo,
+  exploreCountOptions,
   exploreWeaponOptions,
   legalExplores,
 } from './explorePicker';
@@ -53,6 +54,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
 
   const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Multi-explore: how many of the seat's remaining Explores this action spends.
+  const [exploreCount, setExploreCount] = useState(1);
+  // Alliance Partner Modification: who leads (takes the damage on a failed
+  // explore). Defaults to the Main character.
+  const [leader, setLeader] = useState<'main' | 'partner'>('main');
 
   // Re-pick the default combo when the available weapons change (an explore
   // moves a weapon to the play area; end of turn clears it) or when the best
@@ -65,8 +71,15 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableKey, bestKey]);
 
-  const combo = evaluateExploreCombo(state, seat, selected);
+  const combo = evaluateExploreCombo(state, seat, selected, exploreCount);
   const canExplore = explores.length > 0 && prompt === undefined;
+  const exploreCounts = exploreCountOptions(state, seat);
+  const exploreCountsKey = exploreCounts.join(',');
+  useEffect(() => {
+    const max = exploreCounts[exploreCounts.length - 1] ?? 1;
+    if (exploreCount > max) setExploreCount(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exploreCountsKey]);
 
   // WE-025 Blowback Pistol: "Discard any number of 'Pistol' cards from hand to
   // play. +10 damage per card discarded." Offered only while a Blowback Pistol
@@ -166,6 +179,14 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                 />
                 <span className="explore-option-name">{opt.name}</span>
                 <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
+                {opt.partner && (
+                  <span
+                    className="explore-option-partner"
+                    title="Attached to your Partner. It joins this explore but stays attached."
+                  >
+                    partner
+                  </span>
+                )}
                 {opt.reusable && (
                   <span
                     className="explore-option-reuse"
@@ -211,6 +232,48 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         </div>
       )}
 
+      {canExplore && (
+        <div className="explore-options">
+          {exploreCounts.length > 1 && (
+            <div className="explore-picker-count" data-explore-count>
+              <span>Explores to use:</span>
+              {exploreCounts.map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  className={exploreCount === n ? 'explore-count-active' : undefined}
+                  data-explore-count-option={n}
+                  onClick={() => setExploreCount(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+          {player?.partnerInstanceId !== undefined && (
+            <div className="explore-picker-leader" data-explore-leader>
+              <span>Leading (takes damage):</span>
+              <button
+                type="button"
+                className={leader === 'main' ? 'explore-count-active' : undefined}
+                data-leader-option="main"
+                onClick={() => setLeader('main')}
+              >
+                Main
+              </button>
+              <button
+                type="button"
+                className={leader === 'partner' ? 'explore-count-active' : undefined}
+                data-leader-option="partner"
+                onClick={() => setLeader('partner')}
+              >
+                Partner
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="action-buttons">
         {onOpenLog !== undefined && (
           <button
@@ -239,7 +302,8 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                 type: 'explore',
                 seat,
                 weapons: selected,
-                exploreCount: 1,
+                exploreCount,
+                ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
                 ...(discardPistols.length > 0 ? { discardedPistols: discardPistols } : {}),
               })}
             >
