@@ -223,7 +223,7 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
         boostedAttack += bonus;
       }
       if (effect.kind === 'plusDamagePerFull10AmmoOfAttacker') {
-        effective += effect.amount * Math.floor(ammo / 10);
+        boostedAttack += effect.amount * Math.floor(ammo / 10);
       }
       if (effect.kind === 'onRevealWeaponDamagePenalty') {
         effective -= effect.amount * weapons.length;
@@ -355,7 +355,7 @@ export function resolveMultiExplore(params: {
     const xpPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealDamagePenaltyIfCharacterXpAtLeast') as { kind: 'onRevealDamagePenaltyIfCharacterXpAtLeast'; amount: number; threshold: number } | undefined;
     if (xpPenalty && (params.characterXp ?? 0) >= xpPenalty.threshold) atk -= xpPenalty.amount;
     const ammoBonus = target.infectedEffects?.find(e => e.kind === 'plusDamagePerFull10AmmoOfAttacker') as { kind: 'plusDamagePerFull10AmmoOfAttacker'; amount: number } | undefined;
-    if (ammoBonus) damage += ammoBonus.amount * Math.floor(ammo / 10);
+    if (ammoBonus) atk += ammoBonus.amount * Math.floor(ammo / 10);
     const weaponPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealWeaponDamagePenalty') as { kind: 'onRevealWeaponDamagePenalty'; amount: number } | undefined;
     if (weaponPenalty) damage -= weaponPenalty.amount * weapons.length;
     const charDamageBonus = target.infectedEffects?.find(e => e.kind === 'onRevealBonusDamageIfCharacterDamaged') as { kind: 'onRevealBonusDamageIfCharacterDamaged'; amount: number; threshold: number } | undefined;

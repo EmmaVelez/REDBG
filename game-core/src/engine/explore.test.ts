@@ -77,8 +77,13 @@ test('resolveExplore Uroboros shuffleBack', () => {
 });
 
 test('resolveExplore Gatling Gun Majini', () => {
-  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 60, bonusDamage: 0, revealed: { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] } })).toEqual({ kind: 'defeated', decorations: 4, damage: 60, hp: 40 });
-  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 10, bonusDamage: 0, revealed: { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] } })).toEqual({ kind: 'notDefeated', damageTaken: 25, shuffleBack: false });
+  // FAQ ch. VIII: the bonus boosts the Infected's OWN damage per full 10 total Ammo
+  // ("the Gatling Gun Majini would get +30 Damage"), not the player's.
+  const majini: CardDef = { id: 'ma-014', name: 'Gatling Gun Majini', type: 'infected', set: 'premier', text: '', copies: 3, hp: 40, attack: 25, decorations: 4, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] };
+  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 0, bonusDamage: 0, revealed: majini })).toEqual({ kind: 'notDefeated', damageTaken: 25, shuffleBack: false });
+  expect(resolveExplore({ weapons: [{ damage: 30, ammoReq: 0 }], ammo: 60, bonusDamage: 0, revealed: majini })).toEqual({ kind: 'notDefeated', damageTaken: 55, shuffleBack: false });
+  // The player's damage is unchanged by the effect: 45 still defeats 40 HP.
+  expect(resolveExplore({ weapons: [{ damage: 45, ammoReq: 0 }], ammo: 60, bonusDamage: 0, revealed: majini })).toEqual({ kind: 'defeated', decorations: 4, damage: 45, hp: 40 });
 });
 
 test('resolveExplore nonInfected', () => {
@@ -95,4 +100,19 @@ test('resolveMultiExplore not defeated', () => {
 
 test('resolveMultiExplore Uroboros flagged', () => {
   expect(resolveMultiExplore({ damage: 50, revealed: [{ cardId: 'ma-002', hp: 20, attack: 20 }, { cardId: 'ma-010', hp: 90, attack: 70, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] }] })).toEqual({ defeated: false, combinedHp: 110, combinedAttack: 90, shuffleBackCards: ['ma-010'], blockedByCannotDefeat: false, effectiveDamage: 50 });
+});
+
+test('resolveMultiExplore Gatling Gun Majini boosts the combined attack', () => {
+  // FAQ ch. VIII: +5 per full 10 total Ammo to the Infected's OWN damage.
+  const result = resolveMultiExplore({
+    damage: 30,
+    ammo: 60,
+    revealed: [
+      { cardId: 'ma-014', hp: 40, attack: 30, infectedEffects: [{ kind: 'plusDamagePerFull10AmmoOfAttacker', amount: 5 }] },
+      { cardId: 'ma-001', hp: 15, attack: 10 },
+    ],
+  });
+  expect(result.combinedAttack).toBe(70); // (30 + 30) + 10
+  expect(result.effectiveDamage).toBe(30); // the player's damage is unchanged
+  expect(result.defeated).toBe(false); // 30 < 55
 });
