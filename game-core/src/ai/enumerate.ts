@@ -2,7 +2,8 @@
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
 import { explorableWeapons } from '../engine/weaponReuse';
-import { characterAbilities, weaponCostCap } from '../engine/abilities';
+import { characterAbilities, weaponCostCap } from '../engine/abilities';
+
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
@@ -159,6 +160,18 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   // partner mode leader selection is handled automatically; bots should not pick manually
 
+  }
+
+  // --- 6a. useWeaponAbility (Mercenaries manual weapon effects) ---
+  for (const instanceId of [...player.hand, ...player.playArea]) {
+    const cardData = state.cards[instanceId];
+    if (!cardData) continue;
+    const def = state.cardDefs[cardData.cardId];
+    const hasManual = (def?.weaponEffects ?? []).some(e =>
+      e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd');
+    if (hasManual) {
+      generatedActions.push({ type: 'useWeaponAbility', seat, instanceId });
+    }
   }
 
   // --- 6b. moveXp (Mercenaries Skill System) ---

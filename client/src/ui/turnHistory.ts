@@ -35,6 +35,7 @@ const VERBS: Record<Action['type'], string> = {
   chooseExploreLeader: 'chose explore leader',
   moveXp: 'moved XP onto a Skill',
   useSkill: 'used a Skill',
+  useWeaponAbility: 'activated a weapon effect',
 };
 
 function cardName(state: GameState, instanceId: string | undefined): string | null {

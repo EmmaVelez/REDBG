@@ -1,6 +1,7 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
-import { requiredAmmoForWeapons, characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
-import { canReuseWeapon, explorableWeapons } from './weaponReuse';
+import { characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
+import { requiredAmmoForExplore } from './ammo';
+import { canReuseWeapon, explorableWeapons } from './weaponReuse';
 import { isSkillActive } from './skill';
 
 /** True when the seat's character has the given ability kind (level-gated). */
@@ -30,7 +31,7 @@ function canExploreLegally(
   return explorableWeapons(state, seat).some(id => {
     const def = cardDef(state, id);
     if (def === undefined || def.type !== 'weapon') return false;
-    const req = requiredAmmoForWeapons(state, seat, [id], wid => cardDef(state, wid));
+    const req = requiredAmmoForExplore(state, seat, [id]);
     return req <= player.turnAmmo;
   });
 }
@@ -90,6 +91,15 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       if (actionCardDef.type !== 'action') {
         return { ok: false, reason: `playActionCard: not an action card: ${action.instanceId}` };
+      }
+      // WE-048 Hunting Bow: while it is in the Play Area, the player cannot
+      // play Actions.
+      const bowInPlayArea = player.playArea.some(id => {
+        const d = cardDef(state, id);
+        return d?.type === 'weapon' && (d.weaponEffects ?? []).some(e => e.kind === 'cannotPlayActionsWhileInPlayArea');
+      });
+      if (bowInPlayArea) {
+        return { ok: false, reason: 'playActionCard: Hunting Bow prevents playing Actions' };
       }
       return { ok: true };
 
@@ -225,8 +235,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                 return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
               }
             }
-            // Ability-aware ammo cost (Leon L1 pistols -10, Sheva L2 rifles -20).
-            const requiredAmmo = requiredAmmoForWeapons(state, action.seat, action.weapons, id => cardDef(state, id));
+            // Ability-aware ammo cost (Leon L1 pistols -10, Sheva L2 rifles -20,
+            // Skill discounts, Claire/Jill Mercenaries modifiers).
+            const requiredAmmo = requiredAmmoForExplore(state, action.seat, action.weapons);
             if (player.turnAmmo < requiredAmmo) {
               return { ok: false, reason: 'explore: insufficient ammo' };
             }
@@ -384,7 +395,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'discardForActionFromDiscard':
         case 'gainSpecificWeaponIntoInventory':
         case 'movePlayAreaWeaponToInventoryTop':
-        case 'discardWeaponToCopyEffects': {
+        case 'discardWeaponToCopyEffects':
+        case 'choosePlayerIncreaseAmmoReqNextTurn': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -462,6 +474,12 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               return { ok: false, reason: 'useCharacterAbility: needs exactly one other player with 30 or less HP and a card in hand' };
             }
           }
+          if (ability.kind === 'choosePlayerIncreaseAmmoReqNextTurn') {
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead);
+            if (others.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: no other players' };
+            }
+          }
           return { ok: true };
         }
         case 'exchangeBuyForAction':
@@ -475,6 +493,46 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           // client never renders a no-op button and bots never waste a slot.
           return { ok: false, reason: 'useCharacterAbility: passive ability' };
       }
+
+    case 'useWeaponAbility': {
+      // Mercenaries: manual weapon effects (WE-043/046/049).
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'useWeaponAbility: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `useWeaponAbility: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'useWeaponAbility: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'useWeaponAbility: not your turn' };
+      }
+      const weaponDef = cardDef(state, action.instanceId);
+      if (weaponDef === undefined || weaponDef.type !== 'weapon') {
+        return { ok: false, reason: 'useWeaponAbility: unknown weapon' };
+      }
+      if (!player.hand.includes(action.instanceId) && !player.playArea.includes(action.instanceId)) {
+        return { ok: false, reason: 'useWeaponAbility: weapon not in hand or play area' };
+      }
+      const manual = (weaponDef.weaponEffects ?? []).filter(e =>
+        e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd');
+      if (manual.length === 0) {
+        return { ok: false, reason: 'useWeaponAbility: no manual effect' };
+      }
+      if ((player.usedWeaponEffectsThisTurn ?? []).includes(action.instanceId)) {
+        return { ok: false, reason: 'useWeaponAbility: already used this turn' };
+      }
+      for (const e of manual) {
+        if (e.kind === 'payAmmoForDamage' && player.turnAmmo < e.ammoCost) {
+          return { ok: false, reason: 'useWeaponAbility: not enough ammo' };
+        }
+        if (e.kind === 'removeXpForDamage' && (player.xp ?? 0) < 1) {
+          return { ok: false, reason: 'useWeaponAbility: no XP on the Character' };
+        }
+      }
+      return { ok: true };
+    }
 
     case 'attachToPartner':
       if (state.phase !== 'main') {

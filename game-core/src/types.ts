@@ -168,7 +168,17 @@ export type WeaponEffect =
   | { readonly kind: "plusDamagePerCardGainedThisTurn"; readonly amount: number } // WE-027 Samurai Edge
   | { readonly kind: "moveLowHpInfectedToMansionTop"; readonly hpThreshold: number } // WE-028 Stun Rod
   | { readonly kind: "plusDamageIfNightTime"; readonly amount: number }
-  | { readonly kind: "trashAfterUse" }; // WE-031 Night Scope Rocket Launcher
+  | { readonly kind: "trashAfterUse" } // WE-031 Night Scope Rocket Launcher
+  // --- Mercenaries weapons (WE-043..WE-050) ---
+  | { readonly kind: "payAmmoForDamage"; readonly ammoCost: number; readonly amount: number } // WE-043 Ibex Standard: pay N Ammo -> +amount damage this turn
+  | { readonly kind: "onDefeatMoveDiscardOrHandToPlayerDiscard" } // WE-044 Custom Pump-Action Shotgun
+  | { readonly kind: "onDefeatGainXp"; readonly amount: number } // WE-045 Custom Full-Bore Machine Gun
+  | { readonly kind: "removeXpForDamage"; readonly perXp: number } // WE-046 Custom Lightning Hawk
+  | { readonly kind: "plusDamageIfCharacterXpAtLeast"; readonly threshold: number; readonly amount: number } // WE-047 Custom Bolt-Action Rifle
+  | { readonly kind: "plusDamageIfNoActionsInPlayArea"; readonly amount: number } // WE-048 Hunting Bow
+  | { readonly kind: "cannotPlayActionsWhileInPlayArea" } // WE-048 Hunting Bow
+  | { readonly kind: "selfPlusDamageTrashAtTurnEnd"; readonly amount: number } // WE-049 Custom Standard Sidearm
+  | { readonly kind: "onDefeatOptionalGoldTrashAtTurnEnd"; readonly amount: number }; // WE-050 Reliable Blade
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -197,7 +207,30 @@ export type InfectedEffect =
   | { readonly kind: "onRevealAllInfectionIncrease"; readonly amount: number } // MA-043 Nemesis (2nd form)
   | { readonly kind: "onNotDefeatedInfectionIncrease"; readonly amount: number; readonly perLevel: number } // MA-041 Tyrant T-002, MA-046 Web Spinner
   | { readonly kind: "onNotDefeatedShuffleBack" } // MA-041 Tyrant T-002
-  | { readonly kind: "onDefeatInfectionIncrease"; readonly amount: number; readonly toMansionBottom: boolean }; // MA-053 Lisa Trevor
+  | { readonly kind: "onDefeatInfectionIncrease"; readonly amount: number; readonly toMansionBottom: boolean } // MA-053 Lisa Trevor
+  // --- Mercenaries infected (MA-073..MA-098) ---
+  | { readonly kind: "onDefeatChoosePlayerGainAmmoX10"; readonly count: number } // MA-073 Town Majini
+  | { readonly kind: "onDefeatChoosePlayerTrashHandForAmmoX10" } // MA-074 Town Majini (Shovel)
+  | { readonly kind: "onNotDefeatedReduceAllMaxHpIfPilesBelow"; readonly pileThreshold: number; readonly amount: number } // MA-075 Giant Majini
+  | { readonly kind: "onRevealEachPlayerRemovesSkillXp"; readonly amount: number } // MA-076 Base Majini (Gun)
+  | { readonly kind: "zeroDecorationsInComboPile" } // MA-077 Chicken (dormant: no Combo Pile in Story Mode)
+  | { readonly kind: "onNotDefeatedMoveHighestDecorationAttachedToBottomThenShuffle" } // MA-078 Red Executioner
+  | { readonly kind: "onNotDefeatedExploringPlayerGainsAmmoX10"; readonly count: number } // MA-079 Big Man Majini
+  | { readonly kind: "onRevealLowestDecorationPlayersMoveDiscardToHighest"; readonly count: number } // MA-080 Chainsaw Majini
+  | { readonly kind: "onRevealZeroDamageOfLowestAmmoReqWeapon" } // MA-081 Los Illuminados (Shield)
+  | { readonly kind: "onNotDefeatedTrashTopInventory"; readonly count: number } // MA-082 J.J.
+  | { readonly kind: "onRevealPlusHpPerSameNameAttached"; readonly amount: number } // MA-083 Los Ganados (Male)
+  | { readonly kind: "onRevealPlusHpPerAttachedToExploring"; readonly amount: number } // MA-084 Los Ganados (Female)
+  | { readonly kind: "onRevealDamagePenaltyIfCharacterXpAtLeast"; readonly threshold: number; readonly amount: number } // MA-085 Adjule
+  | { readonly kind: "onRevealEachPlayerPassesHandCardLeft"; readonly count: number } // MA-086 Los Illuminados (Scythe)
+  | { readonly kind: "onDefeatMoveResourceCardToOpponentDiscard" } // MA-088 Tribal Majini (Bow)
+  | { readonly kind: "onRevealEachPlayerRemovesResourcePileTop" } // MA-089 / MA-091
+  | { readonly kind: "onNotDefeatedTrashUsedWeaponCostAtMost"; readonly maxCost: number } // MA-090 Tribal Majini (Shield)
+  | { readonly kind: "onRevealAllPlayersGainLowestCostResource" } // MA-092 Town Majini (Motorcycle)
+  | { readonly kind: "onDefeatDrawCardAtEndOfTurn"; readonly count: number } // MA-093 Los Ganados (Handscythe)
+  | { readonly kind: "onDefeatTrashCardFromAnyDiscard" } // MA-094 Los Ganados (Pitchfork)
+  | { readonly kind: "onDefeatGiveDamageToAnyCharacter"; readonly amount: number } // MA-096 Los Illuminados (Bow)
+  | { readonly kind: "onDefeatMoveHandOrDiscardToPlayerDiscard" }; // MA-098 Base Majini (Shield)
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
@@ -259,7 +292,18 @@ export type ActionEffect =
   | { readonly kind: "sloughArmor"; readonly amount: number } // IN-004 (reactive)
   | { readonly kind: "drag" } // IN-005
   | { readonly kind: "devour"; readonly heal: number } // IN-006
-  | { readonly kind: "infectionIncrease"; readonly amount: number }; // IN-007
+  | { readonly kind: "infectionIncrease"; readonly amount: number } // IN-007
+  // --- Mercenaries actions (AC-042..AC-051) ---
+  | { readonly kind: "reactiveFightOrFlight" } // AC-042: on reveal, trash from hand to move the Infected to the Mansion bottom
+  | { readonly kind: "choosePlayerDiscardWeaponForDamage" } // AC-043 The Mercenaries
+  | { readonly kind: "discardTwoThenTrashOneFromHand" } // AC-044 Boundless Battlefield
+  | { readonly kind: "choosePlayerForCoupDeGrace"; readonly perXp: number; readonly maxAmount: number } // AC-045 Coup de Grâce
+  | { readonly kind: "choosePlayerForBackstab" } // AC-048 Backstab
+  | { readonly kind: "trashTwoFromHandForGoldIfSameType"; readonly amount: number } // AC-047 Anticipation
+  | { readonly kind: "moveHandToInventoryBottomAndDraw" } // AC-049 Battle Hardened
+  | { readonly kind: "removeXpForCard" } // AC-049 Battle Hardened (optional second half)
+  | { readonly kind: "reactiveResuscitate" } // AC-050: on lethal damage, trash to set the Character's Health to 10
+  | { readonly kind: "discardInventoryUntilWeaponForDamage"; readonly amount: number }; // AC-051 Tear Gas
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -391,7 +435,16 @@ export type CharacterAbility =
   // Outbreak Infected Characters (reanimated players)
   | { readonly kind: "zombieAAoEOnAttack"; readonly amount: number; readonly level: 1 | 2 } // CH-031 Zombie A: other non-infected characters take damage when it attacks
   | { readonly kind: "zombieBInfectionIncrease"; readonly level: 1 | 2 } // CH-032 Zombie B: trash an infection card to raise a character's level by 1 more
-  | { readonly kind: "zombieCTurnStartInfectionSwap"; readonly level: 1 | 2 }; // CH-033 Zombie C: swap a hand infection card with the top of the Infection Deck
+  | { readonly kind: "zombieCTurnStartInfectionSwap"; readonly level: 1 | 2 } // CH-033 Zombie C: swap a hand infection card with the top of the Infection Deck
+  // --- Mercenaries characters (CH-044..CH-051) ---
+  | { readonly kind: "turnStartLowestDecorationsDamage"; readonly amount: number; readonly level: 1 | 2 } // CH-044 Jack Krauser: +amount damage this turn when tied for lowest Decorations
+  | { readonly kind: "damageReductionForAmmo"; readonly amount: number; readonly level: 1 | 2 } // CH-045 HUNK: -amount damage taken; when he takes damage, gain 1 "Ammo x10"
+  | { readonly kind: "turnStartBuyForAmmoDiscount"; readonly amount: number; readonly level: 1 | 2 } // CH-046 Claire: -1 Buy -> all weapons -amount Ammo this turn
+  | { readonly kind: "onDefeatTrashFromDiscardOrHand"; readonly level: 1 | 2 } // CH-047 Chris: on defeat, may Trash 1 card from Discard or Hand
+  | { readonly kind: "choosePlayerIncreaseAmmoReqNextTurn"; readonly amount: number; readonly level: 1 | 2 } // CH-048 Jill: a player's weapons cost +amount Ammo next turn
+  | { readonly kind: "exploreDamageReductionPerHandCard"; readonly amount: number; readonly level: 1 | 2 } // CH-049 Wesker: while exploring, -amount damage per card in hand
+  | { readonly kind: "buyRedirectToPlayerDiscard"; readonly level: 1 | 2 } // CH-050 Rebecca: on buy, may move the bought card to another player's discard
+  | { readonly kind: "onDefeatChainLowerHp"; readonly hpThreshold: number; readonly level: 1 | 2 }; // CH-051 Barry: chain-defeat lower-HP infected from the Mansion top
 
 
 // ---------------------------------------------------------------------------
@@ -532,6 +585,31 @@ export interface PlayerState {
   readonly pendingSkillEffects?: readonly PendingSkillEffect[];
   /** Mercenaries: weapon types chosen via Weapon Master LV.1 this turn. */
   readonly skillAmmoDiscountTypes?: readonly string[];
+
+  // --- Mercenaries expansion (characters / weapons / actions) ---
+  /** Claire Redfield (Mercenaries) L1: all weapons require this much less
+   *  Ammo this turn (bought with -1 Buy at turn start). */
+  readonly allWeaponsAmmoDiscountThisTurn?: number;
+  /** Jill Valentine (Mercenaries) L1: this player's weapons require this much
+   *  MORE Ammo on their NEXT turn (set by another player's ability). */
+  readonly ammoReqIncreaseNextTurn?: number;
+  /** Jill Valentine (Mercenaries) L1: the increase in force for THIS turn
+   *  (derived from ammoReqIncreaseNextTurn at turn start, then cleared). */
+  readonly ammoReqIncreaseThisTurn?: number;
+  /** Per-weapon damage bonuses this turn (Ibex Standard, Lightning Hawk,
+   *  Custom Standard Sidearm, Coup de Grâce, ...). Keyed by instance id. */
+  readonly weaponDamageBonusById?: Readonly<Record<string, number>>;
+  /** Weapons that will be Trashed at the end of this turn (Custom Standard
+   *  Sidearm, Reliable Blade). */
+  readonly trashAtEndOfTurn?: readonly string[];
+  /** Weapon instances whose manual ("can") effect already fired this turn. */
+  readonly usedWeaponEffectsThisTurn?: readonly string[];
+  /** MA-093 Los Ganados (Handscythe): extra cards drawn at end of turn. */
+  readonly pendingEndOfTurnDraws?: number;
+  /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
+  readonly pendingBackstab?: { readonly targetSeat: number };
+  /** AC-045 Coup de Grâce: the chosen weapon + bonus for this turn's explores. */
+  readonly pendingCoupDeGrace?: { readonly weaponInstanceId: string; readonly amount: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -635,11 +713,17 @@ export interface GameState {
   readonly winners: readonly number[];
   readonly endReason?: "uroborosDefeated" | "allPlayersDead";
 
-  /** Reactive trash window (AC-018, Jill L2): pending off-turn reaction. */
+  /** Reactive trash window (AC-018, Jill L2, AC-042): pending off-turn reaction. */
   readonly reactiveTrashWindow?: {
-    readonly kind: 'uroborosInjection' | 'jillFlashGrenade';
+    readonly kind: 'uroborosInjection' | 'jillFlashGrenade' | 'fightOrFlight';
     readonly triggeringSeat: number;
     readonly revealedInstanceId: string;
+  };
+  /** AC-050 Resuscitate: a Character was saved from a lethal hit and is at 10
+   *  HP pending a Resuscitate holder's decision; `downSnapshot` is the state to
+   *  restore if nobody trashes the card. */
+  readonly pendingResuscitate?: {
+    readonly seat: number;
   };
   /** Flash Grenade reactive defeat: instance ID of infected defeated by Flash Grenade. */
   readonly flashGrenadeDefeatedInstanceId?: string;
@@ -656,6 +740,12 @@ export interface GameState {
     readonly mansionDeck: readonly string[];
     readonly mansionBottom: readonly string[];
     readonly rngState: number;
+    /** AC-042 Fight or Flight: the exploring player's pre-explore state, used to
+     *  cancel the explore when the revealed Infected is stronger. */
+    readonly prePlayer?: PlayerState;
+    /** AC-042: the exploring Character's Health at reveal time. When the
+     *  revealed Infected's Health exceeds this, the explore is cancelled. */
+    readonly revealHpThreshold?: number;
   };
   readonly log: readonly LoggedAction[];
 
@@ -693,6 +783,8 @@ export type Action =
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
   | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }
   | { readonly type: "endTurn"; readonly seat: number }
+  /** Mercenaries: activate a manual ("can") weapon effect (free action). */
+  | { readonly type: "useWeaponAbility"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */

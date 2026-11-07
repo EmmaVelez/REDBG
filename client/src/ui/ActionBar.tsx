@@ -76,6 +76,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   // targets available, not already used this turn). Label from the character
   // card's level text when resolvable.
   const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
+  const weaponAbilities = legal.filter((a): a is Extract<Action, { type: 'useWeaponAbility' }> => a.type === 'useWeaponAbility' && a.seat === seat);
   const player = state.seats[seat];
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
@@ -229,6 +230,20 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             title={abilityLabel(a.abilityIndex)}
           >
             Ability: {abilityLabel(a.abilityIndex)}
+          </button>
+        ))}
+
+        {weaponAbilities.map(a => (
+          <button
+            key={`weapon-ability-${a.instanceId}`}
+            type="button"
+            className="ability-button"
+            data-weapon-ability={a.instanceId}
+            onClick={() => onAction(a)}
+            disabled={disabled}
+            title={defForInstance(state, a.instanceId)?.name ?? 'Activate weapon effect'}
+          >
+            Weapon: {defForInstance(state, a.instanceId)?.name ?? 'Activate'}
           </button>
         ))}
 

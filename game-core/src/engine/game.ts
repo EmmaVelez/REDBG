@@ -211,6 +211,19 @@ function turnStartAbilityPrompts(
     }
   }
 
+  // CH-046 Claire Redfield (Mercenaries) L1: at turn start, may get -1 Buy for
+  // -amount Ammo Requirement on all weapons this turn.
+  const claireBuy = abilities.find(a => a.kind === 'turnStartBuyForAmmoDiscount');
+  if (claireBuy !== undefined && claireBuy.kind === 'turnStartBuyForAmmoDiscount') {
+    prompts.push({
+      id: `claire-buy-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l1Text,
+      options: ['Yes', 'No'],
+      payload: { kind: 'claireBuyForAmmo', amount: String(claireBuy.amount) },
+    });
+  }
+
   return prompts;
 }
 
@@ -701,6 +714,19 @@ function startTurnInternal(state: GameState): GameState {
 
   const skillTurn = turnStartSkillEffects(state, player.seat);
 
+  // CH-044 Jack Krauser (Mercenaries) L1: at the beginning of your turn, if you
+  // have the lowest Decorations among all Players (ties count), Jack deals an
+  // additional 10 Damage during this turn.
+  const krauserAbility = abilitiesForLevel(charDef?.abilities, player.level)
+    .find(a => a.kind === 'turnStartLowestDecorationsDamage');
+  const krauserBonus = (() => {
+    if (krauserAbility === undefined || krauserAbility.kind !== 'turnStartLowestDecorationsDamage') return 0;
+    const alive = state.seats.filter(x => !x.dead);
+    if (alive.length === 0) return 0;
+    const min = Math.min(...alive.map(x => x.decorations));
+    return player.decorations <= min ? krauserAbility.amount : 0;
+  })();
+
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
@@ -736,7 +762,7 @@ function startTurnInternal(state: GameState): GameState {
       )
         ? 1
         : 0) + skillTurn.explores,
-    weaponDamageBonusThisTurn: skillTurn.damageThisTurn,
+    weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
       ? {
@@ -755,6 +781,17 @@ function startTurnInternal(state: GameState): GameState {
     chrisAmmoDiscountTypes: undefined,
     pendingSkillEffects: undefined,
     skillAmmoDiscountTypes: undefined,
+    // Jill Valentine (Mercenaries) L1: the targeted player's weapons cost
+    // +amount Ammo THIS turn (the "next turn" the ability named).
+    ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,
+    ammoReqIncreaseNextTurn: undefined,
+    allWeaponsAmmoDiscountThisTurn: undefined,
+    weaponDamageBonusById: undefined,
+    trashAtEndOfTurn: undefined,
+    usedWeaponEffectsThisTurn: undefined,
+    pendingEndOfTurnDraws: undefined,
+    pendingBackstab: undefined,
+    pendingCoupDeGrace: undefined,
     skipNextTurn: undefined,
     noActionsNextTurn: undefined,
     actionsCapNextTurn: undefined,

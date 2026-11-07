@@ -1,5 +1,6 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
 import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove } from './abilities';
+import { exploreAmmoReq } from './ammo';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -101,8 +102,11 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     return inst === undefined ? undefined : state.cardDefs[inst.cardId];
   });
   const chrisSingleDiscount = (weaponIds?.length ?? 0) === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
+  void chrisSingleDiscount;
   const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
+  void chrisTypeDiscount;
   const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
+  void chrisTypeDiscountTypes;
   const weapons: ExploreWeapon[] = defs.map((def, i) => {
     // David King (Outbreak) L1: effects copied onto this weapon from a
     // discarded one apply for this turn's explore.
@@ -110,9 +114,15 @@ export function exploreDamage(state: GameState, seat: number, weaponIds: readonl
     const copied = id !== undefined && player.copiedWeaponEffects?.instanceId === id
       ? player.copiedWeaponEffects.effects
       : [];
+    const coup = player.pendingCoupDeGrace;
+    const noActions = player.playArea.every(pid => state.cardDefs[state.cards[pid]?.cardId ?? '']?.type !== 'action');
+    const bowEff = def?.weaponEffects?.find(e => e.kind === 'plusDamageIfNoActionsInPlayArea');
+    const xpEff = def?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast');
+    const bowBonus = bowEff !== undefined && bowEff.kind === 'plusDamageIfNoActionsInPlayArea' && noActions ? bowEff.amount : 0;
+    const xpBonus = xpEff !== undefined && xpEff.kind === 'plusDamageIfCharacterXpAtLeast' && (player.xp ?? 0) >= xpEff.threshold ? xpEff.amount : 0;
     return {
-      damage: def?.damage ?? 0,
-      ammoReq: Math.max(ammoReqForWeapon(abilities, def) - chrisSingleDiscount - (def?.weaponType !== undefined && chrisTypeDiscountTypes.includes(def.weaponType) ? chrisTypeDiscount : 0), 0),
+      damage: (def?.damage ?? 0) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
+      ammoReq: exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,
     };
@@ -177,8 +187,8 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number }): ExploreOutcome {
-  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier } = params;
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number }): ExploreOutcome {
+  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
 
@@ -226,6 +236,18 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
       if (effect.kind === 'onRevealHealthPenaltyIfMultipleWeapons') {
         if (weapons.length >= effect.count) {
           effectiveHp -= effect.amount;
+        }
+      }
+      // --- Mercenaries reveal effects ---
+      if (effect.kind === 'onRevealPlusHpPerSameNameAttached') {
+        effectiveHp += effect.amount * (sameNameAttachedCount ?? 0);
+      }
+      if (effect.kind === 'onRevealPlusHpPerAttachedToExploring') {
+        effectiveHp += effect.amount * count;
+      }
+      if (effect.kind === 'onRevealDamagePenaltyIfCharacterXpAtLeast') {
+        if ((characterXp ?? 0) >= effect.threshold) {
+          boostedAttack -= effect.amount;
         }
       }
     }
