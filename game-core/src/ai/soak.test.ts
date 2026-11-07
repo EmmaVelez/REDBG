@@ -4,6 +4,7 @@ import type { SimResult } from './sim';
 import { SCENARIOS, cardsForScenario, pilesForScenario } from '../data/cards';
 import type { ScenarioId } from '../data/cards';
 import { checkWin } from '../engine/game';
+import { MAX_INFECTION_LEVEL } from '../engine/actions';
 import type { GameState } from '../types';
 
 /**
@@ -19,7 +20,7 @@ import type { GameState } from '../types';
  *   dealt the same `am-001#1`), which made `state.cards` unable to name three
  *   of the four physical cards.
  * - SANITY: pools never negative, HP within [0, maxHp], activeSeat in range,
- *   Outbreak infection levels within 0..3.
+ *   Outbreak infection levels within 0..MAX_INFECTION_LEVEL.
  * - TERMINATION: the reported `ended` agrees with the engine's own win check,
  *   and most games finish naturally instead of hitting the action cap.
  *
@@ -36,7 +37,7 @@ const MAX_ACTIONS = 4000;
 function zoneInstanceIds(state: GameState): string[] {
   const ids: string[] = [];
   for (const seat of state.seats) {
-    ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached);
+    ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached, ...(seat.infectionCards ?? []));
   }
   for (const pile of Object.values(state.marketPiles)) ids.push(...pile.cards);
   ids.push(...state.mansionDeck, ...state.mansionBottom);
@@ -102,7 +103,10 @@ function assertSane(state: GameState, scenario: ScenarioId): void {
     expect(Array.isArray(state.infectionDeck), 'outbreak has an Infection Deck').toBe(true);
     for (const seat of state.seats) {
       const level = (seat.infectionCards ?? []).length;
-      expect(level, `seat ${seat.seat} infection level in 0..3`).toBeLessThanOrEqual(3);
+      // Rulebook: "All Characters have a Maximum Infection Level of 10."
+      // (This bound used to be a heuristic 0..3; seed 16 at the pre-dedup HEAD
+      //  already reached 7, so it was a latent flake rather than a rule.)
+      expect(level, `seat ${seat.seat} infection level in 0..${MAX_INFECTION_LEVEL}`).toBeLessThanOrEqual(MAX_INFECTION_LEVEL);
     }
   }
 }

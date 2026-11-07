@@ -2,10 +2,20 @@
 
 ## Pitfall: Duplicate IDs in expansion cards
 
-Expansion cards often re-use base game names (Alliance "Combat Knife" matches Premier's). DO NOT implement both; verify whether intentional or wiki transcription error:
-- **Correct**: Same ID is a data deduplication rule — `alliance.ts` lists Alliance cards first so setup takes the alliance version for we-004/we-005 etc.
-- **Wrong**: Two different card IDs in the same set = bug
-- **Action**: Grep all card arrays for id duplicates before commit. Use `ALLIANCE_CARDS` entries that override `PREMIER_CARDS` entries for shared IDs (setup stops at first match). Test pile construction counts to catch missing/duplicate cards before runtime.
+Every card id in the database must be UNIQUE. `ALL_CARDS` is built as
+`[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...OUTBREAK_CARDS, ...MERCENARIES_CARDS, ...NIGHTMARE_CARDS]`
+and `setup()` builds `defsById`/`cardDefs` with a plain object/Map assignment, so
+when two files declare the same id the LAST one wins — a later, emptier
+definition silently shadows the real card (this is how Alliance `we-015` lost its
+"+30 damage" effect, and how the Outbreak mansion served Nightmare bosses).
+- **Correct**: one definition per id. Re-prints of a base card keep the original
+  (Premier) definition; do not add a second copy in the expansion file.
+- **Wrong**: two different cards sharing an id. If the official numbering really
+  does collide (Outbreak MA-054..057 vs Nightmare MA-054..057), disambiguate with
+  an explicit suffix (`ma-054o`..`ma-057o`) rather than letting one shadow the other.
+- **Action**: Grep all card arrays for id duplicates before commit
+  (`new Set(ALL_CARDS.map(c => c.id)).size === ALL_CARDS.length`). Test pile
+  construction counts to catch missing/duplicate cards before runtime.
 
 ## Pitfall: Effect kind consistency (tsc errors)
 

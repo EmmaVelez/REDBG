@@ -303,6 +303,13 @@ describe('Outbreak mode', () => {
     expect(pr(done).payload?.kind).toBe('injectionTrash');
     const trashed = applyAction(done, { type: 'chooseOption', seat: 0, promptId: pr(done).id, option: 0 });
     expect(trashed.seats[0]!.infectionCards).toHaveLength(2);
+    // Regression: the Injection prompt must carry the played card's instance id.
+    // Without it the card was never trashed, '' was pushed onto `removed`, and
+    // the infection card that left the face-up pile vanished from every zone.
+    expect(trashed.seats[0]!.playArea).not.toContain('ac-026#1');
+    expect(trashed.removed).toContain('ac-026#1');
+    expect(trashed.removed).not.toContain('');
+    expect(trashed.infectionDeck).toContain('in-001#3');
   });
 
   test('AC-029 Parting Ways: +1 action, trash a card, then gain a Resource card', () => {

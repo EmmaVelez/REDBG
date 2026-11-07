@@ -374,10 +374,10 @@ export const OUTBREAK_MANSION: ReadonlyArray<{ cardId: string; count: number }> 
   { cardId: 'ma-051', count: 3 },
   { cardId: 'ma-052', count: 2 },
   { cardId: 'ma-053', count: 1 },
-  { cardId: 'ma-054', count: 1 },
-  { cardId: 'ma-055', count: 2 },
-  { cardId: 'ma-056', count: 1 },
-  { cardId: 'ma-057', count: 1 },
+  { cardId: 'ma-054o', count: 1 },
+  { cardId: 'ma-055o', count: 2 },
+  { cardId: 'ma-056o', count: 1 },
+  { cardId: 'ma-057o', count: 1 },
 ];
 
 export const OUTBREAK_SCENARIO_DEF = {

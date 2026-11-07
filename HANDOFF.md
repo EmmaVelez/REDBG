@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~08:20):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅ commit `974540a`. Nightmare (50 cards) ✅ — data + engine + scenario, all 50 cards implemented, new `engine/nightmare.test.ts` (55 tests).** Suites: **game-core 658, server 131, client 96** — all green, typecheck clean, client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found). Coder model: `qwen2.5-coder:14b` on Ollama (localhost:11434), FULL store at `F:\ollama\models` (C: was 100% full — see below).
+**Current state (2026-11-07 ~10:15):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** Suites: **game-core 658, server 96, client 131** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
 
 **M5-T03/T04 found and fixed 7 real defects** (all with regression tests):
 1. reconnect replaced the `byClient` routing entry but left the old socket alive — a stale socket could act as the player and mark them disconnected on close.
@@ -119,8 +119,48 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
    and the reachable unconsumed effects `we-028 Stun Rod`
    (`moveLowHpInfectedToMansionTop`), `in-002 Virulent Frenzy`, `in-004 Slough Armor`.
 
+## Duplicate card-id resolution (2026-11-07)
+
+**Done:** every card id in the database is now unique — `ALL_CARDS` is 304 cards,
+0 duplicates (was 345 records / 41 duplicate ids).
+
+- `data/alliance.ts` carried 41 transcriptions that are not Alliance cards:
+  the Premier-only weapons (we-001..we-016 minus the Alliance's own re-prints
+  we-004/005/009/010), the Outbreak/Nightmare/Mercenaries weapons
+  (we-027..we-048), and it-005/006/007/009/050. All removed. The file now holds
+  only canonical Alliance cards (CH-011..020, WE-017..025, AC-013..022,
+  MA-022..040, IT-004, AM-004); the shared basic-resource ids resolve to the
+  Premier definitions.
+- Verified against the wiki's Alliance box layout + the RE DBG Master Card List
+  (Scribd 667052640): Alliance weapons = WE-004/005/009/010 (re-prints) +
+  WE-017..025; items = IT-001 (re-print) + IT-004.
+- **Outbreak MA-054..057 vs Nightmare MA-054..057 is a genuine official numbering
+  collision** (the master list prints both). The Outbreak items/events (Kevlar
+  Jacket, Antivirus, Laser Trap, Rock Trap) are now `ma-054o`..`ma-057o`; the
+  Nightmare infected keep the bare numbers. Before this, last-wins meant the
+  Outbreak mansion served Osmund Saddler / Bitores Mendez / Regenerator /
+  Jack Krauser instead.
+- The shadowing this removed had been silently dropping real effects: Alliance
+  `we-015` Bolt-Action Rifle lost its "+30 damage" gate and `we-008` Rocket
+  Launcher lost "trash after use" in every expansion scenario.
+
+**Three real defects the rename exposed (all fixed, with tests):**
+1. AC-026 Injection's `injectionTrash` prompt carried no `instanceId`, and the
+   follow-up `injectionDiscard` prompt dropped it — the card was never trashed,
+   `''` was pushed onto `removed`, and the infection card leaving the face-up
+   pile vanished from every zone.
+2. Attack / counter-damage HP was subtracted unclamped (`hp: target.hp - damage`),
+   so HP went negative; all three sites now go through `applyHpLoss`.
+3. The soak's conservation `zoneInstanceIds` ignored `seat.infectionCards`, and
+   its infection-level bound was an arbitrary 0..3 (the pre-dedup HEAD already
+   reached 7 on seed 16); both corrected to the rulebook max of 10.
+
+**Still open (pre-existing, not caused by the dedup):** the downed/revive
+mechanic is not wired into the damage path — `flipDown` is imported into
+actions.ts but never called, so a character at 0 HP keeps taking turns.
+
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Mercenaries effects commit (`974540a`).
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect a clean tree at the duplicate-id resolution commit.
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.

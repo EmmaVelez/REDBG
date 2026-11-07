@@ -2705,7 +2705,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           const newTarget: PlayerState = {
             ...target,
-            hp: target.hp - damage,
+            hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, damage, target.downed || target.dead),
             infectionCards: targetInfectionCards,
             ...targetFlags,
           };
@@ -2720,7 +2720,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           };
           // An Infected Character that survives deals its base Damage back.
           if (targetSurvives && target.isInfectedCharacter === true) {
-            finalPlayer = { ...finalPlayer, hp: finalPlayer.hp - (targetDef?.baseDamage ?? 0) };
+            finalPlayer = { ...finalPlayer, hp: applyHpLoss(characterAbilities(state, seat), finalPlayer.hp, targetDef?.baseDamage ?? 0, finalPlayer.downed || finalPlayer.dead) };
           }
           // CH-031 Zombie A: when this infected character attacks, all other
           // non-infected characters that are not being attacked take damage.
@@ -3483,7 +3483,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat
-            ? { ...player, hp: player.hp - dmg, exploresLeft: player.exploresLeft + 1 }
+            ? { ...player, hp: applyHpLoss(characterAbilities(state, seat), player.hp, dmg, player.downed || player.dead), exploresLeft: player.exploresLeft + 1 }
             : s)),
           prompts: newPrompts,
         };
@@ -3654,7 +3654,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               seat,
               text: 'You may trash Injection to decrease your Infection Level by 1.',
               options: ['Trash for -1 Infection', 'Decline'],
-              payload: { kind: 'injectionTrash' },
+              payload: { kind: 'injectionTrash', instanceId },
             }],
           };
         }
@@ -3670,7 +3670,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seat,
             text: 'Discard any number of cards from your hand, then draw the same amount.',
             options: [...remaining, 'DONE'],
-            payload: { kind: 'injectionDiscard', count: String(count + 1) },
+            payload: { kind: 'injectionDiscard', instanceId, count: String(count + 1) },
           }],
         };
       }
@@ -3680,6 +3680,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         const lvl = player.infectionCards?.length ?? 0;
+        // Trashing Injection lowers the Infection Level by 1: the top infection
+        // card leaves the face-up pile and goes back to the Infection Deck
+        // (rulebook: "Level decreases, move 1 of the ... Infection Deck").
+        const removedInfection = lvl > 0 ? (player.infectionCards ?? [])[lvl - 1] : undefined;
         const after: GameState = {
           ...state,
           ...nextBase,
@@ -3690,6 +3694,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 infectionCards: lvl > 0 ? (player.infectionCards ?? []).slice(0, -1) : [],
               }
             : s)),
+          ...(state.infectionDeck !== undefined && removedInfection !== undefined
+            ? { infectionDeck: [...(state.infectionDeck ?? []), removedInfection] }
+            : {}),
           removed: [...state.removed, instanceId],
           prompts: newPrompts,
         };
