@@ -28,7 +28,7 @@ export interface LobbyProps {
   readonly onSetSkillSystem: (skillSystem: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -65,11 +65,12 @@ function ScenarioDropdown(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
+  const [skillSystem, setSkillSystem] = useState(false);
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -81,6 +82,15 @@ function PassAndPlay(props: {
       <h2 className="lobby-section">Pass &amp; Play (this device)</h2>
       <p className="lobby-hint">No room or server needed — everyone shares this screen.</p>
       <ScenarioDropdown value={scenario} onChange={setScenario} />
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={skillSystem}
+          onChange={e => setSkillSystem(e.target.checked)}
+          data-testid="hotseat-skill-system-toggle"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
+      </label>
       <div className="passandplay-count">
         {[2, 3, 4].map(n => (
           <button
@@ -109,7 +119,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario)}
+        onClick={() => props.onStart(effective, scenario, skillSystem)}
       >
         Start pass &amp; play
       </button>

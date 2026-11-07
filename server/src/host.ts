@@ -9,6 +9,7 @@ import {
   pilesForScenario,
   SCENARIOS,
   cardsForScenario,
+  seatAwaitingAction,
 } from '@re/game-core';
 import type { Action, GameState, PlayerView, BotDifficulty } from '@re/game-core';
 import type { PlayerInfo } from './protocol';
@@ -83,7 +84,7 @@ export function createHost(room: Room): GameHost {
         throw new Error('no seated players');
       }
       const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
-      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak', skillSystem: room.skillSystem }, cardsForScenario(room.scenario), pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak', skillSystem: room.skillSystem }, cardsForScenario(room.scenario, { skillSystem: room.skillSystem }), pilesForScenario(room.scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
       return state;
     },
 
@@ -125,13 +126,14 @@ export function createHost(room: Room): GameHost {
       if (checkWin(state).gameOver) {
         return undefined;
       }
-      const active = state.seats[state.activeSeat];
-      if (active === undefined) return undefined;
-      const sitter = room.players.find(p => p.seat === active.seat);
+      // During the opening Skill Draft the waiting seat is the draft's
+      // pick/keep seat, not activeSeat (which stays 0 until the draft ends).
+      const seat = seatAwaitingAction(state);
+      const sitter = room.players.find(p => p.seat === seat);
       if (sitter === undefined || !sitter.isBot) {
         return undefined;
       }
-      const action = chooseBotAction(state, state.activeSeat, difficulty, () => 0.5);
+      const action = chooseBotAction(state, seat, difficulty, () => 0.5);
       let next = applyAction(state, action);
       if (action.type === 'endTurn') {
         next = startTurn(next);

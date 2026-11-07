@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import type { ServerMessage, RoomSnapshot, ClientMessage } from '@re/server';
 import type { PlayerView, GameState, Action, ScenarioId } from '@re/game-core';
+import { seatAwaitingAction } from '@re/game-core';
 import type { ConnectionStatus, GameSocket } from './net/ws';
 import { createHotseatGame, applyHotseatAction, hotseatView } from './hotseat';
-import type { HotseatResult } from './hotseat';
+import type { HotseatResult, HotseatOptions } from './hotseat';
 
 /**
  * M4-T02: client store fed by server state.
@@ -50,7 +51,7 @@ export interface GameStore extends GameStoreState {
   readonly handleServerMessage: (msg: ServerMessage) => void;
   readonly dispatch: (msg: ClientMessage, opts?: { readonly silent?: boolean }) => boolean;
   readonly bindSocket: (socket: GameSocket) => void;
-  readonly startHotseat: (names: readonly string[], seed: number, scenario?: ScenarioId) => void;
+  readonly startHotseat: (names: readonly string[], seed: number, scenario?: ScenarioId, opts?: HotseatOptions) => void;
   readonly hotseatAction: (action: Action) => void;
   /** The new holder taps the pass screen: reveal their hand, unpause. */
   readonly continuePass: () => void;
@@ -133,8 +134,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socketForDispatch = socket;
     socket.connect();
   },
-  startHotseat: (names, seed, scenario = 'firstTimer') => {
-    const game = createHotseatGame(names, seed, scenario);
+  startHotseat: (names, seed, scenario = 'firstTimer', opts = {}) => {
+    const game = createHotseatGame(names, seed, scenario, opts);
     const viewerSeat = game.activeSeat;
     set({
       hotseat: { names, seed, scenario, game, viewerSeat, passPending: false },
@@ -165,7 +166,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // After endTurn the active seat advanced: the device must be passed
     // before the next player may reveal their hand. Everything else (plays,
     // buys, explores) keeps the same viewer.
-    const passPending = game.activeSeat !== hs.viewerSeat && !result.gameOver;
+    // During the opening Skill Draft the device passes to the draft's
+    // pick/keep seat, not the active seat (which stays 0 until the draft ends).
+    const holderSeat = seatAwaitingAction(game);
+    const passPending = holderSeat !== hs.viewerSeat && !result.gameOver;
     set({
       hotseat: { ...hs, game, passPending },
       view: passPending ? s.view : hotseatView(game, hs.viewerSeat),
@@ -177,7 +181,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const s = get();
     const hs = s.hotseat;
     if (hs === null) return;
-    const viewerSeat = hs.game.activeSeat;
+    const viewerSeat = seatAwaitingAction(hs.game);
     set({
       hotseat: { ...hs, viewerSeat, passPending: false },
       view: hotseatView(hs.game, viewerSeat),

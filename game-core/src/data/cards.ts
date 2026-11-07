@@ -641,8 +641,18 @@ export function isExpansionScenario(id: ScenarioId): boolean {
  * to live as a duplicated inline copy in both the server and the client.
  * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
  */
-export function cardsForScenario(id: ScenarioId): ReadonlyArray<CardDef> {
-  return isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
+export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean }): ReadonlyArray<CardDef> {
+  const base = isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
+  if (opts?.skillSystem !== true) {
+    return base;
+  }
+  // The Mercenaries Skill System is a Game Modification available on ANY
+  // scenario (Manny ruling 2026-11-06), so its 30 Skill cards must be present
+  // even when the scenario's own list is the base set. Only the Skill cards are
+  // added — the rest of the Mercenaries set is expansion content, not part of
+  // the modification. Ids already present (an expansion scenario) are skipped.
+  const known = new Set(base.map(c => c.id));
+  return [...base, ...MERCENARIES_CARDS.filter(c => c.type === 'skill' && !known.has(c.id))];
 }
 
 export const MANSION_EXTRA_ITEM_IDS: readonly string[] = ['it-002'];

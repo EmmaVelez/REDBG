@@ -497,6 +497,13 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     return baseState;
   }
 
+  // Safety net: the Skill System is a Game Modification that needs its own
+  // cards. If the caller did not include them the draft would deal empty hands
+  // and the game would deadlock in the skillDraft phase with nothing to answer.
+  if (skillIds.length === 0) {
+    return baseState;
+  }
+
   const seatCount = drawnHands.length;
   const hands = {} as Record<number, string[]>;
   let offset = 0;

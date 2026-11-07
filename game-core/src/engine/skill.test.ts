@@ -3,7 +3,7 @@ import type { CardInstance, GameState } from '../types';
 import { setup, startTurn } from './game';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
-import { FIRST_TIMER_PILES, STANDARD_MANSION_DECK, PREMIER_CARDS, pilesForScenario, MERCENARIES_MANSION } from '../data/cards';
+import { FIRST_TIMER_PILES, STANDARD_MANSION_DECK, PREMIER_CARDS, pilesForScenario, MERCENARIES_MANSION, cardsForScenario } from '../data/cards';
 import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { isSkillActive, activeSkillEffects, skillDamageReduction, consumeNegateDamage, consumeInfectedEffectReaction } from './skill';
 
@@ -285,5 +285,35 @@ describe('Mercenaries Skill System + Partner Modification', () => {
     // The second kept Skill belongs to the partner Character.
     expect(s.seats[0]?.partnerSkillId).toBe(s.seats[0]?.skills?.[1]);
     expect(s.seats[1]?.partnerSkillId).toBe(s.seats[1]?.skills?.[1]);
+  });
+});
+
+describe('Skill System card availability (any scenario)', () => {
+  it('cardsForScenario adds the 30 Skill cards when skillSystem is on', () => {
+    const cards = cardsForScenario('firstTimer', { skillSystem: true });
+    expect(cards.filter(c => c.type === 'skill')).toHaveLength(30);
+    // The base scenario's own cards are untouched.
+    expect(cards).toHaveLength(PREMIER_CARDS.length + 30);
+    // No skill card is duplicated when the scenario already carries them.
+    const expansion = cardsForScenario('mercenaries', { skillSystem: true });
+    const skillIds = expansion.filter(c => c.type === 'skill').map(c => c.id);
+    expect(new Set(skillIds).size).toBe(skillIds.length);
+  });
+
+  it('a base scenario + skillSystem starts the draft (the real server flow)', () => {
+    const s = setup(makeSetup(), cardsForScenario('firstTimer', { skillSystem: true }), FIRST_TIMER_PILES, STANDARD_MANSION_DECK);
+    expect(s.phase).toBe('skillDraft');
+    expect(s.skillDraft?.hands[0]).toHaveLength(5);
+    expect(s.skillDraft?.hands[1]).toHaveLength(5);
+    expect(s.prompts[0]?.payload?.kind).toBe('skillDraftPick');
+  });
+
+  it('does not deadlock when the Skill cards are absent from the card list', () => {
+    // Safety net: the caller forgot to include the Skill cards. The game must
+    // still start (main phase, no prompts) rather than lock in skillDraft.
+    const s = setup(makeSetup(), PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK);
+    expect(s.phase).toBe('main');
+    expect(s.prompts).toHaveLength(0);
+    expect(validateAction(s, { type: 'endTurn', seat: 0 }).ok).toBe(true);
   });
 });

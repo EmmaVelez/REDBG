@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { ServerMessage, ClientMessage } from '@re/server';
 import type { CardDef, GameState } from '@re/game-core';
+import { seatAwaitingAction } from '@re/game-core';
 import { useGameStore } from './store';
 import { createGameSocket } from './net/ws';
 import { ActionBar } from './ui/ActionBar';
@@ -151,13 +152,18 @@ export function App(): JSX.Element {
         onSetSkillSystem={skillSystem => dispatchClient({ kind: 'setSkillSystem', skillSystem })}
         onSetCharacterSelection={(main?: string, partner?: string) => dispatchClient({ kind: 'setCharacterSelection', mainCharacterId: main, partnerCharacterId: partner })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
-        onStartHotseat={(names, scenario) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario)}
+        onStartHotseat={(names, scenario, skillSystem) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem })}
       />
     );
   }
   void inLobby;
 
   const gameState = view.state;
+  // Pass-and-play hand-off follows the seat the game is waiting on — the draft's
+  // pick/keep seat during the opening Skill Draft, the active seat afterwards.
+  // Read it from the authoritative hotseat game (the view is frozen while the
+  // device is being passed).
+  const hotseatHolder = hotseat !== null ? seatAwaitingAction(hotseat.game) : -1;
   const disabled =
     gameState.phase !== 'main' ||
     gameState.activeSeat !== mySeat ||
@@ -220,7 +226,7 @@ export function App(): JSX.Element {
       {passPending && hotseat !== null && (
         <SeatSwap
           mode="pass"
-          nextName={hotseat.names[gameState.activeSeat] ?? `Player ${gameState.activeSeat + 1}`}
+          nextName={hotseat.names[hotseatHolder] ?? `Player ${hotseatHolder + 1}`}
           onContinue={() => useGameStore.getState().continuePass()}
         />
       )}

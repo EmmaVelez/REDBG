@@ -6,6 +6,8 @@ import { createHost } from './host';
 import type { GameHost, HostResult } from './host';
 import { createRoomStore } from './rooms';
 import type { RoomStore } from './rooms';
+import { seatAwaitingAction } from '@re/game-core';
+import type { GameState } from '@re/game-core';
 
 /**
  * WebSocket game server (M3-T04). Wires the protocol to the room store and
@@ -136,9 +138,10 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
       if (state === undefined) return undefined;
       const room = roomStore.getRoom(roomCode);
       if (room === undefined) return undefined;
-      const activeSeat = state.seats[state.activeSeat]?.seat;
-      if (activeSeat === undefined) return undefined;
-      const sitter = room.players.find(p => p.seat === activeSeat);
+      // During the opening Skill Draft the waiting seat is the draft's
+      // pick/keep seat; activeSeat stays 0 until the draft ends.
+      const seat = seatAwaitingAction(state);
+      const sitter = room.players.find(p => p.seat === seat);
       if (sitter === undefined || !sitter.isBot) return undefined; // human or no one: stop
       const result = host.stepBot(Math.floor(random() * 2 ** 31), 'hard');
       if (result === undefined || !result.ok) return undefined;

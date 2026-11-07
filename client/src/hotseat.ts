@@ -35,7 +35,12 @@ export type HotseatResult =
       readonly winners: readonly [];
     };
 
-export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer'): GameState {
+export interface HotseatOptions {
+  /** Mercenaries Skill System (a Game Modification, available on any scenario). */
+  readonly skillSystem?: boolean;
+}
+
+export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
   if (names.length < 2 || names.length > 4) {
     throw new Error(`pass-and-play needs 2-4 players, got ${names.length}`);
   }
@@ -45,7 +50,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak' }, cardsForScenario(scenario), pilesForScenario(scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem }, cardsForScenario(scenario, { skillSystem: opts.skillSystem }), pilesForScenario(scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

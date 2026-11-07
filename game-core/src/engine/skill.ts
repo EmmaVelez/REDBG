@@ -137,6 +137,20 @@ export function draftPrompt(state: GameState): Prompt | undefined {
 }
 
 /**
+ * The seat whose choice the game is currently waiting on: the draft's
+ * pick/keep seat during the opening Skill Draft (`activeSeat` stays 0 until
+ * the draft finishes), otherwise the active seat. Bot stepping and the
+ * pass-and-play hand-off both key off this.
+ */
+export function seatAwaitingAction(state: GameState): number {
+  const draft = state.skillDraft;
+  if (draft !== undefined) {
+    return draft.step === 'pick' ? draft.pickSeat : draft.keepSeat;
+  }
+  return state.activeSeat;
+}
+
+/**
  * Advance the draft after a pick/keep choice. `state` must already carry the
  * resolved prompt's removal and the bumped version/log (i.e. `nextBase`).
  * Returns the state with the next draft prompt appended.

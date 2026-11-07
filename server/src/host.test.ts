@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRoomStore } from './rooms';
 import { createHost } from './host';
-import { sanitize, pilesForScenario } from '@re/game-core';
+import { sanitize, pilesForScenario, seatAwaitingAction } from '@re/game-core';
 import type { GameState } from '@re/game-core';
 
 const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -165,6 +165,46 @@ describe('createHost', () => {
     expect(botResult).toBeDefined();
     if (botResult === undefined) return;
     expect(botResult.ok).toBe(true);
+  });
+});
+
+describe('Skill Draft with bots', () => {
+  it('bot seats are stepped through the whole draft instead of stalling it', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('h1', 'Human', 'firstTimer', false, undefined, undefined, true);
+    store.addBot(room.roomCode, 'h1', 1);
+    store.addBot(room.roomCode, 'h1', 2);
+    const latest = store.getRoom(room.roomCode) as NonNullable<ReturnType<typeof store.getRoom>>;
+    const host = createHost(latest);
+
+    let state = host.start(11);
+    expect(state.phase).toBe('skillDraft');
+    expect(state.prompts[0]?.payload?.kind).toBe('skillDraftPick');
+    expect(state.prompts[0]?.seat).toBe(0);
+
+    // Alternate: step every bot seat, answer every human prompt.
+    let guard = 0;
+    while (state.phase === 'skillDraft' && guard++ < 500) {
+      const waiting = seatAwaitingAction(state);
+      const sitter = latest.players.find(p => p.seat === waiting);
+      if (sitter?.isBot === true) {
+        const r = host.stepBot(11);
+        if (r === undefined || !r.ok) break;
+        state = r.state;
+        continue;
+      }
+      const prompt = state.prompts.find(p => p.seat === waiting);
+      if (prompt === undefined) break;
+      const r = host.apply('h1', { type: 'chooseOption', seat: waiting, promptId: prompt.id, option: 0 });
+      if (!r.ok) break;
+      state = r.state;
+    }
+
+    expect(state.phase).toBe('main');
+    expect(state.skillDraft).toBeUndefined();
+    expect(state.seats[0]?.skills).toHaveLength(3);
+    expect(state.seats[1]?.skills).toHaveLength(3);
+    expect(state.seats[2]?.skills).toHaveLength(3);
   });
 });
 
