@@ -1,6 +1,6 @@
 # HANDOFF — resume here
 
-**Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T04.** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 706, server 96, client 135** — all green, typecheck clean (3 workspaces), client build OK, soak green. **Next: M5-T05 — rules verification checklist vs the official FAQ** (needs Manny's rulings on any gaps found).
+**Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 707, server 96, client 135** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
 
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
@@ -58,7 +58,7 @@ Model inventory: gemma4:e4b (active coder), qwen2.5-coder:14b, qwen3.8:27b, qwen
 - **M4 COMPLETE** — `client/` (Vite + React + TS): ws client w/ auto-reconnect, zustand store, CardView/Hand/Zones/Board/PlayerPanel/ActionBar/Lobby/GameLog, hotseat mode, animations, HealthRing, CharacterSkills. 126 client tests.
 - **Expansion sets COMPLETE** — Nightmare / Alliance / Outbreak card data + engine behaviour for all 47 characters (see ABILITY_AUDIT.md; 16 effect kinds still have zero engine refs).
 - **gainCard refactor COMPLETE** — `engine/gainCard.ts` is the single writer of gained instances; buy/token/ability/explore gains all route through it; AC-021 Gathering Forces implemented; `gainedCardsGoToHand` typed on PlayerState.
-- **M5 NEXT**: hardening & release (PLAN.md is scope authority) — README + run scripts, production build verification, reconnect torture test, deploy smoke test.
+- **M5 COMPLETE (T01–T05)**: README + run scripts, production build + deploy smoke test, reconnect torture test, full-game bot soak + engine fixes, official FAQ verification checklist (FAQ-3 fixed per ruling). Release-ready.
 
 ## Harness facts baked into tools/
 - orchestrate.py gate: coder -> tsc -> vitest -> feedback-retry (max 3) -> git commit + LEDGER. coder.py: DEFAULT_MODEL = "gemma4:e4b", timeout 1800s, num_predict 16384, num_ctx 32768.
@@ -308,5 +308,5 @@ engine are unused union members in `types.ts`
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
 2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect a clean tree at the downed/revive wiring commit.
-3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
+3. M5-T05 DONE (commit 0083419): FAQ checklist at `docs/rules/FAQ-VERIFICATION.md`. FAQ-3 (Gatling Gun Majini) was a gap — the engine boosted the player's damage instead of the Infected's attack; Manny ruled Infected's attack, and `resolveExplore`/`resolveMultiExplore` now add it to `boostedAttack`/`atk` (regression tests in `explore.test.ts`).
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
