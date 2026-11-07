@@ -519,6 +519,10 @@ export interface PlayerState {
   readonly xp?: number;
   /** Mercenaries Skill System: Skill cards in the Skill Area (instance ids. */
   readonly skills?: readonly string[];
+  /** Mercenaries + Partner Modification: the single Skill assigned to the
+   *  partner Character ("each Character a Player controls can only have 1
+   *  Skill"). Absent when the partner holds no Skill or partner mode is off. */
+  readonly partnerSkillId?: string;
   /** Mercenaries: explore-time "can" Skills declared this turn (consumed by the
    *  next explore, then cleared). */
   readonly pendingSkillEffects?: readonly PendingSkillEffect[];
@@ -545,7 +549,14 @@ export type PendingSkillEffect =
   | { readonly kind: 'giantKillingAllWeaponsPlusDamage'; readonly amount: number }
   | { readonly kind: 'reversalBonusPerCharacterDamage' }
   | { readonly kind: 'duplicateWeaponEffect'; readonly weaponInstanceId: string }
-  | { readonly kind: 'removeXpForWeaponDamage'; readonly weaponInstanceId: string; readonly amount: number };
+  | { readonly kind: 'removeXpForWeaponDamage'; readonly weaponInstanceId: string; readonly amount: number }
+  // Reactive Mercenaries Skills (SK-008 Luck LV.2, SK-010 Toughness LV.1,
+  // SK-012 Toughness LV.3). The engine cannot interrupt a resolved combat, so
+  // these are DECLARED during the player's turn (useSkill) and consumed by the
+  // next qualifying event; the Skill's XP is removed when the reaction fires.
+  | { readonly kind: 'negateNextDamage'; readonly skillInstanceId: string }
+  | { readonly kind: 'negateNextInfectedEffect'; readonly skillInstanceId: string }
+  | { readonly kind: 'redirectNextInfectedEffect'; readonly skillInstanceId: string; readonly targetSeat: number };
 
 /** Mercenaries opening draft: 5 cards each, pick 1 and pass left for 5 rounds,
  *  then keep 3 of the 5 chosen. Driven entirely by chooseOption prompts. */
@@ -566,10 +577,13 @@ export interface SkillDraftState {
   readonly step: 'pick' | 'keep';
   /** Seat whose keep-pick is pending. */
   readonly keepSeat: number;
-  /** How many cards the current keep seat has already kept (0..3). */
+  /** How many cards the current keep seat has already kept (0..keepTarget). */
   readonly keepPicks: number;
   /** Final kept cards per seat (filled during the keep step). */
   readonly final: Readonly<Record<number, readonly string[]>>;
+  /** Cards to keep: 3 normally, 2 with the Partner Modification ("each
+   *  Character a Player controls can only have 1 Skill"). */
+  readonly keepTarget: number;
 }
 
 export interface GameState {

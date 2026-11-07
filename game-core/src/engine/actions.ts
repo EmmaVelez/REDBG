@@ -40,7 +40,7 @@ import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
 import { makeRng, shuffle } from '../util/rng';
 
-import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard } from './skill';
+import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -945,12 +945,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
       // MA-037 Guardian of Insanity: on reveal, each character takes 10 damage.
       // MA-031 Proto Tyrant: on reveal, non-exploring chars with 50+ HP take 40.
+      // SK-008 Luck LV.2 can negate either for the seats that armed it.
       let revealHpDelta: Record<number, number> = {};
       if (revealedDef?.id === 'ma-037') {
-        state = { ...state, seats: state.seats.map(s => ({ ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 10, s.downed || s.dead) })) };
+        for (const s of state.seats) {
+          const neg = consumeNegateDamage(state, s.seat);
+          state = neg.state;
+          if (neg.negated) continue;
+          const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 10, s.downed || s.dead);
+          state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
+        }
       }
       if (revealedDef?.id === 'ma-031') {
-        state = { ...state, seats: state.seats.map(s => (s.seat === seat || (s.hp ?? 0) < 50) ? s : { ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 40, s.downed || s.dead) }) };
+        for (const s of state.seats) {
+          if (s.seat === seat || (s.hp ?? 0) < 50) continue;
+          const neg = consumeNegateDamage(state, s.seat);
+          state = neg.state;
+          if (neg.negated) continue;
+          const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, 40, s.downed || s.dead);
+          state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
+        }
       }
 
       let mansionDeck = rev.mansion.deck;
@@ -1206,14 +1220,29 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         infectionBySeat.set(seatIdx, arr);
       };
+      // Mercenaries Toughness LV.1 / LV.3: a declared reaction negates or
+      // redirects this Infected's effect(s) away from this Character.
+      const infectedReaction = consumeInfectedEffectReaction(state, seat);
+      state = infectedReaction.state;
+      const infectedEffectNegated = infectedReaction.negated;
+      const infectedEffectRedirectSeat = infectedReaction.redirectSeat;
+      /** The seat an Infected effect should actually affect. */
+      const infectedEffectSeat = (): number => infectedEffectRedirectSeat ?? seat;
       if (revealedDef?.type === 'infected') {
         for (const e of revealedDef.infectedEffects ?? []) {
           if (e.kind === 'onRevealInfectionIncrease') {
-            const lvl = infectionBySeat.get(seat)?.length ?? 0;
-            drawInfectionsFor(seat, lvl <= e.threshold ? e.lowAmount : e.highAmount);
+            if (infectedEffectNegated) continue;
+            const targetSeat = infectedEffectSeat();
+            const lvl = infectionBySeat.get(targetSeat)?.length ?? 0;
+            drawInfectionsFor(targetSeat, lvl <= e.threshold ? e.lowAmount : e.highAmount);
           } else if (e.kind === 'onRevealAllInfectionIncrease') {
-            for (const s of state.seats) {
-              if (!s.dead) drawInfectionsFor(s.seat, e.amount);
+            if (infectedEffectNegated) continue;
+            if (infectedEffectRedirectSeat !== undefined) {
+              drawInfectionsFor(infectedEffectRedirectSeat, e.amount);
+            } else {
+              for (const s of state.seats) {
+                if (!s.dead) drawInfectionsFor(s.seat, e.amount);
+              }
             }
           }
         }
@@ -1227,7 +1256,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // attached - it goes to the bottom of the Mansion instead.
         let defeatedInfectionInc = 0;
         let defeatedToBottom = false;
-        if (revealedDef?.type === 'infected') {
+        if (revealedDef?.type === 'infected' && !infectedEffectNegated) {
           for (const e of revealedDef.infectedEffects ?? []) {
             if (e.kind === 'onDefeatInfectionIncrease') {
               defeatedInfectionInc += e.amount;
@@ -1235,7 +1264,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
           }
         }
-        drawInfectionsFor(seat, defeatedInfectionInc);
+        if (!infectedEffectNegated) {
+          drawInfectionsFor(infectedEffectSeat(), defeatedInfectionInc);
+        }
         const decorations = player.decorations + (revealedDef.decorations ?? 0);
         const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
           activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
@@ -1257,14 +1288,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId],
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 };
-        const hasSkip = revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false;
-        const hasNoActions = revealedDef?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false;
+        const hasSkip = !infectedEffectNegated && (revealedDef?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
+        const hasNoActions = !infectedEffectNegated && (revealedDef?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false);
         const defeatPrompts = (hasSkip || hasNoActions)
           ? [...state.prompts, {
               id: 'p' + (state.prompts.length + 1),
               seat,
-              text: 'Choose a player.',
-              options: state.seats.filter(s => !s.dead).map(s => String(s.seat)),
+              text: infectedEffectRedirectSeat !== undefined
+                ? `This Infected's effect is redirected to ${state.seats[infectedEffectRedirectSeat]?.name ?? 'another Player'}.`
+                : 'Choose a player.',
+              options: infectedEffectRedirectSeat !== undefined
+                ? [String(infectedEffectRedirectSeat)]
+                : state.seats.filter(s => !s.dead).map(s => String(s.seat)),
               payload: { kind: hasSkip ? 'skipNextTurn' : 'noActionsNextTurn' },
             }]
           : state.prompts;
@@ -1331,11 +1366,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Mercenaries: Toughness LV.2 (-10 all damage), Luck LV.1 (lethal hit
       // becomes 10 while at 20+ HP), Giant Killing LV.1 (40+ HP Infected deals 0).
       const damageSkillEffects = activeSkillEffects(state, seat);
+      // SK-008 Luck LV.2: a declared reaction negates this Damage entirely (the
+      // Skill's XP is removed as the printed cost).
+      const negateConsumption = consumeNegateDamage(state, seat);
+      state = negateConsumption.state;
       const skillReduction = skillDamageReduction(damageSkillEffects);
       const giantThreshold = skillGiantKillingThreshold(damageSkillEffects);
       const skillSuppressed = giantThreshold !== undefined && (revealedDef?.hp ?? 0) >= giantThreshold;
       const skillLethal = skillLethalReplacementAmount(damageSkillEffects);
-      const rawSkillDamage = skillSuppressed ? 0 : Math.max((outcome.damageTaken ?? 0) - skillReduction, 0);
+      const rawSkillDamage = (skillSuppressed || negateConsumption.negated)
+        ? 0
+        : Math.max((outcome.damageTaken ?? 0) - skillReduction, 0);
       const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
         ? skillLethal
         : rawSkillDamage;
@@ -1374,7 +1415,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'infected') {
         for (const e of revealedDef.infectedEffects ?? []) {
           if (e.kind === 'onNotDefeatedInfectionIncrease') {
-            drawInfectionsFor(seat, e.amount + e.perLevel * player.level);
+            if (infectedEffectNegated) continue;
+            drawInfectionsFor(infectedEffectSeat(), e.amount + e.perLevel * player.level);
           } else if (e.kind === 'onNotDefeatedShuffleBack') {
             const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
             mansionDeck = shuffled.deck;
@@ -1394,6 +1436,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         mansionBottom = bottomed.bottom;
       }
 
+      // Partner Modification: a partner reduced to 0 Health dies — its Skill
+      // and any XP on it are Removed from the Game.
+      const partnerDied = leadingIsPartner && newLeadingHp <= 0;
+      const afterPartnerDeath = partnerDied ? removePartnerSkill(state, seat) : state;
       const newPlayer: PlayerState = {
               ...player,
               hand,
@@ -1408,19 +1454,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               xp: (player.xp ?? 0) + 1,
               pendingSkillEffects: undefined,
               ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
+              ...(partnerDied
+                ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined }
+                : {}),
               downed,
               infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
             };
+      const removedFinal = partnerDied
+        ? [...removedAfter, ...afterPartnerDeath.removed.filter(id => !removedAfter.includes(id))]
+        : removedAfter;
 
       return {
-        ...state,
+        ...afterPartnerDeath,
         ...nextBase,
-        seats: state.seats.map(s => (
+        seats: afterPartnerDeath.seats.map(s => (
           s.seat === seat
             ? newPlayer
             : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] }
         )),
-        removed: removedAfter,
+        removed: removedFinal,
         mansionDeck,
         mansionBottom,
         rngState: currentRng,
@@ -2341,6 +2393,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const skillInstanceId = String(prompt.payload?.skillInstanceId ?? '');
         return resolveSkillXpAmount({ ...state, ...nextBase, prompts: newPrompts }, seat, skillInstanceId, weaponInstanceId, Number(chosenId));
       }
+      if (kind === 'skillRevealPistolsForExplore' && chosenId !== undefined) {
+        // SK-029 Handgun Technique LV.2: reveal N Pistols from hand -> +1 Explore.
+        if (chosenId !== 'Reveal') return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, exploresLeft: s.exploresLeft + 1 } : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'skillRedirectInfectedEffect' && chosenId !== undefined) {
+        // SK-012 Toughness LV.3: arm a reaction redirecting the next Infected
+        // effect to the chosen Player.
+        const skillInstanceId = String(prompt.payload?.skillInstanceId ?? '');
+        const targetSeat = Number(chosenId);
+        if (!Number.isInteger(targetSeat) || targetSeat === seat) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, pendingSkillEffects: [...(s.pendingSkillEffects ?? []), { kind: 'redirectNextInfectedEffect', skillInstanceId, targetSeat }] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
 
       if (kind === 'skipNextTurn' || kind === 'noActionsNextTurn') {
         const chosen = prompt.options[option];
@@ -2392,14 +2471,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (!remainingReactive && updatedState.pendingExplore) {
           const pe = updatedState.pendingExplore;
           const defeated = !!updatedState.flashGrenadeDefeatedInstanceId;
+          // SK-008 Luck LV.2: a declared reaction negates this Damage.
+          const neg = defeated ? { state: updatedState, negated: false } : consumeNegateDamage(updatedState, pe.seat);
+          const baseState = neg.state;
           const newPlayer = defeated
             ? { ...pe.newPlayer, decorations: pe.decorations, attached: [...pe.newPlayer.attached, pe.revealedInstanceId] }
-            : { ...pe.newPlayer, hp: applyHpLoss(characterAbilities(state, pe.seat), pe.newPlayer.hp, pe.damageTaken, pe.newPlayer.downed || pe.newPlayer.dead) };
+            : { ...pe.newPlayer, hp: applyHpLoss(characterAbilities(baseState, pe.seat), pe.newPlayer.hp, neg.negated ? 0 : pe.damageTaken, pe.newPlayer.downed || pe.newPlayer.dead) };
           return {
-            ...updatedState,
+            ...baseState,
             ...nextBase,
-            seats: updatedState.seats.map(s => (s.seat === pe.seat ? newPlayer : s)),
-            removed: defeated ? [...updatedState.removed, pe.revealedInstanceId] : updatedState.removed,
+            seats: baseState.seats.map(s => (s.seat === pe.seat ? newPlayer : s)),
+            removed: defeated ? [...baseState.removed, pe.revealedInstanceId] : baseState.removed,
             mansionDeck: pe.mansionDeck,
             mansionBottom: pe.mansionBottom,
             rngState: pe.rngState,

@@ -1,4 +1,4 @@
-import type { CardDef, GameState, PlayerState, Prompt, SkillDraftState, SkillEffect } from '../types';
+import type { CardDef, GameState, PlayerState, PendingSkillEffect, Prompt, SkillDraftState, SkillEffect } from '../types';
 import { makeRng, shuffle } from '../util/rng';
 import { drawWithReshuffle } from './deck';
 import { flipDown } from './characters';
@@ -56,14 +56,32 @@ export function activeSkillIds(state: GameState, seat: number): readonly string[
   return (player.skills ?? []).filter(id => isSkillActive(state, id));
 }
 
-/** Flattened effects of all active Skills for a seat. */
+/** True when the seat has an active SK-009 (Luck LV.3) among its Skills. */
+function hasCopyActivatedSkills(state: GameState, seat: number): boolean {
+  return activeSkillIds(state, seat).some(id => {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    return def?.type === 'skill' && (def.skillEffects ?? []).some(e => e.kind === 'copyActivatedSkills');
+  });
+}
+
+/** Flattened effects of all active Skills for a seat.
+ *
+ *  SK-009 Luck LV.3 ("This Skill is considered to have the same effect(s) as
+ *  your other activated Skills") is implemented as a stacking copy: the other
+ *  active Skills' effects are appended a second time, so a copied passive
+ *  (Toughness LV.2 -10 damage, Medic LV.1 +10 healing, ...) applies twice.
+ *  SK-009 itself contributes no effect of its own. */
 export function activeSkillEffects(state: GameState, seat: number): readonly SkillEffect[] {
   const out: SkillEffect[] = [];
   for (const id of activeSkillIds(state, seat)) {
     const inst = state.cards[id];
     const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
-    if (def?.skillEffects) out.push(...def.skillEffects);
+    if (def?.type !== 'skill') continue;
+    if ((def.skillEffects ?? []).some(e => e.kind === 'copyActivatedSkills')) continue;
+    if (def.skillEffects) out.push(...def.skillEffects);
   }
+  if (out.length > 0 && hasCopyActivatedSkills(state, seat)) out.push(...out);
   return out;
 }
 
@@ -108,10 +126,11 @@ export function draftPrompt(state: GameState): Prompt | undefined {
   }
   const kept = draft.kept[draft.keepSeat] ?? [];
   if (kept.length === 0) return undefined;
+  const keepTarget = draft.keepTarget;
   return {
     id: `skill-draft-keep-${draft.keepSeat}-k${draft.keepPicks}-v${state.version}`,
     seat: draft.keepSeat,
-    text: `Skill Draft — keep 3 of your 5 chosen Skills (${draft.keepPicks}/3 kept).`,
+    text: `Skill Draft — keep ${keepTarget} of your 5 chosen Skills (${draft.keepPicks}/${keepTarget} kept).`,
     options: [...kept],
     payload: { kind: 'skillDraftKeep' },
   };
@@ -177,7 +196,7 @@ export function advanceDraft(state: GameState, seat: number, chosenId: string): 
   let keepSeat = draft.keepSeat;
   let keepPicks = draft.keepPicks + 1;
   let done = false;
-  if (keepPicks >= 3) {
+  if (keepPicks >= draft.keepTarget) {
     keepSeat += 1;
     keepPicks = 0;
     if (keepSeat >= n) done = true;
@@ -201,7 +220,10 @@ function finishDraft(state: GameState, draft: SkillDraftState): GameState {
     const kept = draft.final[i] ?? [];
     const dropped = (draft.kept[i] ?? []).filter(id => !kept.includes(id));
     removed.push(...dropped);
-    return { ...s, skills: kept, xp: 0 };
+    // Partner Modification: each Character a Player controls can only have 1
+    // Skill, so the second kept Skill belongs to the partner Character.
+    const partnerSkillId = draft.keepTarget < 3 && kept.length >= 2 ? kept[1] : undefined;
+    return { ...s, skills: kept, xp: 0, ...(partnerSkillId !== undefined ? { partnerSkillId } : {}) };
   });
   return {
     ...state,
@@ -237,6 +259,76 @@ export function clearSkillXp(state: GameState, skillInstanceId: string): GameSta
   const inst = state.cards[skillInstanceId];
   if (inst === undefined) return state;
   return { ...state, cards: { ...state.cards, [skillInstanceId]: { ...inst, xp: 0 } } };
+}
+
+// ---------------------------------------------------------------------------
+// Reactive Skills (SK-008 Luck LV.2 / SK-010 Toughness LV.1 / SK-012 LV.3)
+// ---------------------------------------------------------------------------
+
+export interface ReactiveConsumption {
+  readonly state: GameState;
+  /** SK-008 or SK-010 fired: the event is negated. */
+  readonly negated: boolean;
+  /** SK-012 fired: the seat the event is redirected to. */
+  readonly redirectSeat?: number;
+}
+
+/**
+ * Consume the first pending reaction of the given kinds. The owning Skill's XP
+ * is removed (the printed cost of the reaction) and the declaration is dropped.
+ */
+function consumePending(
+  state: GameState,
+  seat: number,
+  kinds: readonly PendingSkillEffect['kind'][],
+): { readonly state: GameState; readonly consumed?: PendingSkillEffect } {
+  const player = state.seats[seat];
+  if (player === undefined) return { state };
+  const pending = (player.pendingSkillEffects ?? []).find(e => kinds.includes(e.kind));
+  if (pending === undefined) return { state };
+  const skillInstanceId = (pending as { readonly skillInstanceId?: string }).skillInstanceId;
+  const cleared = skillInstanceId === undefined ? state : clearSkillXp(state, skillInstanceId);
+  return {
+    state: {
+      ...cleared,
+      seats: cleared.seats.map(s => (s.seat === seat
+        ? { ...s, pendingSkillEffects: (s.pendingSkillEffects ?? []).filter(e => e !== pending) }
+        : s)),
+    },
+    consumed: pending,
+  };
+}
+
+/** SK-008 Luck LV.2: consume a declared "negate the next Damage" reaction. */
+export function consumeNegateDamage(state: GameState, seat: number): ReactiveConsumption {
+  const { state: next, consumed } = consumePending(state, seat, ['negateNextDamage']);
+  return { state: next, negated: consumed !== undefined };
+}
+
+/** SK-010 / SK-012: consume a declared Infected-effect reaction. */
+export function consumeInfectedEffectReaction(state: GameState, seat: number): ReactiveConsumption {
+  const { state: next, consumed } = consumePending(state, seat, ['negateNextInfectedEffect', 'redirectNextInfectedEffect']);
+  if (consumed === undefined) return { state: next, negated: false };
+  if (consumed.kind === 'redirectNextInfectedEffect') {
+    return { state: next, negated: false, redirectSeat: consumed.targetSeat };
+  }
+  return { state: next, negated: true };
+}
+
+/**
+ * Partner Modification: when the partner Character dies, its Skill and any XP
+ * on it are Removed from the Game. Returns the updated state (the partner
+ * instance itself is detached by the caller).
+ */
+export function removePartnerSkill(state: GameState, seat: number): GameState {
+  const player = state.seats[seat];
+  const skillId = player?.partnerSkillId;
+  if (player === undefined || skillId === undefined) return state;
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat ? { ...s, partnerSkillId: undefined } : s)),
+    removed: [...state.removed, skillId],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +421,44 @@ export function turnStartSkillEffects(state: GameState, seat: number): TurnStart
     }
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Turn-start prompts (SK-029)
+// ---------------------------------------------------------------------------
+
+/**
+ * SK-029 Handgun Technique LV.2: "At the beginning of your turn, you can
+ * Reveal 2 'Pistol' Weapons from your Hand. In that case, you get +1 Explore
+ * during this turn." Offered once per turn while the Skill is active and the
+ * hand actually holds that many Pistols.
+ */
+export function turnStartSkillPrompts(state: GameState, seat: number, newVersion: number): GameState['prompts'] {
+  const player = state.seats[seat];
+  if (player === undefined) return [];
+  const prompts: Prompt[] = [];
+  for (const id of activeSkillIds(state, seat)) {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    if (def?.type !== 'skill') continue;
+    for (const e of def.skillEffects ?? []) {
+      if (e.kind !== 'revealPistolsForExplore') continue;
+      const pistols = player.hand.filter(hid => {
+        const hInst = state.cards[hid];
+        const hDef = hInst === undefined ? undefined : state.cardDefs[hInst.cardId];
+        return hDef?.type === 'weapon' && (hDef.weaponTags ?? []).includes('pistol');
+      });
+      if (pistols.length < e.count) continue;
+      prompts.push({
+        id: `skill-reveal-pistols-${seat}-v${newVersion}`,
+        seat,
+        text: `Reveal ${e.count} "Pistol" Weapons from your Hand to get +1 Explore this turn?`,
+        options: ['Reveal', 'Decline'],
+        payload: { kind: 'skillRevealPistolsForExplore', skillInstanceId: id, count: e.count },
+      });
+    }
+  }
+  return prompts;
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +662,37 @@ export function applyUseSkill(state: GameState, seat: number, skillInstanceId: s
           text: 'Choose 1 Weapon your Character is using to get +10 Damage per XP removed.',
           options: candidates,
           payload: { kind: 'skillRemoveXpForWeaponDamage' },
+        });
+      }
+      case 'negateDamageRemoveXp': {
+        // SK-008 Luck LV.2 — arm a reaction that negates the next Damage.
+        return {
+          ...state,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, pendingSkillEffects: [...(s.pendingSkillEffects ?? []), { kind: 'negateNextDamage', skillInstanceId }] }
+            : s)),
+        };
+      }
+      case 'negateInfectedEffectRemoveXp': {
+        // SK-010 Toughness LV.1 — arm a reaction that negates the next
+        // Infected effect that would affect this Character.
+        return {
+          ...state,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, pendingSkillEffects: [...(s.pendingSkillEffects ?? []), { kind: 'negateNextInfectedEffect', skillInstanceId }] }
+            : s)),
+        };
+      }
+      case 'redirectInfectedEffectRemoveXp': {
+        // SK-012 Toughness LV.3 — choose another Player to be affected instead.
+        const targets = state.seats.filter(s => s.seat !== seat && !s.dead).map(s => String(s.seat));
+        if (targets.length === 0) return state;
+        return withPrompt(state, {
+          id: pid,
+          seat,
+          text: "Choose another Player to be affected by the Infected's effect instead.",
+          options: targets,
+          payload: { kind: 'skillRedirectInfectedEffect', skillInstanceId },
         });
       }
       default:

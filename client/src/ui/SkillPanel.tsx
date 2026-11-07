@@ -13,6 +13,9 @@ const MANUAL_KINDS = new Set([
   'movePlayAreaWeaponToInventoryTop', 'nameWeaponTypeAmmoDiscount', 'removeXpForTrashHand',
   'exploreBonusDamagePerCharacterDamage', 'giantKillingPlusDamage',
   'giantKillingAllWeaponsPlusDamage', 'exploreDuplicateWeaponEffect', 'removeXpForWeaponDamage',
+  // Reactive Skills (SK-008/010/012): armed during the turn, consumed by the
+  // next qualifying event.
+  'negateDamageRemoveXp', 'negateInfectedEffectRemoveXp', 'redirectInfectedEffectRemoveXp',
 ]);
 
 export interface SkillPanelProps {
@@ -50,6 +53,9 @@ export function SkillPanel({ state, seat, onAction, disabled }: SkillPanelProps)
             data-active={active}
           >
             <span className="skill-row-name" title={def.text}>{def.name}</span>
+            {player.partnerSkillId === id && (
+              <span className="skill-row-partner" data-testid={`skill-partner-${def.id}`}>Partner</span>
+            )}
             <span className="skill-row-pips">{on}/{req}</span>
             {active && manual && (
               <button

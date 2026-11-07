@@ -80,16 +80,19 @@ while not Exploring; faithful pass-left draft (deal 5, pick 1/pass left x5, keep
    reduction, Claire buy-for-ammo, Chris on-defeat trash, Jill manual target,
    Rebecca on-buy, Barry on-defeat reveal; then the weapon/action/infected
    effects).
-2. **Unconsumed skill kinds:** `copyActivatedSkills` (SK-009),
-   `negateDamageRemoveXp` (SK-008), `negateInfectedEffectRemoveXp` (SK-010),
-   `redirectInfectedEffectRemoveXp` (SK-012), `healTrashFromDiscard` (SK-005),
-   `revealPistolsForExplore` (SK-029), `exploreDuplicateWeaponEffect` (SK-021).
-   Each is encoded in `data/mercenaries.ts` but has no engine consumer yet.
+2. **Skill System — remaining known limitations** (gaps 2-4 closed):
+   the reactive Skills (SK-008/010/012) are armed *before* the triggering event
+   rather than reacted to at the moment of it, and SK-010/012 cover the
+   infection-increase / turn-penalty / AoE effects applied in `actions.ts` —
+   combat-modifying infected effects resolved inside the pure `resolveExplore()`
+   (`onRevealWeaponDamagePenalty`, `onRevealHealthPenaltyIfMultipleWeapons`,
+   `cannotBeDefeatedIf*`) are not yet interceptable. All 30 Skill kinds now
+   have an engine consumer.
 3. Hotseat (pass-and-play) does not yet expose the Skill System toggle.
 4. `sim.ts` / the soak do not drive the draft (skillSystem is off there).
 
 ## Resume checklist
 1. Server healthy? `curl :11434/api/ps`; if empty list: `export OLLAMA_MODELS="F:\ollama\models" && ollama serve`.
-2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at `966df34` (Mercenaries card data).
+2. `git log --oneline -1`, `tail -1 LEDGER.jsonl`, `git status --short` — expect clean tree at the Skill System gaps 2-4 commit.
 3. M5-T05: rules verification checklist vs the official FAQ (`docs/rules/RE1_Rulebook.pdf` has a clean text layer; `re1_rulebook.txt` is OCR'd and column-mangled — use `pdftotext -layout`). Every gap found needs Manny's ruling before it becomes a contract change.
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.

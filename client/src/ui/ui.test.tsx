@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { GameState } from '@re/game-core';
-import { setup, startTurn, applyAction, PREMIER_CARDS, FIRST_TIMER_PILES } from '@re/game-core';
+import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
 import { YouDiedOverlay } from './YouDiedOverlay';
@@ -685,3 +685,48 @@ function firstAmmoInHand(state: GameState): string | undefined {
     return inst !== undefined && state.cardDefs[inst.cardId]?.type === 'ammunition';
   });
 }
+
+describe('Mercenaries Skill draft UI', () => {
+  function draftState(seed = 11): GameState {
+    return setup(
+      { seed, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'bot' }], skillSystem: true },
+      [...PREMIER_CARDS, ...MERCENARIES_CARDS],
+      FIRST_TIMER_PILES,
+    );
+  }
+
+  it('renders the opening draft prompt with the seat\'s five Skill names', () => {
+    const s = draftState();
+    expect(s.phase).toBe('skillDraft');
+    const hand = s.skillDraft?.hands[0] ?? [];
+    expect(hand).toHaveLength(5);
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Skill Draft');
+    // Options render as card NAMES via optionLabel, never as raw instance ids.
+    for (const id of hand) {
+      const def = s.cardDefs[s.cards[id]?.cardId ?? ''];
+      expect(def).toBeDefined();
+      expect(html).toContain(def!.name);
+      expect(html).not.toContain(id);
+    }
+  });
+
+  it('never leaks another seat\'s draft hand into the sanitized view', () => {
+    const s = draftState();
+    const view = sanitize(s, 0);
+    const html = renderToStaticMarkup(<ActionBar state={view} seat={0} onAction={() => {}} />);
+    for (const id of s.skillDraft?.hands[1] ?? []) {
+      const def = s.cardDefs[s.cards[id]?.cardId ?? ''];
+      if (def !== undefined) expect(html).not.toContain(def.name);
+    }
+  });
+
+  it('advances the draft when the seat picks a Skill', () => {
+    const s = draftState();
+    const prompt = s.prompts.find(p => p.payload?.kind === 'skillDraftPick' && p.seat === 0);
+    expect(prompt).toBeDefined();
+    const next = applyAction(s, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    expect(next.skillDraft?.kept[0]).toHaveLength(1);
+    expect(next.prompts.some(p => p.payload?.kind === 'skillDraftPick')).toBe(true);
+  });
+});

@@ -6,7 +6,7 @@ import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
 
-import { skillCardDefs, draftPrompt, turnStartSkillEffects } from './skill';
+import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
@@ -487,6 +487,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     keepSeat: 0,
     keepPicks: 0,
     final: emptyRecords(),
+    // Partner Modification: 1 Skill per Character, so 2 kept instead of 3.
+    keepTarget: setup.partnerMode === true ? 2 : 3,
   };
   const draftState: GameState = {
     ...baseState,
@@ -830,13 +832,16 @@ function startTurnInternal(state: GameState): GameState {
   // other actions while it is open).
   const newVersion = state.version + 1;
   const abilityPrompts = turnStartAbilityPrompts(state, turnPlayer, newVersion);
+  // Mercenaries Skill System: turn-start "can" Skills (SK-029 reveal Pistols).
+  const skillPrompts = state.skillSystem === true ? turnStartSkillPrompts(state, player.seat, newVersion) : [];
+  const turnStartPrompts = [...abilityPrompts, ...skillPrompts];
 
   return {
     ...state,
     version: newVersion,
     rngState: nextRng,
     seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
-    prompts: abilityPrompts.length > 0 ? [...state.prompts, ...abilityPrompts] : state.prompts,
+    prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
     ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
   };
 }
