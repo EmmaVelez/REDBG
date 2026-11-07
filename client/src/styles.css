@@ -1002,6 +1002,9 @@ h1, h2 { margin: 0 0 8px; }
 .action-prompt { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .prompt-text { font-weight: 700; }
 .prompt-options { display: flex; gap: 6px; flex-wrap: wrap; }
+.action-prompts { display: flex; flex-direction: column; gap: 6px; }
+.action-extra { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.action-extra-title { font-weight: 700; }
 
 .game-log {
   border: 1px solid var(--border);

@@ -12,6 +12,19 @@ import {
   legalExplores,
 } from './explorePicker';
 
+/** Prompt kinds whose numeric options are AMOUNTS (XP), not seat indices. */
+const AMOUNT_KINDS = new Set(['we046ChooseAmount', 'skillRemoveXpAmount']);
+
+/** Action types the rest of the UI already exposes (Hand / Board / SkillPanel /
+ *  ActionBar). Any OTHER legal action is rendered as a generic button in the
+ *  ActionBar so no legal action is ever unreachable — currently Outbreak
+ *  `attack` and Alliance `attachToPartner`. */
+const UI_HANDLED_ACTION_TYPES = new Set<Action['type']>([
+  'playActionCard', 'playItem', 'playAmmo', 'explore', 'buy',
+  'useCharacterAbility', 'useWeaponAbility', 'moveXp', 'useSkill',
+  'removeAttachedItem', 'endTurn', 'chooseOption',
+]);
+
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
  * legal-action enumeration (the server validates anything we dispatch, so
@@ -45,7 +58,10 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legalExplores(state, seat);
-  const prompt = state.prompts.find(p => p.seat === seat);
+  // Every prompt awaiting this seat, in queue order — chained prompts (a
+  // resolver that raises the next step) must all be visible, not just the first.
+  const prompts = state.prompts.filter(p => p.seat === seat);
+  const prompt = prompts[0];
 
   // Weapons usable in an explore: hand weapons plus any play-area weapon an
   // ability lets this seat use again (Leon L2 pistolsTwicePerTurn).
@@ -108,6 +124,22 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const abilities = legal.filter((a): a is Extract<Action, { type: 'useCharacterAbility' }> => a.type === 'useCharacterAbility' && a.seat === seat);
   const weaponAbilities = legal.filter((a): a is Extract<Action, { type: 'useWeaponAbility' }> => a.type === 'useWeaponAbility' && a.seat === seat);
   const attachedItems = legal.filter((a): a is Extract<Action, { type: 'removeAttachedItem' }> => a.type === 'removeAttachedItem' && a.seat === seat);
+  // Legal actions the rest of the UI does not expose (Outbreak attack, Alliance
+  // attachToPartner) — rendered as generic buttons so they stay reachable.
+  const extraActions = legal.filter(a => 'seat' in a && a.seat === seat && !UI_HANDLED_ACTION_TYPES.has(a.type));
+  const extraLabel = (a: Action): string => {
+    if (a.type === 'attack') {
+      const target = state.seats[a.targetSeat];
+      const weapon = a.weaponInstanceId !== undefined ? defForInstance(state, a.weaponInstanceId)?.name : undefined;
+      const infect = (a.infectionCardIds?.length ?? 0) > 0 ? ' + infection card' : '';
+      return `Attack ${target?.name ?? `seat ${a.targetSeat}`}${weapon !== undefined ? ` with ${weapon}` : ''}${infect}`;
+    }
+    if (a.type === 'attachToPartner') {
+      const def = defForInstance(state, a.instanceId);
+      return `Attach ${def?.name ?? a.instanceId} to Partner${a.replaceIndex !== undefined ? ` (replace slot ${a.replaceIndex + 1})` : ''}`;
+    }
+    return a.type;
+  };
   const player = state.seats[seat];
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
@@ -115,17 +147,19 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     const levelText = charDef?.levels?.find(l => l.level === (charDef.abilities?.[abilityIndex]?.level ?? 1))?.text;
     return levelText ?? 'Use ability';
   };
-  // Prompt options are instance ids, 'DONE' for multi-choice chains, or seat
-  // numbers for player-choice prompts (Wesker L2 target, Rebecca L1 redirect);
-  // render readable labels for each.
-  const optionLabel = (opt: string): string => {
+  // Prompt options are card instance ids, 'DONE' for multi-choice chains, seat
+  // numbers for player-choice prompts (Wesker L2 target, Rebecca L1 redirect),
+  // or bare amounts (XP removal). Render a readable label for each.
+  const optionLabel = (opt: string, kind: unknown): string => {
     if (opt === 'DONE') return 'Done';
+    // XP-amount prompts offer numbers that are amounts, NOT seat indices.
+    if (typeof kind === 'string' && AMOUNT_KINDS.has(kind)) return `${opt} XP`;
     if (/^\d+$/.test(opt)) {
       const target = state.seats[Number(opt)];
       return target !== undefined ? `${target.name} (seat ${target.seat})` : opt;
     }
-    const def = defForInstance(state, opt);
-    return def !== null ? def.name : opt;
+    const def = defForInstance(state, opt) ?? state.cardDefs[opt];
+    return def?.name ?? opt;
   };
   const phaseNote = state.phase === 'gameOver' ? 'Game over'
     : state.phase === 'turnEnd' ? 'Resolving turn end…'
@@ -149,17 +183,42 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         <div className="action-error" data-action-error role="alert">{lastError}</div>
       )}
 
-      {prompt !== undefined && (
-        <div className="action-prompt" data-prompt={prompt.id}>
-          <span className="prompt-text">{prompt.text}</span>
+      {prompts.length > 0 && (
+        <div className="action-prompts" data-prompts={prompts.length}>
+          {prompts.map((p, promptIndex) => (
+            <div key={p.id} className="action-prompt" data-prompt={p.id} data-prompt-index={promptIndex}>
+              <span className="prompt-text">{p.text}</span>
+              <div className="prompt-options">
+                {p.options.map((opt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    data-option={i}
+                    onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
+                  >
+                    {optionLabel(opt, p.payload?.kind)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {extraActions.length > 0 && (
+        <div className="action-extra" data-extra-actions={extraActions.length}>
+          <span className="action-extra-title">Other actions</span>
           <div className="prompt-options">
-            {prompt.options.map((opt, i) => (
+            {extraActions.map((a, i) => (
               <button
                 key={i}
                 type="button"
-                onClick={() => onAction({ type: 'chooseOption', seat, promptId: prompt.id, option: i })}
+                className="extra-action-button"
+                data-extra-action={a.type}
+                disabled={disabled}
+                onClick={() => onAction(a)}
               >
-                {optionLabel(opt)}
+                {extraLabel(a)}
               </button>
             ))}
           </div>
