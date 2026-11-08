@@ -73,6 +73,33 @@ resolution can still apply the heal. Art: `CARD-ART/LK-001.png`, `CR-001.png`,
 +4 portrait/gate cases and a Lobby case client-side. Gates: typecheck clean,
 game-core 774, server 102, client 159, build OK.
 
+**FAN CARD LINE 2 (2026-11-08): CI-002 Infected Crow + FCH-008 Sherry Birkin** —
+- **CI-002 Infected Crow** (20 Health / 10 Damage / 2 Decorations, 2 copies) has
+  the new `InfectedEffect` kind `onRevealRevealNextMansionCard`: when revealed,
+  reveal the next Mansion card; an Infected joins the SAME battle, anything else
+  is shuffled back into the Mansion. Implemented by adding an infected branch to
+  the explore handler's event-expansion loop and letting a single explore that
+  reveals a Crow fall into that loop (`exploreCount > 1 || crowChainPending`), so
+  the chained Infected is resolved by the existing `resolveMultiExplore` batch.
+  Crows chain through each other; the loop marks expanded Crows so a re-scan
+  cannot expand the same one twice.
+- **FCH-008 Sherry Birkin** (50 Health, `level1At: 0`, NO `level2At` — a
+  single-level character) has two abilities: `cannotUseWeapons` (a passive
+  restriction enforced in explore validation and in `enumerateLegalActions`) and
+  `forceAllyExploreWithSupport` (manual, once per turn). The manual ability opens
+  a seat prompt; choosing a player immediately resolves an explore FOR them out
+  of `engine/allyExplore.ts` — the weapon pool is the target's hand weapons plus
+  Sherry's, Sherry pays the Ammo (it is her turn), each weapon ends up in its
+  OWNER's play area, defeated Infected and their Decorations go to SHERRY, the
+  damage the Infected deals is split evenly (target rounds up, Sherry rounds
+  down), and the exploring player then redraws a fresh hand. Validation requires
+  Sherry to afford the combined arsenal for at least one candidate target.
+  NOTE `applyRicardoDamage` only COMPUTES the new Health — the caller must write
+  it back into the seat (that bug made the first Sherry test pass silently).
+  Tests: `engine/customCrow.test.ts` (8) + `engine/fanSherry.test.ts` (9), +3
+  client cases. Art: `CARD-ART/CI-002.png` (whole card, like every infected PNG)
+  and `CARD-ART/FCH-008.png` (character art window).
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like

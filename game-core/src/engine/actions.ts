@@ -52,6 +52,7 @@ import { dropEmptyPrompts } from './prompts';
 import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
 import { makeRng, shuffle } from '../util/rng';
 
+import { resolveAllyExplore } from './allyExplore';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
@@ -1259,6 +1260,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
+      // CI-002 Infected Crow: a single explore that reveals it becomes a
+      // combined engagement (the chained card joins the same battle).
+      const crowChainPending = exploreCount === 1 && revealedDef?.type === 'infected' &&
+        (revealedDef.infectedEffects ?? []).some(e => e.kind === 'onRevealRevealNextMansionCard');
       // -----------------------------------------------------------------
       // MULTI-EXPLORE (exploreCount > 1)
       // Rulebook "Extra Explore": reveal N cards one at a time and battle ALL
@@ -1271,7 +1276,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // vs a Las Plagas reveal, AC-018 Uroboros Injection, AC-042 Fight or
       // Flight) are single-explore only; a multi-explore does not offer them.
       // -----------------------------------------------------------------
-      if (exploreCount > 1) {
+      if (exploreCount > 1 || crowChainPending) {
         const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
         let mDeck = rev.mansion.deck;
         let mBottom = rev.mansion.bottom;
@@ -1295,11 +1300,29 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const barrelIds: string[] = [];
         const trapIds: string[] = [];
         let expanding = true;
+        // CI-002 Infected Crow chains: each Crow reveals one more Mansion
+        // card. Mark them so the re-scan does not expand the same Crow twice.
+        const crowExpanded = new Set<string>();
         while (expanding) {
           expanding = false;
           for (const id of [...revealedIds]) {
             const d = cardDef(state, id);
-            if (d?.type !== 'event' || eventIdsToRemove.includes(id)) continue;
+            if (d === undefined) continue;
+            if (d.type === 'infected') {
+              if (crowExpanded.has(id)) continue;
+              if (!(d.infectedEffects ?? []).some(e => e.kind === 'onRevealRevealNextMansionCard')) continue;
+              crowExpanded.add(id);
+              if (deckCount({ deck: mDeck, bottom: mBottom }) > 0) {
+                const r = revealTop({ deck: mDeck, bottom: mBottom });
+                revealedIds.push(r.revealedInstanceId);
+                expansionIds.push(r.revealedInstanceId);
+                mDeck = r.mansion.deck;
+                mBottom = r.mansion.bottom;
+              }
+              expanding = true;
+              continue;
+            }
+            if (d.type !== 'event' || eventIdsToRemove.includes(id)) continue;
             if (d.id === 'ma-039') {
               eventIdsToRemove.push(id);
               for (let k = 0; k < 2 && deckCount({ deck: mDeck, bottom: mBottom }) > 0; k++) {
@@ -3387,6 +3410,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'forceAllyExploreWithSupport': {
+              // FCH-008 Sherry Birkin: choose another player; they
+              // immediately Explore with Sherry's support.
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Choose a player: they Explore with Sherry.',
+                    options: others.map(s => String(s.seat)),
+                    payload: { kind: 'sherryForceExplore' },
+                  },
+                ],
+              };
+            }
             case 'forceExploreOtherPlayer': {
               // Wesker L2: choose another player; they get +1 Explore and must
               // Explore on their next turn (choice resolved via prompt).
@@ -4936,6 +4978,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 prompts,
               };
             }
+
+      if (kind === 'sherryForceExplore') {
+        // FCH-008 Sherry Birkin: the chosen player immediately Explores
+        // with Sherry's support (see engine/allyExplore.ts).
+        const targetSeat = Number(prompt.options[option]);
+        if (Number.isNaN(targetSeat)) return { ...state, ...nextBase, prompts: newPrompts };
+        const resolved = resolveAllyExplore(state, seat, targetSeat);
+        return {
+          ...resolved,
+          ...nextBase,
+          prompts: [...newPrompts, ...resolved.prompts.filter(p => p.id !== prompt.id)],
+        };
+      }
 
       if (kind === 'forceExploreOtherPlayer') {
         // Wesker L2: the chosen player must Explore on their next turn

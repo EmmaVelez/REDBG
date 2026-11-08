@@ -191,6 +191,36 @@ describe('CardView (T03)', () => {
     expect(unlockedHtml).not.toContain('skill-locked');
   });
 
+  it('fills the CI-002 Infected Crow art from its PNG', () => {
+    const crow = CUSTOM_CARDS.find(c => c.id === 'ci-002');
+    expect(crow).toBeDefined();
+    if (crow === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={crow} />);
+    expect(html).toContain('card-has-art');
+    expect(html).toMatch(/<img class="card-art-img" src="[^"]*CI-002[^"]*"/i);
+  });
+
+  it('fills the FCH-008 Sherry Birkin portrait from its PNG', () => {
+    const sherry = CUSTOM_CARDS.find(c => c.id === 'fch-008');
+    expect(sherry).toBeDefined();
+    if (sherry === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={sherry} decorations={0} />);
+    expect(html).toContain('card-portrait-has-art');
+    expect(html).toMatch(/<img class="card-portrait-img" src="[^"]*FCH-008[^"]*"/i);
+  });
+
+  it('FCH-008 is a single-level character unlocked from the start', () => {
+    const sherry = CUSTOM_CARDS.find(c => c.id === 'fch-008');
+    expect(sherry).toBeDefined();
+    if (sherry === undefined) return;
+    expect(sherry.level1At).toBe(0);
+    expect(sherry.level2At).toBeUndefined();
+    const html = renderToStaticMarkup(<CardView def={sherry} decorations={0} />);
+    expect(html).toContain('skill-unlocked');
+    expect(html).not.toContain('skill-locked');
+    expect(html).toContain('cannot use Weapons');
+  });
+
   it('fills the LK-001/CR-001/CC-001 portraits from their PNGs', () => {
     for (const id of ['lk-001', 'cr-001', 'cc-001']) {
       const def = CUSTOM_CARDS.find(c => c.id === id);
@@ -839,11 +869,14 @@ describe('Lobby (T08)', () => {
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
 
-    const on = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...base, customCards: ['cu-001', 'lk-001', 'cr-001', 'cc-001'] }, clientId: 'c1' })} />);
+    const on = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...base, customCards: ['cu-001', 'lk-001', 'cr-001', 'cc-001', 'ci-002', 'fch-008'] }, clientId: 'c1' })} />);
     expect(on).toContain('value="cu-001"');
     expect(on).toContain('value="lk-001"');
     expect(on).toContain('value="cr-001"');
     expect(on).toContain('value="cc-001"');
+    expect(on).toContain('value="fch-008"');
+    expect(on).toContain('Infected Crow');
+    expect(on).toContain('Sherry Birkin');
   });
 });
 

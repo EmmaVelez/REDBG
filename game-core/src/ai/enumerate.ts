@@ -55,7 +55,10 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     // weaponCostCap (Josh L1): restricted weapons never enter the pool, so the
     // UI and the bots cannot offer an explore validate would reject.
     const costCap = weaponCostCap(characterAbilities(state, seat));
+    // FCH-008 Sherry Birkin cannot use Weapons, so she has no explore.
+    const cannotUseWeapons = characterAbilities(state, seat).some(a => a.kind === 'cannotUseWeapons');
     const weaponsAvailable = explorableWeapons(state, seat).filter(id => {
+      if (cannotUseWeapons) return false;
       if (costCap === undefined) return true;
       const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
       return (cd?.cost ?? 0) < costCap;

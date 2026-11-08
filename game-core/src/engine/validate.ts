@@ -1,5 +1,6 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
+import { allyExploreAmmoCost } from './allyExplore';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
@@ -239,6 +240,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.weapons.length === 0) {
         return { ok: false, reason: 'explore: no weapons' };
       }
+      // FCH-008 Sherry Birkin: she cannot use Weapons at all.
+      if (characterAbilities(state, action.seat).some(a => a.kind === 'cannotUseWeapons')) {
+        return { ok: false, reason: 'explore: cannot use weapons' };
+      }
       // singleWeaponLimiter: cannot use >1 weapon in one explore.
       if (action.weapons.length > 1 && characterAbilities(state, action.seat).some(a => a.kind === 'singleWeaponLimiter')) {
         return { ok: false, reason: 'explore: single weapon limiter' };
@@ -465,7 +470,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'movePlayAreaWeaponToInventoryTop':
         case 'discardWeaponToCopyEffects':
         case 'choosePlayerIncreaseAmmoReqNextTurn':
-        case 'discardActionCardFromHandForPlusTwoCards': {
+        case 'discardActionCardFromHandForPlusTwoCards':
+        case 'forceAllyExploreWithSupport': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -482,6 +488,18 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               logged.abilityIndex === action.abilityIndex
             ) {
               return { ok: false, reason: 'useCharacterAbility: already used this turn' };
+            }
+          }
+          if (ability.kind === 'forceAllyExploreWithSupport') {
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
+            if (others.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: no other players' };
+            }
+            // The forced explore spends the combined arsenals, so Sherry must be
+            // able to pay the Ammo for at least one candidate target.
+            const affordable = others.some(o => allyExploreAmmoCost(state, action.seat, o.seat) <= player.turnAmmo);
+            if (!affordable) {
+              return { ok: false, reason: 'useCharacterAbility: not enough Ammo to assist' };
             }
           }
           if (ability.kind === 'exchangeHandWithInventoryTop') {

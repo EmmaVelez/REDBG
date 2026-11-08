@@ -246,6 +246,8 @@ export type InfectedEffect =
   | { readonly kind: "onRevealZeroAmmoWeaponsDealNoDamage" } // MA-049 Reinforced Licker
   // --- Custom card line (MX-001..) ---
   | { readonly kind: "onNotDefeatedInsertIntoMansionAt"; readonly position: number } // MX-001 Mr. X
+  | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
+  | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
@@ -472,6 +474,9 @@ export type CharacterAbility =
   | { readonly kind: "plusBuyPassive"; readonly amount: number; readonly level: 1 | 2 } // CR-001 Claire L1: +amount Buy
   | { readonly kind: "turnStartActionsForBuy"; readonly actions: number; readonly buy: number; readonly level: 1 | 2 } // CR-001 Claire L2: at turn start, may get +actions Actions and -buy Buy
   | { readonly kind: "healOnDefeatWithWeaponTag"; readonly tag: WeaponTag; readonly heal: number; readonly level: 1 | 2 } // CC-001 Claire L2: heal when defeating an Infected with a weapon of that tag
+  // --- Fan characters (FCH-008..) ---
+  | { readonly kind: "cannotUseWeapons"; readonly level: 1 | 2 } // FCH-008 Sherry: she cannot use Weapons
+  | { readonly kind: "forceAllyExploreWithSupport"; readonly level: 1 | 2 } // FCH-008 Sherry: once per turn, force another Player to Explore with her
 
 
 // ---------------------------------------------------------------------------
