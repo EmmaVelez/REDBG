@@ -67,7 +67,7 @@ export interface CardDef {
   readonly id: string;
   readonly name: string;
   readonly type: CardType;
-  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare' | 'outbreak' | 'mercenaries';
+  readonly set: 'premier' | 'promo' | 'alliance' | 'nightmare' | 'outbreak' | 'mercenaries' | 'custom';
   /** Human-readable rules text (for UI + reference). */
   readonly text: string;
   /** Copies of this card in the game (used when building piles). */
@@ -244,6 +244,8 @@ export type InfectedEffect =
   | { readonly kind: "reduceLevel2DecorationRequirement"; readonly amount: number } // MA-047 Reinforced Zombie
   | { readonly kind: "onRevealBonusIfZombieAttached"; readonly hp: number; readonly damage: number } // MA-048 Crimson Head
   | { readonly kind: "onRevealZeroAmmoWeaponsDealNoDamage" } // MA-049 Reinforced Licker
+  // --- Custom card line (MX-001..) ---
+  | { readonly kind: "onNotDefeatedInsertIntoMansionAt"; readonly position: number } // MX-001 Mr. X
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb

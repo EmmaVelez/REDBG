@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS } from '@re/game-core';
+import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS } from '@re/game-core';
 
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
@@ -18,7 +18,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[]) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -26,9 +26,10 @@ export interface LobbyProps {
   readonly onSetScenario: (scenario: ScenarioId) => void;
   readonly onSetPartnerMode: (partnerMode: boolean) => void;
   readonly onSetSkillSystem: (skillSystem: boolean) => void;
+  readonly onSetCustomCards: (customCards: readonly string[]) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[]) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -64,13 +65,47 @@ function ScenarioDropdown(props: {
   );
 }
 
+/**
+ * Expandable Custom Cards picker — the fan-made card line (MX-001..).
+ * Every selected card is shuffled into the Mansion deck for this game.
+ * A native <details> keeps it expandable with no local state.
+ */
+function CustomCardsPicker(props: {
+  readonly selected: readonly string[];
+  readonly onChange: (ids: readonly string[]) => void;
+  readonly disabled?: boolean;
+}): JSX.Element {
+  const toggle = (id: string, checked: boolean): void => {
+    props.onChange(checked ? [...props.selected, id] : props.selected.filter(x => x !== id));
+  };
+  return (
+    <details className="custom-cards" data-testid="custom-cards">
+      <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
+      <p className="lobby-hint">Fan-made cards. Selected cards are shuffled into the Mansion deck.</p>
+      {CUSTOM_CARDS.map(c => (
+        <label key={c.id} className="custom-card-row">
+          <input
+            type="checkbox"
+            checked={props.selected.includes(c.id)}
+            disabled={props.disabled === true}
+            onChange={e => toggle(c.id, e.target.checked)}
+            data-testid={`custom-card-${c.id}`}
+          />
+          <span>{c.id.toUpperCase()} {c.name} — {c.text}</span>
+        </label>
+      ))}
+    </details>
+  );
+}
+
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[]) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [skillSystem, setSkillSystem] = useState(false);
+  const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -91,6 +126,7 @@ function PassAndPlay(props: {
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
       </label>
+      <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       <div className="passandplay-count">
         {[2, 3, 4].map(n => (
           <button
@@ -119,7 +155,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards)}
       >
         Start pass &amp; play
       </button>
@@ -139,6 +175,7 @@ export function Lobby({
   onSetScenario,
   onSetPartnerMode,
   onSetSkillSystem,
+  onSetCustomCards,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -193,6 +230,7 @@ export function Lobby({
                   {' '}Skill System (Mercenaries expansion)
                 </label>
               </div>
+              <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
               <div style={{ marginTop: '8px' }}>
                 <label style={{ display: 'block', fontSize: '0.9em' }}>
                   Main character:
@@ -268,12 +306,13 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[]) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [partnerMode, setPartnerMode] = useState(false);
   const [skillSystem, setSkillSystem] = useState(false);
+  const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -281,7 +320,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -318,6 +357,7 @@ function RoomEntry(props: {
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
         </label>
+        <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

@@ -2,6 +2,28 @@
 
 **Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 710, server 97, client 141** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
 
+**CUSTOM CARD LINE (2026-11-08):** the first fan-designed card, **MX-001 Mr. X**
+(60 Health / 30 Damage / 5 Decorations, 2 copies), is in. Manny's ruling: "If this
+infected is not defeated, place it on top of the mansion as the 5th upcoming card"
+means **insert into the mansion deck 5th from the top** (index 4) — NOT the bottom,
+and NOT "on top". New `set: 'custom'` + `data/custom.ts` (`CUSTOM_CARDS`, deliberately
+NOT in `ALL_CARDS`) + `InfectedEffect` kind `onNotDefeatedInsertIntoMansionAt` +
+`mansion.insertAt`. Reachability is a room toggle: the lobby has an expandable
+**Custom Cards** picker (create-room form, host room controls, pass & play), the
+selection rides `createRoom.customCards` / `setCustomCards`, and
+`cardsForScenario(id, { customCards })` appends them; `setup()` always shuffles every
+custom mansion card it finds in that list into the Mansion (kitchen-sink scenarios
+exclude them from the fallback pass and append them uniformly, so both paths agree).
+Consumed in the single-explore, multi-explore and AC-042 deferred-explore
+disposition paths. Art: `CARD-ART/MX-001.png` (from Manny's scan). Tests:
+`engine/customCards.test.ts` (13) + protocol/rooms/hotseat/Lobby cases. Gates:
+typecheck clean, game-core 735, server 102, client 146, build OK.
+**Known limitation:** a not-defeated Mr. X gets NO mansion-reveal overlay — it stays
+in the `mansion` zone and `detectReveal` only reports attached/mansionBottom/removed.
+That is a pre-existing gap (Uroboros Aheri's shuffle-back behaves the same), not a
+regression. Also: MA-025 was already Alliance's Duvalia, so the custom card uses the
+`mx-` prefix to keep the official numbering intact.
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like

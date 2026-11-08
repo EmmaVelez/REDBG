@@ -1,7 +1,7 @@
 import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
-import { revealTop, revealBottom, sendToBottom, shuffleBack, deckCount } from './mansion';
+import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
 import type { MultiExploreTarget } from './explore';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
@@ -1691,7 +1691,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         for (const id of undefeatedEntries.map(e => e.id)) {
           const def = cardDef(state, id);
           const shuffles = (def?.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle')) ?? false;
-          if (shuffles) {
+          const insertEffect = def?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
+          if (insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt') {
+            const inserted = insertAt({ deck: mDeck, bottom: mBottom }, id, insertEffect.position);
+            mDeck = inserted.deck;
+            mBottom = inserted.bottom;
+          } else if (shuffles) {
             const shuffled = shuffleBack({ deck: mDeck, bottom: mBottom }, id, rngShuffle);
             mDeck = shuffled.deck;
             mBottom = shuffled.bottom;
@@ -2844,7 +2849,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // MA-092 reveal gains apply AFTER the explore's own seat updates.
       for (const g of revealGains) state = gainCopy(state, g.seat, g.cardId);
 
-      if (outcome.shuffleBack) {
+      const insertEffect = revealedDef?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
+      const insertPosition = !infectedEffectNegated && insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt'
+        ? insertEffect.position
+        : undefined;
+      if (insertPosition !== undefined) {
+        const inserted = insertAt({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, insertPosition);
+        mansionDeck = inserted.deck;
+        mansionBottom = inserted.bottom;
+      } else if (outcome.shuffleBack) {
         const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
         mansionDeck = shuffled.deck;
         mansionBottom = shuffled.bottom;
@@ -4104,11 +4117,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (pe.revealHpThreshold !== undefined && (revealedDef?.hp ?? 0) > pe.revealHpThreshold) {
             const pre = pe.prePlayer ?? s.seats[pe.seat] ?? pe.newPlayer;
             const restored: PlayerState = { ...pre, exploresLeft: Math.max(pre.exploresLeft - 1, 0) };
+            // The revealed Infected was not defeated, so its own
+            // not-defeated effect still places it (MX-001 inserts it 5th
+            // from the top). The pre-reveal deck still holds the card, so
+            // drop it before placing.
+            const deckWithout = s.mansionDeck.filter(id => id !== pe.revealedInstanceId);
+            const insertFx = revealedDef?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
+            const placed = insertFx !== undefined && insertFx.kind === 'onNotDefeatedInsertIntoMansionAt'
+              ? insertAt({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId, insertFx.position)
+              : { deck: deckWithout, bottom: [...s.mansionBottom, pe.revealedInstanceId] };
             return {
               ...s,
               seats: s.seats.map(x => (x.seat === pe.seat ? restored : x)),
-              mansionDeck: s.mansionDeck.filter(id => id !== pe.revealedInstanceId),
-              mansionBottom: [...s.mansionBottom, pe.revealedInstanceId],
+              mansionDeck: placed.deck,
+              mansionBottom: placed.bottom,
               pendingExplore: undefined,
               prompts: newPrompts,
             };
@@ -4118,9 +4140,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const newPlayer = defeated
             ? { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(s, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] }
             : { ...currentSeat, hp: applyHpLoss(characterAbilities(s, pe.seat), currentSeat.hp, pe.damageTaken, currentSeat.downed || currentSeat.dead) };
+          // Not defeated: the Infected's own effect places it (MX-001
+          // inserts it 5th from the top). The pre-reveal deck still holds
+          // the card, so drop it before placing.
+          const deckWithout = s.mansionDeck.filter(id => id !== pe.revealedInstanceId);
+          const insertFx = defeated
+            ? undefined
+            : cardDef(s, pe.revealedInstanceId)?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
           const bottomed = defeated
             ? { deck: s.mansionDeck, bottom: s.mansionBottom }
-            : sendToBottom({ deck: s.mansionDeck, bottom: s.mansionBottom }, pe.revealedInstanceId);
+            : insertFx !== undefined && insertFx.kind === 'onNotDefeatedInsertIntoMansionAt'
+              ? insertAt({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId, insertFx.position)
+              : sendToBottom({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId);
           return {
             ...s,
             seats: s.seats.map(x => (x.seat === pe.seat ? newPlayer : x)),

@@ -33,6 +33,7 @@ const roomState = (): Extract<ServerMessage, { kind: 'roomState' }> => ({
     ],
     partnerMode: false,
     skillSystem: false,
+    customCards: [],
   },
 });
 

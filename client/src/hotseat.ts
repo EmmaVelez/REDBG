@@ -38,6 +38,8 @@ export type HotseatResult =
 export interface HotseatOptions {
   /** Mercenaries Skill System (a Game Modification, available on any scenario). */
   readonly skillSystem?: boolean;
+  /** Custom card ids (MX-001..) shuffled into the Mansion deck. */
+  readonly customCards?: readonly string[];
 }
 
 export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
@@ -50,7 +52,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem }, cardsForScenario(scenario, { skillSystem: opts.skillSystem }), pilesForScenario(scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards }), pilesForScenario(scenario), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

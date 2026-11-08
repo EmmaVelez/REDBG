@@ -188,7 +188,22 @@ describe('createRoomStore', () => {
       players: room.players,
       partnerMode: false,
       skillSystem: false,
+      customCards: [],
     });
+  });
+
+  it('setCustomCards records the selection; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, ['mx-001']);
+    expect(room.customCards).toEqual(['mx-001']);
+
+    const changed = store.setCustomCards(room.roomCode, 'c1', []);
+    expect(changed.customCards).toEqual([]);
+    expect(store.toSnapshot(changed).customCards).toEqual([]);
+
+    expect(() => store.setCustomCards(room.roomCode, 'stranger', ['mx-001'])).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setCustomCards(room.roomCode, 'c1', ['mx-001'])).toThrow('game already started');
   });
 
   it('setConnected flips a player connection flag; guards unknown players', () => {

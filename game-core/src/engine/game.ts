@@ -392,6 +392,12 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   });
 
   // Mansion: infected + token + Yellow Herb (plusMaxHp20 item — id-independent)
+  const isMansionCard = (c: CardDef): boolean =>
+    c.type === 'infected' || c.type === 'token' || (c.type === 'item' && (c.itemEffects?.some(e => e.kind === 'plusMaxHp') ?? false));
+  // Custom card line (MX-001..): present in `cards` only when the room
+  // enabled it, and always appended to the Mansion (custom cards are
+  // mansion-only — they are never dealt into the market).
+  const customMansion = cards.filter(c => c.set === 'custom' && isMansionCard(c));
   const mansionIds: string[] = [];
   if (mansionCards !== undefined) {
     for (const mc of mansionCards) {
@@ -405,13 +411,20 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     }
   } else {
     for (const c of cards) {
-      if (c.type === 'infected' || c.type === 'token' || (c.type === 'item' && c.itemEffects?.some(e => e.kind === 'plusMaxHp'))) {
-        for (let j = 0; j < c.copies; j++) {
-          const id = `${c.id}#${j + 1}`;
-          mansionIds.push(id);
-          register(id, c.id, 'mansionDeck');
-        }
+      if (c.set === 'custom') continue;
+      if (!isMansionCard(c)) continue;
+      for (let j = 0; j < c.copies; j++) {
+        const id = `${c.id}#${j + 1}`;
+        mansionIds.push(id);
+        register(id, c.id, 'mansionDeck');
       }
+    }
+  }
+  for (const c of customMansion) {
+    for (let j = 0; j < c.copies; j++) {
+      const id = `${c.id}#${j + 1}`;
+      mansionIds.push(id);
+      register(id, c.id, 'mansionDeck');
     }
   }
   const mansionDeck = rngShuffle(mansionIds);

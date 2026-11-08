@@ -1329,3 +1329,9 @@ h1, h2 { margin: 0 0 8px; }
 .skill-row-pips { color: var(--muted-foreground); }
 .skill-use, .skill-move-xp { font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border); background: var(--accent); color: #1d1f23; cursor: pointer; }
 .skill-move-xp:disabled, .skill-use:disabled { opacity: 0.45; cursor: default; }
+
+/* ---- Custom Cards picker ---- */
+.custom-cards { margin-top: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,0.03); }
+.custom-cards-summary { cursor: pointer; font-size: 0.9em; color: var(--muted-foreground); }
+.custom-card-row { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; margin: 4px 0; }
+.custom-card-row span { line-height: 1.3; }

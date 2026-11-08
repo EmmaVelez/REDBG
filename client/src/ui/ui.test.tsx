@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { GameState } from '@re/game-core';
-import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS } from '@re/game-core';
+import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
 import { YouDiedOverlay } from './YouDiedOverlay';
@@ -115,6 +115,15 @@ describe('CardView (T03)', () => {
     const plainHtml = renderToStaticMarkup(<CardView def={noArt} />);
     expect(plainHtml).not.toContain('card-has-art');
     expect(plainHtml).not.toContain('card-art-img');
+  });
+
+  it('renders the MX-001 Mr. X custom card face from its PNG', () => {
+    const mx = CUSTOM_CARDS.find(c => c.id === 'mx-001');
+    expect(mx).toBeDefined();
+    if (mx === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={mx} />);
+    expect(html).toContain('card-has-art');
+    expect(html).toMatch(/<img class="card-art-img" src="[^"]*MX-001[^"]*"/i);
   });
 
   it('artOnly gives the hand/pile face an art-only card (rows stay for the hover reveal)', () => {
@@ -662,6 +671,7 @@ describe('Lobby (T08)', () => {
     onSetScenario: () => {},
     onSetPartnerMode: () => {},
     onSetSkillSystem: () => {},
+    onSetCustomCards: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -694,6 +704,7 @@ describe('Lobby (T08)', () => {
       ],
       partnerMode: false,
       skillSystem: false,
+      customCards: [],
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -701,6 +712,30 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Bot');
     expect(html).toContain('Start game');
     expect(html).toContain('Spy Games');
+  });
+
+  it('lists the custom card line in an expandable picker (create-room form)', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(html).toContain('data-testid="custom-cards"');
+    expect(html).toContain('data-testid="custom-card-mx-001"');
+    expect(html).toContain('Mr. X');
+    expect(html).toContain('Custom Cards (0 selected)');
+  });
+
+  it('shows the host custom-card picker bound to the room selection', () => {
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: ['mx-001'],
+    };
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(html).toContain('Custom Cards (1 selected)');
+    expect(html).toContain('checked');
   });
 });
 

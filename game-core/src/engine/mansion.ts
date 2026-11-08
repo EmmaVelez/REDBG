@@ -84,6 +84,20 @@ export function recycleBottom(mansion: Mansion): Mansion {
   };
 }
 
+/**
+ * Insert `instanceId` into the deck so it becomes the `position`-th
+ * upcoming card (1-based from the top). Clamps to the end of the deck
+ * when the deck is shorter than `position - 1`.
+ * Used by MX-001 Mr. X ("place it on top of the mansion as the 5th
+ * upcoming card").
+ */
+export function insertAt(mansion: Mansion, instanceId: string, position: number): Mansion {
+  const deck = [...mansion.deck];
+  const index = Math.max(0, Math.min(Math.floor(position) - 1, deck.length));
+  deck.splice(index, 0, instanceId);
+  return { deck, bottom: [...mansion.bottom] };
+}
+
 export function deckCount(mansion: Mansion): number {
   return mansion.deck.length + mansion.bottom.length;
 }

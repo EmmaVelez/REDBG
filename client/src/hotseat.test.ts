@@ -55,6 +55,16 @@ describe('createHotseatGame', () => {
     expect(pileIds).not.toContain('spray');
   });
 
+  it('adds selected custom cards to the Mansion when requested', () => {
+    const without = createHotseatGame(['Chris', 'Jill'], 42);
+    const noX = [...without.mansionDeck, ...without.mansionBottom].filter(id => without.cards[id]?.cardId === 'mx-001');
+    expect(noX).toHaveLength(0);
+
+    const withX = createHotseatGame(['Chris', 'Jill'], 42, 'firstTimer', { customCards: ['mx-001'] });
+    const copies = [...withX.mansionDeck, ...withX.mansionBottom].filter(id => withX.cards[id]?.cardId === 'mx-001');
+    expect(copies).toHaveLength(2);
+  });
+
   it('deals each player a character and a real opening hand', () => {
     const s = createHotseatGame(['Chris', 'Jill'], 42);
     for (const p of s.seats) {

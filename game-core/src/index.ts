@@ -18,6 +18,7 @@ export { ALLIANCE_CARDS } from "./data/alliance";
 export { NIGHTMARE_CARDS } from "./data/nightmare";
 export { OUTBREAK_CARDS } from "./data/outbreak";
 export { MERCENARIES_CARDS } from "./data/mercenaries";
+export { CUSTOM_CARDS } from "./data/custom";
 export type { ScenarioId, ScenarioDef } from "./data/cards";
 export { chooseBotAction } from "./ai/bot";
 export { seatAwaitingAction } from "./engine/skill";

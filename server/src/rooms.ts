@@ -21,12 +21,14 @@ export interface Room {
   readonly partnerMode: boolean;
   /** Enable the Mercenaries Skill System (Skill cards, XP, draft). */
   readonly skillSystem: boolean;
+  /** Custom card ids (MX-001..) added to the Mansion deck. */
+  readonly customCards: readonly string[];
 }
 
 export interface RoomStore {
   readonly rooms: ReadonlyMap<string, Room>;
   /** Create a room; the creator becomes host seated at 0. Returns the new room. */
-  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean, mainCharacterId?: string, partnerCharacterId?: string, skillSystem?: boolean): Room;
+  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean, mainCharacterId?: string, partnerCharacterId?: string, skillSystem?: boolean, customCards?: readonly string[]): Room;
   /** Add an unseated player (seat -1) to a lobby room. */
   joinRoom(roomCode: string, clientId: string, name: string): Room;
   /** Remove a player; host leaves -> lowest-seat remaining becomes host;
@@ -44,6 +46,8 @@ export interface RoomStore {
   setPartnerMode(roomCode: string, hostClientId: string, partnerMode: boolean): Room;
   /** Host only, lobby only: enable/disable the Mercenaries Skill System. */
   setSkillSystem(roomCode: string, hostClientId: string, skillSystem: boolean): Room;
+  /** Host only, lobby only: choose which custom cards join the Mansion. */
+  setCustomCards(roomCode: string, hostClientId: string, customCards: readonly string[]): Room;
   /** Host only, lobby only: set host character selection. */
   setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
@@ -120,7 +124,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
   return {
     rooms,
 
-    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string, skillSystem: boolean = false): Room {
+    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string, skillSystem: boolean = false, customCards: readonly string[] = []): Room {
       const roomCode = allocateCode();
       const room: Room = {
         roomCode,
@@ -130,6 +134,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         players: [{ clientId, name, seat: 0, isBot: false, connected: true, mainCharacterId, partnerCharacterId }],
         partnerMode,
         skillSystem,
+        customCards,
       };
       save(roomCode, room);
       hosts.set(roomCode, clientId);
@@ -276,6 +281,13 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       return save(roomCode, { ...room, skillSystem });
     },
 
+    setCustomCards(roomCode: string, hostClientId: string, customCards: readonly string[]): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      return save(roomCode, { ...room, customCards });
+    },
+
     setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room {
       const room = requireRoom(roomCode);
       requireLobby(room);
@@ -321,6 +333,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         players: room.players,
         partnerMode: room.partnerMode,
         skillSystem: room.skillSystem,
+        customCards: room.customCards,
       };
     },
   };

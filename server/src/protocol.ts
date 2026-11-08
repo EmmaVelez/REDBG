@@ -43,6 +43,8 @@ export interface RoomSnapshot {
   readonly partnerMode: boolean;
   /** Enable the Mercenaries Skill System (Skill cards, XP, draft). */
   readonly skillSystem: boolean;
+  /** Custom card ids (MX-001..) added to the Mansion deck. */
+  readonly customCards: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +52,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[] }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -67,6 +69,8 @@ export type ClientMessage =
   | { readonly kind: 'setPartnerMode'; readonly partnerMode: boolean }
   /** Host control: enable/disable the Mercenaries Skill System. */
   | { readonly kind: 'setSkillSystem'; readonly skillSystem: boolean }
+  /** Host control: choose which custom cards (MX-001..) join the Mansion. */
+  | { readonly kind: 'setCustomCards'; readonly customCards: readonly string[] }
   | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
@@ -150,7 +154,7 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
@@ -162,6 +166,9 @@ export function validateMessage(value: unknown): DecodeResult {
     }
     if (m.skillSystem !== undefined && typeof m.skillSystem !== 'boolean') {
       return { ok: false, error: 'createRoom requires a skillSystem boolean when present' };
+    }
+    if (m.customCards !== undefined && (!Array.isArray(m.customCards) || m.customCards.some(c => typeof c !== 'string'))) {
+      return { ok: false, error: 'createRoom requires a customCards string array when present' };
     }
     return { ok: true, msg: value as WireMessage };
   }
@@ -183,6 +190,13 @@ export function validateMessage(value: unknown): DecodeResult {
     const m = value as { kind: string; skillSystem?: unknown };
     if (typeof m.skillSystem !== 'boolean') {
       return { ok: false, error: 'setSkillSystem requires a skillSystem boolean' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setCustomCards') {
+    const m = value as { kind: string; customCards?: unknown };
+    if (!Array.isArray(m.customCards) || m.customCards.some(c => typeof c !== 'string')) {
+      return { ok: false, error: 'setCustomCards requires a customCards string array' };
     }
     return { ok: true, msg: value as WireMessage };
   }

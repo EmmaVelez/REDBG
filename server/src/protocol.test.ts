@@ -15,6 +15,9 @@ describe('protocol round trips', () => {
     { name: 'setScenario battleHardenedVeteran', msg: { kind: 'setScenario', scenario: 'battleHardenedVeteran' } },
     { name: 'setScenario alliance', msg: { kind: 'setScenario', scenario: 'alliance' } },
     { name: 'setPartnerMode', msg: { kind: 'setPartnerMode', partnerMode: true } },
+    { name: 'createRoom with custom cards', msg: { kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false, skillSystem: true, customCards: ['mx-001'] } },
+    { name: 'setCustomCards', msg: { kind: 'setCustomCards', customCards: ['mx-001'] } },
+    { name: 'setCustomCards empty', msg: { kind: 'setCustomCards', customCards: [] } },
     { name: 'joinRoom', msg: { kind: 'joinRoom', roomCode: 'ABCDEF', playerName: 'Ada' } },
     { name: 'reconnect', msg: { kind: 'reconnect', token: 'tok-123' } },
     { name: 'spectate', msg: { kind: 'spectate', roomCode: 'ABCDEF' } },
@@ -30,7 +33,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [] } },
     },
     {
       name: 'stateSync',
@@ -127,6 +130,14 @@ describe('protocol validation', () => {
     expect(validateMessage({ kind: 'gameOver' }).ok).toBe(false);
     expect(validateMessage({ kind: 'gameOver', winners: 'someone' }).ok).toBe(false);
     expect(validateMessage({ kind: 'gameOver', winners: [1] }).ok).toBe(true);
+  });
+
+  it('validates customCards as a string array', () => {
+    expect(validateMessage({ kind: 'setCustomCards', customCards: 'mx-001' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'setCustomCards', customCards: [1] }).ok).toBe(false);
+    expect(validateMessage({ kind: 'setCustomCards', customCards: ['mx-001'] }).ok).toBe(true);
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, customCards: 'nope' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, customCards: ['mx-001'] }).ok).toBe(true);
   });
 
   it('keeps extra fields when structurally valid (forward-compatible)', () => {
