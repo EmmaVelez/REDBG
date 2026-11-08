@@ -90,7 +90,7 @@ re-deck-builder/
 │  ├─ src/types.ts        contract: CardDef, PlayerState, GameState, Action unions
 │  ├─ src/engine/         reducer (GameState × Action → GameState), validate, explore, gainCard
 │  ├─ src/ai/             enumerateLegalActions + heuristic bot policy
-│  └─ src/data/           card database + scenario registry + CARD-ART/*.svg
+│  └─ src/data/           card database + scenario registry + CARD-ART/*.png
 ├─ server/        Node + ws authoritative host: rooms, seats, per-seat sanitized views
 └─ client/        Vite + React + zustand: lobby, board, hand, hot-seat
 ```
@@ -101,11 +101,10 @@ exact same engine — all from one code path.
 
 ### Card art
 
-`game-core/src/data/CARD-ART/<UPPERCASE-ID>.svg` holds art-only scans (decorative border, no
-printed text). The client resolves them with an eager `import.meta.glob` — **dropping a new SVG
-in that directory is all it takes**, no manifest and no copy step. Cards without art keep the
-placeholder frame. The scans are 2–6 MB each (~68 MB dist); if rendering gets janky, the fix is
-to pre-rasterize to PNG/WebP at ~3× card size, not to drop the art.
+`game-core/src/data/CARD-ART/<UPPERCASE-ID>.png` holds the card face art (one PNG per card id,
+quantized to 256 colours at ~320 px wide, ~100 KB each). The client resolves them with an eager
+`import.meta.glob` — **dropping a new PNG in that directory is all it takes**, no manifest and no
+copy step. Cards without art keep the placeholder frame.
 
 ## Testing
 

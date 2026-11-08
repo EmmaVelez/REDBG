@@ -68,7 +68,7 @@ check('GET / serves the built app', /<div id="root">|<script type="module"/.test
 const assets = readdirSync(DIST + '/assets');
 const jsAsset = assets.find((f) => /^index-.*\.js$/.test(f));
 const cssAsset = assets.find((f) => /^index-.*\.css$/.test(f));
-const svgAsset = assets.find((f) => f.endsWith('.svg'));
+const pngAsset = assets.find((f) => f.endsWith('.png'));
 
 if (jsAsset) {
   const js = await get(`/assets/${jsAsset}`);
@@ -82,9 +82,9 @@ if (cssAsset) {
   check(`GET /assets/${cssAsset} -> 200 css`, css.status === 200 && /css/.test(css.type), `${css.status} ${css.type}`);
 }
 
-if (svgAsset) {
-  const svg = await get(`/assets/${svgAsset}`);
-  check(`GET /assets/${svgAsset} -> 200 svg`, svg.status === 200 && /svg/.test(svg.type), `${svg.status} ${svg.type}`);
+if (pngAsset) {
+  const png = await get(`/assets/${pngAsset}`);
+  check(`GET /assets/${pngAsset} -> 200 png`, png.status === 200 && /png/.test(png.type), `${png.status} ${png.type}`);
 }
 
 const spa = await get('/room/ABCDEF');

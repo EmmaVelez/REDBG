@@ -17,6 +17,16 @@ loop + `stepBot` + the pass-and-play hand-off during the draft, and pass-and-pla
 System toggle. Browser-verified: a server room (1 human + 3 bots) drafts 5 rounds + keeps 3 with
 the human participating, and a 2-player pass-and-play hands the device between picks.
 
+**CARD ART = PNG-ONLY (2026-11-07):** `game-core/src/data/CARD-ART/` now holds **69 card-face
+PNGs** — the 18 premier mansion cards (MA-001..MA-017 + IT-002) and all 51 character cards
+(CH-001..CH-051) — quantized to 256 colours at <=320 px wide (~100 KB each, 8 MB total,
+replacing 25 SVGs at 76 MB / ~68 MB dist). `client/src/ui/cardArt.ts` globs `*.png`; the smoke
+test checks a `.png` asset. The PNGs were sliced from two Tabletop Simulator sheet images:
+grid auto-detected from edge peaks (mansion 10x4 @ 297x418, characters 10x5 + one extra card
+below the grid @ 490x695), one PNG per card id, 3 px inset to drop the grid lines. Card ids were
+read off the printed names + HP and cross-checked against the engine's `maxHp`; every match was
+exact. Browser-verified: character art fills the portrait window from the PNG files.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by

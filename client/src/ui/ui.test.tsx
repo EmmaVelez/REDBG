@@ -101,9 +101,9 @@ describe('CardView (T03)', () => {
     expect(html).toContain(`data-card-id="${def.id}"`);
   });
 
-  it('uses the CARD-ART SVG as the card face when one exists', () => {
-    const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.svg exists
-    const herb = PREMIER_CARDS.find(c => c.id === 'it-001');   // no SVG for this id
+  it('uses the CARD-ART PNG as the card face when one exists', () => {
+    const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
+    const herb = PREMIER_CARDS.find(c => c.id === 'it-001');   // no PNG for this id
     expect(majini).toBeDefined();
     expect(herb).toBeDefined();
     if (majini === undefined || herb === undefined) return;
@@ -117,8 +117,8 @@ describe('CardView (T03)', () => {
     expect(plainHtml).not.toContain('card-art-img');
   });
 
-  it('fills the character portrait window with the SVG when one exists', () => {
-    const chris = PREMIER_CARDS.find(c => c.id === 'ch-008'); // CH-008.svg exists
+  it('fills the character portrait window with the PNG when one exists', () => {
+    const chris = PREMIER_CARDS.find(c => c.id === 'ch-008'); // CH-008.png exists
     expect(chris).toBeDefined();
     if (chris === undefined) return;
     const html = renderToStaticMarkup(<CardView def={chris} decorations={0} />);

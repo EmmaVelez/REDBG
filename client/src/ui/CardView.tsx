@@ -8,7 +8,7 @@ import { HealthRing } from './HealthRing';
  * M4-T03/T11: CardView — card frames. The frame carries type color, name, cost,
  * stat line, bonuses and rules text.
  *
- * Cards that have an SVG in `game-core/src/data/CARD-ART/<ID>.svg` render it
+ * Cards that have a PNG in `game-core/src/data/CARD-ART/<ID>.png` render it
  * as the card face instead of the plain placeholder frame:
  *   - non-character cards: the art fills the card (it ships with its own
  *     decorative border) and the text rows sit on a scrim at the bottom;

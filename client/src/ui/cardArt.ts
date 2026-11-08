@@ -1,16 +1,16 @@
 /**
  * Card art URLs.
  *
- * The artwork lives in `game-core/src/data/CARD-ART/<UPPERCASE-ID>.svg` —
+ * The artwork lives in `game-core/src/data/CARD-ART/<UPPERCASE-ID>.png` —
  * one file per card id, art only (no printed text). Vite globs the directory
- * at build time, so dropping a new SVG there is enough: no manifest to keep
+ * at build time, so dropping a new PNG there is enough: no manifest to keep
  * in sync, and the browser only fetches the images a card actually renders.
  *
  * Cards without a file (most of the catalogue) get `undefined` and the UI
  * keeps the placeholder frame.
  */
 
-const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.svg', {
+const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.png', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -18,11 +18,11 @@ const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.svg', {
 
 const BY_ID: Record<string, string> = {};
 for (const [path, url] of Object.entries(modules)) {
-  const file = path.slice(path.lastIndexOf('/') + 1).replace(/\.svg$/i, '');
+  const file = path.slice(path.lastIndexOf('/') + 1).replace(/\.png$/i, '');
   BY_ID[file.toUpperCase()] = url;
 }
 
-/** Art URL for a card id (case-insensitive), or undefined when there is no SVG. */
+/** Art URL for a card id (case-insensitive), or undefined when there is no PNG. */
 export function cardArtUrl(cardId: string): string | undefined {
   return BY_ID[cardId.toUpperCase()];
 }
