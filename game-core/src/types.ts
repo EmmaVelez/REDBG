@@ -462,7 +462,10 @@ export type CharacterAbility =
   | { readonly kind: "choosePlayerIncreaseAmmoReqNextTurn"; readonly amount: number; readonly level: 1 | 2 } // CH-048 Jill: a player's weapons cost +amount Ammo next turn
   | { readonly kind: "exploreDamageReductionPerHandCard"; readonly amount: number; readonly level: 1 | 2 } // CH-049 Wesker: while exploring, -amount damage per card in hand
   | { readonly kind: "buyRedirectToPlayerDiscard"; readonly level: 1 | 2 } // CH-050 Rebecca: on buy, may move the bought card to another player's discard
-  | { readonly kind: "onDefeatChainLowerHp"; readonly hpThreshold: number; readonly level: 1 | 2 }; // CH-051 Barry: chain-defeat lower-HP infected from the Mansion top
+  | { readonly kind: "onDefeatChainLowerHp"; readonly hpThreshold: number; readonly level: 1 | 2 } // CH-051 Barry: chain-defeat lower-HP infected from the Mansion top
+  // --- Custom characters (CU-001..) ---
+  | { readonly kind: "revealInventoryTopForAction"; readonly level: 1 | 2 } // CU-001 Ricardo Irving L1: reveal the top of your Inventory; an Action there moves to your hand
+  | { readonly kind: "damageReductionAndGiveDamage"; readonly threshold: number; readonly reduction: number; readonly give: number; readonly level: 1 | 2 }; // CU-001 Ricardo Irving L2
 
 
 // ---------------------------------------------------------------------------

@@ -160,6 +160,15 @@ describe('CardView (T03)', () => {
     expect(html).toContain('skill-row');
   });
 
+  it('fills the CU-001 Ricardo Irving portrait from its PNG', () => {
+    const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
+    expect(ric).toBeDefined();
+    if (ric === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={ric} decorations={0} />);
+    expect(html).toContain('card-portrait-has-art');
+    expect(html).toMatch(/<img class="card-portrait-img" src="[^"]*CU-001[^"]*"/i);
+  });
+
   it('renders a character card with its skill list and unlock gates', () => {
     // Chris: L1 gate 0 -> L1 unlocked from the start, L2 gated
     const chris = PREMIER_CARDS.find(c => c.id === 'ch-008');
@@ -180,6 +189,25 @@ describe('CardView (T03)', () => {
     const unlockedHtml = renderToStaticMarkup(<CardView def={chris} decorations={chris.level2At} />);
     expect(unlockedHtml).toContain('skill-unlocked');
     expect(unlockedHtml).not.toContain('skill-locked');
+  });
+
+  it('CU-001 gates: L1 at 3 decorations, L2 at 8', () => {
+    const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
+    expect(ric).toBeDefined();
+    if (ric === undefined || ric.level1At === undefined || ric.level2At === undefined) return;
+    expect(ric.level1At).toBe(3);
+    expect(ric.level2At).toBe(8);
+    const fresh = renderToStaticMarkup(<CardView def={ric} decorations={0} />);
+    expect(fresh).toContain('skill-locked');
+    expect(fresh).not.toContain('skill-unlocked');
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">3<\/span>/);
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">8<\/span>/);
+    // both level texts are printed verbatim
+    expect(fresh).toContain('Reveal the top card of your Inventory');
+    expect(fresh).toContain('lower that Damage by 10');
+    const leveled = renderToStaticMarkup(<CardView def={ric} decorations={ric.level2At} />);
+    expect(leveled).toContain('skill-unlocked');
+    expect(leveled).not.toContain('skill-locked');
   });
 
   it('Leon/Jill gates: L1 requires decorations — greyed on a fresh character', () => {
@@ -736,6 +764,24 @@ describe('Lobby (T08)', () => {
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
     expect(html).toContain('checked');
+  });
+
+  it('offers custom characters in the host picker only when the room enabled them', () => {
+    const base = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+    };
+    const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
+    expect(off).not.toContain('value="cu-001"');
+
+    const on = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...base, customCards: ['cu-001'] }, clientId: 'c1' })} />);
+    expect(on).toContain('value="cu-001"');
   });
 });
 

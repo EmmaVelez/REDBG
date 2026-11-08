@@ -28,6 +28,27 @@ on a forced Mr. X reveal (overlay shows his art + that line). Tests: +4 in
 `anims.test.ts` (client 150). Also: MA-025 was already Alliance's Duvalia, so the
 custom card uses the `mx-` prefix to keep the official numbering intact.
 
+**CUSTOM CHARACTER LINE (2026-11-08): CU-001 Ricardo Irving** (80 Health, 1 copy,
+`level1At: 3` / `level2At: 8`) is the second fan card and the first custom CHARACTER.
+L1 `revealInventoryTopForAction`: during your turn, reveal the top of your Inventory;
+an Action there moves to your hand (once per turn, needs a non-empty Inventory).
+L2 `damageReductionAndGiveDamage` (threshold 30, reduction 10, give 10): a hit ABOVE 30
+is provisionally lowered by 10 and a `ricardoL2` prompt asks which Character takes 10
+(options = every other seat + `Decline`). Accepting deals 10 to the chosen Character;
+declining re-applies the reduction (the full hit lands). Implemented as ONE choke point,
+`applyRicardoDamage(state, seat, hp, amount)` in `abilities.ts`, called from EVERY
+`applyHpLoss` site (actions.ts, mercenaries.ts, nightmare.ts, outbreak.ts, skill.ts) —
+the engine resolves damage atomically through `applyHpLoss`, so a helper at that seam
+covers explore, traps, AoE, MA-031/037/038, Kevlar and skill damage. The two
+`applyHpLoss` calls inside the `ricardoL2` prompt handler are the effect itself, not
+damage intake. Art: `CARD-ART/CU-001.png` (from Manny's scan, cropped to the character
+art window). The lobby's Custom Cards picker now lists characters too (the hint says
+Infected go to the Mansion deck and Characters enter the deal pool), and
+`selectableCharacters(room)` only offers custom characters when the room enabled them.
+Tests: `engine/customCharacters.test.ts` (11), +2 ActionBar cases, +1 Lobby case,
++1 portrait case, +1 gate case. Gates: typecheck clean, game-core 746, server 102,
+client 155, build OK.
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like

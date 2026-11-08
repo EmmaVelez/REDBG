@@ -4,6 +4,14 @@ import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
 import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS } from '@re/game-core';
 
+/** Custom characters are only selectable when the room enabled them. */
+function selectableCharacters(room: RoomSnapshot): ReadonlyArray<typeof PREMIER_CARDS[number]> {
+  return [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS, ...CUSTOM_CARDS].filter(c => {
+    if (c.type !== 'character') return false;
+    return c.set !== 'custom' || room.customCards.includes(c.id);
+  });
+}
+
 /**
  * M4-T08: Lobby — create/join a room, pick a seat, add/remove bots (host),
  * and start. Bare-bones forms driven by the store's dispatch.
@@ -81,7 +89,7 @@ function CustomCardsPicker(props: {
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
-      <p className="lobby-hint">Fan-made cards. Selected cards are shuffled into the Mansion deck.</p>
+      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected are shuffled into the Mansion deck, Characters enter the deal pool.</p>
       {CUSTOM_CARDS.map(c => (
         <label key={c.id} className="custom-card-row">
           <input
@@ -236,7 +244,7 @@ export function Lobby({
                   Main character:
                   <select value={me?.mainCharacterId ?? ''} onChange={e => onSetCharacterSelection(e.target.value || undefined, me?.partnerCharacterId)}>
                     <option value="">Random</option>
-                    {[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character').filter(c => {
+                    {selectableCharacters(room).filter(c => {
                       const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                       return !taken.has(c.id) || c.id === me?.mainCharacterId;
                     }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}
@@ -247,7 +255,7 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character').filter(c => {
+                      {selectableCharacters(room).filter(c => {
                         const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                         return !taken.has(c.id) || c.id === me?.partnerCharacterId;
                       }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}

@@ -9,6 +9,7 @@ import {
   SCENARIOS,
   cardsForScenario,
   pilesForScenario,
+  CUSTOM_CARDS,
 } from '@re/game-core';
 import { ActionBar } from './ActionBar';
 
@@ -72,6 +73,37 @@ describe('ActionBar prompt panel', () => {
     const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
     expect(html).toContain('Ammo x10');
     expect(html).not.toContain('am-001#s1_1');
+  });
+
+  it('labels CU-001 L2 options as player names plus Decline', () => {
+    const s = withPrompts(twoPlayerState(), [
+      { id: 'p1', seat: 0, text: 'Ricardo lowers the Damage by 10 — give 10 Damage to any Character.', options: ['1', 'Decline'], payload: { kind: 'ricardoL2' } },
+    ]);
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Bot (seat 1)');
+    expect(html).toContain('Decline');
+  });
+
+  it('offers CU-001 L1 as a button once he reaches Level 1', () => {
+    const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
+    expect(ric).toBeDefined();
+    if (ric === undefined) return;
+    const base = startTurn(setup(
+      { seed: 11, players: [
+        { name: 'Me', controller: 'human', characterCardId: 'cu-001' },
+        { name: 'Bot', controller: 'human', characterCardId: 'ch-002' },
+      ] },
+      [...PREMIER_CARDS, ...CUSTOM_CARDS],
+      FIRST_TIMER_PILES,
+    ));
+    const itemId = 'it-001#probe';
+    const s: GameState = {
+      ...base,
+      cards: { ...base.cards, [itemId]: { instanceId: itemId, cardId: 'it-001', location: { zone: 'inventory', index: 0 } } },
+      seats: base.seats.map((p, i) => (i === 0 ? { ...p, decorations: 5, level: 1, inventory: [itemId, ...p.inventory] } : p)),
+    };
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Reveal the top card of your Inventory');
   });
 });
 

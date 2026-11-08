@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState, Prompt } from '../types';
 import { gainCard } from './gainCard';
 import { sendToBottom, shuffleBack } from './mansion';
-import { characterAbilities, applyHpLoss } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
 import { flipDown } from './characters';
 import { makeRng, shuffle } from '../util/rng';
 
@@ -112,7 +112,9 @@ export function dealDamageToCharacter(state: GameState, seat: number, amount: nu
   const abilities = characterAbilities(state, seat);
   const hunkReduce = abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
   const dmg = Math.max(amount - hunkReduce, 0);
-  const newHp = applyHpLoss(abilities, player.hp, dmg, player.downed || player.dead);
+  const ric = applyRicardoDamage(state, seat, player.hp, dmg);
+  state = ric.state;
+  const newHp = ric.hp;
   if (newHp > 0 || player.downed || player.dead) {
     return { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, hp: newHp } : s)) };
   }

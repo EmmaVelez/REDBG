@@ -1,5 +1,5 @@
 import type { CardDef, GameState, PlayerState, Prompt } from '../types';
-import { characterAbilities, applyHpLoss } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
 import { drawWithReshuffle } from './deck';
 import { nonEmptyPileIds, gainAmmoX10 } from './mercenaries';
 
@@ -46,7 +46,9 @@ export function applyNightmareRevealEffects(state: GameState, ctx: NightmareCont
         if (player === undefined || player.dead) break;
         const amount = Math.max(e.base - e.perInventoryCard * player.inventory.length, 0);
         if (amount <= 0) break;
-        const newHp = applyHpLoss(characterAbilities(s, ctx.seat), player.hp, amount, player.downed || player.dead);
+        const ric = applyRicardoDamage(s, ctx.seat, player.hp, amount);
+        s = ric.state;
+        const newHp = ric.hp;
         s = { ...s, seats: s.seats.map(x => (x.seat === ctx.seat ? { ...x, hp: newHp } : x)) };
         break;
       }
@@ -273,7 +275,11 @@ export function applyMindControlCopy(state: GameState, seat: number, def: CardDe
       }
       if (e.kind === 'gainActions') p = { ...p, actionsLeft: p.actionsLeft + e.count };
       if (e.kind === 'gainAmmo') p = { ...p, turnAmmo: p.turnAmmo + e.amount };
-      if (e.kind === 'damageCharacter') p = { ...p, hp: applyHpLoss(characterAbilities(s, seat), p.hp, e.amount, p.downed || p.dead) };
+      if (e.kind === 'damageCharacter') {
+        const ric = applyRicardoDamage(s, seat, p.hp, e.amount);
+        s = ric.state;
+        p = { ...p, hp: ric.hp };
+      }
       if (e.kind === 'discardInventory') p = { ...p, discard: [...p.discard, ...p.inventory], inventory: [] };
     }
   }

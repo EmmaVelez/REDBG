@@ -2,7 +2,7 @@ import type { CardDef, GameState, PlayerState, PendingSkillEffect, Prompt, Skill
 import { makeRng, shuffle } from '../util/rng';
 import { drawWithReshuffle } from './deck';
 import { flipDown } from './characters';
-import { characterAbilities, applyHpLoss } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
 
 /**
  * Mercenaries Skill System — shared queries and the opening draft.
@@ -488,7 +488,9 @@ function damageCharacter(state: GameState, seat: number, amount: number): GameSt
   const player = state.seats[seat];
   if (player === undefined || amount <= 0) return state;
   const abilities = characterAbilities(state, seat);
-  const newHp = applyHpLoss(abilities, player.hp, amount, player.downed || player.dead);
+  const ric = applyRicardoDamage(state, seat, player.hp, amount);
+  state = ric.state;
+  const newHp = ric.hp;
   if (newHp > 0 || player.downed || player.dead) {
     return { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, hp: newHp } : s)) };
   }

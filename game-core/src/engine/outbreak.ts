@@ -1,5 +1,5 @@
 import type { CardDef, GameState, PlayerState, Prompt } from '../types';
-import { characterAbilities, applyHpLoss } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
 
 /**
  * Outbreak expansion — engine support for the infected effects that were
@@ -55,7 +55,9 @@ export function applyOutbreakRevealEffects(state: GameState, ctx: OutbreakReveal
         const kevlar = applyDamageWithKevlar(s, ctx.seat, e.amount);
         s = kevlar.state;
         movedToBottom = [...movedToBottom, ...kevlar.movedIds];
-        const newHp = applyHpLoss(characterAbilities(s, ctx.seat), player.hp, kevlar.damage, player.downed || player.dead);
+        const ric = applyRicardoDamage(s, ctx.seat, player.hp, kevlar.damage);
+        s = ric.state;
+        const newHp = ric.hp;
         s = { ...s, seats: s.seats.map(x => (x.seat === ctx.seat ? { ...x, hp: newHp } : x)) };
         break;
       }

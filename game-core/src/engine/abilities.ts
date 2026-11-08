@@ -1,4 +1,4 @@
-import type { CharacterAbility, GameState, PlayerState, CardDef, WeaponTag } from '../types';
+import type { CharacterAbility, GameState, PlayerState, CardDef, WeaponTag, Prompt } from '../types';
 import { drawWithReshuffle } from './deck';
 import { abilitiesForLevel } from './characters';
 
@@ -136,6 +136,27 @@ export function infectedDamageReduction(abilities: readonly CharacterAbility[]):
     (sum, a) => (a.kind === 'infectedDamageReduction' ? sum + a.amount : sum),
     0
   );
+}
+
+/**
+ * CU-001 Ricardo Irving L2: "When Ricardo would take more than 30 Damage,
+ * you can lower that Damage by 10. In that case, give 10 Damage to any
+ * Character." Returns the reduction to apply to a hit of `amount`
+ * (0 when the trigger does not fire).
+ */
+export function ricardoReduction(abilities: readonly CharacterAbility[], amount: number): number {
+  for (const a of abilities) {
+    if (a.kind === 'damageReductionAndGiveDamage' && amount > a.threshold) return a.reduction;
+  }
+  return 0;
+}
+
+/** The `give` amount for the Ricardo L2 side effect (0 when he has no such ability). */
+export function ricardoGiveAmount(abilities: readonly CharacterAbility[]): number {
+  for (const a of abilities) {
+    if (a.kind === 'damageReductionAndGiveDamage') return a.give;
+  }
+  return 0;
 }
 
 /**
@@ -334,6 +355,56 @@ export function applyHpLoss(abilities: readonly CharacterAbility[], hp: number, 
   const next = Math.max(hp - amount, 0);
   if (next > 0 || seatDownedOrDead) return next;
   return setHpToOnLethal(abilities) ?? next;
+}
+
+/**
+ * Applies `amount` damage to `seat` through the shared HP-loss choke
+ * point, intercepting CU-001 Ricardo Irving L2: a hit greater than the
+ * threshold is provisionally lowered by `reduction` and the player is
+ * asked to accept (deal `give` to the chosen Character) or decline (the
+ * full hit lands — the resolver implements that as re-applying
+ * `reduction`). Returns the state (with the prompt queued when the
+ * trigger fired) and the resulting HP.
+ */
+/** Queue the CU-001 Ricardo Irving L2 accept/decline prompt. */
+export function queueRicardoL2Prompt(state: GameState, seat: number, amount: number, reduce: number): GameState {
+  const give = ricardoGiveAmount(characterAbilities(state, seat));
+  const targets = state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat));
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `ricardo-l2-${seat}-v${state.version}`,
+      seat,
+      text: `Ricardo would take ${amount} Damage. Lower it by ${reduce} and give ${give} Damage to any Character?`,
+      options: [...targets, 'Decline'],
+      payload: { kind: 'ricardoL2', amount: String(amount), reduction: String(reduce), give: String(give) },
+    }],
+  };
+}
+
+/**
+ * Applies `amount` damage to `hp` (the Character's current Health),
+ * intercepting CU-001 Ricardo Irving L2: a hit greater than the
+ * threshold is provisionally lowered by `reduction` and the player is
+ * asked to accept (deal `give` to the chosen Character) or decline (the
+ * full hit lands — the resolver implements that as re-applying
+ * `reduction`). Returns the state (with the prompt queued when the
+ * trigger fired) and the resulting HP.
+ */
+export function applyRicardoDamage(
+  state: GameState,
+  seat: number,
+  hp: number,
+  amount: number,
+): { readonly state: GameState; readonly hp: number } {
+  const player = state.seats[seat];
+  if (player === undefined) return { state, hp };
+  const abilities = characterAbilities(state, seat);
+  const downed = player.downed || player.dead;
+  const reduce = downed ? 0 : ricardoReduction(abilities, amount);
+  const nextHp = applyHpLoss(abilities, hp, Math.max(amount - reduce, 0), downed);
+  if (reduce <= 0) return { state, hp: nextHp };
+  return { state: queueRicardoL2Prompt(state, seat, amount, reduce), hp: nextHp };
 }
 
 /**

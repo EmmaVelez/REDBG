@@ -25,4 +25,23 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     decorations: 5,
     infectedEffects: [{ kind: 'onNotDefeatedInsertIntoMansionAt', position: 5 }],
   },
+  {
+    id: 'cu-001',
+    name: 'Ricardo Irving',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: During your turn, you can Reveal the top card of your Inventory. If it is an Action, move it to your hand.\nLevel 2: When Ricardo would take more than 30 Damage, you can lower that Damage by 10. In that case, give 10 Damage to any Character.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 3,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'During your turn, you can Reveal the top card of your Inventory. If it is an Action, move it to your hand.' },
+      { level: 2, text: 'When Ricardo would take more than 30 Damage, you can lower that Damage by 10. In that case, give 10 Damage to any Character.' },
+    ],
+    abilities: [
+      { kind: 'revealInventoryTopForAction', level: 1 },
+      { kind: 'damageReductionAndGiveDamage', threshold: 30, reduction: 10, give: 10, level: 2 },
+    ],
+  },
 ];

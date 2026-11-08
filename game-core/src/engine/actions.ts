@@ -39,6 +39,9 @@ import {
   exploreOnInfectedDefeat,
   trashCardFromDiscardOnInfectedDefeat,
   trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat,
+  applyRicardoDamage,
+  ricardoReduction,
+  queueRicardoL2Prompt,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -756,7 +759,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
               if (e.kind === 'damageCharacter') {
-                newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.amount, newPlayer.downed || newPlayer.dead) };
+                const ric = applyRicardoDamage(state, seat, newPlayer.hp, e.amount);
+                state = ric.state;
+                newPlayer = { ...newPlayer, hp: ric.hp };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
               if (e.kind === 'unlimitedActionsThisTurn') {
@@ -797,7 +802,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 // If beginTurnTrashIfHealthAtMost already trashed, instanceId is gone from attached.
                 const trashed = !stillAttached && newPlayer.discard.includes(instanceId);
                 if (!trashed) {
-                  newPlayer = { ...newPlayer, hp: applyHpLoss(characterAbilities(state, seat), newPlayer.hp, e.damage, newPlayer.downed || newPlayer.dead) };
+                  const ric = applyRicardoDamage(state, seat, newPlayer.hp, e.damage);
+                  state = ric.state;
+                  newPlayer = { ...newPlayer, hp: ric.hp };
                   const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: e.cards, rngState: rngAfterEffects });
                   newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
                   rngAfterEffects = d.rngState;
@@ -1345,7 +1352,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               state = neg.state;
               if (neg.negated) continue;
               const reduce = characterAbilities(state, s.seat).reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
-              const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(10 - reduce, 0), s.downed || s.dead);
+              const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(10 - reduce, 0));
+              state = ric.state;
+              const newHp = ric.hp;
               state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
             }
           }
@@ -1357,7 +1366,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               state = neg.state;
               if (neg.negated) continue;
               const reduce = characterAbilities(state, s.seat).reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
-              const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(40 - reduce, 0), s.downed || s.dead);
+              const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(40 - reduce, 0));
+              state = ric.state;
+              const newHp = ric.hp;
               state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
             }
           }
@@ -1637,9 +1648,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (!mBottom.includes(id)) mBottom = [...mBottom, id];
           }
 
-          newLeadingHp = damageOnAda
-            ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
-            : baseLeadingHp - kevlar.damage;
+          if (damageOnAda) {
+            const ric = applyRicardoDamage(state, seat, baseLeadingHp, kevlar.damage);
+            state = ric.state;
+            newLeadingHp = ric.hp;
+          } else {
+            const reduce = player.downed || player.dead ? 0 : ricardoReduction(characterAbilities(state, seat), kevlar.damage);
+            newLeadingHp = baseLeadingHp - Math.max(kevlar.damage - reduce, 0);
+            if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+          }
           for (const { id, def } of undefeatedEntries) {
             if (negatedIds.has(id)) continue;
             for (const e of def.infectedEffects ?? []) {
@@ -1653,7 +1670,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // MA-038 Explosive Barrel / MA-056o / MA-057o traps.
         for (const id of barrelIds) {
           if (damage >= 80) {
-            const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead);
+            const ric = applyRicardoDamage(state, seat, player.hp, 30);
+            state = ric.state;
+            const newHp = ric.hp;
             state = { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, hp: newHp } : x)) };
           } else {
             exploresLeftAfter += 1;
@@ -1671,7 +1690,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             for (const bid of kevlarTrap.movedIds) {
               if (!mBottom.includes(bid)) mBottom = [...mBottom, bid];
             }
-            const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, kevlarTrap.damage, player.downed || player.dead);
+            const ric = applyRicardoDamage(state, seat, player.hp, kevlarTrap.damage);
+            state = ric.state;
+            const newHp = ric.hp;
             state = { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, hp: newHp } : x)) };
           }
         }
@@ -1855,7 +1876,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (neg.negated) continue;
           const hunkReduce = characterAbilities(state, s.seat)
             .reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
-          const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(10 - hunkReduce, 0), s.downed || s.dead);
+          const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(10 - hunkReduce, 0));
+          state = ric.state;
+          const newHp = ric.hp;
           state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
         }
       }
@@ -1867,7 +1890,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (neg.negated) continue;
           const hunkReduce = characterAbilities(state, s.seat)
             .reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
-          const newHp = applyHpLoss(characterAbilities(state, s.seat), s.hp ?? 0, Math.max(40 - hunkReduce, 0), s.downed || s.dead);
+          const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(40 - hunkReduce, 0));
+          state = ric.state;
+          const newHp = ric.hp;
           state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
         }
       }
@@ -2040,7 +2065,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
         const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
-        let newPlayer: PlayerState = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: evDamage >= 80 ? applyHpLoss(characterAbilities(state, seat), player.hp, 30, player.downed || player.dead) : player.hp });
+        let ricHp = player.hp;
+        if (evDamage >= 80) {
+          const ricBarrel = applyRicardoDamage(state, seat, player.hp, 30);
+          state = ricBarrel.state;
+          ricHp = ricBarrel.hp;
+        }
+        let newPlayer: PlayerState = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + (evDamage < 80 ? 1 : 0), turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, hp: ricHp });
         // +30 damage collectively handled by not removing; for simplicity add to weaponDamageBonus? skip; damage already resolved via threshold only.
         return {
           ...state,
@@ -2121,11 +2152,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           for (const id of kevlarTrap.movedIds) {
             if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
           }
+          const ricTrap = applyRicardoDamage(state, seat, trapPlayer.hp, kevlarTrap.damage);
+          state = ricTrap.state;
           trapPlayer = {
             ...trapPlayer,
             // Keep the post-kevlar `attached`: the jacket left play.
             attached: (state.seats[seat] as PlayerState).attached,
-            hp: applyHpLoss(characterAbilities(state, seat), trapPlayer.hp, kevlarTrap.damage, trapPlayer.downed || trapPlayer.dead),
+            hp: ricTrap.hp,
           };
         }
         return {
@@ -2708,9 +2741,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
       }
 
-      const newLeadingHp = damageOnAda
-        ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
-        : Math.max(baseLeadingHp - kevlar.damage, 0);
+      let newLeadingHp: number;
+      if (damageOnAda) {
+        const ric = applyRicardoDamage(state, seat, baseLeadingHp, kevlar.damage);
+        state = ric.state;
+        newLeadingHp = ric.hp;
+      } else {
+        const reduce = player.downed || player.dead ? 0 : ricardoReduction(characterAbilities(state, seat), kevlar.damage);
+        newLeadingHp = Math.max(baseLeadingHp - Math.max(kevlar.damage - reduce, 0), 0);
+        if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+      }
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
       let hand: readonly string[] = handAfter;
@@ -3049,6 +3089,36 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     text: `You peek at the Mansion: ${topDef?.name ?? 'an unknown card'} (${topDef?.hp ?? '?'} HP). It stays on top.`,
                     options: ['OK'],
                     payload: { kind: 'lookAtMansionTop' },
+                  },
+                ],
+              };
+            }
+            case 'revealInventoryTopForAction': {
+              // Ricardo Irving (Custom CU-001) L1: reveal the top of your
+              // Inventory; when it is an Action, it moves to your hand.
+              const invTopId = player.inventory[0];
+              const invTopDef = invTopId === undefined ? undefined : cardDef(state, invTopId);
+              const movedId = invTopDef?.type === 'action' ? invTopId : undefined;
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? {
+                      ...s,
+                      inventory: movedId === undefined ? s.inventory : s.inventory.slice(1),
+                      hand: movedId === undefined ? s.hand : [...s.hand, movedId],
+                    }
+                  : s)),
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: movedId === undefined
+                      ? `You reveal ${invTopDef?.name ?? 'a card'} — not an Action. It stays on top of your Inventory.`
+                      : `You reveal ${invTopDef?.name ?? 'a card'} — an Action. It moves to your hand.`,
+                    options: ['OK'],
+                    payload: { kind: 'revealInventoryTop' },
                   },
                 ],
               };
@@ -3660,11 +3730,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // MA-054o Kevlar Jacket: the target's jacket absorbs this damage.
           const kevlar = applyDamageWithKevlar(state, targetSeat, damage);
           state = kevlar.state;
+          const ricTarget = applyRicardoDamage(state, targetSeat, target.hp, kevlar.damage);
+          state = ricTarget.state;
           const newTarget: PlayerState = {
             ...target,
             // Keep the post-kevlar `attached`: the jacket left play.
             attached: (state.seats[targetSeat] as PlayerState).attached,
-            hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, kevlar.damage, target.downed || target.dead),
+            hp: ricTarget.hp,
             hand: sloughArmorId !== undefined ? target.hand.filter(id => id !== sloughArmorId) : target.hand,
             discard: sloughArmorId !== undefined ? [...target.discard, sloughArmorId] : target.discard,
             infectionCards: targetInfectionCards,
@@ -3682,7 +3754,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           };
           // An Infected Character that survives deals its base Damage back.
           if (targetSurvives && target.isInfectedCharacter === true) {
-            finalPlayer = { ...finalPlayer, hp: applyHpLoss(characterAbilities(state, seat), finalPlayer.hp, targetDef?.baseDamage ?? 0, finalPlayer.downed || finalPlayer.dead) };
+            const ric = applyRicardoDamage(state, seat, finalPlayer.hp, targetDef?.baseDamage ?? 0);
+            state = ric.state;
+            finalPlayer = { ...finalPlayer, hp: ric.hp };
           }
           // CH-031 Zombie A: when this infected character attacks, all other
           // non-infected characters that are not being attacked take damage.
@@ -3696,7 +3770,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (s.seat === targetSeat) return newTarget;
             // CH-031 Zombie A: other non-infected characters take damage.
             if (aoeAmount > 0 && s.isInfectedCharacter !== true && !s.dead) {
-              return { ...s, hp: applyHpLoss(characterAbilities(state, s.seat), s.hp, aoeAmount, s.downed || s.dead) };
+              const ric = applyRicardoDamage(state, s.seat, s.hp, aoeAmount);
+              state = ric.state;
+              return { ...s, hp: ric.hp };
             }
             return s;
           });
@@ -4137,9 +4213,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           const defeated = pe.outcome === 'defeated';
           const currentSeat = s.seats[pe.seat] ?? pe.newPlayer;
-          const newPlayer = defeated
-            ? { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(s, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] }
-            : { ...currentSeat, hp: applyHpLoss(characterAbilities(s, pe.seat), currentSeat.hp, pe.damageTaken, currentSeat.downed || currentSeat.dead) };
+          let newPlayer: PlayerState;
+          if (defeated) {
+            newPlayer = { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(s, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
+          } else {
+            const ric = applyRicardoDamage(s, pe.seat, currentSeat.hp, pe.damageTaken);
+            s = ric.state;
+            newPlayer = { ...currentSeat, hp: ric.hp };
+          }
           // Not defeated: the Infected's own effect places it (MX-001
           // inserts it 5th from the top). The pre-reveal deck still holds
           // the card, so drop it before placing.
@@ -4186,15 +4267,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const defeated = !!updatedState.flashGrenadeDefeatedInstanceId;
           // SK-008 Luck LV.2: a declared reaction negates this Damage.
           const neg = defeated ? { state: updatedState, negated: false } : consumeNegateDamage(updatedState, pe.seat);
-          const baseState = neg.state;
+          let baseState = neg.state;
           // Apply the combat OUTCOME to the seat's CURRENT state. The saved
           // `newPlayer` snapshot is stale — the exploring player may have kept
           // acting while the reactive prompt was open — and restoring it would
           // silently discard those changes (cards orphaned, pools reverted).
           const currentSeat = baseState.seats[pe.seat] ?? pe.newPlayer;
-          const newPlayer = defeated
-            ? { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(baseState, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] }
-            : { ...currentSeat, hp: applyHpLoss(characterAbilities(baseState, pe.seat), currentSeat.hp, neg.negated ? 0 : pe.damageTaken, currentSeat.downed || currentSeat.dead) };
+          let newPlayer: PlayerState;
+          if (defeated) {
+            newPlayer = { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(baseState, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
+          } else {
+            const ric = applyRicardoDamage(baseState, pe.seat, currentSeat.hp, neg.negated ? 0 : pe.damageTaken);
+            baseState = ric.state;
+            newPlayer = { ...currentSeat, hp: ric.hp };
+          }
           // The Infected's own fate likewise applies to the CURRENT deck (it
           // may have changed while the prompt was open).
           const bottomed = defeated
@@ -4466,13 +4552,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         const dmg = Number(prompt.payload?.amount ?? '10');
+        const promptCountBefore = state.prompts.length;
+        const ric = applyRicardoDamage(state, seat, player.hp, dmg);
+        state = ric.state;
+        const ricPrompts = state.prompts.slice(promptCountBefore);
         return {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat
-            ? { ...player, hp: applyHpLoss(characterAbilities(state, seat), player.hp, dmg, player.downed || player.dead), exploresLeft: player.exploresLeft + 1 }
+            ? { ...player, hp: ric.hp, exploresLeft: player.exploresLeft + 1 }
             : s)),
-          prompts: newPrompts,
+          prompts: [...newPrompts, ...ricPrompts],
         };
       }
 
@@ -5403,6 +5493,40 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               return afterPile;
             }
 
+      if (kind === 'ricardoL2') {
+        // CU-001 Ricardo Irving L2: accept -> the chosen Character takes
+        // `give` Damage (the reduction is already provisionally applied);
+        // Decline -> the full hit lands, i.e. re-apply the reduction.
+        const chosen = prompt.options[option];
+        const give = Number(prompt.payload?.give ?? '0');
+        const reduction = Number(prompt.payload?.reduction ?? '0');
+        if (chosen === undefined || chosen === 'Decline') {
+          const p = state.seats[seat];
+          if (p === undefined || reduction <= 0) {
+            return { ...state, ...nextBase, prompts: newPrompts };
+          }
+          const hp = applyHpLoss(characterAbilities(state, seat), p.hp, reduction, p.downed || p.dead);
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? { ...s, hp } : s)),
+            prompts: newPrompts,
+          };
+        }
+        const targetSeat = Number(chosen);
+        const target = state.seats[targetSeat];
+        if (target === undefined || give <= 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetHp = applyHpLoss(characterAbilities(state, targetSeat), target.hp, give, target.downed || target.dead);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, hp: targetHp } : s)),
+          prompts: newPrompts,
+        };
+      }
+
       if (kind === 'exchangeHandWithInventoryTop') {
         // Sheva L1: the chosen hand card swaps with the top of Inventory.
         const chosen = prompt.options[option];
@@ -6185,14 +6309,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           | { damage: number; amount: number }
           | undefined;
         if (ab === undefined) return { ...state, ...nextBase, prompts: newPrompts };
-        const newHp = applyHpLoss(characterAbilities(state, seat), player.hp, ab.damage, player.downed || player.dead);
+        const promptCountBefore = state.prompts.length;
+        const ric = applyRicardoDamage(state, seat, player.hp, ab.damage);
+        state = ric.state;
+        const newHp = ric.hp;
+        const ricPrompts = state.prompts.slice(promptCountBefore);
         return {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat
             ? { ...s, hp: newHp, weaponDamageBonusThisTurn: (s.weaponDamageBonusThisTurn ?? 0) + ab.amount }
             : s)),
-          prompts: newPrompts,
+          prompts: [...newPrompts, ...ricPrompts],
         };
       }
 

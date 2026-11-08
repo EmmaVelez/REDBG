@@ -445,6 +445,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'plusDamageThisTurn':
         case 'exchangeHandWithInventoryTop':
         case 'revealMansionTopNoEffect':
+        case 'revealInventoryTopForAction':
         case 'trashFromHandAtWill':
         case 'forceExploreOtherPlayer':
         case 'giveOneCardToPlayerThenMaybeAnother':
@@ -490,6 +491,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           }
           if (ability.kind === 'revealMansionTopNoEffect' && state.mansionDeck.length === 0) {
             return { ok: false, reason: 'useCharacterAbility: Mansion is empty' };
+          }
+          if (ability.kind === 'revealInventoryTopForAction' && player.inventory.length === 0) {
+            return { ok: false, reason: 'useCharacterAbility: Inventory is empty' };
           }
           if (ability.kind === 'trashFromHandAtWill' && player.hand.length === 0) {
             return { ok: false, reason: 'useCharacterAbility: hand is empty' };
