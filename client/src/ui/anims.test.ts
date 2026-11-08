@@ -192,6 +192,51 @@ describe('detectReveal', () => {
     expect(detectReveal(prev, next, 0)).toBeNull();
   });
 
+  it('detects a re-inserted Infected: revealed from the deck and put back in it', () => {
+    const prev = makeState({ mansionDeck: ['mx-001#1', 'a1', 'b1', 'c1', 'd1', 'e1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['a1', 'b1', 'c1', 'd1', 'mx-001#1', 'e1'],
+      seats: [{ seat: 0 }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
+    });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'mx-001#1', outcomeZone: 'mansion', damage: 0, weapons: [] });
+  });
+
+  it('detects a re-inserted Infected even when it lands back on top', () => {
+    const prev = makeState({ mansionDeck: ['mx-001#1', 'a1', 'b1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['mx-001#1', 'a1', 'b1'],
+      seats: [{ seat: 0 }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
+    });
+    expect(detectReveal(prev, next, 0)?.outcomeZone).toBe('mansion');
+  });
+
+  it('prefers a defeated Infected over a re-inserted one in the same explore', () => {
+    const prev = makeState({ mansionDeck: ['mx-001#1', 'ma-001#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['mx-001#1'],
+      seats: [{ seat: 0, attached: ['ma-001#1'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 2 } }],
+    });
+    expect(detectReveal(prev, next, 0)?.outcomeZone).toBe('attached');
+  });
+
+  it('does not report a card that merely shifted up when the revealed card left', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#1', 'ma-002#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['ma-002#1'],
+      mansionBottom: ['ma-001#1'],
+      seats: [{ seat: 0 }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
+    });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#1', outcomeZone: 'mansionBottom', damage: 0, weapons: [] });
+  });
+
   it('returns null when the newest action is not an explore', () => {
     const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
     const next = makeState({

@@ -118,7 +118,9 @@ export function App(): JSX.Element {
         ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
         : detected.outcomeZone === 'removed'
           ? `${def.name} was removed from the Mansion.`
-          : `${def.name} escaped to the bottom of the Mansion.`;
+          : detected.outcomeZone === 'mansion'
+            ? `${def.name} was returned to the Mansion deck.`
+            : `${def.name} escaped to the bottom of the Mansion.`;
     // Resolve the explore's weapon instances to defs for the reveal panel.
     const weaponDefs = detected.weapons
       .map(id => defForInstance(state, id))

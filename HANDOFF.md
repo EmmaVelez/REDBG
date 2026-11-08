@@ -18,11 +18,15 @@ Consumed in the single-explore, multi-explore and AC-042 deferred-explore
 disposition paths. Art: `CARD-ART/MX-001.png` (from Manny's scan). Tests:
 `engine/customCards.test.ts` (13) + protocol/rooms/hotseat/Lobby cases. Gates:
 typecheck clean, game-core 735, server 102, client 146, build OK.
-**Known limitation:** a not-defeated Mr. X gets NO mansion-reveal overlay — it stays
-in the `mansion` zone and `detectReveal` only reports attached/mansionBottom/removed.
-That is a pre-existing gap (Uroboros Aheri's shuffle-back behaves the same), not a
-regression. Also: MA-025 was already Alliance's Duvalia, so the custom card uses the
-`mx-` prefix to keep the official numbering intact.
+**Reveal overlay for re-inserted cards (2026-11-08):** `detectReveal` now also reports
+`outcomeZone: 'mansion'` — a revealed card found back in `next.mansionDeck` was
+re-inserted (revealing REMOVES it from the deck, so being back means re-inserted; the
+revealed set is the top `exploreCount` of the PRE-explore deck). Do NOT compare deck
+indices: every card behind the reveal shifts up, so index drift flags cards that were
+never revealed. `App.tsx` renders "was returned to the Mansion deck." Browser-verified
+on a forced Mr. X reveal (overlay shows his art + that line). Tests: +4 in
+`anims.test.ts` (client 150). Also: MA-025 was already Alliance's Duvalia, so the
+custom card uses the `mx-` prefix to keep the official numbering intact.
 
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.

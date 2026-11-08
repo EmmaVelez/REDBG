@@ -96,8 +96,9 @@ function travelsFaceDown(from: AnimZone, to: AnimZone): boolean {
 
 export interface Reveal {
   readonly instanceId: string;
-  /** Zone the revealed card ended up in after the fight resolved. */
-  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed';
+  /** Zone the revealed card ended up in after the fight resolved. `mansion`
+   *  means it was RE-INSERTED into the deck (MX-001 Mr. X). */
+  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed' | 'mansion';
   /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
   readonly damage: number;
   /** Weapon instance ids the exploring player used for this attack. */
@@ -110,15 +111,19 @@ function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
 
 /**
  * The card revealed by the viewing player's most recent explore, if any.
- * Requires the newest logged action to be an explore by `mySeat` AND an
- * instance that left the mansion this step. Returns null when there is no
- * fresh reveal (bots exploring, reshuffles, non-infected prompts).
+ * Requires the newest logged action to be an explore by `mySeat` AND a
+ * revealed instance that is now somewhere other than the top of the
+ * mansion. Returns null when there is no fresh reveal (bots exploring,
+ * reshuffles, non-infected prompts).
  */
 export function detectReveal(prev: GameState, next: GameState, mySeat: number): Reveal | null {
   const last = next.log[next.log.length - 1];
   if (last === undefined) return null;
   const action = last.action;
   if (action.type !== 'explore' || action.seat !== mySeat) return null;
+
+  const damage = exploreDamage(prev, action.seat, action.weapons);
+  const weapons = action.weapons;
 
   const prevZones = zoneIndex(prev);
   const nextZones = zoneIndex(next);
@@ -129,9 +134,20 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
     if (prevLoc.zone !== 'mansion') continue;
     if (sameLoc(prevLoc, nextLoc)) continue;
     if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
-      const damage = action.type === 'explore' ? exploreDamage(prev, action.seat, action.weapons) : 0;
-      const weapons = action.type === 'explore' ? action.weapons : [];
       return { instanceId, outcomeZone: nextLoc.zone, damage, weapons };
+    }
+  }
+
+  // Re-inserted into the Mansion deck (MX-001 Mr. X: "place it on top of
+  // the mansion as the 5th upcoming card"). Revealing REMOVES the card
+  // from the deck, so a revealed card found back in the deck was
+  // re-inserted — its zone never changed, which the loop above cannot see.
+  // The revealed cards are the top `exploreCount` of the pre-explore deck.
+  const revealedCount = Math.max(1, action.exploreCount ?? 1);
+  for (const instanceId of prev.mansionDeck.slice(0, revealedCount)) {
+    if (instanceId.startsWith('hidden-')) continue;
+    if (next.mansionDeck.includes(instanceId)) {
+      return { instanceId, outcomeZone: 'mansion', damage, weapons };
     }
   }
   return null;
