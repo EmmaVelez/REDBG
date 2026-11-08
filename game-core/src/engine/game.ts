@@ -4,7 +4,7 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 
@@ -221,6 +221,19 @@ function turnStartAbilityPrompts(
       text: l1Text,
       options: ['Yes', 'No'],
       payload: { kind: 'claireBuyForAmmo', amount: String(claireBuy.amount) },
+    });
+  }
+
+  // CR-001 Claire Redfield L2 (SPECIALIST): at turn start, may get
+  // +actions Actions and -buy Buy.
+  const specialist = abilities.find(a => a.kind === 'turnStartActionsForBuy');
+  if (specialist !== undefined && specialist.kind === 'turnStartActionsForBuy') {
+    prompts.push({
+      id: `specialist-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: l2Text,
+      options: ['Yes', 'No'],
+      payload: { kind: 'specialistActionsForBuy', actions: String(specialist.actions), buy: String(specialist.buy) },
     });
   }
 
@@ -778,7 +791,8 @@ function startTurnInternal(state: GameState): GameState {
         .filter(a => a.kind === 'turnStartActionIfHpAtMost' && player.hp <= a.threshold).length;
       return capped + adaBonus;
     })(),
-    buysLeft: 1,
+    // CR-001 Claire Redfield L1 (TACTICIAN): flat +amount Buy.
+    buysLeft: 1 + plusBuyBonus(abilitiesForLevel(charDef?.abilities, player.level)),
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
     // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).

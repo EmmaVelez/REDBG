@@ -465,7 +465,13 @@ export type CharacterAbility =
   | { readonly kind: "onDefeatChainLowerHp"; readonly hpThreshold: number; readonly level: 1 | 2 } // CH-051 Barry: chain-defeat lower-HP infected from the Mansion top
   // --- Custom characters (CU-001..) ---
   | { readonly kind: "revealInventoryTopForAction"; readonly level: 1 | 2 } // CU-001 Ricardo Irving L1: reveal the top of your Inventory; an Action there moves to your hand
-  | { readonly kind: "damageReductionAndGiveDamage"; readonly threshold: number; readonly reduction: number; readonly give: number; readonly level: 1 | 2 }; // CU-001 Ricardo Irving L2
+  | { readonly kind: "damageReductionAndGiveDamage"; readonly threshold: number; readonly reduction: number; readonly give: number; readonly level: 1 | 2 } // CU-001 Ricardo Irving L2
+  // --- Fan characters (LK-001..) ---
+  | { readonly kind: "plusDamagePerPistolUsed"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // LK-001 Leon L1: +amount per pistol when using threshold+ pistols
+  | { readonly kind: "playAreaCardsArePistols"; readonly level: 1 | 2 } // LK-001 Leon L2: all cards in your play area are also labeled as pistol
+  | { readonly kind: "plusBuyPassive"; readonly amount: number; readonly level: 1 | 2 } // CR-001 Claire L1: +amount Buy
+  | { readonly kind: "turnStartActionsForBuy"; readonly actions: number; readonly buy: number; readonly level: 1 | 2 } // CR-001 Claire L2: at turn start, may get +actions Actions and -buy Buy
+  | { readonly kind: "healOnDefeatWithWeaponTag"; readonly tag: WeaponTag; readonly heal: number; readonly level: 1 | 2 } // CC-001 Claire L2: heal when defeating an Infected with a weapon of that tag
 
 
 // ---------------------------------------------------------------------------
@@ -767,6 +773,9 @@ export interface GameState {
     /** AC-042: the exploring Character's Health at reveal time. When the
      *  revealed Infected's Health exceeds this, the explore is cancelled. */
     readonly revealHpThreshold?: number;
+    /** The weapons the exploring player used, so a deferred resolution can
+     *  still apply "on defeat with weapon tag" abilities. */
+    readonly weaponIds?: readonly string[];
   };
   readonly log: readonly LoggedAction[];
 

@@ -1,5 +1,5 @@
 import type { CardDef, CharacterAbility, GameState } from '../types';
-import { characterAbilities } from './abilities';
+import { characterAbilities, effectiveWeaponTags } from './abilities';
 
 /**
  * Weapon-reuse rules — "use this weapon more than once per turn".
@@ -45,7 +45,7 @@ export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: str
 export function maxWeaponUses(state: GameState, seat: number, weaponId: string): number {
   const def = weaponDef(state, weaponId);
   const reusable = hasAbilityKind(state, seat, 'pistolsTwicePerTurn') &&
-    (def?.weaponTags ?? []).includes('pistol');
+    effectiveWeaponTags(state, seat, weaponId).includes('pistol');
   return reusable ? 2 : 1;
 }
 

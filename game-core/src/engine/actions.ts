@@ -19,6 +19,8 @@ import {
   hasDoubleDamageOnBothHerbs,
   hasPerfectExploreReward,
   plusDamageIfTwoOrMoreWeapons,
+  dualWieldBonus,
+  healOnDefeatWithWeaponTag,
   exploreBonusIfAmmoAbove,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
@@ -1207,8 +1209,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             exploreActionsBonus(abilities, playAreaAfter.map(id => cardDef(state, id)?.type ?? ''), t => t === 'action') +
             partnerAttachedDamageBonus(abilities, player.partnerAttached) +
             plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
+            dualWieldBonus(state, seat, abilities, weapons) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
-            exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs);
+            exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
           const perDiscardCardBonus = player.playArea.reduce((sum, id) => {
@@ -1477,6 +1480,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const removedIds: string[] = [...removedAfter, ...eventIdsToRemove];
         const chainAttachedIds: string[] = [];
         let decorations = player.decorations;
+        // CC-001 Claire Redfield L2: heal when the explore defeats an
+        // Infected with a weapon carrying the ability's tag.
+        const onDefeatHeal = defeated ? healOnDefeatWithWeaponTag(state, seat, abilities, weapons) : 0;
         let level = player.level;
         let xp = player.xp ?? 0;
         let exploresLeftAfter = exploresLeft + grantedExplores + (laserTargeting ? 1 : 0);
@@ -1825,7 +1831,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : (state.seats[seat] as PlayerState).attached,
           partnerAttached,
           infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
-          hp: resuscitatePending ? 10 : newHp,
+          hp: Math.min((resuscitatePending ? 10 : newHp) + onDefeatHeal, player.maxHp),
           ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
           ...(partnerDied ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined } : {}),
           downed,
@@ -2012,7 +2018,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           })),
         });
         const defeatedDecorations = multiResult.defeated ? infectedTargets.reduce((s, d) => s + (d?.decorations ?? 0), 0) : 0;
-        let newPlayer = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations });
+        const comboHeal = multiResult.defeated ? healOnDefeatWithWeaponTag(state, seat, abilities, weapons) : 0;
+        let newPlayer = applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false, decorations: player.decorations + defeatedDecorations, hp: Math.min(player.hp + comboHeal, player.maxHp) });
         // remove event + any defeated infected from game (simplified: remove all revealed)
         // WE-028 Stun Rod: while your character is battling two or more
         // Infected, you may move one of them with 20 or less Health to the top
@@ -2412,6 +2419,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seat,
             revealedInstanceId,
             outcome: pendingOutcome,
+            weaponIds: weapons,
             decorations: pendingDecorations,
             decorationDelta: outcome.kind === 'defeated' ? (revealedDef.decorations ?? 0) : 0,
             damageTaken: pendingDamageTaken,
@@ -2556,6 +2564,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ? levelForDecorations(charDef.level1At, Math.max(level2At, charDef.level1At ?? 0), decorations)
           : player.level;
         const sergeiExploreBonus = exploreOnInfectedDefeat(abilities);
+        const singleDefeatHeal = healOnDefeatWithWeaponTag(state, seat, abilities, weapons);
         const newPlayer: PlayerState = applyNightmareGains({
                   ...player,
                   hand: handAfter,
@@ -2567,6 +2576,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   mustExplore: false,
                   decorations,
                   level,
+                  hp: Math.min(player.hp + singleDefeatHeal, player.maxHp),
                   xp: (player.xp ?? 0) + 1 + maximizerXp,
                   pendingSkillEffects: undefined,
                   pendingBackstab: undefined,
@@ -4215,7 +4225,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const currentSeat = s.seats[pe.seat] ?? pe.newPlayer;
           let newPlayer: PlayerState;
           if (defeated) {
-            newPlayer = { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(s, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
+            newPlayer = { ...currentSeat, hp: Math.min(currentSeat.hp + healOnDefeatWithWeaponTag(s, pe.seat, characterAbilities(s, pe.seat), pe.weaponIds ?? []), currentSeat.maxHp), decorations: currentSeat.decorations + decorationDelta(s, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
           } else {
             const ric = applyRicardoDamage(s, pe.seat, currentSeat.hp, pe.damageTaken);
             s = ric.state;
@@ -4275,7 +4285,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const currentSeat = baseState.seats[pe.seat] ?? pe.newPlayer;
           let newPlayer: PlayerState;
           if (defeated) {
-            newPlayer = { ...currentSeat, decorations: currentSeat.decorations + decorationDelta(baseState, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
+            newPlayer = { ...currentSeat, hp: Math.min(currentSeat.hp + healOnDefeatWithWeaponTag(baseState, pe.seat, characterAbilities(baseState, pe.seat), pe.weaponIds ?? []), currentSeat.maxHp), decorations: currentSeat.decorations + decorationDelta(baseState, currentSeat.attached, [...currentSeat.attached, pe.revealedInstanceId]), attached: [...currentSeat.attached, pe.revealedInstanceId] };
           } else {
             const ric = applyRicardoDamage(baseState, pe.seat, currentSeat.hp, neg.negated ? 0 : pe.damageTaken);
             baseState = ric.state;
@@ -5672,6 +5682,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, chosen],
           pendingResuscitate: undefined,
           prompts: clearPrompts,
+        };
+      }
+
+      if (kind === 'specialistActionsForBuy') {
+        // CR-001 Claire Redfield L2 (SPECIALIST): at turn start, may get
+        // +actions Actions and -buy Buy.
+        const chosen = prompt.options[option];
+        const extraActions = Number(prompt.payload?.actions ?? '0');
+        const lostBuy = Number(prompt.payload?.buy ?? '0');
+        if (chosen !== 'Yes') return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, actionsLeft: s.actionsLeft + extraActions, buysLeft: Math.max(s.buysLeft - lostBuy, 0) }
+            : s)),
+          prompts: newPrompts,
         };
       }
 

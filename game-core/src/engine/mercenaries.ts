@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState, Prompt } from '../types';
 import { gainCard } from './gainCard';
 import { sendToBottom, shuffleBack } from './mansion';
-import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage, effectiveWeaponTags } from './abilities';
 import { flipDown } from './characters';
 import { makeRng, shuffle } from '../util/rng';
 
@@ -358,9 +358,11 @@ function weaponAmmoReq(state: GameState, seat: number, weaponId: string): number
   const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
   const abilities = characterAbilities(state, seat);
   const base = def?.ammoReq ?? 0;
+  const tags = new Set<string>(def?.weaponTags ?? []);
+  for (const t of effectiveWeaponTags(state, seat, weaponId)) tags.add(t);
   let reduction = 0;
   for (const a of abilities) {
-    if (a.kind === 'ammoReqReduction' && (def?.weaponTags ?? []).includes(a.tag)) reduction += a.amount;
+    if (a.kind === 'ammoReqReduction' && tags.has(a.tag)) reduction += a.amount;
   }
   return Math.max(base - reduction, 0);
 }

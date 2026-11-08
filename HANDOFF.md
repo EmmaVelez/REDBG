@@ -49,6 +49,30 @@ Tests: `engine/customCharacters.test.ts` (11), +2 ActionBar cases, +1 Lobby case
 +1 portrait case, +1 gate case. Gates: typecheck clean, game-core 746, server 102,
 client 155, build OK.
 
+**FAN CHARACTER LINE (2026-11-08): LK-001 Leon, CR-001 Claire, CC-001 Claire** —
+three more custom characters (all toggle-gated like MX-001/CU-001).
+- **LK-001 Leon S. Kennedy** (90 Health, L1 at 1 / L2 at 8): L1 DUAL WIELD
+  (`plusDamagePerPistolUsed`, amount 5, threshold 2) = +5 damage per pistol when
+  using 2+ pistols; L2 RAPID FIRE (`playAreaCardsArePistols`) = every card in the
+  play area is also labeled as a pistol.
+- **CR-001 Claire Redfield** (70 Health, L1 at 0 / L2 at 7): L1 TACTICIAN
+  (`plusBuyPassive`) = +1 Buy; L2 SPECIALIST (`turnStartActionsForBuy`) = at turn
+  start, may get +2 Actions and -2 Buy (Yes/No prompt).
+- **CC-001 Claire Redfield** (90 Health, L1 at 2 / L2 at 5): L1 uses the existing
+  `ammoReqReduction` with tag `shotgun` (-10 Ammo); L2 (`healOnDefeatWithWeaponTag`)
+  = heal 5 when defeating an Infected with a Shotgun weapon.
+New ability kinds live in `types.ts` beside the CU-001 ones. RAPID FIRE is
+implemented as ONE tag choke point — `effectiveWeaponTags(state, seat, instanceId)`
+in `abilities.ts` — and every "is this a pistol" check now reads it
+(`exploreAmmoReq`, `mercenaries.weaponAmmoReq`, `skill.exploreSkillDamageBonus`,
+SK-029's reveal, `weaponReuse.maxWeaponUses`, `ammoReqForWeapon`'s extraTags
+param). Healing is capped at max Health at each of the four defeat sites, and
+`pendingExplore` now carries `weaponIds` so the deferred (Las Plagas / AC-042)
+resolution can still apply the heal. Art: `CARD-ART/LK-001.png`, `CR-001.png`,
+`CC-001.png` from Manny's scans. Tests: `engine/fanCharacters.test.ts` (28),
++4 portrait/gate cases and a Lobby case client-side. Gates: typecheck clean,
+game-core 774, server 102, client 159, build OK.
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like

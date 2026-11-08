@@ -191,6 +191,65 @@ describe('CardView (T03)', () => {
     expect(unlockedHtml).not.toContain('skill-locked');
   });
 
+  it('fills the LK-001/CR-001/CC-001 portraits from their PNGs', () => {
+    for (const id of ['lk-001', 'cr-001', 'cc-001']) {
+      const def = CUSTOM_CARDS.find(c => c.id === id);
+      expect(def).toBeDefined();
+      if (def === undefined) continue;
+      const html = renderToStaticMarkup(<CardView def={def} decorations={0} />);
+      expect(html).toContain('card-portrait-has-art');
+      expect(html).toMatch(new RegExp(`<img class="card-portrait-img" src="[^"]*${id.toUpperCase()}[^"]*"`, 'i'));
+    }
+  });
+
+  it('LK-001 gates: L1 at 1 decoration, L2 at 8', () => {
+    const leon = CUSTOM_CARDS.find(c => c.id === 'lk-001');
+    expect(leon).toBeDefined();
+    if (leon === undefined) return;
+    const fresh = renderToStaticMarkup(<CardView def={leon} decorations={0} />);
+    expect(fresh).toContain('skill-locked');
+    expect(fresh).not.toContain('skill-unlocked');
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">1<\/span>/);
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">8<\/span>/);
+    expect(fresh).toContain('additional 5 damage for each pistol');
+    expect(fresh).toContain('also labeled as pistol');
+    const leveled = renderToStaticMarkup(<CardView def={leon} decorations={leon.level2At} />);
+    expect(leveled).toContain('skill-unlocked');
+    expect(leveled).not.toContain('skill-locked');
+  });
+
+  it('CR-001 gates: L1 at 0 decorations, L2 at 7', () => {
+    const claire = CUSTOM_CARDS.find(c => c.id === 'cr-001');
+    expect(claire).toBeDefined();
+    if (claire === undefined) return;
+    const fresh = renderToStaticMarkup(<CardView def={claire} decorations={0} />);
+    // L1 gates at 0, so it is already unlocked on a fresh character.
+    expect(fresh).toContain('skill-unlocked');
+    expect(fresh).toContain('skill-locked');
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">0<\/span>/);
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">7<\/span>/);
+    expect(fresh).toContain('+1 Buy');
+    expect(fresh).toContain('+2 Actions and -2 Buy');
+    const leveled = renderToStaticMarkup(<CardView def={claire} decorations={claire.level2At} />);
+    expect(leveled).not.toContain('skill-locked');
+  });
+
+  it('CC-001 gates: L1 at 2 decorations, L2 at 5', () => {
+    const claire = CUSTOM_CARDS.find(c => c.id === 'cc-001');
+    expect(claire).toBeDefined();
+    if (claire === undefined) return;
+    const fresh = renderToStaticMarkup(<CardView def={claire} decorations={0} />);
+    expect(fresh).toContain('skill-locked');
+    expect(fresh).not.toContain('skill-unlocked');
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">2<\/span>/);
+    expect(fresh).toMatch(/<span class="skill-gate" data-skill-gate="true">5<\/span>/);
+    expect(fresh).toContain('-10 Ammo Requirement');
+    expect(fresh).toContain('Heal 5 Health');
+    const leveled = renderToStaticMarkup(<CardView def={claire} decorations={claire.level2At} />);
+    expect(leveled).toContain('skill-unlocked');
+    expect(leveled).not.toContain('skill-locked');
+  });
+
   it('CU-001 gates: L1 at 3 decorations, L2 at 8', () => {
     const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
     expect(ric).toBeDefined();
@@ -780,8 +839,11 @@ describe('Lobby (T08)', () => {
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
 
-    const on = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...base, customCards: ['cu-001'] }, clientId: 'c1' })} />);
+    const on = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...base, customCards: ['cu-001', 'lk-001', 'cr-001', 'cc-001'] }, clientId: 'c1' })} />);
     expect(on).toContain('value="cu-001"');
+    expect(on).toContain('value="lk-001"');
+    expect(on).toContain('value="cr-001"');
+    expect(on).toContain('value="cc-001"');
   });
 });
 

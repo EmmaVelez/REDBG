@@ -26,11 +26,17 @@ export function characterAbilities(state: GameState, seat: number): readonly Cha
  * Ammo requirement of one weapon for this seat, after ammoReqReduction
  * abilities (Leon L1 pistols -10, Sheva L2 rifles -20). Never below 0.
  */
-export function ammoReqForWeapon(abilities: readonly CharacterAbility[], def: CardDef | undefined): number {
+export function ammoReqForWeapon(
+  abilities: readonly CharacterAbility[],
+  def: CardDef | undefined,
+  extraTags: readonly string[] = [],
+): number {
   const base = def?.ammoReq ?? 0;
+  const tags = new Set<string>(def?.weaponTags ?? []);
+  for (const t of extraTags) tags.add(t);
   let reduction = 0;
   for (const ability of abilities) {
-    if (ability.kind === 'ammoReqReduction' && (def?.weaponTags ?? []).includes(ability.tag as WeaponTag)) {
+    if (ability.kind === 'ammoReqReduction' && tags.has(ability.tag)) {
       reduction += ability.amount;
     }
   }
@@ -45,7 +51,7 @@ export function requiredAmmoForWeapons(
   defs: (id: string) => CardDef | undefined
 ): number {
   const abilities = characterAbilities(state, seat);
-  return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abilities, defs(id)), 0);
+  return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abilities, defs(id), effectiveWeaponTags(state, seat, id)), 0);
 }
 
 /**
@@ -588,4 +594,69 @@ export function partnerAttachedDamageBonus(
     if (a.kind === 'partnerAttachedCountDamageBonus' && partnerAttached.length <= a.threshold) bonus += a.amount;
   }
   return bonus;
+}
+
+/** CR-001 Claire Redfield L1 (TACTICIAN): flat +amount Buy. */
+export function plusBuyBonus(abilities: readonly CharacterAbility[]): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'plusBuyPassive') bonus += a.amount;
+  }
+  return bonus;
+}
+
+/** LK-001 Leon L2 (RAPID FIRE): every card in the seat's play area counts
+ *  as a Pistol, so any "is this a pistol" check must read the effective
+ *  tags rather than the printed weaponTags. */
+export function playAreaCardsArePistols(state: GameState, seat: number): boolean {
+  return characterAbilities(state, seat).some(a => a.kind === 'playAreaCardsArePistols');
+}
+
+export function effectiveWeaponTags(state: GameState, seat: number, instanceId: string): readonly string[] {
+  const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
+  const tags = [...(def?.weaponTags ?? [])];
+  if (!tags.includes('pistol')) {
+    const player = state.seats[seat];
+    if ((player?.playArea ?? []).includes(instanceId) && playAreaCardsArePistols(state, seat)) {
+      tags.push('pistol');
+    }
+  }
+  return tags;
+}
+
+export function isPistolWeapon(state: GameState, seat: number, instanceId: string): boolean {
+  return effectiveWeaponTags(state, seat, instanceId).includes('pistol');
+}
+
+/** LK-001 Leon L1 (DUAL WIELD): +amount per pistol when using threshold+
+ *  pistols in one explore. */
+export function dualWieldBonus(
+  state: GameState,
+  seat: number,
+  abilities: readonly CharacterAbility[],
+  weaponIds: readonly string[],
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind !== 'plusDamagePerPistolUsed') continue;
+    const pistols = weaponIds.filter(id => isPistolWeapon(state, seat, id)).length;
+    if (pistols >= a.threshold) bonus += a.amount * pistols;
+  }
+  return bonus;
+}
+
+/** CC-001 Claire Redfield L2: heal `heal` when the player defeats an
+ *  Infected with a weapon carrying `tag`. */
+export function healOnDefeatWithWeaponTag(
+  state: GameState,
+  seat: number,
+  abilities: readonly CharacterAbility[],
+  weaponIds: readonly string[],
+): number {
+  let heal = 0;
+  for (const a of abilities) {
+    if (a.kind !== 'healOnDefeatWithWeaponTag') continue;
+    if (weaponIds.some(id => effectiveWeaponTags(state, seat, id).includes(a.tag))) heal += a.heal;
+  }
+  return heal;
 }

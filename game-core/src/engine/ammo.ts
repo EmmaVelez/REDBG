@@ -4,6 +4,7 @@ import {
   ammoReqForWeapon,
   singleWeaponAmmoDiscount,
   chosenWeaponTypeAmmoDiscount,
+  effectiveWeaponTags,
 } from './abilities';
 import { activeSkillEffects } from './skill';
 
@@ -28,7 +29,7 @@ export function exploreAmmoReq(
   const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
   const abilities = characterAbilities(state, seat);
 
-  let req = ammoReqForWeapon(abilities, def);
+  let req = ammoReqForWeapon(abilities, def, effectiveWeaponTags(state, seat, weaponId));
   if (weaponCount === 1) req -= singleWeaponAmmoDiscount(abilities);
   const typeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
   if (def?.weaponType !== undefined && (player?.chrisAmmoDiscountTypes ?? []).includes(def.weaponType)) {

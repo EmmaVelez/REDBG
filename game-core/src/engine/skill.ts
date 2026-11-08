@@ -2,7 +2,7 @@ import type { CardDef, GameState, PlayerState, PendingSkillEffect, Prompt, Skill
 import { makeRng, shuffle } from '../util/rng';
 import { drawWithReshuffle } from './deck';
 import { flipDown } from './characters';
-import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
+import { characterAbilities, applyHpLoss, applyRicardoDamage, effectiveWeaponTags, isPistolWeapon } from './abilities';
 
 /**
  * Mercenaries Skill System — shared queries and the opening draft.
@@ -385,12 +385,23 @@ export function skillGiantKillingThreshold(effects: readonly SkillEffect[]): num
 export function exploreSkillDamageBonus(
   effects: readonly SkillEffect[],
   weaponDefs: readonly (CardDef | undefined)[],
+  state?: GameState,
+  seat?: number,
+  weaponIds?: readonly string[],
 ): number {
   let bonus = 0;
   for (const e of effects) {
     if (e.kind === 'exploreAllWeaponsPlusDamage') bonus += e.amount * weaponDefs.length;
     if (e.kind === 'explorePistolPlusDamage') {
-      bonus += e.amount * weaponDefs.filter(d => (d?.weaponTags ?? []).includes('pistol')).length;
+      let pistols = 0;
+      for (let i = 0; i < weaponDefs.length; i++) {
+        const id = weaponIds?.[i];
+        const tags = id !== undefined && state !== undefined && seat !== undefined
+          ? effectiveWeaponTags(state, seat, id)
+          : (weaponDefs[i]?.weaponTags ?? []);
+        if (tags.includes('pistol')) pistols += 1;
+      }
+      bonus += e.amount * pistols;
     }
   }
   return bonus;
@@ -460,7 +471,7 @@ export function turnStartSkillPrompts(state: GameState, seat: number, newVersion
       const pistols = player.hand.filter(hid => {
         const hInst = state.cards[hid];
         const hDef = hInst === undefined ? undefined : state.cardDefs[hInst.cardId];
-        return hDef?.type === 'weapon' && (hDef.weaponTags ?? []).includes('pistol');
+        return hDef?.type === 'weapon' && isPistolWeapon(state, seat, hid);
       });
       if (pistols.length < e.count) continue;
       prompts.push({
