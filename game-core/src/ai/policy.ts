@@ -3,6 +3,7 @@ import type { Action, GameState } from '../types';
 import { enumerateLegalActions } from './enumerate';
 import { evaluateState } from './evaluate';
 import { applyAction } from '../engine/actions';
+import { checkWin } from '../engine/game';
 
 /**
  * Flat score bonus applied to explore candidates (all difficulties).
@@ -156,4 +157,187 @@ function withSpentTurnPoolsZeroed(state: GameState, seat: number): GameState {
         : s,
     ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Greedy playout (rollout) - the "hard" bot's action selection.
+//
+// chooseGreedyAction scores each candidate by the state ONE action ahead, so
+// it cannot see a line like "play Ammo, then Explore, then Buy": the payoff
+// lands two actions away and never appears in the 1-ply comparison. The
+// playout fixes that by simulating the rest of the turn with the same greedy
+// policy and scoring the position the seat actually ends up in.
+//
+// Cost control: every candidate is still 1-ply scored (cheap), only the best
+// candidate of each kind is rolled out (ROLLOUT_CANDIDATE_CAP), and each
+// rollout stops after ROLLOUT_MAX_STEPS actions or when the turn ends.
+// ---------------------------------------------------------------------------
+
+/** Max actions a single rollout simulates after the candidate action. */
+export const ROLLOUT_MAX_STEPS = 5;
+/** Max candidate first-actions the rollout compares. */
+export const ROLLOUT_CANDIDATE_CAP = 6;
+/** Terminal bonus for a line that wins the game - dwarfs any positional score. */
+const WIN_BONUS = 100000;
+/** Per-step cost applied to winning lines so the FASTEST win wins ties. */
+const STEP_COST = 1;
+
+/** Coarse grouping used to build the rollout shortlist. */
+function candidateKind(action: Action): string {
+  switch (action.type) {
+    case 'buy':
+      // One kind for every pile: with 8+ market piles, per-pile kinds would
+      // fill the shortlist with buys and crowd out the explore/play lines.
+      return 'buy';
+    case 'playActionCard':
+    case 'playItem':
+    case 'playAmmo':
+      return 'play:' + action.instanceId;
+    case 'attack':
+      return 'attack:' + action.targetSeat;
+    case 'useCharacterAbility':
+      return 'ability:' + action.abilityIndex;
+    case 'useWeaponAbility':
+      return 'weaponAbility:' + action.instanceId;
+    case 'attachToPartner':
+      return 'attach:' + action.instanceId;
+    case 'chooseOption':
+      return 'prompt:' + action.promptId + ':' + action.option;
+    default:
+      return action.type;
+  }
+}
+
+interface RolloutOutcome {
+  /** Final comparison score; -Infinity when the line could not be simulated. */
+  readonly score: number;
+  /** True when the line ends with the seat having won the game. */
+  readonly won: boolean;
+  /** Actions simulated after the candidate (0 when the candidate ends the turn). */
+  readonly steps: number;
+}
+
+/**
+ * Simulates the rest of the seat's turn after `first` using the 1-ply greedy
+ * policy, then scores the resulting position.
+ *
+ * The turn ends when the greedy policy picks endTurn, when a skip-turn option
+ * advances the seat, or when the step cap is hit. A won game adds WIN_BONUS
+ * minus a small per-step cost, so among winning lines the fastest win wins.
+ */
+function rollout(state: GameState, seat: number, first: Action): RolloutOutcome {
+  let current: GameState;
+  try {
+    current = applyAction(state, first);
+  } catch {
+    return { score: -Infinity, won: false, steps: 0 };
+  }
+
+  let turnOver = first.type === 'endTurn' || isSkipTurnOption(state, first);
+  let steps = 0;
+
+  while (!turnOver && steps < ROLLOUT_MAX_STEPS) {
+    if (checkWin(current).gameOver) break;
+
+    const action = chooseGreedyAction(current, seat);
+    if (action.type === 'endTurn') {
+      try {
+        current = applyAction(current, action);
+      } catch {
+        break;
+      }
+      turnOver = true;
+      break;
+    }
+    try {
+      current = applyAction(current, action);
+    } catch {
+      break;
+    }
+    steps += 1;
+    // A skip-turn prompt option advances the seat without an endTurn action.
+    if (current.activeSeat !== seat) {
+      turnOver = true;
+      break;
+    }
+  }
+
+  const win = checkWin(current);
+  const won = win.gameOver && win.winners.includes(seat);
+  // A won line is judged by SPEED alone: leftover turn pools are worthless
+  // once the game is over, and scoring them would rank a slower win higher.
+  const score = won
+    ? WIN_BONUS - steps * STEP_COST
+    : evaluateState(
+        turnOver ? withSpentTurnPoolsZeroed(current, seat) : current,
+        seat,
+        { clampDiscardToHeld: true },
+      );
+  return { score, won, steps };
+}
+
+/**
+ * Chooses the action whose completing the turn greedily yields the best
+ * end-of-turn position. This is the "hard" bot: it still uses the 1-ply
+ * evaluator, but it compares whole lines instead of single moves.
+ *
+ * Deterministic: no rng is consumed, and every simulation runs on copies.
+ */
+export function choosePlayoutAction(state: GameState, seat: number): Action {
+  if (state.seats.every(s => s.dead)) {
+    return { type: 'endTurn', seat };
+  }
+
+  const legal = enumerateLegalActions(state, seat);
+  if (legal.length === 0) {
+    return { type: 'endTurn', seat };
+  }
+
+  // 1-ply score every candidate (cheap) and keep the best of each kind.
+  const byKind = new Map<string, { action: Action; score: number }>();
+  for (const action of legal) {
+    let next: GameState;
+    try {
+      next = applyAction(state, action);
+    } catch {
+      continue;
+    }
+    if (sameCoreState(state, next)) continue;
+
+    const endsTurn = action.type === 'endTurn' || isSkipTurnOption(state, action);
+    const raw = evaluateState(
+      endsTurn ? withSpentTurnPoolsZeroed(next, seat) : next,
+      seat,
+      { clampDiscardToHeld: action.type === 'buy' ? false : true },
+    );
+    const score = action.type === 'explore' ? raw + EXPLORE_BIAS : raw;
+
+    const kind = candidateKind(action);
+    const prev = byKind.get(kind);
+    if (prev === undefined || score > prev.score) {
+      byKind.set(kind, { action, score });
+    }
+  }
+
+  const shortlist = [...byKind.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, ROLLOUT_CANDIDATE_CAP);
+
+  let best: { action: Action; score: number } | undefined;
+  for (const candidate of shortlist) {
+    let outcome: RolloutOutcome;
+    try {
+      outcome = rollout(state, seat, candidate.action);
+    } catch {
+      continue;
+    }
+    if (outcome.score === -Infinity) continue;
+    if (best === undefined || outcome.score > best.score) {
+      best = { action: candidate.action, score: outcome.score };
+    }
+  }
+
+  // Fallback: the best 1-ply candidate (shortlist is never empty here, but an
+  // every-line-throws edge must still return a legal action).
+  return best?.action ?? shortlist[0]?.action ?? { type: 'endTurn', seat };
 }

@@ -2,6 +2,42 @@
 
 **Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 710, server 97, client 141** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
 
+**GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
+`chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
+The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like
+"play Ammo, then Explore, then Buy" — the payoff lands two actions away. The playout 1-ply scores
+every candidate (cheap), keeps the best of each `candidateKind` (all buys share ONE kind, or 8+
+market piles fill the shortlist and crowd out the explore/play lines), then ROLLS OUT the rest of
+the turn with the same 1-ply greedy policy and compares the END-OF-TURN positions. Bounds:
+`ROLLOUT_MAX_STEPS = 5`, `ROLLOUT_CANDIDATE_CAP = 6`. A line that wins the game scores
+`WIN_BONUS - steps` (so the FASTEST win wins), and a won line is judged by speed alone — leftover
+turn pools are worthless once the game is over, and scoring them ranked a slower win higher.
+Measured on First Timer (2 hard bots, seeds 1-8): the playout agrees with the 1-ply greedy on 89%
+of decisions, explores LESS per turn (~0.24 -> ~0.14) because it declines the losing fights the
+1-ply EXPLORE_BIAS accepted, and roughly DOUBLES the Decorations the bots win (~14 -> ~30-40 per
+game, the metric the game is decided on). `sim.test.ts` therefore pins a Decorations floor as well
+as the explore-rate floor. Cost: ~30x the 1-ply policy per decision, so the soak went from
+~11s to ~127s (it now carries a 240s timeout).
+
+**ENGINE BUGS THE PLAYOUT EXPOSED (all pre-existing, all fixed with regression tests):** the
+stronger AI reaches states the 1-ply bot never did.
+1. **Kevlar Jacket (`ma-054o`) duplicate placement.** `applyDamageWithKevlar` removes the jacket
+   from `attached` and puts it on the Mansion bottom, but FOUR call sites then rebuilt the seat
+   from the PRE-kevlar `player`/`target` object (restoring it into `attached` while it was also in
+   `mansionBottom`) or rebuilt the pile from a stale local (dropping it into no zone). Fixed in the
+   single-explore infected-damage, single-explore trap, multi-explore infected-damage and attack
+   paths (the multi-explore trap path already synced its local). Reading `state.mansionBottom` back
+   into the local is WRONG — the reveal
+   lives only in the local `rev.mansion`, so `state` still holds the revealed card.
+2. **WE-019 bottom reveal duplicated the card.** Same root cause: the single-explore path's local
+   `mansionBottom` was re-read from `state` (pre-reveal) and `sendToBottom` appended the revealed
+   card a second time. Fixed by appending ONLY `kevlar.movedIds` to the local.
+3. **Stale prompt options duplicated moved cards.** Prompts built during one action can be answered
+   after a second prompt from the same action already moved the chosen card; the handlers appended
+   it to the destination without checking the source. Added source-membership guards to
+   `we044ChooseTarget`, `ma098ChooseTarget`, `ac043ChooseWeapon`, `we036Discard`/`we037Discard`,
+   `luisDiscardOne`, `chooseActionCardCostAtMost` (Mind Control) and the Rebecca L1 trash-target
+   handler (`weskerDiscardOneCard` and `ac044Discard` already had them).
 **ACTIONBAR PROMPT UI + FALLBACK (2026-11-07, commit c035cab):** the ActionBar is the single
 prompt renderer. It now renders EVERY queued prompt for the seat (not just the first), labels
 options by kind (XP amounts → "N XP", seats → player names, card ids → card names), and has

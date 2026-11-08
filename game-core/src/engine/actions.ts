@@ -1631,6 +1631,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : rawSkillDamage;
           const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
           state = kevlar.state;
+          // The jacket joined the Mansion bottom; fold it into the local pile
+          // or the return below (which spreads this local) drops it into no zone.
+          for (const id of kevlar.movedIds) {
+            if (!mBottom.includes(id)) mBottom = [...mBottom, id];
+          }
+
           newLeadingHp = damageOnAda
             ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
             : baseLeadingHp - kevlar.damage;
@@ -1788,7 +1794,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           xp,
           pendingSkillEffects: undefined,
           pendingBackstab: undefined,
-          attached: defeated ? [...player.attached, ...defeatedIds, ...chainAttachedIds] : player.attached,
+          attached: defeated
+            ? [...(state.seats[seat] as PlayerState).attached, ...defeatedIds, ...chainAttachedIds]
+            : (state.seats[seat] as PlayerState).attached,
           partnerAttached,
           infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
           hp: resuscitatePending ? 10 : newHp,
@@ -2110,6 +2118,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           trapPlayer = {
             ...trapPlayer,
+            // Keep the post-kevlar `attached`: the jacket left play.
+            attached: (state.seats[seat] as PlayerState).attached,
             hp: applyHpLoss(characterAbilities(state, seat), trapPlayer.hp, kevlarTrap.damage, trapPlayer.downed || trapPlayer.dead),
           };
         }
@@ -2684,6 +2694,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // the bottom of the Mansion.
       const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
       state = kevlar.state;
+      // The jacket joined the Mansion bottom; keep the local pile in sync
+      // or the return below (which spreads this local) drops it into no zone.
+      // Append ONLY the moved jacket: `state.mansionBottom` is still the
+      // pre-reveal pile (the reveal lives in this local), so reading it
+      // back would restore the revealed card and duplicate it below.
+      for (const id of kevlar.movedIds) {
+        if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+      }
+
       const newLeadingHp = damageOnAda
         ? applyHpLoss(characterAbilities(state, seat), baseLeadingHp, kevlar.damage, player.downed || player.dead)
         : Math.max(baseLeadingHp - kevlar.damage, 0);
@@ -2777,6 +2796,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               playArea: playAreaAfter,
               discard,
               inventory,
+              attached: (state.seats[seat] as PlayerState).attached,
               exploresLeft: exploresLeft + grantedExplores,
               turnAmmo: turnAmmoAfter,
               turnGold: turnGoldAfter,
@@ -3629,6 +3649,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           state = kevlar.state;
           const newTarget: PlayerState = {
             ...target,
+            // Keep the post-kevlar `attached`: the jacket left play.
+            attached: (state.seats[targetSeat] as PlayerState).attached,
             hp: applyHpLoss(characterAbilities(state, targetSeat), target.hp, kevlar.damage, target.downed || target.dead),
             hand: sloughArmorId !== undefined ? target.hand.filter(id => id !== sloughArmorId) : target.hand,
             discard: sloughArmorId !== undefined ? [...target.discard, sloughArmorId] : target.discard,
@@ -4950,7 +4972,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         const targetSeat = Number(prompt.options[option]);
-        if (Number.isNaN(targetSeat)) {
+        if (Number.isNaN(targetSeat) || !state.removed.includes(trashedId)) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return {
@@ -5789,6 +5811,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cardId = String(prompt.payload?.cardId ?? '');
         if (chosen === undefined || cardId === '') return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
+        // Another prompt from the same explore may already have moved this
+        // card; moving it again would duplicate it into the target's discard.
+        const ma098Source = state.seats[seat];
+        if (ma098Source === undefined || (!ma098Source.hand.includes(cardId) && !ma098Source.discard.includes(cardId))) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
         return {
           ...state,
           ...nextBase,
@@ -5853,6 +5881,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cardId = String(prompt.payload?.cardId ?? '');
         if (chosen === undefined || cardId === '') return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
+        // Another prompt from the same explore (e.g. MA-098) may already have
+        // moved this card. Moving it again would duplicate it into the target's
+        // discard, so verify it is still in the source seat's zones.
+        const source = state.seats[seat];
+        if (source === undefined || (!source.hand.includes(cardId) && !source.discard.includes(cardId))) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
         return {
           ...state,
           ...nextBase,
@@ -5903,6 +5938,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const chosen = prompt.options[option];
         const targetSeat = Number(prompt.payload?.targetSeat ?? '');
         if (chosen === undefined || chosen === 'None') return { ...state, ...nextBase, prompts: newPrompts };
+        if (!(state.seats[targetSeat]?.hand ?? []).includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
         const def = cardDef(state, chosen);
         return {
           ...state,
@@ -5940,6 +5978,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'we036Discard' || kind === 'we037Discard') {
         const chosen = prompt.options[option];
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (!player.hand.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
         return {
           ...state,
           ...nextBase,
@@ -6082,6 +6121,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'luisDiscardOne') {
         const chosen = prompt.options[option];
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (!player.hand.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
         return {
           ...state,
           ...nextBase,
@@ -6212,6 +6252,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const chosen = prompt.options[option];
         const targetSeat = Number(prompt.payload?.targetSeat ?? '');
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (!(state.seats[targetSeat]?.hand ?? []).includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
         const def = cardDef(state, chosen);
         const s = {
           ...state,

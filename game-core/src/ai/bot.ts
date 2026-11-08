@@ -1,13 +1,14 @@
 
 import type { Action, GameState } from '../types';
 import { enumerateLegalActions } from './enumerate';
-import { chooseGreedyAction } from './policy';
+import { chooseGreedyAction, choosePlayoutAction } from './policy';
 
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
 /**
  * Chooses an action for the bot based on difficulty.
- * Hard bots play greedily. Easy/Normal bots introduce noise.
+ * Hard bots play a greedy playout (whole-turn lines). Easy/Normal bots
+ * add noise on top of the 1-ply greedy policy.
  *
  * @param state The current game state.
  * @param seat The seat of the bot.
@@ -24,9 +25,9 @@ export function chooseBotAction(state: GameState, seat: number, difficulty: BotD
     return { type: 'endTurn', seat };
   }
 
-  // 3. Hard mode: always greedy
+  // 3. Hard mode: greedy playout - compare whole turns, not single moves
   if (difficulty === 'hard') {
-    return chooseGreedyAction(state, seat);
+    return choosePlayoutAction(state, seat);
   }
 
   // 4. Compute noise probability (Normal defaults to 0.2)

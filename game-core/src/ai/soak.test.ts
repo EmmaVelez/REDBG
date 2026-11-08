@@ -154,7 +154,7 @@ describe('M5-T04 full-game bot soak', () => {
     // end the game is a balance/AI defect, not a soak formality.
     expect(natural / total, `natural-end rate ${natural}/${total}: ${JSON.stringify(perScenario)}`).toBeGreaterThanOrEqual(0.6);
     console.log(`soak: ${natural}/${total} games ended naturally`, perScenario);
-  }, 180000);
+  }, 240000);
 
   test('expansion scenarios are deterministic for a fixed seed', () => {
     for (const scenario of ['alliance', 'partnersInEscape', 'outbreak'] as const) {
@@ -164,7 +164,7 @@ describe('M5-T04 full-game bot soak', () => {
       expect(a.ended, scenario).toBe(b.ended);
       expect(a.actionsApplied, scenario).toBe(b.actionsApplied);
     }
-  }, 180000);
+  }, 240000);
 
   test('every scenario pile + mansion card resolves in its own card pool', () => {
     const unresolved: string[] = [];

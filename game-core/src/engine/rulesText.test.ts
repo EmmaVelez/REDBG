@@ -87,6 +87,25 @@ describe('WE-019 Telescopic Sight Rifle — "reveal cards from BOTTOM of Mansion
     expect(after.mansionDeck).toContain(topId);
     expect(after.mansionDeck).not.toContain(bottomId);
   });
+
+  // Regression: the reveal-from-bottom result lives only in the local pile,
+  // so an undefeated Infected sent back to the bottom used to be appended to
+  // a bottom that still held it (the card ended up in the pile twice).
+  test('an undefeated Infected revealed from the bottom returns there exactly once', () => {
+    const s0 = withInstances(rigExplore(game(), 0, ['we-019#1']), ['we-019#1', 'ma-006#1']);
+    const tuned: GameState = {
+      ...s0,
+      mansionDeck: [...s0.mansionDeck.filter(id => id !== 'ma-006#1'), 'ma-006#1'],
+      cardDefs: { ...s0.cardDefs, 'ma-006': { ...s0.cardDefs['ma-006']!, hp: 999 } },
+    };
+    const after = applyAction(tuned, { type: 'explore', seat: 0, weapons: ['we-019#1'], exploreCount: 1 });
+    const everywhere = [
+      ...after.mansionDeck,
+      ...after.mansionBottom,
+      ...(after.seats[0]?.attached ?? []),
+    ];
+    expect(everywhere.filter(id => id === 'ma-006#1').length).toBe(1);
+  });
 });
 
 describe('WE-021 Triple Barreled Shotgun — "+2 explore" and "+10 damage per Infected battled"', () => {
@@ -216,6 +235,40 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
     const withJacket: GameState = {
       ...s,
       seats: s.seats.map((p, i) => (i === 0 ? { ...p, attached: ['ma-054o#1'] } : p)),
+    };
+    const hpBefore = withJacket.seats[0]!.hp;
+    const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(after.seats[0]?.hp).toBe(hpBefore);
+    expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
+    expect(after.mansionBottom).toContain('ma-054o#1');
+  });
+
+  // Regression: applyDamageWithKevlar removes the jacket from `attached` and
+  // puts it on the Mansion bottom, but the explore paths rebuild the seat from
+  // the pre-kevlar `player` object, which used to restore the jacket into
+  // `attached` while it was also in `mansionBottom` (two zones, one card).
+  test('the jacket is not duplicated when it absorbs infected combat damage', () => {
+    const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-001#1'), ['we-009#1', 'ma-054o#1']);
+    const tuned: GameState = {
+      ...s,
+      cardDefs: { ...s.cardDefs, 'ma-001': { ...s.cardDefs['ma-001']!, hp: 999 } },
+    };
+    const withJacket: GameState = {
+      ...tuned,
+      seats: tuned.seats.map((p, i) => (i === 0 ? { ...p, attached: ['ma-054o#1'] } : p)),
+    };
+    const hpBefore = withJacket.seats[0]!.hp;
+    const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    expect(after.seats[0]?.hp).toBe(hpBefore);
+    expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
+    expect(after.mansionBottom).toContain('ma-054o#1');
+  });
+
+  test('the jacket is not duplicated when it absorbs a trap', () => {
+    const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-056o#1'), ['we-009#1', 'ma-054o#1', 'ac-001#1']);
+    const withJacket: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, attached: ['ma-054o#1'], playArea: ['ac-001#1'] } : p)),
     };
     const hpBefore = withJacket.seats[0]!.hp;
     const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });

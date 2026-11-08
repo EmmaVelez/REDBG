@@ -1,6 +1,6 @@
 
 import { chooseBotAction, type BotDifficulty } from './bot';
-import { chooseGreedyAction } from './policy';
+import { chooseGreedyAction, choosePlayoutAction } from './policy';
 import { enumerateLegalActions } from './enumerate';
 import type { Action, GameState, CardDef, PlayerState } from '../types';
 
@@ -55,8 +55,8 @@ describe('chooseBotAction', () => {
     s = baseState({ seats: [player(0, { hand: HAND5 }), player(1)] });
   });
 
-  // Test 1: Hard bot plays the greedy policy
-  test('hard bot plays the greedy policy', () => {
+  // Test 1: Hard bot plays the greedy playout (whole-turn lines)
+  test('hard bot plays the greedy playout', () => {
     // Assert enumerate order first
     const order = enumerateLegalActions(s, seat).map(a => a.type);
     // The fixture player is level 1 with generic L1+L2 abilities: only the L1
@@ -64,12 +64,12 @@ describe('chooseBotAction', () => {
     expect(order).toEqual(['playActionCard', 'playAmmo', 'explore', 'explore', 'explore', 'useCharacterAbility', 'endTurn']);
 
     // Check greedy action
-    expect(chooseBotAction(s, seat, 'hard', () => 0.1)).toEqual(chooseGreedyAction(s, seat));
+    expect(chooseBotAction(s, seat, 'hard', () => 0.1)).toEqual(choosePlayoutAction(s, seat));
   });
 
   // Test 2: Hard bot ignores noise
   test('hard bot ignores noise', () => {
-    expect(chooseBotAction(s, seat, 'hard', () => 0.99)).toEqual(chooseGreedyAction(s, seat));
+    expect(chooseBotAction(s, seat, 'hard', () => 0.99)).toEqual(choosePlayoutAction(s, seat));
   });
 
   // Test 3: easy bot with r=0 uses the first legal action

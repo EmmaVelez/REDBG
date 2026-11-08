@@ -152,21 +152,27 @@ describe('Bot Game Simulation (M2-T05)', () => {
 
   // 8. Regression: hard bots must actually EXPLORE (was 0.05 explores/turn —
   // endTurn draw arbitrage + ammo farming + a -4000 downed freeze made games
-  // drag to 500+ turns). With the fixed evaluator + EXPLORE_BIAS the rate is
-  // ~0.28/turn and games end naturally; assert a conservative floor so a
-  // future evaluator change can't silently re-freeze the bots.
+  // drag to 500+ turns). The fixed evaluator + EXPLORE_BIAS lifted the 1-ply
+  // bot to ~0.24/turn; the greedy PLAYOUT is deliberately more selective (it
+  // can see whether the fight is won, so it declines the losing explores the
+  // 1-ply bias accepted), which drops the rate to ~0.14 while roughly
+  // DOUBLING the Decorations the bots actually win. The floor stays far above
+  // the 0.05 freeze, and the natural-end count is the real anti-freeze guard.
   test('hard bots explore at a healthy rate and games end naturally', () => {
     let totalExplores = 0;
     let totalTurns = 0;
     let gameOverCount = 0;
+    let totalDecorations = 0;
     for (let seed = 1; seed <= 8; seed++) {
       const r = playBotGame({ seed, difficulties: ['hard', 'hard'], maxActions: 6000 });
       totalExplores += r.state.log.filter(e => e.action.type === 'explore').length;
       totalTurns += r.state.log.filter(e => e.action.type === 'endTurn').length;
+      totalDecorations += r.state.seats.reduce((n, s) => n + s.decorations, 0);
       if (r.ended === 'gameOver') gameOverCount++;
     }
     const perTurn = totalExplores / Math.max(totalTurns, 1);
-    expect(perTurn).toBeGreaterThan(0.15);       // was 0.05 before the fix
+    expect(perTurn).toBeGreaterThan(0.08);       // 0.05 was the freeze; the playout is selective
+    expect(totalDecorations).toBeGreaterThan(150); // ~30/game vs ~14 for the 1-ply bot
     expect(gameOverCount).toBeGreaterThanOrEqual(5); // most games finish, not cap out
   });
 });
