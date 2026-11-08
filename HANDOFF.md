@@ -27,6 +27,12 @@ below the grid @ 490x695), one PNG per card id, 3 px inset to drop the grid line
 read off the printed names + HP and cross-checked against the engine's `maxHp`; every match was
 exact. Browser-verified: character art fills the portrait window from the PNG files.
 
+**CARD ART ROUND 2 (2026-11-07):** a third sheet (the Mercenaries expansion subset) added **25 more
+PNGs** — AC-042..AC-051 (all 10 Mercenaries actions), SK-001..SK-012 (Extension/Medic/Luck/Toughness
+LV.1-3), AM-005..AM-007 (Ammo x10/x20/x30). The sheet is 4060x4214 but the cards only fill the top
+1805 px (3 rows: 10 + 10 + 5, the last 5 slots of row 3 empty), 400x592 per card. Total CARD-ART is
+now **94 PNGs / 11 MB**; dist 13 MB with 94 PNG assets. Gates: typecheck clean, client 141, build OK.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by
