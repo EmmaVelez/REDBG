@@ -43,6 +43,20 @@ Total CARD-ART is now **149 PNGs / 18 MB**; dist 19 MB with 149 PNG assets. Gate
 client 141 (the "no art" test case moved from `it-001` to `we-043`, since IT-001 now has art),
 build OK. Browser-verified on the prod server: every resource card renders its PNG.
 
+**CARD ART CSS RESTORED + CHARACTER ART CROPPED (2026-11-07):** the art CSS (`.card-art-img`
+absolute-fill, `.card-has-art` scrim rows, `.card-portrait-img`) had been dropped in an earlier
+mansion-reveal refactor, so the PNGs rendered unstyled — resource cards showed a small image with
+the app's text below instead of the art filling the card, and the character cards crammed the whole
+card scan into the portrait window. Restored the block (from commit 9c67613) and:
+- cropped every `CH-*.png` to the character art window (below the `[CHARACTER]` banner, above the
+  name bar → 320x260), so the portrait window shows art only;
+- gave `.card-character .card-portrait` an `aspect-ratio: 320 / 260` so the art is never cropped or
+  letterboxed, and fixed the `::after` "Art" placeholder specificity (`.card-character
+  .card-portrait.card-portrait-has-art::after`);
+- dropped the character name bar to 9px / 0.5px tracking so long names ("REBECCA CHAMBERS") fit.
+Browser-verified: the character art fills the window with no watermark, no leftover printed text and
+no truncation; the resource cards fill their frames.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by
