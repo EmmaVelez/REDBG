@@ -117,6 +117,29 @@ describe('CardView (T03)', () => {
     expect(plainHtml).not.toContain('card-art-img');
   });
 
+  it('artOnly gives the hand/pile face an art-only card (rows stay for the hover reveal)', () => {
+    const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
+    const noArt = MERCENARIES_CARDS.find(c => c.id === 'ma-073'); // no PNG for this id
+    expect(majini).toBeDefined();
+    expect(noArt).toBeDefined();
+    if (majini === undefined || noArt === undefined) return;
+
+    const artOnly = renderToStaticMarkup(<CardView def={majini} compact artOnly />);
+    expect(artOnly).toContain('card-art-only');
+    expect(artOnly).toContain('data-art-only="true"');
+    // the printed rows stay in the DOM so the CSS :hover rule can reveal them
+    expect(artOnly).toContain('card-top');
+    expect(artOnly).toContain(majini.name);
+
+    // without the prop the same card keeps its normal face
+    const plain = renderToStaticMarkup(<CardView def={majini} compact />);
+    expect(plain).not.toContain('card-art-only');
+
+    // a card with no art has nothing to show but text, so artOnly is ignored
+    const noArtHtml = renderToStaticMarkup(<CardView def={noArt} compact artOnly />);
+    expect(noArtHtml).not.toContain('card-art-only');
+  });
+
   it('fills the character portrait window with the PNG when one exists', () => {
     const chris = PREMIER_CARDS.find(c => c.id === 'ch-008'); // CH-008.png exists
     expect(chris).toBeDefined();

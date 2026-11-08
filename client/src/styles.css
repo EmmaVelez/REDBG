@@ -200,6 +200,27 @@ h1, h2 { margin: 0 0 8px; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* art-only faces (hand / resource piles): the artwork fills the whole card and
+   the printed rows + type band fade back in when the card is hovered. The rows
+   stay in the DOM (invisible) so the hover reveal needs no re-render. */
+.card-art-only::before {
+  display: none;
+}
+.card-art-only .card-top,
+.card-art-only .card-name,
+.card-art-only .card-stats,
+.card-art-only .card-bonus,
+.card-art-only .card-text {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.card-art-only:hover .card-top,
+.card-art-only:hover .card-name,
+.card-art-only:hover .card-stats,
+.card-art-only:hover .card-bonus,
+.card-art-only:hover .card-text {
+  opacity: 1;
+}
 .hover-card-pop .card-has-art .card-text {
   -webkit-line-clamp: unset;
   display: block;

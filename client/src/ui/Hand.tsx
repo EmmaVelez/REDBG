@@ -37,7 +37,7 @@ export function Hand({ state, seat, onPlay, disabled = false }: HandProps): JSX.
                 disabled={disabled || onPlay === undefined}
                 title={`Play ${def.name}`}
               >
-                <CardView def={def} compact />
+                <CardView def={def} compact artOnly />
               </button>
             </HoverCard>
           );

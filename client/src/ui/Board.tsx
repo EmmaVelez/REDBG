@@ -57,7 +57,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
                 title={`Buy ${def.name} for ${costText(def)} gold`}
               >
                 <HoverCard def={def}>
-                  <CardView def={def} compact />
+                  <CardView def={def} compact artOnly />
                 </HoverCard>
                 <span className="pile-count">{count} left</span>
                 <span className="pile-cost">{costText(def)}g</span>

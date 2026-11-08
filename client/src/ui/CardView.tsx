@@ -41,21 +41,30 @@ export interface CardViewProps {
   readonly maxHp?: number;
   /** Hide the cost badge (e.g. for revealed mansion cards). */
   readonly hideCost?: boolean;
+  /**
+   * Art-only face for the hand / resource piles: the printed text rows, the
+   * type banner and the cost badge are hidden so the artwork fills the card,
+   * and fade back in when the card is hovered. Cards WITHOUT art ignore this
+   * (there is nothing to show but the text).
+   */
+  readonly artOnly?: boolean;
 }
 
-export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false }: CardViewProps): JSX.Element {
+export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false }: CardViewProps): JSX.Element {
   const art = cardArtUrl(def.id);
   if (def.type === 'character') {
     return <CharacterCard def={def} compact={compact} decorations={decorations} hp={hp} maxHp={maxHp} art={art} />;
   }
   const stats = statLine(def);
   const bonus = bonusLine(def);
+  const artOnlyMode = artOnly && art !== undefined;
   return (
     <div
-      className={`card ${typeClass(def.type)}${art !== undefined ? ' card-has-art' : ''}`}
+      className={`card ${typeClass(def.type)}${art !== undefined ? ' card-has-art' : ''}${artOnlyMode ? ' card-art-only' : ''}`}
       data-card-id={def.id}
       data-card-type={def.type}
       data-has-art={art !== undefined || undefined}
+      data-art-only={artOnlyMode || undefined}
     >
       {art !== undefined && (
         <img className="card-art-img" src={art} alt="" draggable={false} loading="lazy" decoding="async" />
