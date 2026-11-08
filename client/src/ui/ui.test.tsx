@@ -103,16 +103,16 @@ describe('CardView (T03)', () => {
 
   it('uses the CARD-ART PNG as the card face when one exists', () => {
     const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
-    const herb = PREMIER_CARDS.find(c => c.id === 'it-001');   // no PNG for this id
+    const noArt = MERCENARIES_CARDS.find(c => c.id === 'we-043'); // no PNG for this id
     expect(majini).toBeDefined();
-    expect(herb).toBeDefined();
-    if (majini === undefined || herb === undefined) return;
+    expect(noArt).toBeDefined();
+    if (majini === undefined || noArt === undefined) return;
 
     const artHtml = renderToStaticMarkup(<CardView def={majini} />);
     expect(artHtml).toContain('card-has-art');
     expect(artHtml).toMatch(/<img class="card-art-img" src="[^"]*"/);
 
-    const plainHtml = renderToStaticMarkup(<CardView def={herb} />);
+    const plainHtml = renderToStaticMarkup(<CardView def={noArt} />);
     expect(plainHtml).not.toContain('card-has-art');
     expect(plainHtml).not.toContain('card-art-img');
   });

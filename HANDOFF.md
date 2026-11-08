@@ -33,6 +33,16 @@ LV.1-3), AM-005..AM-007 (Ammo x10/x20/x30). The sheet is 4060x4214 but the cards
 1805 px (3 rows: 10 + 10 + 5, the last 5 slots of row 3 empty), 400x592 per card. Total CARD-ART is
 now **94 PNGs / 11 MB**; dist 13 MB with 94 PNG assets. Gates: typecheck clean, client 141, build OK.
 
+**CARD ART ROUND 3 (2026-11-07):** a fourth sheet (premier + alliance **resource** cards) added **54
+more PNGs** — AM-001..AM-004, IT-001/003/004, WE-001..WE-025 (all premier + alliance weapons),
+AC-001..AC-022 (all premier + alliance actions) — plus `CARD-BACK.png` (the generic card back, slot
+r7c10 of the sheet). The sheet is 4900x4865, 10x7 grid @ 490x695, but only 63 slots are filled
+(rows 1-6 full, row 7 has 3 cards + the card back); several cards appear twice, so the 63 cells
+collapse to 54 unique ids. Card ids were read straight off the printed bottom-right card numbers.
+Total CARD-ART is now **149 PNGs / 18 MB**; dist 19 MB with 149 PNG assets. Gates: typecheck clean,
+client 141 (the "no art" test case moved from `it-001` to `we-043`, since IT-001 now has art),
+build OK. Browser-verified on the prod server: every resource card renders its PNG.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by
