@@ -57,6 +57,16 @@ card scan into the portrait window. Restored the block (from commit 9c67613) and
 Browser-verified: the character art fills the window with no watermark, no leftover printed text and
 no truncation; the resource cards fill their frames.
 
+**CARD ART ROUND 4 (2026-11-07):** a fifth sheet (Outbreak + Nightmare + Mercenaries **resource**
+cards) added **52 more PNGs** — IN-001..IN-007 (the Outbreak infection cards), AC-023..AC-041
+(Outbreak + Nightmare actions), WE-026..WE-050 (Outbreak + Nightmare + Mercenaries weapons) and
+IT-005 (First Aid Spray). The sheet is 4900x4865, a 10x7 grid @ 490x695 with 66 filled slots
+(row 7 holds 5 cards plus the generic card back at r7c10); ids were read off the printed card
+numbers, and the Mercenaries ammo/actions that also appear here were left as the round-2 files.
+Total CARD-ART is now **201 PNGs / 27 MB**; dist 28 MB with 201 PNG assets. Gates: typecheck clean,
+client 141 (the "no art" test case moved again, `we-043` → `ma-073`), build OK, smoke 12/12.
+Browser-verified: an Outbreak pass-and-play renders the new action/weapon art.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by

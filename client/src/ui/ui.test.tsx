@@ -103,7 +103,7 @@ describe('CardView (T03)', () => {
 
   it('uses the CARD-ART PNG as the card face when one exists', () => {
     const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
-    const noArt = MERCENARIES_CARDS.find(c => c.id === 'we-043'); // no PNG for this id
+    const noArt = MERCENARIES_CARDS.find(c => c.id === 'ma-073'); // no PNG for this id
     expect(majini).toBeDefined();
     expect(noArt).toBeDefined();
     if (majini === undefined || noArt === undefined) return;
