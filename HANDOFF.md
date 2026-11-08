@@ -67,6 +67,18 @@ Total CARD-ART is now **201 PNGs / 27 MB**; dist 28 MB with 201 PNG assets. Gate
 client 141 (the "no art" test case moved again, `we-043` → `ma-073`), build OK, smoke 12/12.
 Browser-verified: an Outbreak pass-and-play renders the new action/weapon art.
 
+**CARD ART ROUND 5 (2026-11-07):** a sixth sheet — the **promo characters** — added **10 PNGs**,
+`PR-001..PR-010` (Chris Redfield, Jill Valentine, George Hamilton, Jim Chapman, Albert Wesker,
+Yoko Suzuki, Alyssa Ashcroft, Cindy Lennox, Rebecca Chambers, HUNK). The sheet is 5500x5390 but the
+cards fill only the top 1539 px: 10 cards in row 1 (550x770 each) plus `CH-022` (Kevin Ryman) alone
+in row 2, which was already covered by round 1 and left alone. The promo cards have a much thinner
+header than the base character cards, so the art crop runs from just under the `[CHARACTER]` banner
+to the torn edge above the name panel (320x292, art only — the printed "NN Health" badge stays in
+the top-right corner of the crop). Ids were read off the printed bottom-right codes one cell at a
+time. Total CARD-ART is now **211 PNGs / 28 MB**; dist 30 MB with 211 PNG assets. Gates: typecheck
+clean, client 141, build OK. Browser-verified: a pass-and-play that drew `pr-010`/`pr-009` renders
+the promo art.
+
 **MULTI-EXPLORE + PARTNER EXPLORE (2026-11-07 ~15:00, commit pending):**
 - **Rulebook "Extra Explore" is implemented.** `Action.explore.exploreCount` is now a real choice: the player
   picks how many of their remaining Explores one action spends (1..`exploresLeft`, capped by
