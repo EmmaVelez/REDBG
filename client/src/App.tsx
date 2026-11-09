@@ -100,8 +100,12 @@ export function App(): JSX.Element {
   const [dockEl, setDockEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (dockEl === null) return;
+    let last = -1;
     const publish = (): void => {
-      document.documentElement.style.setProperty('--dock-h', `${dockEl.offsetHeight}px`);
+      const height = dockEl.offsetHeight;
+      if (height === last) return;
+      last = height;
+      document.documentElement.style.setProperty('--dock-h', `${height}px`);
     };
     publish();
     const observer = new ResizeObserver(publish);
@@ -113,10 +117,15 @@ export function App(): JSX.Element {
     const mutation = new MutationObserver(() => setTimeout(publish, 0));
     mutation.observe(dockEl, { childList: true, subtree: true, characterData: true });
     window.addEventListener('resize', publish);
+    // Belt and braces: when the bar WRAPS its height changes without a resize
+    // event or a DOM mutation, so neither observer above sees it. A slow poll
+    // keeps the reservation honest in that case (and in a backgrounded tab).
+    const timer = setInterval(publish, 250);
     return () => {
       observer.disconnect();
       mutation.disconnect();
       window.removeEventListener('resize', publish);
+      clearInterval(timer);
     };
   }, [dockEl]);
   // When the fatal explore ALSO revealed a card, the reveal plays first and

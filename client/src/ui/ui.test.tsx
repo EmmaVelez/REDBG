@@ -364,27 +364,17 @@ describe('Hand + Zones (T04)', () => {
     expect((html.match(/class="hand-card"/g) ?? []).length).toBe(hand.length);
   });
 
-  it('renders deck/discard piles flanking the hand slot and the play area', () => {
+  it('renders the play area; the deck/hand/discard row moved to the action bar', () => {
     const state = twoPlayerState();
-    const player = state.seats[0];
-    expect(player).toBeDefined();
-    if (player === undefined) return;
-    const html = renderToStaticMarkup(
-      <Zones state={state} seat={0}>
-        <Hand state={state} seat={0} onPlay={() => {}} />
-      </Zones>
-    );
-    // deck (left) and discard (right) piles carry anchors + counts
-    expect(html).toContain('data-anim-zone="deck"');
-    expect(html).toContain('data-anim-zone="discard"');
-    expect(html).toContain(`data-pile-count="${player.inventory.length}"`);
-    expect(html).toContain(`data-pile-count="${player.discard.length}"`);
-    // hand slot contains the actual hand component
-    expect(html).toContain('zone-hand-slot');
-    expect(html).toContain('class="hand"');
+    const html = renderToStaticMarkup(<Zones state={state} seat={0} />);
     // play area anchor present even when empty (flight target stability)
     expect(html).toContain('data-anim-zone="play"');
     expect(html).toContain('<span class="zone-empty">none</span>');
+    // the deck / hand / discard row now lives in the ActionBar, not here
+    expect(html).not.toContain('data-anim-zone="deck"');
+    expect(html).not.toContain('data-anim-zone="discard"');
+    expect(html).not.toContain('zone-hand-slot');
+    expect(html).not.toContain('class="hand"');
   });
 
   it('renders an empty-hand message when the hand is empty', () => {
@@ -439,6 +429,15 @@ describe('PlayerPanel (T06)', () => {
     const charIdx = html.indexOf('player-character-card');
     expect(infoIdx).toBeGreaterThan(-1);
     expect(charIdx).toBeGreaterThan(infoIdx);
+  });
+
+  it('can drop the character cards from the viewing player’s own panel (they live in the bar)', () => {
+    const state = twoPlayerState();
+    const mine = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe showCharacterCards={false} />);
+    expect(mine).not.toContain('player-character-card');
+    // every other seat still shows its character card on the board
+    const theirs = renderToStaticMarkup(<PlayerPanel state={state} seat={1} />);
+    expect(theirs).toContain('player-character-card');
   });
 });
 
@@ -590,6 +589,32 @@ describe('ActionBar (T07)', () => {
     const offline = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
     expect(offline).not.toContain('app-status-');
     expect(offline).not.toContain('app-room');
+  });
+
+  it('puts the character/partner cards and the deck/hand/discard between the stats and the buttons', () => {
+    const state = twoPlayerState();
+    const player = state.seats[0];
+    expect(player).toBeDefined();
+    if (player === undefined) return;
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    const at = (needle: string): number => html.indexOf(needle);
+    const statsIdx = at('action-stats');
+    const charIdx = at('data-character-card');
+    const deckIdx = at('data-anim-zone="deck"');
+    const handIdx = at('class="hand"');
+    const discardIdx = at('data-anim-zone="discard"');
+    const buttonsIdx = at('action-buttons');
+    for (const [label, i] of [['stats', statsIdx], ['char', charIdx], ['deck', deckIdx], ['hand', handIdx], ['discard', discardIdx], ['buttons', buttonsIdx]] as const) {
+      expect(i, label).toBeGreaterThan(-1);
+    }
+    // left to right: stats, character, deck, hand, discard, buttons
+    expect(charIdx).toBeGreaterThan(statsIdx);
+    expect(deckIdx).toBeGreaterThan(charIdx);
+    expect(handIdx).toBeGreaterThan(deckIdx);
+    expect(discardIdx).toBeGreaterThan(handIdx);
+    expect(buttonsIdx).toBeGreaterThan(discardIdx);
+    // the hand still renders one playable button per card
+    expect((html.match(/class="hand-card"/g) ?? []).length).toBe(player.hand.length);
   });
 
   it('offers end turn on my turn and disables explore with no legal combo', () => {

@@ -1069,7 +1069,10 @@ h1, h2 { margin: 0 0 8px; }
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* display: flex is load-bearing: the row/gap/wrap rules below have been
+   dead for the whole life of this file without it. */
 .app-action-dock .action-bar {
+  display: flex;
   border: none;
   background: transparent;
   padding: 0;
@@ -1692,3 +1695,34 @@ h1, h2 { margin: 0 0 8px; }
     0 0 0 1px rgba(120, 150, 170, 0.10),
     0 3px 12px rgba(0, 0, 0, 0.55);
 }
+
+/* ---- action bar identity: character + partner cards, then deck / hand / discard ---- */
+.action-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.app-action-dock .player-character-row {
+  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+}
+.app-action-dock .player-character-card {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.app-action-dock .player-character-card .card { width: 100px; min-height: 0; }
+.app-action-dock .player-partner-hp,
+.app-action-dock .player-partner-attached { font-size: 9px; white-space: nowrap; }
+.app-action-dock .hand { flex-wrap: nowrap; }
+.app-action-dock .zone-pile { min-width: 52px; }
+/* the hand is the one variable-width element in the bar: keep it compact
+   so stats + identity + buttons still fit on one row at a 1600px viewport */
+.app-action-dock .hand-card { margin-right: -18px; }
+.app-action-dock .hand-card .card { width: 72px; }

@@ -4,6 +4,10 @@ import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import type { ConnectionStatus } from '../net/ws';
 import { ActionBarStats } from './ActionBarStats';
+import { CharacterCards } from './CharacterCards';
+import { Hand } from './Hand';
+import { ZonePile } from './ZonePile';
+import { playFromHand } from './playFromHand';
 import { defForInstance } from './cards';
 import {
   bestExploreCombo,
@@ -146,6 +150,8 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     return a.type;
   };
   const player = state.seats[seat];
+  const discardTopId = player?.discard[0];
+  const discardTopDef = discardTopId === undefined ? null : defForInstance(state, discardTopId);
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
   const abilityLabel = (abilityIndex: number): string => {
@@ -183,6 +189,21 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           buys={player.buysLeft}
         />
       )}
+
+      {player !== undefined && (
+        <div className="action-identity" data-action-identity>
+          <CharacterCards state={state} seat={seat} />
+          <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />
+          <Hand
+            state={state}
+            seat={seat}
+            onPlay={instanceId => playFromHand(state, seat, instanceId, onAction)}
+            disabled={disabled}
+          />
+          <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} />
+        </div>
+      )}
+
       {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
       {lastError !== undefined && lastError !== null && lastError !== '' && (
         <div className="action-error" data-action-error role="alert">{lastError}</div>

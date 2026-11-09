@@ -3,7 +3,6 @@ import type { GameState, Action } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { PlayerPanel } from './PlayerPanel';
-import { Hand } from './Hand';
 import { Zones } from './Zones';
 import { ZonePile } from './ZonePile';
 import { CardFlightLayer } from './CardFlightLayer';
@@ -86,42 +85,16 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
 
       <div className="board-players">
         {state.seats.map(player => (
-          <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={player.seat === mySeat} />
+          <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={player.seat === mySeat} showCharacterCards={player.seat !== mySeat} />
         ))}
       </div>
 
       <div className="board-self">
         <h2 className="board-section-title">Your table</h2>
-        <Zones state={state} seat={mySeat}>
-          <Hand state={state} seat={mySeat} onPlay={instanceId => onPlayFromHand(state, mySeat, instanceId, onAction)} disabled={disabled || state.activeSeat !== mySeat || state.phase !== 'main'} />
-        </Zones>
+        <Zones state={state} seat={mySeat} />
       </div>
 
       <CardFlightLayer state={state} />
     </div>
   );
-}
-
-/** Route a hand click to the right action kind by card type. */
-function onPlayFromHand(state: GameState, seat: number, instanceId: string, onAction: (a: Action) => void): void {
-  const def = defForInstance(state, instanceId);
-  if (def === null) return;
-  switch (def.type) {
-    case 'action':
-      onAction({ type: 'playActionCard', seat, instanceId });
-      return;
-    case 'item':
-      onAction({ type: 'playItem', seat, instanceId });
-      return;
-    case 'ammunition':
-      onAction({ type: 'playAmmo', seat, instanceId });
-      return;
-    case 'weapon':
-      // Weapons are card-type items that play into the hand → play area pipeline.
-      // use playActionCard for all cards (weapons, actions) — explore handles using them.
-      onAction({ type: 'playActionCard', seat, instanceId });
-      return;
-    default:
-      return; // characters/others have no play action from hand
-  }
 }

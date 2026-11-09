@@ -1,45 +1,30 @@
-import type { JSX, ReactNode } from 'react';
+import type { JSX } from 'react';
 import type { GameState } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
-import { ZonePile } from './ZonePile';
 import { defForInstance } from './cards';
 
 /**
- * M4-T04: Zones — the player's table area, laid out as
- *   [ Deck ]  [ hand slot ]  [ Discard ]
- *   [ play area ]
- * Each zone carries a data-anim-zone anchor for the card-flight layer.
+ * M4-T04: Zones — the player's table area.
+ *
+ * The deck / hand / discard row moved into the ACTION BAR (see ActionBar), so
+ * what stays on the board is the play area. It keeps its `data-anim-zone`
+ * anchor so the card-flight layer still has a stable target.
  */
 
 export interface ZonesProps {
   readonly state: GameState;
   readonly seat: number;
-  /** Rendered in the middle slot (the player's Hand). */
-  readonly children?: ReactNode;
 }
 
-export function Zones({ state, seat, children }: ZonesProps): JSX.Element {
+export function Zones({ state, seat }: ZonesProps): JSX.Element {
   const player = state.seats[seat];
   if (player === undefined) {
     return <div className="zones" data-seat={seat} />;
   }
   const playArea = player.playArea;
-  const discardTopId = player.discard[0];
-  const discardTopDef = discardTopId === undefined ? null : defForInstance(state, discardTopId);
   return (
     <div className="zones" data-seat={seat}>
-      <div className="zone-row">
-        <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />
-        <div className="zone-hand-slot">{children}</div>
-        <ZonePile
-          label="Discard"
-          count={player.discard.length}
-          animZone="discard"
-          seat={seat}
-          topDef={discardTopDef}
-        />
-      </div>
       <div className="play-area" data-zone="playArea" data-anim-zone="play">
         <span className="zone-label">In play</span>
         <div className="play-area-cards">
