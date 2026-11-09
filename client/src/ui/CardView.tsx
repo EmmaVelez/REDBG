@@ -134,9 +134,9 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
           {levels.map(entry => {
             // Each tier has its own decoration gate. Level 1 uses level1At — 0 for
             // most characters (active and green from the start, e.g. Chris), 1 for
-            // Krauser — and Level 2 uses level2At. Greyed while decorations are
-            // below that tier's gate. The stat box shows [level, gate] like the
-            // reference card ("1 2" = level 1, gate 2).
+            // Krauser — and Level 2 uses level2At. The stat box reads "Lv1:★" when
+            // that tier is unlocked and "Lv1:☆" while it is still gated (the gate
+            // itself is in the tooltip and in data-level1-at / data-level2-at).
             const gate = entry.level === 1 ? level1At : level2At;
             const unlocked = decorations >= gate;
             return (
@@ -147,9 +147,7 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
                 data-unlocked={unlocked || undefined}
               >
                 <span className="skill-box" title={`Level ${entry.level} · unlocks at ${gate} ★`}>
-                  <SkillIcon text={entry.text} />
-                  <span className="skill-level">{entry.level}</span>
-                  <span className="skill-gate" data-skill-gate>{gate}</span>
+                  Lv{entry.level}:{unlocked ? '★' : '☆'}
                 </span>
                 <span className="skill-text">{entry.text}</span>
               </div>
@@ -160,41 +158,5 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
         <div className="card-text">{def.text}</div>
       ))}
     </div>
-  );
-}
-
-/** Pixel glyph for a skill row's stat box: bullet for ammo lines, coin for
- *  gold lines, star otherwise. 8×8 crisp rects for the pixel-art frame. */
-function SkillIcon({ text }: { text: string }): JSX.Element {
-  const t = text.toLowerCase();
-  const kind = t.includes('ammo') ? 'ammo' : t.includes('gold') ? 'gold' : 'star';
-  return (
-    <svg className="skill-icon" viewBox="0 0 8 8" width="8" height="8" shapeRendering="crispEdges" aria-hidden>
-      {kind === 'ammo' && (
-        <g fill="currentColor">
-          <rect x="3" y="0" width="2" height="1" />
-          <rect x="2" y="1" width="4" height="4" />
-          <rect x="2" y="5" width="4" height="3" />
-        </g>
-      )}
-      {kind === 'gold' && (
-        <g fill="currentColor">
-          <rect x="3" y="0" width="2" height="1" />
-          <rect x="1" y="1" width="6" height="6" />
-          <rect x="3" y="7" width="2" height="1" />
-          <rect x="3" y="3" width="2" height="2" fill="#23242a" />
-        </g>
-      )}
-      {kind === 'star' && (
-        <g fill="currentColor">
-          <rect x="4" y="1" width="1" height="1" />
-          <rect x="3" y="2" width="3" height="1" />
-          <rect x="2" y="3" width="5" height="2" />
-          <rect x="3" y="5" width="2" height="1" />
-          <rect x="2" y="6" width="1" height="1" />
-          <rect x="5" y="6" width="1" height="1" />
-        </g>
-      )}
-    </svg>
   );
 }

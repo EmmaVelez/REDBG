@@ -286,7 +286,10 @@ h1, h2 { margin: 0 0 8px; }
   background: rgba(8, 9, 12, 0.78);
   border: none;
   color: #dde2ea;
-  font-size: 6px;
+  /* the ability text is the point of the overlay, so keep it as large as the
+     card can hold: 7px is the biggest size whose two clamped rows still fit
+     inside the 114px base card (8px needs 121px) */
+  font-size: 7px;
   line-height: 1.25;
   opacity: 0;
   pointer-events: none;
@@ -294,19 +297,20 @@ h1, h2 { margin: 0 0 8px; }
 }
 .card.card-character.card-art-only .card-skills { display: flex; flex-direction: column; gap: 1px; }
 .card.card-character.card-art-only .skill-row { flex-direction: column; align-items: flex-start; gap: 1px; }
-.card.card-character.card-art-only .skill-box { font-size: 6px; min-width: 22px; padding: 0 2px; }
-.card.card-character.card-art-only .skill-icon { width: 6px; height: 6px; }
-/* Clamped to 3 lines per level, exactly how `.card-has-art .card-text` clamps a
-   resource card's rules text. Without the clamp the panel needs 175px for a
-   long-character card on a 73px promo card, i.e. it can never fit. */
+.card.card-character.card-art-only .skill-box { font-size: 7px; min-width: 0; padding: 0 2px; }
 .card.card-character.card-art-only .skill-text {
   color: #dde2ea;
-  font-size: 6px;
+  font-size: 7px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* locked tiers stay greyed until unlocked */
+.card.card-character.card-art-only .skill-locked { opacity: 0.55; }
+/* promo art is the short 320x292 window, so its card is only 73px tall and
+   cannot hold three clamped rows at 7px — two lines is what fits */
+.card.card-promo.card-art-only .skill-text { -webkit-line-clamp: 2; }
 .card.card-character.card-art-only:hover .card-skills,
 .card.card-character.card-art-only:hover .card-text { opacity: 1; }
 /* Hovering a character card grows the card itself (a transform, so the bar
@@ -544,15 +548,10 @@ h1, h2 { margin: 0 0 8px; }
   padding: 1px 3px;
   min-width: 30px;
 }
-.card-character .skill-icon { flex: 0 0 auto; }
-.card-character .skill-level,
-.card-character .skill-gate { color: #fff; letter-spacing: 0; }
-.card-character .skill-gate { color: #ffd76e; }
-.card-character .skill-unlocked .skill-gate { color: #8dff9e; }
-.card-character .skill-locked .skill-gate { color: #c6c9cf; }
-.card-character .skill-text { font-size: 8px; line-height: 1.25; color: #1d1f23; }
-.card-character .skill-locked { opacity: 0.55; border-left: none; }
-.card-character .skill-locked .skill-level { color: var(--cc-line); }
+/* The character card's stat box now reads "Lv1:★" / "Lv1:☆" (level + lock
+   state) instead of a pixel icon plus a level and gate number, so the old
+   .skill-icon / .skill-level / .skill-gate rules for .card-character are gone.
+   .skill-gate itself is still used by CharacterSkills. */
 
 /* ---- hover card ---- */
 .hover-card { position: relative; display: inline-block; }
@@ -1926,6 +1925,22 @@ h1, h2 { margin: 0 0 8px; }
 .app-action-dock .zone-pile-stack { width: 76px; height: 103px; }
 /* prompts grow to fill the controls band; the buttons spread across it */
 .app-action-dock .action-prompts { flex: 1 1 auto; min-width: 260px; }
+/* The controls band (prompts + the turn's buttons) is pulled OUT of the dock and
+   floats just ABOVE it, over the board, with a transparent background so the
+   board shows through between the buttons. It is position:fixed against the
+   viewport, anchored to the dock's measured height (--dock-h, published by
+   App.tsx), so it still follows the dock when the dock wraps or grows. */
+.app-action-dock .action-row-controls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--dock-h, 0px);
+  z-index: 45;
+  background: transparent;
+  border: none;
+  padding: 0 16px 8px;
+  max-height: none;
+}
 .app-action-dock .action-buttons {
   flex: 1 1 auto;
   justify-content: space-between;
@@ -2078,6 +2093,8 @@ h1, h2 { margin: 0 0 8px; }
   }
   .app-board .app-action-dock .action-bar { gap: 6px; }
   .app-board .action-row { gap: 6px; flex-wrap: wrap; }
+  /* the controls band is out of the dock now, so it carries its own padding */
+  .app-board .app-action-dock .action-row-controls { padding: 0 8px 6px; }
   /* stat pills inherit the borderless 25%-smaller base pill; only the padding
      tightens further so all five still fit on one row */
   .app-board .action-stat { padding: 2.25px 5.25px; gap: 2.25px; }
@@ -2135,14 +2152,13 @@ h1, h2 { margin: 0 0 8px; }
   .hover-card-pop .card { width: 150px; }
 
   /* The phone's character card is only 44-56px wide and 63-79px tall, so the
-     overlay is clamped harder and set smaller. It is also allowed to exceed the
-     card's height: the card sits at the top of the dock's identity row with the
-     whole hand row below it, so the extra ~8px lands inside the dock rather than
-     off-screen. */
+     overlay is smaller (6px, 2-line clamp) and allowed to exceed the card's
+     height: the card sits at the top of the dock's identity row with the whole
+     hand row below it, so the extra lands inside the dock rather than off-screen. */
   .card.card-character.card-art-only .card-skills,
-  .card.card-character.card-art-only .card-text { font-size: 5px; max-height: none; }
-  .card.card-character.card-art-only .skill-text { -webkit-line-clamp: 2; font-size: 5px; }
-  .card.card-character.card-art-only .skill-box { font-size: 5px; min-width: 18px; }
+  .card.card-character.card-art-only .card-text { font-size: 6px; max-height: none; }
+  .card.card-character.card-art-only .skill-text { -webkit-line-clamp: 2; font-size: 6px; }
+  .card.card-character.card-art-only .skill-box { font-size: 6px; }
 
   /* ---- overlays ---- */
   .mansion-door-panel { max-width: calc(100vw - 32px); padding: 16px; }

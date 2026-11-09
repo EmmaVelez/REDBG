@@ -1,5 +1,36 @@
 # HANDOFF — resume here
 
+**BIGGER ABILITY TEXT, "Lv1:★" STAT BOXES, FLOATING CONTROLS BAND (2026-11-09, commit pending):**
+Manny asked for three more UI changes on top of the character hover work.
+
+1. **Scale the ability text.** The overlay was 6px; it is now **7px** (desktop) / **6px** (mobile).
+   7px is the largest size whose two clamped rows still fit inside the 114px base card — the
+   content needs 91px and **8px needs 121px**, so 8px clips. Promo cards are the short 320x292 art
+   window (73px tall), so they get a **2-line clamp** instead of 3 (7px x 3 lines = 91px > 73px;
+   measured 74 vs 73 with the clamp). Mobile keeps the smaller font because its card is 63-79px.
+2. **Stat box now reads "Lv1:★" / "Lv1:☆".** Replaced the pixel `SkillIcon` glyph, the separate
+   `.skill-level` span and the `.skill-gate` number with one string:
+   `Lv{entry.level}:{unlocked ? '★' : '☆'}`. The component's `SkillIcon` function is **deleted**
+   and its CSS (plus the `.card-character .skill-level` / `.skill-gate` rules) is gone.
+   **The absolute decoration gate is no longer displayed** — it moved into the box's `title`
+   tooltip and stays on the panel as `data-level1-at` / `data-level2-at`. Locked rows keep
+   `opacity: 0.55` (the grey-out Manny asked to leave in place).
+   **Test churn:** 7 assertion blocks asserted the gate NUMBER (`>0<`, `>4<`, …); they now assert
+   the star text and the `data-levelN-at` attributes, so the gate thresholds are still covered.
+3. **The controls band floats above the action bar.** `.app-action-dock .action-row-controls` is now
+   `position: fixed; left: 0; right: 0; bottom: var(--dock-h, 0px); background: transparent` with
+   no border and its own padding. It is still a DOM child of the dock (so the existing
+   `.app-action-dock …` overrides keep applying) but out of flow, anchored to the dock's measured
+   height that App.tsx publishes as `--dock-h`. Measured at 1280x800: the band is y=590..629
+   (39px) and the dock starts at y=629 — **they touch exactly**, and the band overlaps the board's
+   bottom 23px as asked. Mobile gets its own `padding: 0 8px 6px` because it is no longer inside
+   the dock's padding.
+   **Note:** the dock shrank from 213px to 171px at 1280x800 (the controls are no longer in it), so
+   the board gained height. The board itself still scrolls on desktop (its content is 1438px in a
+   597px box, mostly the 531px `.market-piles` block wrapping into rows) — **pre-existing**, not
+   caused by these changes.
+- Gates: typecheck clean, client 174, game-core 801, server 102, `vite build` OK.
+
 **ATTACHED TROPHY FAN ON CHARACTER HOVER (2026-11-09, commit 8993c39):** Manny asked that a
 hovered character card also **display its attached (defeated Infected) cards to the right**, laid out
 like the hand, with **the overlap growing with the number of attached cards**.
