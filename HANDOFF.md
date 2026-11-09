@@ -1,5 +1,57 @@
 # HANDOFF — resume here
 
+**M6 MOBILE LAYOUT (2026-11-09, commit 5226b7a):** Manny asked for **"specific UI tweaks —
+I'm trying to maximize board space on mobile screens"**. Measured the real board in the
+browser at five viewports *before* changing anything, and it was broken, not just untidy:
+**at 390x844 the board was 2px wide** and the log sidebar took 87% of the screen; at 360x640
+it was **0px**. Two root causes, both in `client/src/styles.css`, which had **zero `@media`
+rules**: `.app-side { width: 340px; flex-shrink: 0 }` could not shrink while
+`.board { flex: 1 1 auto; min-width: auto }` could not go below its min-content width, so the
+board was crushed instead of the sidebar; and `.action-identity { flex-wrap: nowrap }` with
+`.action-col-hand { min-width: 160px }` made the dock **456px wide and scrollable** on a
+390px phone. Manny's choices: Resource Area = **one swipeable row**, log = **slide-over from
+the right, closed by default**, opponents = **slim chips (name / HP / ★ / Attached)**, hand
+cards = **64px**.
+- **All fixes are in a new `@media (max-width: 820px)` block appended to styles.css**, plus
+  a `@media (max-width: 400px)` tier. **Every rule is scoped to `.app-board`**, so the
+  desktop layout is untouched — re-measured at 1600x1000: board 1212x730, dock 238px,
+  sidebar 340px, identical to before.
+- **Resource Area → one swipeable row.** 18 piles wrapped into a column was **1072px tall**
+  at 768px and **3276px** at 390px. Now 159px with `scroll-snap-type: x proximity`.
+- **Log → off-canvas slide-over.** `.app-side` becomes `position: fixed` (which also removes
+  it from the flex row, letting the board take the full width), translated 105% off-screen
+  until the shell carries **`.app-log-open`**, with a scrim (`.app-log-backdrop`, tap to
+  close) below it at z-index 55. `App.tsx` now owns that class, initialises `logOpen` from
+  `matchMedia('(min-width: 821px)')`, and **closes it on a `change` event when the window is
+  narrowed across the breakpoint** — otherwise a desktop user shrinking the window would be
+  left staring at a scrim covering the board.
+- **Opponent panels → slim chips in a swipeable row.** A full panel was ~1050px wide once the
+  public play-area/discard rows and the skill list were in it, which wrapped `.board-players`
+  into a 400px-tall slab. On mobile `.player-pools`, `.player-deck-stats`,
+  `.player-public-zones`, `.character-skills` and `.player-character-row` are hidden, and the
+  character name truncates with an ellipsis. **`Attached` moved out of `.player-deck-stats`
+  into the HP/★ row** (`PlayerPanel.tsx`) — it is a score, not a deck statistic, and it is
+  the one count the chip still shows. That also made the desktop panel 48px shorter.
+- **Action dock compacted** (it is a fixed overlay, so every pixel of its height is a pixel
+  of board lost): 329px → **271px** at 390x844. The identity band wraps, the hand gets its
+  own full-width row at 64px, and `.action-buttons` wraps instead of overflowing.
+- **`HoverCard` clamps its popup to the viewport** (`half = 92`) — at 150-180px wide and
+  centred on the trigger, it hung off the edge of a phone.
+- **`.lobby-form` wraps** (found while checking the lobby at 390px): the join form was
+  **532px in a 358px container**, which forced the phone to widen the layout viewport to
+  **548px**. `flex-wrap: wrap` + `input { flex: 0 1 220px; min-width: 0 }` fixed it.
+- **Latent bug this exposed:** `.board` is a flex COLUMN with `overflow: auto`, so its
+  sections defaulted to `flex-shrink: 1` and were squeezed instead of the board scrolling —
+  at 360x640 the players block collapsed to **4px**. Fixed with
+  `.app-board .board > * { flex: 0 0 auto }`.
+- **Measured after:** 390x844 board **374x557** (was 2x483), dock **271px / 32%** (was
+  329px / 39%), market **159px** (was 3276px), **no board scroll, no page overflow**.
+  360x800, 414x896, 430x932 and 768x1024 all fit with no scrolling either. 360x640 (a 2014-era
+  screen) still scrolls ~160px — the dock alone is 48% of that viewport.
+- Tests are `renderToStaticMarkup` in a **node** env, so none of this is covered by the suite;
+  every number above is from the live browser. Gates: typecheck clean, client 169,
+  game-core 801, server 102, `vite build` OK.
+
 **M6 UI — SURVIVAL-HORROR BOARD THEME (2026-11-08, commit c911adf):** Manny asked to
 tweak the client UI and picked **board/in-game screen only**, direction **"more RE
 atmosphere — darker, grittier, stronger horror mood"**. Done as an **override layer
