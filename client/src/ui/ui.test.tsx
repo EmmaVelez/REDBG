@@ -11,6 +11,7 @@ import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
 import { PlayerPanel } from './PlayerPanel';
+import { CharacterCards } from './CharacterCards';
 import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
@@ -148,6 +149,21 @@ describe('CardView (T03)', () => {
     // a card with no art has nothing to show but text, so artOnly is ignored
     const noArtHtml = renderToStaticMarkup(<CardView def={noArt} compact artOnly />);
     expect(noArtHtml).not.toContain('card-art-only');
+  });
+
+  it('gives a character card the art-only face too, so it matches the resource piles', () => {
+    const chris = PREMIER_CARDS.find(c => c.id === 'ch-008'); // CH-008.png exists
+    expect(chris).toBeDefined();
+    if (chris === undefined) return;
+    const artOnly = renderToStaticMarkup(<CardView def={chris} compact artOnly decorations={0} />);
+    expect(artOnly).toContain('card-character');
+    expect(artOnly).toContain('card-art-only');
+    expect(artOnly).toContain('data-art-only="true"');
+    // the frame is dropped by CSS for this face; the portrait is still there
+    expect(artOnly).toContain('card-portrait');
+    // without the prop the character card keeps its framed face
+    const plain = renderToStaticMarkup(<CardView def={chris} compact decorations={0} />);
+    expect(plain).not.toContain('card-art-only');
   });
 
   it('fills the character portrait window with the PNG when one exists', () => {
@@ -471,6 +487,50 @@ describe('PlayerPanel (T06)', () => {
     // the viewing player's own panel does not repeat their play area
     const mine = renderToStaticMarkup(<PlayerPanel state={withZones} seat={0} isMe />);
     expect(mine).not.toContain('data-public-zones');
+  });
+});
+
+describe('CharacterCards (action bar)', () => {
+  /** A seat with a partner, so both cards render. */
+  const withPartner = (over: Partial<GameState> = {}): GameState => {
+    const state = twoPlayerState();
+    const partnerCharInst = 'ch-002#p1';
+    const partnerInst = 'we-004#77';
+    const armed = {
+      ...state,
+      cards: {
+        ...state.cards,
+        [partnerCharInst]: { instanceId: partnerCharInst, cardId: 'ch-002', location: { zone: 'attached' as const, index: 0, seat: 0 } },
+        [partnerInst]: { instanceId: partnerInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } },
+      },
+      seats: state.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: partnerCharInst, partnerAttached: [partnerInst] }
+        : s)),
+    };
+    return { ...armed, ...over };
+  };
+
+  it('renders the partner card identically to the player card, with no text underneath', () => {
+    const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
+    // both cards take the art-only face
+    expect(html).toContain('data-character-card');
+    expect(html).toContain('data-partner-character-card');
+    expect(html.match(/card-character/g)?.length).toBe(2);
+    expect(html.match(/card-art-only/g)?.length).toBe(2);
+    // no HP / attached text rows under the partner card any more
+    expect(html).not.toContain('player-partner-hp');
+    expect(html).not.toContain('player-partner-attached');
+    expect(html).not.toContain('Attached ');
+  });
+
+  it('shows each card\'s attached count as a badge, in the style of a zone-pile count', () => {
+    const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
+    expect(html).toContain('data-attached-count');
+    expect(html).toContain('data-partner-attached-count');
+    expect(html.match(/cc-attached/g)?.length).toBe(2);
+    // the partner has one infected attached, the main character none
+    expect(html).toMatch(/data-partner-attached-count[^>]*>\s*1\s*</);
+    expect(html).toMatch(/data-attached-count[^>]*>\s*0\s*</);
   });
 });
 

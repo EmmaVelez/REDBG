@@ -202,11 +202,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
       {player !== undefined && (
         <div className="action-row action-identity" data-action-identity>
           <div className="action-col">
-            <span className="action-col-label">Character</span>
             <CharacterCards state={state} seat={seat} />
           </div>
           <div className="action-col">
-            <span className="action-col-label">Deck</span>
             <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />
           </div>
           <div className="action-col action-col-hand">
@@ -234,7 +232,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             <button type="button" className="hand-scroll hand-scroll-right" onClick={() => scrollHand(1)} title="Scroll hand right" aria-label="Scroll hand right">▶</button>
           </div>
           <div className="action-col">
-            <span className="action-col-label">Discard</span>
             <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} />
           </div>
         </div>

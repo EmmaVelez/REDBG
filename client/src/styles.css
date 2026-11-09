@@ -227,9 +227,9 @@ h1, h2 { margin: 0 0 8px; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* art-only faces (hand / resource piles): the artwork fills the whole card and
-   the printed rows + type band fade back in when the card is hovered. The rows
-   stay in the DOM (invisible) so the hover reveal needs no re-render. */
+/* art-only faces (hand / resource piles / character cards): the artwork fills
+   the whole card and the printed rows fade back in when the card is hovered.
+   The rows stay in the DOM (invisible) so the hover reveal needs no re-render. */
 .card-art-only::before {
   display: none;
 }
@@ -241,12 +241,57 @@ h1, h2 { margin: 0 0 8px; }
   opacity: 0;
   transition: opacity 0.12s ease;
 }
+/* Character cards take the same art-only face as the resource piles: the 3px
+   frame, the corner ticks and the inset all go away and the art fills the
+   whole card edge to edge. The card needs an explicit aspect ratio because the
+   portrait is now absolutely positioned and no longer gives it height; the
+   promo art is the shorter window, so it gets its own ratio. The live HP ring
+   still lands on the Health badge printed in the art. */
+.card.card-character.card-art-only {
+  aspect-ratio: 320 / 456;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+.card.card-character.card-promo.card-art-only { aspect-ratio: 320 / 292; }
+.card-character.card-art-only::after { display: none; } /* corner ticks */
+.card-character.card-art-only .card-portrait {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
 .card-art-only:hover .card-top,
 .card-art-only:hover .card-name,
 .card-art-only:hover .card-stats,
 .card-art-only:hover .card-bonus,
 .card-art-only:hover .card-text {
   opacity: 1;
+}
+/* Attached-count badge for a character card, in the visual language of a
+   zone-pile count: a gold disc pinned to the bottom-right corner. It replaces
+   the text rows the partner card used to print underneath itself. */
+.cc-attached {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  z-index: 4;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f0d67c 0%, var(--gold) 60%, #9a7b1c 100%);
+  border: 1px solid #6b5513;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  color: #1c1a12;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
 }
 .hover-card-pop .card-has-art .card-text {
   -webkit-line-clamp: unset;
@@ -1125,12 +1170,13 @@ h1, h2 { margin: 0 0 8px; }
 .action-stat {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
+  gap: 3px;
+  /* 25% smaller than the original 4px 10px, and borderless by request */
+  padding: 3px 7.5px;
+  border: none;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
-  font-size: 11px;
+  font-size: 8.25px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1138,7 +1184,7 @@ h1, h2 { margin: 0 0 8px; }
   white-space: nowrap;
 }
 .action-stat strong {
-  font-size: 14px;
+  font-size: 10.5px;
   letter-spacing: 0;
   color: #e8e2d4;
 }
@@ -1603,15 +1649,15 @@ h1, h2 { margin: 0 0 8px; }
 /* ---- stat pills ---- */
 .app-board .action-stat {
   background: linear-gradient(180deg, #171b21 0%, #101318 100%);
-  border: 1px solid #2d343f;
+  border: none;
   border-radius: 999px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 5px rgba(0, 0, 0, 0.5);
   color: #7f8896;
-  font-size: 10px;
+  font-size: 7.5px;
   letter-spacing: 0.12em;
-  padding: 4px 12px;
+  padding: 3px 9px;
 }
-.app-board .action-stat strong { font-size: 15px; letter-spacing: 0; }
+.app-board .action-stat strong { font-size: 11.25px; letter-spacing: 0; }
 .app-board .action-stat-hp strong { color: #6fbf7a; }
 .app-board .action-stat-gold strong { color: #d4af37; }
 .app-board .action-stat-ammo strong { color: #7fa8c9; }
@@ -1746,13 +1792,8 @@ h1, h2 { margin: 0 0 8px; }
   flex: 0 0 auto;
   min-width: 0;
 }
-.action-col-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+/* no `.action-col-label` any more: the character card needs no caption, and
+   the deck/discard piles carry their own `.zone-pile-label`. */
 /* the hand is the flexible middle region, so it scrolls instead of wrapping */
 .action-col-hand {
   position: relative;
@@ -1803,8 +1844,8 @@ h1, h2 { margin: 0 0 8px; }
   padding-top: 0;
 }
 .app-action-dock .player-character-card .card { width: 80px; min-height: 0; }
-.app-action-dock .player-partner-hp,
-.app-action-dock .player-partner-attached { font-size: 9px; white-space: nowrap; }
+/* the partner card renders exactly like the player card now — no text
+   underneath; its attached count is the .cc-attached badge on the art. */
 /* deck / discard read as labelled boxes under their header */
 .app-action-dock .zone-pile { min-width: 64px; }
 .app-action-dock .zone-pile-stack { width: 76px; height: 103px; }
@@ -1962,8 +2003,9 @@ h1, h2 { margin: 0 0 8px; }
   }
   .app-board .app-action-dock .action-bar { gap: 6px; }
   .app-board .action-row { gap: 6px; flex-wrap: wrap; }
-  .app-board .action-stat { padding: 3px 7px; font-size: 10px; gap: 3px; }
-  .app-board .action-stat strong { font-size: 12px; }
+  /* stat pills inherit the borderless 25%-smaller base pill; only the padding
+     tightens further so all five still fit on one row */
+  .app-board .action-stat { padding: 2.25px 5.25px; gap: 2.25px; }
   .app-board .action-note { font-size: 10px; }
   .app-board .action-identity {
     flex-wrap: wrap;
@@ -1971,7 +2013,6 @@ h1, h2 { margin: 0 0 8px; }
     align-items: flex-end;
   }
   .app-board .action-col { gap: 2px; }
-  .app-board .action-col-label { font-size: 8px; letter-spacing: 1px; }
   /* the hand gets its own full-width row: the character/deck/discard row
      never has to squeeze it below its min-content width, which is what made
      the dock 456px wide (and scrollable) on a 390px phone */
@@ -1990,8 +2031,6 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .app-action-dock .zone-pile { min-width: 0; }
   .app-board .app-action-dock .zone-pile-stack { width: 54px; height: 73px; }
   .app-board .app-action-dock .player-character-card .card { width: 56px; }
-  .app-board .app-action-dock .player-partner-hp,
-  .app-board .app-action-dock .player-partner-attached { font-size: 8px; }
   /* prompts and buttons each take a full row; the buttons wrap instead of
      overflowing the viewport (they measured 403px in a 390px window) */
   .app-board .app-action-dock .action-prompts { flex: 1 1 100%; min-width: 0; }
@@ -2036,7 +2075,6 @@ h1, h2 { margin: 0 0 8px; }
   /* the five stat pills wrapped onto a second line at 360px, costing the
      board another ~26px; tighter padding keeps them on one row */
   .app-board .action-row { gap: 4px; }
-  .app-board .action-stat { padding: 2px 5px; font-size: 9px; gap: 2px; }
-  .app-board .action-stat strong { font-size: 11px; }
+  .app-board .action-stat { padding: 1.5px 3.75px; gap: 1.5px; }
   .app-board .action-note { font-size: 9px; }
 }

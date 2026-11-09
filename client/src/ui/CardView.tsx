@@ -53,7 +53,7 @@ export interface CardViewProps {
 export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false }: CardViewProps): JSX.Element {
   const art = cardArtUrl(def.id);
   if (def.type === 'character') {
-    return <CharacterCard def={def} compact={compact} decorations={decorations} hp={hp} maxHp={maxHp} art={art} />;
+    return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} />;
   }
   const stats = statLine(def);
   const bonus = bonusLine(def);
@@ -87,19 +87,31 @@ export function CardView({ def, compact = false, decorations, hp, maxHp, hideCos
 interface CharacterCardProps {
   readonly def: CardDef;
   readonly compact: boolean;
+  /** Art-only face, matching the resource piles: the rules panel is hidden
+   *  until hover. Ignored when the character has no art. */
+  readonly artOnly?: boolean;
   readonly decorations?: number;
   readonly hp?: number;
   readonly maxHp?: number;
   readonly art: string | undefined;
 }
 
-function CharacterCard({ def, compact, decorations, hp, maxHp, art }: CharacterCardProps): JSX.Element {
+function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, art }: CharacterCardProps): JSX.Element {
   const showRing = hp !== undefined && maxHp !== undefined;
   const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
   const levels = def.levels ?? [];
+  // Same rule as a resource card: art-only only means anything when there IS
+  // art to show — a character without a PNG keeps its printed rules panel.
+  const artOnlyMode = artOnly && art !== undefined;
   return (
-    <div className={`card card-character${def.set === 'promo' ? ' card-promo' : ''}`} data-card-id={def.id} data-card-type="character" data-has-art={art !== undefined || undefined}>
+    <div
+      className={`card card-character${def.set === 'promo' ? ' card-promo' : ''}${artOnlyMode ? ' card-art-only' : ''}`}
+      data-card-id={def.id}
+      data-card-type="character"
+      data-has-art={art !== undefined || undefined}
+      data-art-only={artOnlyMode || undefined}
+    >
       <div className={`card-portrait${art !== undefined ? ' card-portrait-has-art' : ''}`}>
         {art !== undefined && (
           <img className="card-portrait-img" src={art} alt="" draggable={false} loading="lazy" decoding="async" />
