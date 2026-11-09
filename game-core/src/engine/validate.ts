@@ -497,7 +497,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             }
             // The forced explore spends the combined arsenals, so Sherry must be
             // able to pay the Ammo for at least one candidate target.
-            const affordable = others.some(o => allyExploreAmmoCost(state, action.seat, o.seat) <= player.turnAmmo);
+            const affordable = others.some(o => allyExploreAmmoCost(state, action.seat, o.seat) <= player.turnAmmo + (state.seats[o.seat]?.turnAmmo ?? 0));
             if (!affordable) {
               return { ok: false, reason: 'useCharacterAbility: not enough Ammo to assist' };
             }

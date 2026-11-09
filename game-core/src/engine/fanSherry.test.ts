@@ -140,6 +140,21 @@ describe('FCH-008 — force another Player to Explore with her', () => {
     expect(after.seats[1]?.decorations).toBe(0);
   });
 
+  it("may spend the exploring player's Ammo too", () => {
+    const s = withTurnAmmo(withTurnAmmo(startTurn(sherryGame({ level: 1 })), 0, 0), 1, 100);
+    const { state: s1 } = addWeapon(s, 1, 'we-009');
+    const { state: s2 } = addWeapon(s1, 0, 'we-009');
+    const { state: s3 } = setMansionTop(s2, ['ma-002']);
+    const used = applyAction(s3, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    const prompt = findPrompt(used, 'sherryForceExplore');
+    expect(prompt).toBeDefined();
+    if (prompt === undefined) return;
+    const after = applyAction(used, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    // Sherry has no Ammo, so the exploring player pays the whole 60.
+    expect(after.seats[0]?.turnAmmo).toBe(0);
+    expect(after.seats[1]?.turnAmmo).toBe(40);
+  });
+
   it('awards defeated Infected (and their Decorations) to Sherry', () => {
     const s = withTurnAmmo(startTurn(sherryGame({ level: 1 })), 0, 100);
     const { state: s1, id: targetWeapon } = addWeapon(s, 1, 'we-009');

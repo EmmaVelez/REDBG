@@ -16,7 +16,8 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
  * Player. Defeated Infected are awarded to Sherry. Any Damage is split evenly
  * between both Characters. The Exploring Player draws a new Hand after."
  *
- * The forced explore happens during Sherry's turn, so Sherry pays the Ammo.
+ * The forced explore happens during Sherry's turn; BOTH the exploring player's and
+ * Sherry's Ammo may pay for it (Sherry's is spent first, then the target's).
  * Every weapon from the target's hand and Sherry's hand may take part; each
  * weapon ends up in its OWNER's play area. Defeated Infected (and their
  * Decorations) are awarded to Sherry, the damage the Infected deals is split
@@ -71,7 +72,8 @@ export function resolveAllyExplore(
 
   const outcome: ExploreOutcome = resolveExplore({
     weapons,
-    ammo: sherry.turnAmmo,
+    // Both the exploring player's and Sherry's Ammo may pay for the explore.
+    ammo: (target.turnAmmo ?? 0) + (sherry.turnAmmo ?? 0),
     bonusDamage,
     revealed: revealedDef ?? ({} as CardDef),
     damageReduction: infectedDamageReduction(targetAbilities),
@@ -99,9 +101,16 @@ export function resolveAllyExplore(
       return s;
     }),
   };
+  // Sherry pays first (she is forcing the explore), then the exploring player.
+  const sherryPays = Math.min(sherry.turnAmmo, ammoSpent);
+  const targetPays = ammoSpent - sherryPays;
   next = {
     ...next,
-    seats: next.seats.map(s => (s.seat === sherrySeat ? { ...s, turnAmmo: Math.max(s.turnAmmo - ammoSpent, 0) } : s)),
+    seats: next.seats.map(s => {
+      if (s.seat === sherrySeat) return { ...s, turnAmmo: s.turnAmmo - sherryPays };
+      if (s.seat === targetSeat) return { ...s, turnAmmo: Math.max(s.turnAmmo - targetPays, 0) };
+      return s;
+    }),
   };
 
   if (outcome.kind === 'nonInfected') {
