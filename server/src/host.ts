@@ -21,8 +21,9 @@ import type { Room } from './rooms';
  * - humans act via apply(clientId, action) — identity-checked against the
  *   room's seat, then validated by the engine's validator;
  * - bot seats are driven through stepBot() (chooseBotAction, hard difficulty);
- * - every seat sees only its own sanitized view (other hands/inventory
- *   contents are hidden as placeholder ids).
+ * - every seat sees only its own sanitized view (other seats' HAND and
+ *   INVENTORY contents are hidden as placeholder ids; the discard pile, play
+ *   area and action log are public, exactly as across a real table).
  * The host itself is agnostic of WebSockets — the ws layer (T04) translates
  * protocol messages into these calls and broadcasts the per-seat views.
  */
@@ -44,7 +45,7 @@ export interface GameHost {
   apply(clientId: string, action: Action): HostResult;
   /** Steps the bot sitting in the currently active seat (if any). */
   stepBot(seed: number, difficulty?: BotDifficulty): HostResult | undefined;
-  /** Sanitized per-seat view: own hand/inventory visible, others hidden. */
+  /** Sanitized per-seat view: only hands/inventories are hidden. */
   viewFor(clientId: string): PlayerView | undefined;
 }
 

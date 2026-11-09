@@ -37,13 +37,17 @@ describe('sanitize', () => {
     expect(out.seats[0]?.inventory).toEqual(s.seats[0]?.inventory);
   });
 
-  it('hides other seats (hand/inventory/discard/playArea) but keeps the board public', () => {
+  it("hides other seats' hand/inventory but keeps the rest of the table public", () => {
     const s = playingState();
     const out = sanitize(s, 0);
     expect(out.mansionDeck).toEqual(s.mansionDeck);
     expect(out.marketPiles).toEqual(s.marketPiles);
     expect(out.cardDefs).toEqual(s.cardDefs);
     expect(out.seats[1]?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
+    expect(out.seats[1]?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
+    // discard and play area are public, exactly as across a real table
+    expect(out.seats[1]?.discard).toEqual(s.seats[1]?.discard);
+    expect(out.seats[1]?.playArea).toEqual(s.seats[1]?.playArea);
   });
 
   it('placeholder length matches the hidden zone length', () => {
@@ -53,14 +57,13 @@ describe('sanitize', () => {
     const hidden = out.seats[1];
     expect(hidden?.hand).toHaveLength(other?.hand.length ?? 0);
     expect(hidden?.inventory).toHaveLength(other?.inventory.length ?? 0);
-    expect(hidden?.discard).toHaveLength(other?.discard.length ?? 0);
   });
 
   it('never exposes hidden ids that resolve to real card defs', () => {
     const s = playingState();
     const out = sanitize(s, 0);
     for (const seat of out.seats) {
-      for (const id of [...(seat?.hand ?? []), ...(seat?.inventory ?? []), ...(seat?.discard ?? []), ...(seat?.playArea ?? [])]) {
+      for (const id of [...(seat?.hand ?? []), ...(seat?.inventory ?? [])]) {
         if (id !== undefined && id.startsWith('hidden-')) {
           expect(out.cardDefs[id ?? '']).toBeUndefined();
         }
@@ -68,14 +71,30 @@ describe('sanitize', () => {
     }
   });
 
-  it('spectator view (viewerSeat -1) hides every seat including the active one', () => {
+  it('keeps the action log public: another seat keeps its real card ids', () => {
+    const s = playingState();
+    const played = Object.values(s.marketPiles)[0]?.cards[0];
+    expect(played).toBeDefined();
+    if (played === undefined) return;
+    // a logged play by seat 0, viewed from seat 1
+    const withLog: GameState = {
+      ...s,
+      log: [...s.log, { seq: (s.log.at(-1)?.seq ?? 0) + 1, action: { type: 'playActionCard', seat: 0, instanceId: played } }],
+    };
+    const out = sanitize(withLog, 1);
+    const entry = out.log.find(e => e.action.type === 'playActionCard');
+    expect(entry).toBeDefined();
+    if (entry !== undefined && entry.action.type === 'playActionCard') {
+      expect(entry.action.instanceId).toBe(played);
+    }
+  });
+
+  it('spectator view (viewerSeat -1) hides every hand/inventory including the active one', () => {
     const s = playingState();
     const out = sanitize(s, -1);
     for (const seat of out.seats) {
       expect(seat?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
       expect(seat?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
-      expect(seat?.discard.every(id => id.startsWith('hidden-'))).toBe(true);
-      expect(seat?.playArea.every(id => id.startsWith('hidden-'))).toBe(true);
     }
     // lengths preserved vs the raw state
     expect(out.seats[0]?.hand).toHaveLength(s.seats[0]?.hand.length ?? 0);

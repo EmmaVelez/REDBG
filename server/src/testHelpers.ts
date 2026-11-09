@@ -138,15 +138,13 @@ export const isGameOver = (m: ServerMessage): m is Extract<ServerMessage, { kind
 
 /** True when every card zone of `seat` is hidden (another seat's view / spectator). */
 export function seatHidden(state: {
-  seats: readonly { hand: readonly string[]; inventory: readonly string[]; discard: readonly string[]; playArea: readonly string[] }[];
+  seats: readonly { hand: readonly string[]; inventory: readonly string[] }[];
 }, seat: number): boolean {
   const s = state.seats[seat];
   if (s === undefined) return false;
   return (
     s.hand.every((id) => id.startsWith('hidden-')) &&
-    s.inventory.every((id) => id.startsWith('hidden-')) &&
-    s.discard.every((id) => id.startsWith('hidden-')) &&
-    s.playArea.every((id) => id.startsWith('hidden-'))
+    s.inventory.every((id) => id.startsWith('hidden-'))
   );
 }
 

@@ -72,13 +72,16 @@ describe('createHost', () => {
     expect(() => host.start(1)).toThrow('no seated players');
   });
 
-  it('viewFor hides other players hand/inventory/discard contents', () => {
+  it('viewFor hides other players hand/inventory but leaves the rest of the table public', () => {
     const { room } = makePlayingRoom();
     const host = createHost(room);
     host.start(7);
     const mine = host.viewFor('host-1');
     expect(mine).toBeDefined();
     if (mine === undefined) return;
+    const raw = host.state;
+    expect(raw).toBeDefined();
+    if (raw === undefined) return;
 
     expect(mine.seat).toBe(0);
     const mySeat = mine.state.seats[0];
@@ -87,11 +90,12 @@ describe('createHost', () => {
     for (const id of mySeat?.hand ?? []) {
       expect(id.startsWith('hidden-')).toBe(false);
     }
-    // other players' zones are hidden placeholders preserving length
+    // other players' face-down zones are hidden placeholders preserving length
     expect(otherSeat?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
     expect(otherSeat?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
-    expect(otherSeat?.discard.every(id => id.startsWith('hidden-'))).toBe(true);
-    expect(otherSeat?.playArea.every(id => id.startsWith('hidden-'))).toBe(true);
+    // their discard and play area stay public, exactly as across a real table
+    expect(otherSeat?.discard).toEqual(raw.seats[1]?.discard);
+    expect(otherSeat?.playArea).toEqual(raw.seats[1]?.playArea);
   });
 
   it('viewFor is undefined for unknown clients', () => {
@@ -209,8 +213,8 @@ describe('Skill Draft with bots', () => {
   });
 });
 
-describe('sanitize integration (log redaction across real host play)', () => {
-  it('sanitize redacts OTHER seats logged card ids but keeps the viewer own and public data', () => {
+describe('sanitize integration (public log across real host play)', () => {
+  it('keeps the action log public for every viewer while hands stay hidden', () => {
     const { room } = makePlayingRoom();
     const host = createHost(room);
     const s0 = host.start(7);
@@ -230,30 +234,24 @@ describe('sanitize integration (log redaction across real host play)', () => {
     if (!afterOther.ok) return;
 
     const raw = afterOther.state;
-    const view0 = sanitize(raw, 0); // viewer is seat 0
-    const ownLogEntry = view0.log.find(e => e.seq === 1);
-    const otherLogEntry = view0.log.find(e => e.seq === 3);
-    // my own playAmmo keeps the real instance id
-    expect(ownLogEntry?.action.type === 'playAmmo' ? ownLogEntry.action.instanceId : '').toBe(ammo0);
-    // other seat's playAmmo is redacted to a placeholder
-    if (otherLogEntry?.action.type === 'playAmmo') {
-      expect(otherLogEntry.action.instanceId).toMatch(/^hidden-/);
-    } else {
-      expect(true).toBe(true); // seat names/indices: guard for fixture drift
+
+    // Every viewer — including a spectator — sees BOTH plays with their real
+    // instance ids: what a player did is public once done, as across a table.
+    for (const viewer of [0, 1, -1]) {
+      const view = sanitize(raw, viewer);
+      const plays = view.log.filter(e => e.action.type === 'playAmmo');
+      expect(plays).toHaveLength(2);
+      const ids = plays.map(e => (e.action.type === 'playAmmo' ? e.action.instanceId : ''));
+      expect(ids).toContain(ammo0);
+      expect(ids).toContain(ammo1);
     }
 
-    const view1 = sanitize(raw, 1);
-    const own1 = view1.log.find(e => e.seq === 3);
-    const other1 = view1.log.find(e => e.seq === 1);
-    expect(own1?.action.type === 'playAmmo' ? own1.action.instanceId : '').toBe(ammo1);
-    if (other1?.action.type === 'playAmmo') {
-      expect(other1.action.instanceId).toMatch(/^hidden-/);
-    }
-
-    // spectator sees every instance redacted
-    const spec = sanitize(raw, -1);
-    for (const e of spec.log) {
-      if (e.action.type === 'playAmmo') expect(e.action.instanceId).toMatch(/^hidden-/);
-    }
+    // But each viewer still sees only their OWN face-down zones...
+    const view0 = sanitize(raw, 0);
+    expect(view0.seats[0]?.hand).toEqual(raw.seats[0]?.hand);
+    expect(view0.seats[1]?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
+    expect(view0.seats[1]?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);
+    // ...while the other seat's play area stays public.
+    expect(view0.seats[1]?.playArea).toEqual(raw.seats[1]?.playArea);
   });
 });

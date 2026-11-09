@@ -195,7 +195,8 @@ describe('game server over WebSocket', () => {
     const watchView = await watcher.next();
     expect(watchView.kind).toBe('stateSync');
     if (watchView.kind === 'stateSync') {
-      // all 4 zones hidden for every seat (spectator view)
+      // hand + inventory hidden for every seat (spectator view); the discard
+      // and play area stay public
       for (const seat of watchView.view.state.seats) {
         expect(seat?.hand.every(id => id.startsWith('hidden-'))).toBe(true);
         expect(seat?.inventory.every(id => id.startsWith('hidden-'))).toBe(true);

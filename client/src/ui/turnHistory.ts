@@ -4,11 +4,10 @@ import { defForInstance } from './cards';
 /**
  * M4-T11: turn history — pretty-printed lines from the engine action log.
  *
- * The server sanitizes the log per viewer: entries for OTHER seats carry
- * placeholder card ids (hidden-...), so names only resolve for the viewer's
- * own actions; the action kind + public data remain visible either way.
- * Each line shows the turn it happened in, the acting seat's name, and a
- * human description.
+ * The log is PUBLIC: every entry carries real card ids for every seat, exactly
+ * as if the players were sitting around one table. Only hands and inventories
+ * are hidden, and neither is ever logged. Each line shows the turn it happened
+ * in, the acting seat's name, and a human description naming the cards used.
  */
 
 export interface HistoryLine {
@@ -61,8 +60,16 @@ function describe(state: GameState, action: Action): string {
       }
       return `${VERBS.buy} (${action.pileId})`;
     }
-    case 'explore':
-      return `${VERBS.explore} (${action.weapons.length} weapon${action.weapons.length === 1 ? '' : 's'})`;
+    case 'explore': {
+      // the weapons are public once used (they move to the play area), so name them
+      const names = action.weapons
+        .map(id => cardName(state, id))
+        .filter((n): n is string => n !== null);
+      const detail = names.length > 0
+        ? ` with ${names.join(', ')}`
+        : ` (${action.weapons.length} weapon${action.weapons.length === 1 ? '' : 's'})`;
+      return `${VERBS.explore}${detail}`;
+    }
     case 'endTurn':
       return VERBS.endTurn;
     default:
