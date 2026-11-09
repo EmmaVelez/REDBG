@@ -1,5 +1,34 @@
 # HANDOFF — resume here
 
+**ATTACHED TROPHY FAN ON CHARACTER HOVER (2026-11-09, commit 8993c39):** Manny asked that a
+hovered character card also **display its attached (defeated Infected) cards to the right**, laid out
+like the hand, with **the overlap growing with the number of attached cards**.
+- `CharacterCards` resolves `player.attached` / `player.partnerAttached` to defs and renders them as
+  art-only `CardView`s inside **`.cc-attached-fan`** (one fan per character; the partner gets
+  `data-partner-attached-fan`).
+- **The transform moved from `.card` to a new `.cc-fan` wrapper** so the trophies enlarge together
+  with the character card. `.cc-fan` is `position: relative` and the fan is
+  `position: absolute; left: 100%` — so revealing it never reflows the action bar, and it starts
+  flush at the character card's right edge.
+- **The overlap is a FRACTION of the card width, `--cc-overlap`**, computed from the trophy count by
+  the exported `attachedOverlap(count)`: `0.25` at one trophy (matching the hand's own overlap),
+  `+0.08` per extra trophy, capped at `0.85` so cards never stack backwards. The CSS is
+  `margin-left: calc(var(--cc-overlap) * var(--cc-w) * -1)` on every fan card except the first.
+- **The card width moved to `--cc-w` on `.player-character-card`** (80px, 56px at <=820px, 44px at
+  <=400px) instead of being set directly on `.card`, so the fan can size itself identically. Three
+  existing rules had to change: `.player-character-card .card`, `.app-action-dock
+  .player-character-card .card`, and the two mobile `--cc-w` overrides.
+- **Measured live with 5 trophies injected** (via a temporary `window.__store` probe in store.ts,
+  removed afterwards — `git checkout client/src/store.ts` restored it): desktop character 160x228
+  with a **448px** fan starting flush at its right edge; mobile 88x125 with a **247px** fan ending
+  **47px inside the dock**. No page overflow, the board does not scroll, and the rules panel still
+  fits. `--cc-overlap` read 0.55 for 5 trophies (0.15 + 0.08*5) as designed.
+- **Test lesson:** the older assertions `html.match(/card-character/g).length === 2` and
+  `/cc-attached/g === 2` broke because the fan adds `card-art-only` and `cc-attached-fan`
+  elements. They now match the full class (`/card card-character/g`) and `class="cc-attached"`
+  instead of a bare substring. +2 tests (fan markup; overlap grows with the count and is capped).
+- Gates: typecheck clean, client 174, game-core 801, server 102, `vite build` OK.
+
 **CHARACTER CARD HOVER = IN-PLACE ENLARGEMENT (2026-11-09, commit 8801a9f):** Manny asked to
 **"remove all current hover card implementations on character cards"** and instead have the card
 itself get larger on hover with its card text overlaid on the art, "like the resource cards
