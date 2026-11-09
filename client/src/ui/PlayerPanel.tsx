@@ -48,6 +48,9 @@ export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = tr
       <div className="player-row">
         <span className="player-hp">HP {player.hp}/{player.maxHp}</span>
         <span className="player-decorations">★ {player.decorations}</span>
+        {/* Attached sits with HP/Decorations — it is a score, not a deck
+            statistic, and it is the one count a slim mobile chip still shows. */}
+        <span title="Defeated infected attached">Attached {player.attached.length}</span>
       </div>
       <div className="player-row player-pools">
         <span title="Ammo">Ammo {player.turnAmmo}</span>
@@ -60,7 +63,6 @@ export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = tr
         <span title="Draw pile">Deck {player.inventory.length}</span>
         <span title="Discard pile">Discard {player.discard.length}</span>
         <span title="Hand">Hand {player.hand.length}</span>
-        <span title="Defeated infected attached">Attached {player.attached.length}</span>
       </div>
       {!isMe && (
         <div className="player-public-zones" data-public-zones>

@@ -83,14 +83,30 @@ export function App(): JSX.Element {
   const prevStateRef = useRef<GameState | null>(null);
   const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[] } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
-  /** Log sidebar visibility — closed frees the whole sidebar width for the board. */
-  const [logOpen, setLogOpen] = useState<boolean>(true);
+  /** Log sidebar visibility — closed frees the whole sidebar width for the board.
+   *  On a narrow screen the log is an off-canvas slide-over, so it starts CLOSED
+   *  there; on a wide screen it is a permanent sidebar and starts open. */
+  const [logOpen, setLogOpen] = useState<boolean>(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 821px)').matches,
+  );
   // Auto-dismiss the action-bar error toast so stale rejections don't linger.
   useEffect(() => {
     if (lastError === null) return;
     const t = setTimeout(() => useGameStore.setState({ lastError: null }), 5000);
     return () => clearTimeout(t);
   }, [lastError]);
+  // The log is a permanent sidebar on a wide screen and an off-canvas
+  // slide-over on a narrow one, so its initial state is chosen from the
+  // viewport at mount. If the window is then narrowed across the breakpoint,
+  // an open sidebar would become a scrim covering the board — close it.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)');
+    const onChange = (e: MediaQueryListEvent): void => {
+      if (e.matches) setLogOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   // The action dock is a FIXED overlay, so it is out of flow and the flex
   // column cannot reserve its height. Measure it and publish that as a CSS
   // variable; `.app` pads itself by exactly that much so the board's content
@@ -213,7 +229,7 @@ export function App(): JSX.Element {
     passPending;
 
   return (
-    <div className="app app-board">
+    <div className={`app app-board${logOpen ? ' app-log-open' : ''}`}>
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         {logOpen && (
@@ -222,6 +238,16 @@ export function App(): JSX.Element {
           </aside>
         )}
       </main>
+      {/* Narrow screens only: a scrim behind the slide-over log, tapped to close.
+          On a wide screen the log is a permanent sidebar and this is display:none. */}
+      {logOpen && (
+        <div
+          className="app-log-backdrop"
+          data-log-backdrop
+          aria-hidden="true"
+          onClick={() => setLogOpen(false)}
+        />
+      )}
       <footer className="app-action-dock" ref={setDockEl}>
         <SkillPanel
           state={gameState}

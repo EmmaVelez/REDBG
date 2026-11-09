@@ -37,7 +37,14 @@ export function HoverCard({ def, children, decorations, hp, maxHp }: HoverCardPr
     const r = el.getBoundingClientRect();
     // popup is ~240px tall; prefer opening above, fall back to below
     const above = r.top > 260;
-    setPos({ x: r.left + r.width / 2, y: above ? r.top - 8 : r.bottom + 8, above });
+    // The popup is centred on the trigger and ~150-180px wide, so near the
+    // left or right edge of a narrow screen it would otherwise hang off the
+    // viewport. Clamp its centre to half its width plus a small margin.
+    const half = 92;
+    const min = half + 4;
+    const max = Math.max(min, window.innerWidth - half - 4);
+    const x = Math.min(Math.max(r.left + r.width / 2, min), max);
+    setPos({ x, y: above ? r.top - 8 : r.bottom + 8, above });
   };
 
   const hide = (): void => setPos(null);
