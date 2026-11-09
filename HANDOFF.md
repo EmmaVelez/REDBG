@@ -1,5 +1,46 @@
 # HANDOFF — resume here
 
+**CHARACTER CARD HOVER = IN-PLACE ENLARGEMENT (2026-11-09, commit 8801a9f):** Manny asked to
+**"remove all current hover card implementations on character cards"** and instead have the card
+itself get larger on hover with its card text overlaid on the art, "like the resource cards
+behave". So character cards are **no longer wrapped in `HoverCard`** at all, and the old
+`.hover-card-pop .card-character*` sizing rules are gone.
+- **Hover scales the card 2x** (`.player-character-card:hover .card { transform: scale(2) }`) —
+  a transform, so the action bar never reflows. **`transform-origin: bottom left`** is
+  load-bearing: the card is the leftmost control in the bar, and `center bottom` pushed the
+  enlarged card off the left edge of the screen (measured x = -24 at 1600x1000).
+- **The rules panel fades in OVER the art** on a `rgba(8,9,12,0.78)` scrim.
+  `CharacterCard` now renders the panel whenever the art-only face is on (`artOnlyMode || !compact`),
+  and CSS absolutely positions it (`left/right/bottom: 0`, `max-height: 100%`) so it never
+  changes the card's size. It is **`pointer-events: none` while invisible** — while hidden it
+  overflows the card and would otherwise swallow clicks on the deck/hand control above it.
+- **Two sizing facts that took measurement to find:**
+  1. The skill rows must **stack the stat box above the text** (`flex-direction: column`).
+     Side-by-side leaves ~38px of text width = one or two words per line.
+  2. Each level's text must be **clamped to 3 lines** (`-webkit-line-clamp`), exactly how
+     `.card-has-art .card-text` clamps a resource card. Unclamped, the panel needs **161px** for
+     Barry on a 114px card and **175px** for Rebecca on a **73px promo card** — it can never fit.
+     At the inherited 8px font it clips the second level entirely; 6px fits.
+- **The dock must stop clipping while a character card is hovered:**
+  `.app-action-dock:has(.player-character-card:hover) { overflow: visible }`. The enlarged card
+  deliberately grows up over the board, and the dock's `overflow-y: auto` was cutting it off at
+  the dock's top edge.
+- **Phone (≤820px):** the card is only 44-56px wide / 63-79px tall, so the overlay is smaller
+  (5px, 2-line clamp) and `max-height: none` — the panel runs ~8px past the card, which lands on
+  the hand row below it inside the dock rather than off-screen.
+- **Measured after (live board, transitions disabled because headless Chrome never advances
+  CSS transitions — they stay `running` at their start value):** desktop card 160x228 / panel
+  160x182, tablet 112x160 / 112x142, phone 88x125 / 88x142 — `panel.scrollHeight ==
+  clientHeight` at every size (no clipping), panel opacity 1, `dockOverflow: visible`, no page
+  overflow, no board regression.
+- **Pitfall for verifying this:** `getComputedStyle` during a hover reports the transition's
+  START value in a headless browser, so the card looks un-scaled and the panel invisible unless
+  you inject `transition: none` first. Check `el.matches(':hover')` and
+  `document.querySelector('.player-character-card:hover .card')` to confirm the selector fires.
+- Tests unchanged (172) — the `CharacterCards` describe already asserts both cards render the
+  same; the popup removal needed no test change because no test asserted the character popup.
+- Gates: typecheck clean, client 172, game-core 801, server 102, `vite build` OK.
+
 **ACTION-BAR DECLUTTER (2026-11-09, commit 8d19f20):** Manny asked for four tweaks.
 1. **`.action-col-label` removed** — the CHARACTER / DECK / DISCARD captions are gone.
    Nothing is lost: the character card needs no caption and the deck/discard
