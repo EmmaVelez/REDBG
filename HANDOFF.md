@@ -1,5 +1,22 @@
 # HANDOFF — resume here
 
+**M6 UI — SURVIVAL-HORROR BOARD THEME (2026-11-08, commit c911adf):** Manny asked to
+tweak the client UI and picked **board/in-game screen only**, direction **"more RE
+atmosphere — darker, grittier, stronger horror mood"**. Done as an **override layer
+appended to `client/src/styles.css`** (base rules untouched) scoped to **`.app-board`** —
+a class `App.tsx` adds to the shell *only* in the in-game branch, so the lobby is
+byte-identical. Contents: near-black room with cold teal + blood radial glows, a heavy
+vignette and a tiled SVG `feTurbulence` film grain at 5%; brushed-steel header/dock with
+a 3px desaturated hazard-stripe edge; dossier section titles (blood tick + hairline);
+darker steel panels; machined-steel buttons via `.app-board :where(button)` (zero
+specificity so component classes win — `.market-pile`/`.hand-card` are explicitly reset
+or the card-shaped buttons break); desaturated stat-pill accents; darker card frames and
+card backs; themed scrollbars; **fixed SkillPanel's undefined `--card`/`--accent`/
+`--muted-foreground`**; stronger card-art scrims (0.72 → 0.82) for legibility. Gates:
+client 163 tests, typecheck clean, vite build OK. **Next:** Manny's call on whether to
+push the atmosphere further (active-player glow, dimmed-card affordance, player-stat
+dividers were all flagged in review and left out deliberately).
+
 **Current state (2026-11-07 ~15:00):** M1 ✅ 16/16, M2 ✅ 5/5 + bot-logic v2, M3 ✅ 5/5 (T01–T05), M4 ✅ client complete. **M5 ✅ T01–T05 (COMPLETE).** All 47 characters have engine behaviour. **Mercenaries (52 cards) ✅, Nightmare (50 cards) ✅.** **Duplicate card ids RESOLVED — `ALL_CARDS` is now 304 cards with 0 duplicate ids.** **Downed/revive wired into the damage path.** **Every rules-text-only card now has engine behaviour (WE-001/018/018g/019/021/025/030, MA-045/047/048/049/054o/055o/056o/057o).** **No effect kind is dead any more (MA-025/030/036, WE-028, IN-002/004 done; AC-049/035/038 were always prompt/id-handled).** **MULTI-EXPLORE (exploreCount) + PARTNER EXPLORE FIX ✅** (see below). Suites: **game-core 710, server 97, client 141** — all green, typecheck clean (3 workspaces), client build OK, soak green (22/30 natural). **M5-T05 DONE (commit 0083419):** FAQ checklist at `docs/rules/FAQ-VERIFICATION.md` — FAQ-1/FAQ-2/partial-draw PASS; **FAQ-3 Gatling Gun Majini was a real gap, FIXED per Manny's ruling** (the +5 per full 10 total Ammo boosts the Infected's OWN attack, not the player's damage). **M5 COMPLETE — release-ready; next step is Manny's call (deploy / M6 scope).**
 
 **CUSTOM CARD LINE (2026-11-08):** the first fan-designed card, **MX-001 Mr. X**
