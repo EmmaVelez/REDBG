@@ -64,6 +64,9 @@ h1, h2 { margin: 0 0 8px; }
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  /* the action dock is a fixed overlay, so it is out of flow: reserve its
+     measured height (published as --dock-h by App.tsx) instead */
+  padding-bottom: var(--dock-h, 0px);
 }
 /* connection status + room code, lower-right corner of the action bar.
    Lives at the end of .action-buttons (the bar's last row) and pushes
@@ -696,7 +699,11 @@ h1, h2 { margin: 0 0 8px; }
   max-width: 900px;
 }
 .zone-piles { display: flex; gap: 18px; align-items: flex-start; margin-top: 6px; }
-.zone-pile { display: flex; flex-direction: column; gap: 4px; align-items: center; min-width: 64px; }
+/* position: relative is load-bearing — the count badge is absolutely
+   positioned against it, and without this it resolves against the
+   initial containing block (the viewport), landing at the screen's
+   right edge and overflowing the document by 6px. */
+.zone-pile { position: relative; display: flex; flex-direction: column; gap: 4px; align-items: center; min-width: 64px; }
 .zone-pile-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 .zone-pile-stack { position: relative; width: 64px; height: 86px; }
 .zone-pile-cards { position: absolute; inset: 0; }
@@ -1048,7 +1055,13 @@ h1, h2 { margin: 0 0 8px; }
 /* ---- action bar / log ---- */
 /* ---- bottom action dock ---- */
 .app-action-dock {
-  flex: 0 0 auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* below the hover-card popup (100) and the flight layer (500), so a
+     card preview near the bottom is never hidden behind the bar */
+  z-index: 50;
   border-top: 1px solid var(--border);
   background: var(--panel);
   padding: 8px 16px;

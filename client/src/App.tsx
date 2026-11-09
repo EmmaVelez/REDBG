@@ -91,6 +91,34 @@ export function App(): JSX.Element {
     const t = setTimeout(() => useGameStore.setState({ lastError: null }), 5000);
     return () => clearTimeout(t);
   }, [lastError]);
+  // The action dock is a FIXED overlay, so it is out of flow and the flex
+  // column cannot reserve its height. Measure it and publish that as a CSS
+  // variable; `.app` pads itself by exactly that much so the board's content
+  // is never hidden underneath the bar. The effect keys on the ELEMENT, not a
+  // mount flag: the dock only renders in the in-game branch (the lobby returns
+  // early), so a [] effect would run once while the dock is still absent.
+  const [dockEl, setDockEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (dockEl === null) return;
+    const publish = (): void => {
+      document.documentElement.style.setProperty('--dock-h', `${dockEl.offsetHeight}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(dockEl);
+    // Fallback for a dock whose contents change without a resize event, and
+    // for environments where ResizeObserver delivery is tied to rendering
+    // (a hidden tab never renders): re-measure after any DOM change inside
+    // the bar. setTimeout lets layout settle first.
+    const mutation = new MutationObserver(() => setTimeout(publish, 0));
+    mutation.observe(dockEl, { childList: true, subtree: true, characterData: true });
+    window.addEventListener('resize', publish);
+    return () => {
+      observer.disconnect();
+      mutation.disconnect();
+      window.removeEventListener('resize', publish);
+    };
+  }, [dockEl]);
   // When the fatal explore ALSO revealed a card, the reveal plays first and
   // the death screen is queued until the player dismisses it — they should
   // see what emptied their health pool before "YOU DIED".
@@ -185,7 +213,7 @@ export function App(): JSX.Element {
           </aside>
         )}
       </main>
-      <footer className="app-action-dock">
+      <footer className="app-action-dock" ref={setDockEl}>
         <SkillPanel
           state={gameState}
           seat={mySeat}
