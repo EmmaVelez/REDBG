@@ -1,6 +1,30 @@
 # HANDOFF — resume here
 
-**BIGGER ABILITY TEXT, "Lv1:★" STAT BOXES, FLOATING CONTROLS BAND (2026-11-09, commit pending):**
+**EVERY CHARACTER CARD IS 80x114 (2026-11-09, commit pending):** Manny asked to "increase the size of
+the player character card to be 80x114 to match the partner character card". Root cause: promo
+characters (`set: 'promo'` — pr-001 Chris, pr-002 Jill, pr-009 Rebecca, pr-010 HUNK) have a shorter
+art window, and `.card.card-character.card-promo.card-art-only { aspect-ratio: 320/292 }` made their
+cards **80x73** while base characters were **80x114**. In partner mode the main and partner are
+drawn independently, so a seat could easily end up promo-main / base-partner (confirmed live: seat 1
+had Jill Valentine (Promo) / Chris Redfield (premier)).
+- **Removed the promo aspect override** — every character card is now the full `320/456`, i.e.
+  **80x114** at `--cc-w: 80px`.
+- **Promo art is letterboxed, not stretched or cropped.** Cropping (`object-fit: cover`) would cut
+  off the printed Health badge near the right edge, and the live HP ring's `--cc-badge-x/y`
+  percentages resolve against `.card-portrait` — so the portrait keeps `aspect-ratio: 320/292` and is
+  **centred vertically** in the taller card (`top: 50%; transform: translateY(-50%)`), with the
+  card's own gradient filling the letterbox. That keeps the ring exactly on the printed badge.
+- The promo-specific 2-line skill clamp was dropped: the card is full height now, so promos use the
+  same three-line clamp as every other character card.
+- **Verified live in a real 2-player Partner Mode room** (hosted via a throwaway `ws` probe, browser
+  joined as the second player and started the game): every seat's main and partner card measured
+  **80x114**, the promo portrait measured 80x73 centred with 20px above and 21px below, and the HP
+  ring sat on the art's top-right badge. Hovering the promo card scaled it to 160x228 with the
+  portrait at 146px and the rules panel fitting (scrollHeight == clientHeight, 93px), boxes reading
+  `Lv1:☆` / `Lv2:☆`.
+- Gates: typecheck clean, client 174, game-core 801, server 102, `vite build` OK.
+
+**BIGGER ABILITY TEXT, "Lv1:★" STAT BOXES, FLOATING CONTROLS BAND (2026-11-09, commit 4ccb375):**
 Manny asked for three more UI changes on top of the character hover work.
 
 1. **Scale the ability text.** The overlay was 6px; it is now **7px** (desktop) / **6px** (mobile).

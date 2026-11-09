@@ -244,9 +244,11 @@ h1, h2 { margin: 0 0 8px; }
 /* Character cards take the same art-only face as the resource piles: the 3px
    frame, the corner ticks and the inset all go away and the art fills the
    whole card edge to edge. The card needs an explicit aspect ratio because the
-   portrait is now absolutely positioned and no longer gives it height; the
-   promo art is the shorter window, so it gets its own ratio. The live HP ring
-   still lands on the Health badge printed in the art. */
+   portrait is now absolutely positioned and no longer gives it height. Every
+   character card is the full 320x456 scan, so the player's card and the
+   partner's card are always the same size (80x114 at --cc-w: 80px) — promo
+   art is the exception, handled just below. The live HP ring still lands on
+   the Health badge printed in the art. */
 .card.card-character.card-art-only {
   aspect-ratio: 320 / 456;
   padding: 0;
@@ -255,7 +257,26 @@ h1, h2 { margin: 0 0 8px; }
   box-shadow: none;
   overflow: hidden;
 }
-.card.card-character.card-promo.card-art-only { aspect-ratio: 320 / 292; }
+/* Promo art (PR-*) is still the shorter 320x292 window. Rather than stretch it
+   (distortion) or crop it (the printed Health badge sits near the right edge
+   and would be cut off), the card grows to the full 320x456 size and the promo
+   art keeps its own ratio, centred vertically. The ring's percentages resolve
+   against .card-portrait, so the art keeping its aspect is exactly what keeps
+   the ring on the printed badge; the card's own gradient fills the letterbox. */
+.card.card-character.card-promo.card-art-only {
+  background:
+    radial-gradient(circle at 50% 38%, #2b313d 0%, #141721 75%),
+    linear-gradient(180deg, #1b1f27 0%, #0d0f13 100%);
+}
+.card.card-character.card-promo.card-art-only .card-portrait {
+  top: 50%;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  height: auto;
+  aspect-ratio: 320 / 292;
+  transform: translateY(-50%);
+}
 .card-character.card-art-only::after { display: none; } /* corner ticks */
 .card-character.card-art-only .card-portrait {
   position: absolute;
@@ -308,9 +329,8 @@ h1, h2 { margin: 0 0 8px; }
 }
 /* locked tiers stay greyed until unlocked */
 .card.card-character.card-art-only .skill-locked { opacity: 0.55; }
-/* promo art is the short 320x292 window, so its card is only 73px tall and
-   cannot hold three clamped rows at 7px — two lines is what fits */
-.card.card-promo.card-art-only .skill-text { -webkit-line-clamp: 2; }
+/* promo cards are full height now (the art is centred inside them), so they
+   use the same three-line clamp as every other character card */
 .card.card-character.card-art-only:hover .card-skills,
 .card.card-character.card-art-only:hover .card-text { opacity: 1; }
 /* Hovering a character card grows the card itself (a transform, so the bar
