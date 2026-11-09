@@ -84,8 +84,12 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
       </div>
 
       <div className="board-players">
-        {state.seats.map(player => (
-          <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={player.seat === mySeat} showCharacterCards={player.seat !== mySeat} />
+        {/* The viewing player's own panel is deliberately absent: their
+            character/partner cards, life, decorations, resources, deck and
+            discard all live in the action bar, so a second copy here was pure
+            duplication (and the biggest block on the board). */}
+        {state.seats.filter(player => player.seat !== mySeat).map(player => (
+          <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={false} showCharacterCards />
         ))}
       </div>
 

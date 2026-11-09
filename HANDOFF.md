@@ -1,6 +1,38 @@
 # HANDOFF — resume here
 
-**TURN / TOTAL-DECORATION / ROOM / STATUS CHIPS IN THE STATS BAR (2026-11-09, commit pending):** Manny
+**OWN PANEL REMOVED, FULL ABILITY TEXT, HOVER CARD ON TOP (2026-11-09, commit pending):** three changes.
+1. **The viewing player's `PlayerPanel` is gone from `.board-players`.** `Board.tsx` now renders panels
+   only for `player.seat !== mySeat`. Their character/partner cards, HP, decorations, resources, deck
+   and discard already live in the action bar, so the board copy was pure duplication (and the tallest
+   block on the board). `PlayerPanel`'s `isMe` prop stays for compatibility but is now always `false`
+   from the board. Board height at 1280x900 went 597 → 697 (more room for everything else).
+2. **The character hover panel is no longer clamped.** It had `-webkit-line-clamp: 3` per level and
+   `max-height: 100%` of the card, so long abilities were truncated. Measured content heights at 7px in
+   an 80px card: Leon/Claire/Barry/Ada/Krauser fit (102-111px), but **Wesker 166, Chris promo 157,
+   Jill promo 140, Rebecca Nurse 229, HUNK 239** on a 114px card. The clamp and the card-height cap are
+   removed, `.skill-text` is a plain block, and the art-only card gets `overflow: visible` on hover so
+   the panel can extend past the card's top edge. A safety cap remains:
+   `max-height: calc((100vh - 40px) / var(--cc-scale, 2.5))` — the division is REQUIRED because
+   max-height applies in pre-transform units, so without it the rendered cap would be 2.5x the viewport.
+   The mobile block's 2-line clamp is gone too (the text is unclamped everywhere now).
+3. **Hover scale 2 → 2.5**, and the hover card now paints above EVERY other UI element. `.cc-fan`
+   scales by `var(--cc-scale)` (new custom property on `.player-character-card`, default 2.5).
+   **Stacking:** `.player-character-card:hover` z-index 40 → **60**, and a new
+   `.app-action-dock:has(.player-character-card:hover) { z-index: 80 }` lifts the whole dock above the
+   log slide-over (60) and its scrim (55). Raising only the card's z-index is NOT enough — the dock
+   creates a stacking context, so a child can never escape its siblings' z-indexes. The panel's
+   background also went 0.78 → **0.92** alpha: at 0.78 the covered buttons bled through and read as if
+   they were on top.
+- **Verified:** Wesker (the current seat's character) renders both rows with
+  `scrollHeight == clientHeight` (166px, `clipped: false`); a synthetic HUNK worst case renders 239px
+  of text at 2.5x with `scrollHeight == clientHeight`. `elementFromPoint` at a point inside both the
+  panel and the EXPLORE button returns `.skill-text` (panel on top); same against the open log
+  (dock 80 > log 60 > scrim 55). Mobile 390x844: card 110x157, panel 110x577 fully inside the viewport;
+  desktop 1280x900: card 200x285, panel 200x415, top at y=477.
+- **Test:** the Board test now expects 1 panel (not 2), no `data-me="true"`, and `data-seat="1"`.
+- Gates: typecheck clean, client 178, game-core 801, server 102, `vite build` OK.
+
+**TURN / TOTAL-DECORATION / ROOM / STATUS CHIPS IN THE STATS BAR (2026-11-09, commit 9444be2):**
 asked to "add the turn count and total player decoration count to the action-stats bar, move the room
 number and status to the action-stats bar as well".
 - `ActionBarStats` gained four **optional** props — `turn`, `decorations`, `roomCode`, `status` — and

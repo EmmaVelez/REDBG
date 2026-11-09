@@ -282,9 +282,13 @@ h1, h2 { margin: 0 0 8px; }
    `pointer-events: none` while hidden so it can never swallow a click on the
    deck/hand control above it. The skill row stacks its stat box above the text
    so the text gets the full card width (a side-by-side row would leave ~38px,
-   i.e. one or two words per line), and the font is sized so BOTH level texts
-   fit inside the card — at the inherited 8px the panel measures 161px on a
-   114px card and would clip the second level entirely. */
+   i.e. one or two words per line).
+   The text is NOT clamped: every character's full ability text is rendered.
+   Long text (HUNK, Rebecca Nurse) is taller than the card, so the panel is
+   allowed to extend past the card's top edge — the card gets
+   `overflow: visible` on hover for exactly this reason. A viewport cap plus
+   `overflow-y: auto` is the safety net so a very long panel can never run off
+   the screen. */
 .card.card-character.card-art-only .card-skills,
 .card.card-character.card-art-only .card-text {
   position: absolute;
@@ -292,16 +296,18 @@ h1, h2 { margin: 0 0 8px; }
   right: 0;
   bottom: 0;
   z-index: 3;
-  max-height: 100%;
-  overflow: hidden;
+  /* the cap is divided by the hover scale: max-height applies in the panel's
+     own (pre-transform) units, so without the division the rendered cap would
+     be 2.5x the viewport */
+  max-height: calc((100vh - 40px) / var(--cc-scale, 2.5));
+  overflow-y: auto;
   margin: 0;
   padding: 3px;
-  background: rgba(8, 9, 12, 0.78);
+  /* near-opaque so the enlarged card is unambiguously ON TOP of whatever it
+     covers (the controls band, the log slide-over) instead of blending with it */
+  background: rgba(8, 9, 12, 0.92);
   border: none;
   color: #dde2ea;
-  /* the ability text is the point of the overlay, so keep it as large as the
-     card can hold: 7px is the biggest size whose two clamped rows still fit
-     inside the 114px base card (8px needs 121px) */
   font-size: 7px;
   line-height: 1.25;
   opacity: 0;
@@ -314,17 +320,16 @@ h1, h2 { margin: 0 0 8px; }
 .card.card-character.card-art-only .skill-text {
   color: #dde2ea;
   font-size: 7px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  /* no line clamp: the whole ability text is rendered */
+  display: block;
+  overflow: visible;
 }
 /* locked tiers stay greyed until unlocked */
 .card.card-character.card-art-only .skill-locked { opacity: 0.55; }
-/* promo cards are full height now (the art is centred inside them), so they
-   use the same three-line clamp as every other character card */
 .card.card-character.card-art-only:hover .card-skills,
 .card.card-character.card-art-only:hover .card-text { opacity: 1; }
+/* the panel is allowed to grow past the card's top edge for long text */
+.card.card-character.card-art-only:hover { overflow: visible; }
 /* Hovering a character card grows the card itself (a transform, so the bar
    never reflows) and lifts it above its neighbours. origin is the bottom-LEFT
    corner: the card is the leftmost control in the bar, so growing from the
@@ -335,6 +340,7 @@ h1, h2 { margin: 0 0 8px; }
 .player-character-card {
   position: relative;
   --cc-w: 80px; /* card width, overridden per breakpoint for the action bar */
+  --cc-scale: 2.5; /* hover enlargement; the panel's viewport cap divides by it */
 }
 .player-character-card .card { width: var(--cc-w); }
 .cc-fan {
@@ -342,8 +348,12 @@ h1, h2 { margin: 0 0 8px; }
   transition: transform 0.12s ease-out;
   transform-origin: bottom left;
 }
-.player-character-card:hover { z-index: 40; }
-.player-character-card:hover .cc-fan { transform: scale(2); }
+.player-character-card:hover { z-index: 60; }
+/* 2.5x: enough that the whole ability text is legible once the clamp is gone
+   (at 2x the enlarged card is 160x228 with 14px text). The origin stays the
+   bottom-LEFT corner so the card grows up and to the right, away from the
+   screen's left edge. */
+.player-character-card:hover .cc-fan { transform: scale(var(--cc-scale)); }
 /* The attached trophies fan out to the right of the character card, overlapping
    the way the hand does. The fan is absolutely positioned so it never affects
    layout, and `--cc-overlap` (a fraction of the card width, set from the number
@@ -1228,6 +1238,12 @@ h1, h2 { margin: 0 0 8px; }
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* While a character card is hovered, lift the WHOLE dock above every other UI
+   element — the log slide-over (60) and its scrim (55) included — so the
+   enlarged card and its ability panel are never covered. The dock creates a
+   stacking context, so raising only the card's own z-index could never get it
+   above those siblings of the dock. */
+.app-action-dock:has(.player-character-card:hover) { z-index: 80; }
 /* The action bar is a COLUMN of three bands: stats, identity, controls.
    display: flex is load-bearing — the direction/gap rules below have been
    dead for the whole life of this file without it. */
@@ -2177,12 +2193,12 @@ h1, h2 { margin: 0 0 8px; }
   .hover-card-pop .card { width: 150px; }
 
   /* The phone's character card is only 44-56px wide and 63-79px tall, so the
-     overlay is smaller (6px, 2-line clamp) and allowed to exceed the card's
-     height: the card sits at the top of the dock's identity row with the whole
-     hand row below it, so the extra lands inside the dock rather than off-screen. */
+     overlay font is a step smaller. The text is still unclamped (see the base
+     rules): a long ability simply extends past the card, and the card sits at
+     the top of the dock's identity row with the hand row below it to grow into. */
   .card.card-character.card-art-only .card-skills,
-  .card.card-character.card-art-only .card-text { font-size: 6px; max-height: none; }
-  .card.card-character.card-art-only .skill-text { -webkit-line-clamp: 2; font-size: 6px; }
+  .card.card-character.card-art-only .card-text { font-size: 6px; }
+  .card.card-character.card-art-only .skill-text { font-size: 6px; }
   .card.card-character.card-art-only .skill-box { font-size: 6px; }
 
   /* ---- overlays ---- */

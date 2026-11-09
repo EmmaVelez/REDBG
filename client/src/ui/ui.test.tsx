@@ -624,8 +624,11 @@ describe('Board (T05)', () => {
     expect(html).toContain('data-anim-zone="mansion"');
     expect(html).toContain(`data-pile-count="${state.mansionDeck.length}"`);
     expect(html).toContain('Your table');
-    // every seated player gets a panel
-    expect((html.match(/class="player-panel/g) ?? []).length).toBe(2);
+    // every OTHER seat gets a panel; the viewing player's own panel is not
+    // repeated on the board because the action bar already shows it all
+    expect((html.match(/class="player-panel/g) ?? []).length).toBe(1);
+    expect(html).not.toContain('data-me="true"');
+    expect(html).toContain('data-seat="1"');
     // at least one purchasable pile shows a gold cost
     expect(html).toMatch(/\d+g/);
     // flight layer mounts with zero active flights (SSR-safe)
