@@ -282,7 +282,9 @@ h1, h2 { margin: 0 0 8px; }
 .card.card-character {
   --cc-frame: #0c0d10;
   --cc-line: #d8dbd3;
-  aspect-ratio: 5 / 7;
+  /* the art is the whole card, so the frame grows around it instead of
+     clipping a fixed 5:7 box */
+  aspect-ratio: auto;
   min-height: 0;
   padding: 4px;
   gap: 0;
@@ -347,9 +349,9 @@ h1, h2 { margin: 0 0 8px; }
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
-  /* match the character sheet's art crop (320x260) so the art is never
+  /* match the saved character art (the WHOLE card, 320x456) so it is never
      letterboxed or cropped */
-  aspect-ratio: 320 / 260;
+  aspect-ratio: 320 / 456;
   margin: 0;
   border: 1px solid #000;
   border-radius: 0;
