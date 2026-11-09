@@ -1,5 +1,43 @@
 # HANDOFF — resume here
 
+**ACTION-BAR DECLUTTER (2026-11-09, commit 8d19f20):** Manny asked for four tweaks.
+1. **`.action-col-label` removed** — the CHARACTER / DECK / DISCARD captions are gone.
+   Nothing is lost: the character card needs no caption and the deck/discard
+   `ZonePile`s already carry their own `.zone-pile-label`.
+2. **Character cards now use the art-only face**, exactly like the resource piles
+   (`CardView` forwards `artOnly` to `CharacterCard`, which adds `card-art-only`).
+   `.card.card-character.card-art-only` drops the 3px frame, the corner ticks and the
+   4px inset, and the art fills the card edge to edge. The card needs an **explicit
+   aspect ratio** because the portrait becomes `position: absolute` and no longer
+   gives the card height — `320/456` for base characters, `320/292` for promos. The
+   live HP ring still lands on the Health badge printed in the art. Measured at
+   1600x1000: 80x114, `border: 0px`, `padding: 0px`, transparent background, no
+   shadow — versus a hand card at 80x112, `border: 0px`, `padding: 0px`. (The
+   "frame" still visible in a screenshot is the printed border INSIDE the art, which
+   is what a resource card shows too.) **Pitfall:** `.card.card-character` is defined
+   AFTER the art-only block and also carries two classes, so the override must be
+   `.card.card-character.card-art-only` (three classes) or `border`/`padding` silently
+   lose to source order.
+3. **The partner card renders identically to the player card.** The `HP x/y` and
+   `Attached N` spans under it are gone; the attached count is a **`.cc-attached`
+   badge** in the visual language of a `.zone-pile-count` (gold disc, `right/bottom:
+   -5px`, bottom-right corner), on BOTH cards so the pair stays identical. Verified
+   in a real partner-mode server room: both cards 80x114, same class list, same single
+   `.card-portrait` child, no `player-partner-*` spans.
+4. **Stat pills 25% smaller and borderless.** Base: `font-size 11 -> 8.25px`,
+   `strong 14 -> 10.5px`, `padding 4px 10px -> 3px 7.5px`, `gap 4 -> 3px`,
+   `border: none`. The `.app-board` theme override: `font-size 10 -> 7.5px`,
+   `strong 15 -> 11.25px`, `padding 4px 12px -> 3px 9px`, `border: none`. The mobile
+   tiers now only tighten padding (they no longer set a font-size, so they inherit the
+   already-shrunk values).
+- Tests: +3 in `ui.test.tsx` (172 total) — a character card with `artOnly` gets
+  `card-art-only`/`data-art-only`, and a new `CharacterCards` describe asserts both
+  cards render the same with no text underneath and that the badge carries the right
+  counts. The partner fixture has to register the partner CHARACTER instance in
+  `state.cards` as well as `partnerInstanceId`, or `defForInstance` returns null and
+  only the main card renders.
+- Gates: typecheck clean, client 172, game-core 801, server 102, `vite build` OK.
+
 **M6 MOBILE LAYOUT (2026-11-09, commit 5226b7a):** Manny asked for **"specific UI tweaks —
 I'm trying to maximize board space on mobile screens"**. Measured the real board in the
 browser at five viewports *before* changing anything, and it was broken, not just untidy:
