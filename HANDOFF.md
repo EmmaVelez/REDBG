@@ -1,6 +1,32 @@
 # HANDOFF — resume here
 
-**EVERY CHARACTER CARD IS 80x114 (2026-11-09, commit pending):** Manny asked to "increase the size of
+**TURN / TOTAL-DECORATION / ROOM / STATUS CHIPS IN THE STATS BAR (2026-11-09, commit pending):** Manny
+asked to "add the turn count and total player decoration count to the action-stats bar, move the room
+number and status to the action-stats bar as well".
+- `ActionBarStats` gained four **optional** props — `turn`, `decorations`, `roomCode`, `status` — and
+  renders four more `.action-stat` chips after Buys: `Turn N`, `★ N`, `Room CODE`, and the status
+  word. Optional so the component's existing five-chip call sites and tests still work.
+- **"Total player decoration count" = the sum across every seat**
+  (`state.seats.reduce((sum, s) => sum + s.decorations, 0)`), matching the game-level turn counter
+  rather than the viewing player's per-turn numbers. A test builds a 6 + 4 state and asserts the
+  chip reads **10**, not 6.
+- The `.dock-status` corner group is **gone** from `ActionBar` (and its CSS, plus the
+  `.app-board .dock-status` / `.app-room` / `.app-status` mobile leftovers). The chips keep the
+  `app-room` / `app-status app-status-<s>` classes and `data-app-status`, so the existing test hooks
+  still work; it now also asserts they appear **after** `action-stats` in the markup and that
+  `dock-status` is absent.
+- **CSS specificity gotcha:** `.app-board .action-stat` (two classes, later in the file) paints every
+  chip neutral grey `#7f8896`. A two-class `.action-stat-status.app-status-connected` **ties** with it
+  and loses on source order, so the connection colour silently never applied. The status colour rules
+  are now **three** classes (`.action-stat.action-stat-status.app-status-connected`) to win
+  outright. The status chip's `<strong>` is `{ color: inherit }` so it takes the chip colour.
+- The status chip carries only a value, so without a `<strong>` its line box was 14px against the
+  other chips' 19px — wrapping the value in `<strong>` makes all chips the same height.
+- Measured: desktop 8 chips in one row, all **22px** tall, status green `rgb(123,216,143)`; mobile
+  8 chips wrapping to two rows, all **19px** tall, dock 234px, no dock scroll, no page overflow.
+- Gates: typecheck clean, client 178, game-core 801, server 102, `vite build` OK.
+
+**EVERY CHARACTER CARD IS 80x114 (2026-11-09, commit 3eed5ff):** Manny asked to "increase the size of
 the player character card to be 80x114 to match the partner character card". Root cause: promo
 characters (`set: 'promo'` — pr-001 Chris, pr-002 Jill, pr-009 Rebecca, pr-010 HUNK) have a shorter
 art window, and `.card.card-character.card-promo.card-art-only { aspect-ratio: 320/292 }` made their

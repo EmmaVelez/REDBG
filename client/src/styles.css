@@ -68,16 +68,8 @@ h1, h2 { margin: 0 0 8px; }
      measured height (published as --dock-h by App.tsx) instead */
   padding-bottom: var(--dock-h, 0px);
 }
-/* connection status + room code, lower-right corner of the action bar.
-   Lives at the end of .action-buttons (the bar's last row) and pushes
-   itself to the right with an auto margin. */
-.dock-status {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
+/* connection status + room code: they are stat chips in the action bar's stats
+   row now (see .action-stat-room / .action-stat-status), not a corner group */
 .app-room { color: var(--muted); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
 .app-status { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
 .app-status-connected { color: #7bd88f; }
@@ -1287,6 +1279,20 @@ h1, h2 { margin: 0 0 8px; }
 .action-stat-ammo strong { color: #9ecbff; }
 .action-stat-actions strong { color: #f0abfc; }
 .action-stat-buys strong { color: #fdba74; }
+/* the room code and connection status are stat chips too now — they moved out
+   of the dock's lower-right corner and into the stats bar. They take their
+   size from .action-stat / .app-board .action-stat like every other chip. */
+.action-stat-turn strong { color: #e8e2d4; }
+.action-stat-decorations strong { color: #ffd76e; }
+/* three classes on purpose: `.app-board .action-stat` (two classes, later in
+   the file) paints every chip neutral grey and would otherwise win the tie and
+   swallow the connection colour */
+.action-stat.action-stat-status.app-status-connected { color: #7bd88f; }
+.action-stat.action-stat-status.app-status-connecting { color: #c9a227; }
+.action-stat.action-stat-status.app-status-disconnected { color: #c05a5a; }
+/* the status chip carries only a value, so its <strong> takes the chip's
+   colour rather than the neutral stat-value colour */
+.action-stat-status strong { color: inherit; }
 .action-error {
   flex: 1 0 100%;
   color: #ff8f8f;
@@ -2164,9 +2170,8 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .explore-button,
   .app-board .explore-choose-button,
   .app-board .log-button { font-size: 11px; padding: 5px 8px; }
-  .app-board .dock-status { gap: 6px; }
-  .app-board .app-room { font-size: 9px; letter-spacing: 1px; }
-  .app-board .app-status { font-size: 9px; letter-spacing: 1px; }
+  /* .dock-status / .app-room / .app-status corner rules are gone: the room
+     code and connection status are .action-stat chips in the stats row now */
 
   /* ---- hover popup: keep it inside a narrow viewport ---- */
   .hover-card-pop .card { width: 150px; }

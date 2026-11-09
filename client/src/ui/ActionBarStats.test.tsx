@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { ActionBarStats } from './ActionBarStats';
 
 describe('ActionBarStats', () => {
-  it('renders all five stat chips', () => {
+  it('renders the five per-turn stat chips', () => {
     const html = renderToStaticMarkup(<ActionBarStats hp={90} maxHp={120} gold={40} ammo={30} actions={1} buys={2} />);
     expect(html).toContain('data-action-stats');
     expect(html).toContain('data-stat="hp"');
@@ -11,6 +11,38 @@ describe('ActionBarStats', () => {
     expect(html).toContain('data-stat="ammo"');
     expect(html).toContain('data-stat="actions"');
     expect(html).toContain('data-stat="buys"');
+  });
+
+  it('renders the turn and total-decoration chips when given', () => {
+    const html = renderToStaticMarkup(
+      <ActionBarStats hp={90} maxHp={120} gold={40} ammo={30} actions={1} buys={2} turn={7} decorations={13} />,
+    );
+    expect(html).toContain('data-stat="turn"');
+    expect(html).toMatch(/data-stat="turn"[^>]*>.*?<strong>7<\/strong>/);
+    expect(html).toContain('data-stat="decorations"');
+    expect(html).toMatch(/data-stat="decorations"[^>]*>.*?<strong>13<\/strong>/);
+  });
+
+  it('renders the room code and connection status as chips when given', () => {
+    const html = renderToStaticMarkup(
+      <ActionBarStats hp={90} maxHp={120} gold={0} ammo={0} actions={1} buys={1} roomCode="ABC123" status="connected" />,
+    );
+    expect(html).toContain('data-stat="room"');
+    expect(html).toContain('data-stat="status"');
+    expect(html).toContain('data-app-status="connected"');
+    expect(html).toContain('app-status-connected');
+    expect(html).toContain('app-room');
+    expect(html).toContain('ABC123');
+  });
+
+  it('omits the turn, decoration, room and status chips when not given', () => {
+    const html = renderToStaticMarkup(<ActionBarStats hp={90} maxHp={120} gold={0} ammo={0} actions={1} buys={1} />);
+    expect(html).not.toContain('data-stat="turn"');
+    expect(html).not.toContain('data-stat="decorations"');
+    expect(html).not.toContain('data-stat="room"');
+    expect(html).not.toContain('data-stat="status"');
+    expect(html).not.toContain('app-status-');
+    expect(html).not.toContain('app-room');
   });
 
   it('shows hp as current/max', () => {

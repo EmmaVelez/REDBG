@@ -193,6 +193,10 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             ammo={player.turnAmmo}
             actions={player.actionsLeft}
             buys={player.buysLeft}
+            turn={state.turnNumber}
+            decorations={state.seats.reduce((sum, s) => sum + s.decorations, 0)}
+            roomCode={roomCode}
+            status={status}
           />
         )}
         {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
@@ -490,10 +494,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
 
       </div>
 
-      <div className="dock-status" data-app-status={status ?? 'unknown'}>
-        {roomCode !== null && roomCode !== undefined && <span className="app-room">Room {roomCode}</span>}
-        {status !== undefined && <span className={`app-status app-status-${status}`}>{status}</span>}
-      </div>
       </div>
     </div>
   );

@@ -750,18 +750,42 @@ describe('ActionBar (T07)', () => {
     expect(html).toContain('data-log-open="true"');
   });
 
-  it('shows the connection status and room code in the dock corner', () => {
+  it('shows the connection status and room code as chips in the stats bar', () => {
     const state = twoPlayerState();
     const online = renderToStaticMarkup(
       <ActionBar state={state} seat={0} onAction={() => {}} status="connected" roomCode="ABC123" />,
     );
     expect(online).toContain('data-app-status="connected"');
     expect(online).toContain('app-status-connected');
+    expect(online).toContain('app-room');
     expect(online).toContain('ABC123');
+    // they sit inside the stats bar now, not a separate corner group
+    const statsIdx = online.indexOf('action-stats');
+    const roomIdx = online.indexOf('app-room');
+    const statusIdx = online.indexOf('app-status-connected');
+    expect(statsIdx).toBeGreaterThan(-1);
+    expect(roomIdx).toBeGreaterThan(statsIdx);
+    expect(statusIdx).toBeGreaterThan(statsIdx);
+    expect(online).not.toContain('dock-status');
     // pass-and-play has no room code, and the status span is absent when not passed
     const offline = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
     expect(offline).not.toContain('app-status-');
     expect(offline).not.toContain('app-room');
+  });
+
+  it('shows the turn number and the total decorations held by every player', () => {
+    const base = twoPlayerState();
+    const state: GameState = {
+      ...base,
+      turnNumber: 9,
+      seats: base.seats.map((p, i) => ({ ...p, decorations: i === 0 ? 6 : 4 })),
+    };
+    const html = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    expect(html).toContain('data-stat="turn"');
+    expect(html).toMatch(/data-stat="turn"[^>]*>.*?<strong>9<\/strong>/);
+    expect(html).toContain('data-stat="decorations"');
+    // 6 + 4 across both seats, not just the viewing player's 6
+    expect(html).toMatch(/data-stat="decorations"[^>]*>.*?<strong>10<\/strong>/);
   });
 
   it('puts the character/partner cards and the deck/hand/discard between the stats and the buttons', () => {
