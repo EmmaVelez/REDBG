@@ -410,7 +410,11 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   // Custom card line (MX-001..): present in `cards` only when the room
   // enabled it, and always appended to the Mansion (custom cards are
   // mansion-only — they are never dealt into the market).
-  const customMansion = cards.filter(c => c.set === 'custom' && isMansionCard(c));
+  // Custom EVENT cards (ev-001 Zombie Grab) live in the Mansion too, even though
+  // isMansionCard() only covers the official set's card types.
+  const isCustomMansionCard = (c: CardDef): boolean =>
+    c.set === 'custom' && (isMansionCard(c) || c.type === 'event');
+  const customMansion = cards.filter(isCustomMansionCard);
   const mansionIds: string[] = [];
   if (mansionCards !== undefined) {
     for (const mc of mansionCards) {

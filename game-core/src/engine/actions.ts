@@ -2287,6 +2287,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }];
         }
       }
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ev-001') {
+        // Zombie Grab: trash a weapon from hand or discard pile, or take
+        // 20 damage. The card is ALWAYS shuffled back into the Mansion.
+        const grabWeapons = [...handAfter, ...discardAfterExplosives].filter(id => cardDef(state, id)?.type === 'weapon');
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
+          removed: removedAfter,
+          mansionDeck,
+          mansionBottom,
+          prompts: [...reactivePrompts, {
+            id: 'p' + (reactivePrompts.length + 1),
+            seat,
+            text: revealedDef.text,
+            options: [...grabWeapons, 'Take 20 damage'],
+            payload: { kind: 'zombieGrab', amount: '20', instanceId: revealedInstanceId },
+          }],
+        };
+      }
+
       if (revealedDef?.type !== 'infected') {
         // Outbreak: MA-055o Antivirus resolves on reveal — the card is either
         // moved to the bottom of the Mansion or removed from the game, so it
@@ -4978,6 +4999,46 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 prompts,
               };
             }
+
+      if (kind === 'zombieGrab') {
+        // Zombie Grab: trash a weapon from hand or discard pile, or take
+        // 20 damage. Either way the card is shuffled back into the Mansion.
+        const chosen = prompt.options[option];
+        const amount = Number(prompt.payload?.amount ?? '20');
+        const grabInstanceId = String(prompt.payload?.instanceId ?? '');
+        if (chosen === undefined || grabInstanceId === '') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let next: GameState;
+        if (chosen === 'Take 20 damage') {
+          const target = state.seats[seat];
+          const hp = applyHpLoss(characterAbilities(state, seat), target?.hp ?? 0, amount, (target?.downed ?? false) || (target?.dead ?? false));
+          next = { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, hp } : s)) };
+        } else {
+          next = {
+            ...state,
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...s, hand: s.hand.filter(id => id !== chosen), discard: s.discard.filter(id => id !== chosen) }
+              : s)),
+            removed: [...state.removed, chosen],
+          };
+        }
+        const rngBox = { current: next.rngState };
+        const rngShuffle = (items: readonly string[]): string[] => {
+          const r = shuffle(makeRng(rngBox.current), items);
+          rngBox.current = r.rng.s;
+          return r.value;
+        };
+        const shuffled = shuffleBack({ deck: next.mansionDeck, bottom: next.mansionBottom }, grabInstanceId, rngShuffle);
+        return {
+          ...next,
+          ...nextBase,
+          rngState: rngBox.current,
+          mansionDeck: shuffled.deck,
+          mansionBottom: shuffled.bottom,
+          prompts: newPrompts,
+        };
+      }
 
       if (kind === 'sherryForceExplore') {
         // FCH-008 Sherry Birkin: the chosen player immediately Explores

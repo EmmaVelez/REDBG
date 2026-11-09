@@ -69,6 +69,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     infectedEffects: [{ kind: 'onRevealRevealNextMansionCard' }],
   },
   {
+    id: 'ev-001',
+    name: 'Zombie Grab',
+    type: 'event',
+    set: 'custom',
+    text: 'Trash a weapon from your hand or discard pile; otherwise, take 20 damage, then shuffle this card into the mansion.',
+    copies: 1,
+  },
+  {
     id: 'fch-008',
     name: 'Sherry Birkin',
     type: 'character',

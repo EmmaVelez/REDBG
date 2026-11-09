@@ -100,6 +100,25 @@ game-core 774, server 102, client 159, build OK.
   client cases. Art: `CARD-ART/CI-002.png` (whole card, like every infected PNG)
   and `CARD-ART/FCH-008.png` (character art window).
 
+**FAN CARD LINE 3 (2026-11-08): EV-001 Zombie Grab + a Sherry correction** —
+- **EV-001 Zombie Grab** (event, 1 copy): "Trash a weapon from your hand or
+  discard pile; otherwise, take 20 damage, then shuffle this card into the
+  mansion." Per Manny's ruling the card is ALWAYS shuffled back into the Mansion
+  (a recurring hazard). Revealing it opens a `zombieGrab` prompt whose options
+  are every weapon in `handAfter` + `discardAfterExplosives` (NOT `player.hand` —
+  the explore has already moved the used weapon to the play area) plus
+  "Take 20 damage"; the handler trashes the chosen weapon or applies
+  `applyHpLoss`, then `shuffleBack`s the event. Custom EVENT cards needed a
+  `isCustomMansionCard` predicate in `setup` — `isMansionCard` only covers the
+  official set's types, so a custom event would otherwise never reach the deck.
+- **Sherry correction:** the forced explore may spend BOTH the exploring
+  player's and Sherry's Ammo. `resolveAllyExplore` passes the combined pool to
+  `resolveExplore`, then deducts Sherry's share first and the target's second;
+  validation accepts the ability when ANY candidate target is affordable from the
+  combined pools.
+Tests: `engine/customZombieGrab.test.ts` (6), +1 Sherry case, +1 client case.
+Art: `CARD-ART/EV-001.png` (whole card).
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like
