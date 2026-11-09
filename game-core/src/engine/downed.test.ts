@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { setup, startTurn } from './game';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
+import { dealDamageToCharacter } from './mercenaries';
 import {
   ALL_CARDS,
   OUTBREAK_PILES,
@@ -179,5 +180,32 @@ describe('downing', () => {
     expect(explore.ok).toBe(false);
     if (!explore.ok) expect(explore.reason).toContain('downed');
     expect(validateAction(s, { type: 'endTurn', seat: 0 }).ok).toBe(true);
+  });
+
+  test('a mid-turn down keeps the Play Area; endTurn discards it (cards are conserved)', () => {
+    // Regression: the resuscitate-decline / Mercenaries / Skill down handlers used
+    // to set `playArea: []` on the down, destroying every card in it (the soak's
+    // conservation audit caught we-023#1/we-003#2 vanishing from the game).
+    const base = premierState(st => ({
+      ...st,
+      activeSeat: 1,
+      seats: st.seats.map((x, i) => (i === 1
+        ? { ...x, hp: 5, hand: ['am-001#x1'], discard: ['am-002#x1'], playArea: ['we-009#x1'] }
+        : x)),
+    }));
+    const s = withInstances(base, ['am-001#x1', 'am-002#x1', 'we-009#x1']);
+
+    const after = dealDamageToCharacter(s, 1, 10);
+    const downed = after.seats[1]!;
+    expect(downed.downed).toBe(true);
+    expect(downed.hand).toEqual([]);
+    expect(downed.discard).toEqual([]);
+    // Still in the Play Area at down-time (endTurn is what discards it).
+    expect(downed.playArea).toEqual(['we-009#x1']);
+
+    const end = applyAction(after, { type: 'endTurn', seat: 1 });
+    const ended = end.seats[1]!;
+    expect(ended.playArea).toEqual([]);
+    expect(ended.discard).toContain('we-009#x1');
   });
 });

@@ -529,7 +529,7 @@ function damageCharacter(state: GameState, seat: number, amount: number): GameSt
     ...state,
     rngState: rng.s,
     seats: state.seats.map(s => (s.seat === seat
-      ? { ...s, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory, playArea: [] }
+      ? { ...s, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
       : s)),
   };
 }

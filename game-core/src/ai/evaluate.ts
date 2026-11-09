@@ -21,8 +21,39 @@ const HOLD_FACTOR = 0.5;
 const BLOAT_THRESHOLD = 18;
 const TRASH_BLOAT_PER_CARD = 4;
 const TRASH_BLOAT_MAX = 24;
-/** Market pull for healing items (Green Herb / First Aid Spray). */
+/** Market pull for healing items (Green/Red Herb, First Aid Spray). */
 const HEAL_ITEM_PULL = 15;
+/**
+ * Health below this fraction of max is DANGEROUSLY low: the next reveal can
+ * down the character, so every missing point of Health is worth more than a
+ * point. Without this the bot at 10 HP farms ammo forever (measured: zero
+ * heals over 4000-action games that hit the action cap) because the heal's
+ * +Health exactly cancels the gold it costs.
+ */
+const LOW_HP_FRACTION = 0.3;
+const LOW_HP_PENALTY = 3;
+/** Flat cost of the turn a downed character loses. */
+const DOWNED_TURN_PENALTY = 200;
+/**
+ * Max Health is the downed-recovery budget: every down costs 20 max HP
+ * permanently, so a low max is closer to permanent defeat. This is what
+ * stops the revive Health credit from making a down look like a heal.
+ */
+const MAX_HP_WEIGHT = 0.5;
+/** Nominal Health a healing item restores (its card value). */
+const HEAL_FIXED_HP = 20;   // Green Herb: heal 20
+const HEAL_FULL_HP = 40;    // First Aid Spray / Red Herb: heal to full
+
+const HEAL_ITEM_KINDS = new Set([
+  'healFixed20OrTrashWithSecondFor60',
+  'healToFull',
+  'healSelfAndPartnerToFull',
+]);
+/** True when the item restores Health (any herb / spray). */
+function isHealingItem(cardDef: CardDef): boolean {
+  return (cardDef.itemEffects ?? []).some(e => HEAL_ITEM_KINDS.has(e.kind));
+}
+
 /** A card whose owned value is below this floor is "junk" when the deck bloats. */
 const JUNK_FLOOR = 12;
 const JUNK_BLOAT_PENALTY = 4;
@@ -79,19 +110,36 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
 
   // 2. Compute total score
 
-  // 2.1. Downed status — being downed costs 20 max HP + one skipped turn,
-  // then the player revives at the new full HP. It is NOT death (-10000
-  // below). The old -4000 froze low-HP bots out of exploring entirely
-  // (certain-downed explore scored -3880 vs +40 ammo farming), producing
-  // 500+ turn games that only ended when Uroboros chanced into a kill.
+  // 2.1. Downed status — the character revives at the start of its next
+  // turn at maxHp - 20 (see `revive`), having lost that turn. Score the
+  // revive Health instead of the 0 it shows mid-turn: at 10 hp a down is a
+  // +40 hp swing, so a flat penalty made every low-HP explore look fatal
+  // and froze the bots out of exploring. The lost turn is charged below,
+  // and the permanent max HP loss by the max-HP term.
   if (player.downed) {
-    total -= 400;
+    // A down at maxHp <= 20 is permanent defeat (see `revive`), not a recovery.
+    if (player.maxHp <= 20) {
+      total -= 10000;
+    } else {
+      total += player.maxHp - 20;
+      total -= DOWNED_TURN_PENALTY;
+    }
+  } else {
+    // 2.2. Health (main + partner, when partner mode active)
+    total += player.hp;
+    if (player.partnerHp !== undefined) {
+      total += player.partnerHp;
+    }
   }
-
-  // 2.2. Health (main + partner, when partner mode active)
-  total += player.hp;
-  if (player.partnerHp !== undefined) {
-    total += player.partnerHp;
+  // Max Health is the recovery budget — see MAX_HP_WEIGHT.
+  total += player.maxHp * MAX_HP_WEIGHT;
+  // 2.2b. Dangerously low Health — see LOW_HP_FRACTION. This is what makes
+  // the bot pay to heal instead of farming ammo at 10 hp.
+  if (!player.downed && player.hp > 0) {
+    const lowHpThreshold = Math.ceil(player.maxHp * LOW_HP_FRACTION);
+    if (player.hp < lowHpThreshold) {
+      total -= (lowHpThreshold - player.hp) * LOW_HP_PENALTY;
+    }
   }
   // 2.3. Decorations
   total += player.decorations * 50;
@@ -248,7 +296,8 @@ function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[],
     }
     return v;
   }
-  // actioN/items/tokens: flat small value
+  if (cardDef.type === 'item') return healItemValue(cardDef);
+  // tokens: flat small value
   return 5;
 }
 
@@ -271,7 +320,24 @@ function cardOwnedValue(cardDef: CardDef, abilities: readonly CharacterAbility[]
     }
     return v;
   }
+  if (cardDef.type === 'item') return healItemValue(cardDef);
   return 5;
+}
+
+/**
+ * A healing item is worth the Health it actually restores — a Green Herb is
+ * 20 points of Health, a First Aid Spray or Red Herb roughly 40. Valuing
+ * them at the generic 5 made the bot ignore the heal piles entirely.
+ */
+function healItemValue(cardDef: CardDef): number {
+  let v = 0;
+  for (const e of cardDef.itemEffects ?? []) {
+    if (e.kind === 'healFixed20OrTrashWithSecondFor60') v = Math.max(v, HEAL_FIXED_HP);
+    else if (e.kind === 'healToFull' || e.kind === 'healSelfAndPartnerToFull') {
+      v = Math.max(v, HEAL_FULL_HP);
+    }
+  }
+  return v;
 }
 
 /** The "pull" of a market pile top card: how much the bot wants to own it. */
@@ -286,10 +352,7 @@ function marketPull(cardDef: CardDef, abilities: readonly CharacterAbility[], bl
   if (cardDef.type === 'item') {
     // Healing items keep the bot alive so it can keep exploring (low-HP freeze:
     // at ~10 hp every explore scores 'downed' and the bot stopped fighting).
-    const heals = (cardDef.itemEffects ?? []).some(
-      e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60',
-    );
-    return heals ? HEAL_ITEM_PULL : 0;
+    return isHealingItem(cardDef) ? HEAL_ITEM_PULL : 0;
   }
   return 0;
 }

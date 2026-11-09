@@ -119,6 +119,60 @@ game-core 774, server 102, client 159, build OK.
 Tests: `engine/customZombieGrab.test.ts` (6), +1 Sherry case, +1 client case.
 Art: `CARD-ART/EV-001.png` (whole card).
 
+**BOT LOW-HP FREEZE FIXED (2026-11-08):** Manny reported that once the bots' Health
+got low they stopped exploring and stopped progressing. Measured on
+partnersInEscape / 4 hard bots: **0 heals over 4000-action games that never ended**,
+explores 7-38 (a healthy rate is 60-130), and seats parked at 10 HP for 600+ turns.
+Three coupled causes in `ai/evaluate.ts`, all fixed together:
+1. **Healing items were scored at the generic 5 points**, so a 20g Green Herb lost
+   to Ammo x10 every time. `healItemValue` now scores them at the Health they
+   restore (20 for `healFixed20OrTrashWithSecondFor60`, 40 for
+   `healToFull`/`healSelfAndPartnerToFull`). IMPORTANT: the Alliance "herb" pile is
+   the RED herb `it-004` (`healSelfAndPartnerToFull`), so any heal-item detection
+   that names only the two Premier kinds silently misses every Alliance scenario —
+   `HEAL_ITEM_KINDS` + `isHealingItem` is the shared predicate, and `marketPull`
+   reads it too.
+2. **HP is linear, so a heal's +Health exactly cancels the gold it costs.** New
+   `LOW_HP_FRACTION = 0.3` / `LOW_HP_PENALTY = 3`: below 30% of max, each missing
+   Health point is extra-costly, so recovering is worth paying for.
+3. **The flat -400 downed penalty made every low-HP explore look fatal** (at 10 hp
+   a down is a +40 hp swing, because `revive` sets `hp = maxHp - 20`). Downed now
+   scores `maxHp - 20` minus `DOWNED_TURN_PENALTY = 200`, plus a
+   `MAX_HP_WEIGHT = 0.5` term on max Health (every down costs 20 max permanently).
+   A down at `maxHp <= 20` is permanent defeat (`revive`) and scores -10000.
+   NOTE: crediting the revive Health with NO counterweight makes a down a HEAL —
+   the probe then had all four seats dead within 1125 actions.
+Result: heals 1-3 per game, herb buys 2, explores 70-131 (was 7-38), and the
+2-seat firstTimer sim metrics still pass. `evaluate.test.ts`'s 24 hardcoded score
+expectations were re-pinned from the runner's `expected X to be Y` (all shifted by
+the +50 max-HP term, plus the heal item's 5 -> 20).
+**Still open (BALANCE, not AI):** partnersInEscape ends only when Uroboros Aheri
+(hp 90, attack 70) is defeated — at <=70 hp every explore into it is an automatic
+down, and the only healing is 2 copies of a 20g Red Herb across 4 seats. The bots
+now explore at a healthy rate and heal when they can; if they still cap out, the
+fix is scenario balance, not more weight tuning.
+
+**CARD DESTRUCTION THE MORE AGGRESSIVE BOTS EXPOSED (2026-11-08):** with the bots
+exploring (and therefore being downed) far more often, the soak's conservation
+audit failed on alliance/2 — `we-023#1` and `we-003#2` were registered instances
+in NO zone. Traced to a2552: the AC-050 Resuscitate "Decline" branch. Three
+MID-TURN down handlers set `playArea: []` on the down, destroying every card in
+it: `actions.ts` (resuscitate decline), `mercenaries.ts` (`dealDamageToCharacter`)
+and `skill.ts` (`damageCharacter`). The normal down path (`applyDownedHooks`)
+correctly KEEPS the play area and `endTurn` discards it into the discard pile, so
+those three now keep it too. Regression test in `engine/downed.test.ts` ("a
+mid-turn down keeps the Play Area; endTurn discards it"). Soak back to green at
+22/30 natural (firstTimer/classicHorror/spyGames/whaddyaBuyin/battleHardenedVeteran/
+nightmare 3/3 each; the expansion scenarios still cap — see the balance note above).
+
+**CI-002 CROW COPIES = 5 (Manny ruling, 2026-11-08):** enabling the Crow custom card
+adds **5** copies to the Mansion deck (`copies: 5` in `data/custom.ts`). While doing
+this, a DUPLICATE `ci-002` entry was found in `CUSTOM_CARDS` (two identical blocks,
+an earlier bad merge) — `cardsForScenario` uses `find` so only the first was ever
+appended, but the duplicate is removed. Test: `customCrow.test.ts` now asserts the
+data shape (5 copies) and that a game enabled with `ci-002` has exactly 5 Crows in
+`mansionDeck + mansionBottom`.
+
 **GREEDY PLAYOUT FOR THE HARD BOTS (2026-11-08):** `choosePlayoutAction` (`ai/policy.ts`) replaces
 `chooseGreedyAction` for `hard` difficulty (`bot.ts`); easy/normal keep the 1-ply policy + noise.
 The 1-ply policy scores each candidate by the state ONE action ahead, so it cannot see a line like

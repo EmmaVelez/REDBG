@@ -50,10 +50,10 @@ function setMansionTop(s: GameState, cardIds: readonly string[]): { state: GameS
 }
 
 describe('CI-002 Infected Crow data', () => {
-  it('matches the printed card', () => {
+  it('matches the printed card (5 copies per Manny’s ruling)', () => {
     expect(CROW).toEqual(expect.objectContaining({
       id: 'ci-002', name: 'Infected Crow', type: 'infected', set: 'custom',
-      copies: 2, hp: 20, attack: 10, decorations: 2,
+      copies: 5, hp: 20, attack: 10, decorations: 2,
     }));
     expect(CROW?.infectedEffects).toEqual([{ kind: 'onRevealRevealNextMansionCard' }]);
   });
@@ -62,6 +62,24 @@ describe('CI-002 Infected Crow data', () => {
     expect(cardsForScenario('firstTimer').some(c => c.id === 'ci-002')).toBe(false);
     const on = cardsForScenario('firstTimer', { customCards: ['ci-002'] });
     expect(on.some(c => c.id === 'ci-002')).toBe(true);
+  });
+
+  it('adds FIVE copies to the Mansion deck when enabled (Manny ruling)', () => {
+    const s = setup(
+      {
+        seed: 11,
+        players: [
+          { name: 'P', controller: 'human', characterCardId: 'ch-002' },
+          { name: 'Foe', controller: 'human', characterCardId: 'ch-003' },
+        ],
+      },
+      cardsForScenario('firstTimer', { customCards: ['ci-002'] }),
+      FIRST_TIMER_PILES,
+      STANDARD_MANSION_DECK,
+    );
+    const crows = [...s.mansionDeck, ...s.mansionBottom]
+      .filter(id => s.cards[id]?.cardId === 'ci-002');
+    expect(crows).toHaveLength(5);
   });
 });
 

@@ -5783,7 +5783,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ...next,
               rngState: rng.s,
               seats: next.seats.map(s => (s.seat === targetSeat
-                ? { ...s, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory, playArea: [] }
+                ? { ...s, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
                 : s)),
             };
           }
