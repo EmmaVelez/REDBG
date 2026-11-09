@@ -264,6 +264,68 @@ h1, h2 { margin: 0 0 8px; }
   height: 100%;
   aspect-ratio: auto;
 }
+/* The rules panel is lifted out of flow and laid OVER the art, invisible until
+   hover — the same reveal a resource card gives its printed rows. It is
+   `pointer-events: none` while hidden so it can never swallow a click on the
+   deck/hand control above it. The skill row stacks its stat box above the text
+   so the text gets the full card width (a side-by-side row would leave ~38px,
+   i.e. one or two words per line), and the font is sized so BOTH level texts
+   fit inside the card — at the inherited 8px the panel measures 161px on a
+   114px card and would clip the second level entirely. */
+.card.card-character.card-art-only .card-skills,
+.card.card-character.card-art-only .card-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  max-height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 3px;
+  background: rgba(8, 9, 12, 0.78);
+  border: none;
+  color: #dde2ea;
+  font-size: 6px;
+  line-height: 1.25;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.card.card-character.card-art-only .card-skills { display: flex; flex-direction: column; gap: 1px; }
+.card.card-character.card-art-only .skill-row { flex-direction: column; align-items: flex-start; gap: 1px; }
+.card.card-character.card-art-only .skill-box { font-size: 6px; min-width: 22px; padding: 0 2px; }
+.card.card-character.card-art-only .skill-icon { width: 6px; height: 6px; }
+/* Clamped to 3 lines per level, exactly how `.card-has-art .card-text` clamps a
+   resource card's rules text. Without the clamp the panel needs 175px for a
+   long-character card on a 73px promo card, i.e. it can never fit. */
+.card.card-character.card-art-only .skill-text {
+  color: #dde2ea;
+  font-size: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card.card-character.card-art-only:hover .card-skills,
+.card.card-character.card-art-only:hover .card-text { opacity: 1; }
+/* Hovering a character card grows the card itself (a transform, so the bar
+   never reflows) and lifts it above its neighbours. origin is the bottom-LEFT
+   corner: the card is the leftmost control in the bar, so growing from the
+   centre would push it off the left edge of the screen, and growing from the
+   bottom edge keeps it on-screen instead of under the dock. */
+.player-character-card { position: relative; }
+.player-character-card .card {
+  transition: transform 0.12s ease-out;
+  transform-origin: bottom left;
+}
+.player-character-card:hover { z-index: 40; }
+.player-character-card:hover .card { transform: scale(2); }
+/* The enlarged card deliberately overflows the dock (that is the point — it
+   grows up over the board), so the dock must stop clipping while one is
+   hovered. `:has` scopes it to the hover, so the dock still scrolls normally
+   the rest of the time. */
+.app-action-dock:has(.player-character-card:hover) { overflow: visible; }
 .card-art-only:hover .card-top,
 .card-art-only:hover .card-name,
 .card-art-only:hover .card-stats,
@@ -502,21 +564,9 @@ h1, h2 { margin: 0 0 8px; }
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
 }
 
-/* character popup keeps the pixel frame; the ring scales with the card.
-   The popup is an enlarged reading copy, so it must NOT inherit the
-   hand-card size of the on-board character card. */
-.hover-card-pop .card.card-character {
-  /* wide enough that the skill text wraps at a readable line length — at the
-     old 140px it broke almost every word onto its own line */
-  width: 200px;
-  aspect-ratio: auto;
-}
-.hover-card-pop .card-character .card-portrait::after { font-size: 12px; }
-.hover-card-pop .card-character .card-skills,
-.hover-card-pop .card-character .card-text { font-size: 11px; padding: 6px; gap: 5px; }
-.hover-card-pop .card-character .skill-box { font-size: 12px; padding: 2px 5px; min-width: 42px; gap: 4px; }
-.hover-card-pop .card-character .skill-icon { width: 12px; height: 12px; }
-.hover-card-pop .card-character .skill-text { font-size: 11px; line-height: 1.35; }
+/* character cards have no popup any more — the rules text is revealed over the
+   art by the `.card.card-character.card-art-only` rules above, so the old
+   `.hover-card-pop .card-character*` sizing rules are gone. */
 
 @keyframes hover-pop {
   from { opacity: 0; transform: translate(-50%, -6px) scale(0.96); }
@@ -2058,7 +2108,16 @@ h1, h2 { margin: 0 0 8px; }
 
   /* ---- hover popup: keep it inside a narrow viewport ---- */
   .hover-card-pop .card { width: 150px; }
-  .hover-card-pop .card.card-character { width: 180px; }
+
+  /* The phone's character card is only 44-56px wide and 63-79px tall, so the
+     overlay is clamped harder and set smaller. It is also allowed to exceed the
+     card's height: the card sits at the top of the dock's identity row with the
+     whole hand row below it, so the extra ~8px lands inside the dock rather than
+     off-screen. */
+  .card.card-character.card-art-only .card-skills,
+  .card.card-character.card-art-only .card-text { font-size: 5px; max-height: none; }
+  .card.card-character.card-art-only .skill-text { -webkit-line-clamp: 2; font-size: 5px; }
+  .card.card-character.card-art-only .skill-box { font-size: 5px; min-width: 18px; }
 
   /* ---- overlays ---- */
   .mansion-door-panel { max-width: calc(100vw - 32px); padding: 16px; }

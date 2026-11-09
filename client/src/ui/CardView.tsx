@@ -124,7 +124,12 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
           <span className="cc-hp-ring"><HealthRing hp={hp} maxHp={maxHp} size={compact ? 24 : 26} strokeWidth={compact ? 3 : 6} /></span>
         )}
       </div>
-      {!compact && (decorations !== undefined && levels.length > 0 ? (
+      {/* The art-only face has no hover POPUP any more (character cards are not
+          wrapped in HoverCard). Instead the rules panel is rendered here and
+          absolutely positioned OVER the art by CSS, invisible until hover —
+          the same reveal a resource card gives its printed rows. It is rendered
+          even when `compact` because the overlay replaces the popup. */}
+      {(artOnlyMode || !compact) && (decorations !== undefined && levels.length > 0 ? (
         <div className="card-skills" data-decorations={decorations} data-level1-at={level1At} data-level2-at={level2At}>
           {levels.map(entry => {
             // Each tier has its own decoration gate. Level 1 uses level1At — 0 for
