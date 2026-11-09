@@ -214,7 +214,19 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
               <Hand
                 state={state}
                 seat={seat}
-                onPlay={instanceId => playFromHand(state, seat, instanceId, onAction)}
+                onPlay={instanceId => {
+                  // A weapon is not played as a standalone action — the rulebook
+                  // has you play the weapons you will be using as part of an
+                  // Explore. Clicking one opens the picker with it selected,
+                  // which is the only way to actually use it (dispatching
+                  // playActionCard made the server reject the click).
+                  if (defForInstance(state, instanceId)?.type === 'weapon') {
+                    setSelected([instanceId]);
+                    setPickerOpen(true);
+                    return;
+                  }
+                  playFromHand(state, seat, instanceId, onAction);
+                }}
                 disabled={disabled}
               />
             </div>

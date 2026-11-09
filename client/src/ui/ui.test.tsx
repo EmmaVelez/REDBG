@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { GameState } from '@re/game-core';
+import type { Action, GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
@@ -11,6 +11,7 @@ import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
 import { PlayerPanel } from './PlayerPanel';
+import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
 import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions } from './explorePicker';
@@ -438,6 +439,64 @@ describe('PlayerPanel (T06)', () => {
     // every other seat still shows its character card on the board
     const theirs = renderToStaticMarkup(<PlayerPanel state={state} seat={1} />);
     expect(theirs).toContain('player-character-card');
+  });
+
+  it("shows another seat's public play area and discard top card (only hands are secret)", () => {
+    const state = twoPlayerState();
+    const other = state.seats[1];
+    expect(other).toBeDefined();
+    if (other === undefined) return;
+    const [inPlay, discarded] = other.hand;
+    expect(inPlay).toBeDefined();
+    expect(discarded).toBeDefined();
+    if (inPlay === undefined || discarded === undefined) return;
+    const withZones: GameState = {
+      ...state,
+      seats: state.seats.map((s, i) => (i === 1
+        ? { ...s, playArea: [inPlay], discard: [discarded], hand: s.hand.filter(id => id !== inPlay && id !== discarded) }
+        : s)),
+    };
+    const html = renderToStaticMarkup(<PlayerPanel state={withZones} seat={1} />);
+    expect(html).toContain('data-public-zones');
+    expect(html).toContain('In play');
+    expect(html).toContain(defForInstance(withZones, inPlay)?.name ?? '');
+    expect(html).toContain('player-public-count');
+    expect(html).toContain(defForInstance(withZones, discarded)?.name ?? '');
+    // the viewing player's own panel does not repeat their play area
+    const mine = renderToStaticMarkup(<PlayerPanel state={withZones} seat={0} isMe />);
+    expect(mine).not.toContain('data-public-zones');
+  });
+});
+
+describe('playFromHand', () => {
+  it('dispatches nothing for a weapon — weapons are played as part of an Explore', () => {
+    const state = twoPlayerState();
+    const weapon = state.seats[0]?.hand.find(id => defForInstance(state, id)?.type === 'weapon');
+    expect(weapon).toBeDefined();
+    if (weapon === undefined) return;
+    const dispatched: Action[] = [];
+    playFromHand(state, 0, weapon, a => dispatched.push(a));
+    expect(dispatched).toEqual([]);
+  });
+
+  it('still routes actions, items and ammunition to their own action kind', () => {
+    const state = twoPlayerState();
+    const seat = state.seats[0];
+    expect(seat).toBeDefined();
+    if (seat === undefined) return;
+    const find = (type: string): string | undefined =>
+      seat.hand.find(id => defForInstance(state, id)?.type === type);
+    const cases: Array<[string | undefined, Action['type']]> = [
+      [find('action'), 'playActionCard'],
+      [find('item'), 'playItem'],
+      [find('ammunition'), 'playAmmo'],
+    ];
+    for (const [instanceId, expected] of cases) {
+      if (instanceId === undefined) continue;
+      const dispatched: Action[] = [];
+      playFromHand(state, 0, instanceId, a => dispatched.push(a));
+      expect(dispatched).toEqual([{ type: expected, seat: 0, instanceId }]);
+    }
   });
 });
 

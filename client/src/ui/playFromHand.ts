@@ -4,9 +4,11 @@ import { defForInstance } from './cards';
 /**
  * Route a hand click to the right action kind by card type.
  *
- * `playActionCard` handles all cards (weapons/actions/items/ammo); the engine's
- * `applyAction` switch only knows these four kinds, so misrouting a card type
- * to an unknown action throws "unknown action type" in the browser console.
+ * `playActionCard` handles action cards, `playItem` items, `playAmmo`
+ * ammunition. Weapons are deliberately absent: the rulebook has you play them
+ * as part of an Explore ("that Player plays all of their Weapons they will be
+ * using"), never as a standalone action, so the ActionBar opens the explore
+ * picker for a clicked weapon instead of dispatching anything here.
  */
 
 export function playFromHand(
@@ -27,11 +29,7 @@ export function playFromHand(
     case 'ammunition':
       onAction({ type: 'playAmmo', seat, instanceId });
       return;
-    case 'weapon':
-      // Weapons are card-type items that play into the hand → play area pipeline.
-      onAction({ type: 'playActionCard', seat, instanceId });
-      return;
     default:
-      return; // characters/others have no play action from hand
+      return; // weapons (used via Explore) and characters have no play action from hand
   }
 }

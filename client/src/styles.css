@@ -557,6 +557,10 @@ h1, h2 { margin: 0 0 8px; }
   background: var(--panel);
   padding: 10px;
   min-width: 220px;
+  /* Without a cap a single long skill line makes the panel's max-content
+     width ~1050px, which wraps the flex row and doubles the players block
+     height. Two panels plus the gap then fit side by side. */
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -568,6 +572,32 @@ h1, h2 { margin: 0 0 8px; }
 .player-me { color: #7bd88f; font-size: 10px; }
 .player-character { color: var(--muted); font-size: 11px; }
 .player-row { display: flex; gap: 10px; flex-wrap: wrap; }
+/* Another seat's public zones. Only hands and inventories are secret, so the
+   play area and the top of the discard pile are shown the way you would see
+   them across a real table. */
+.player-public-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.player-public-row { display: flex; align-items: flex-start; gap: 6px; }
+.player-zone-label {
+  flex: none;
+  min-width: 44px;
+  padding-top: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.player-public-cards { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.player-public-cards .card { width: 58px; min-height: 0; aspect-ratio: auto; padding: 3px 4px; gap: 2px; font-size: 8px; }
+.player-public-cards .card .card-name { font-size: 9px; }
+.player-public-count { align-self: center; font-size: 10px; font-weight: 700; color: var(--muted); }
 .player-hp { font-weight: 700; }
 .player-decorations { color: #ffd479; }
 .health-ring {
