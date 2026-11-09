@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
+import type { ConnectionStatus } from '../net/ws';
 import { ActionBarStats } from './ActionBarStats';
 import { defForInstance } from './cards';
 import {
@@ -52,9 +53,13 @@ export interface ActionBarProps {
   readonly onOpenLog?: () => void;
   /** Whether the log sidebar is currently open (button shows active state). */
   readonly logOpen?: boolean;
+  /** Connection status, shown in the dock's lower-right corner. */
+  readonly status?: ConnectionStatus;
+  /** Room code, shown beside the status (null/undefined in pass-and-play). */
+  readonly roomCode?: string | null;
 }
 
-export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false }: ActionBarProps): JSX.Element {
+export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false, status, roomCode = null }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legalExplores(state, seat);
@@ -428,6 +433,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         <button type="button" onClick={() => onAction({ type: 'endTurn', seat })} disabled={disabled || !canEndTurn}>
           End turn
         </button>
+
+        <div className="dock-status" data-app-status={status ?? 'unknown'}>
+          {roomCode !== null && roomCode !== undefined && <span className="app-room">Room {roomCode}</span>}
+          {status !== undefined && <span className={`app-status app-status-${status}`}>{status}</span>}
+        </div>
       </div>
     </div>
   );

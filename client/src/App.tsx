@@ -177,11 +177,6 @@ export function App(): JSX.Element {
 
   return (
     <div className="app app-board">
-      <header className="app-header">
-        <h1>RE Deck Builder</h1>
-        {room !== null && <span className="app-room">Room {room.roomCode}</span>}
-        <span className={`app-status app-status-${status}`}>{status}</span>
-      </header>
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         {logOpen && (
@@ -205,6 +200,8 @@ export function App(): JSX.Element {
           lastError={lastError}
           onOpenLog={() => setLogOpen(o => !o)}
           logOpen={logOpen}
+          status={status}
+          roomCode={room?.roomCode ?? null}
         />
       </footer>
       {reveal !== null && (

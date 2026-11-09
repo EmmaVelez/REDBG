@@ -578,6 +578,20 @@ describe('ActionBar (T07)', () => {
     expect(html).toContain('data-log-open="true"');
   });
 
+  it('shows the connection status and room code in the dock corner', () => {
+    const state = twoPlayerState();
+    const online = renderToStaticMarkup(
+      <ActionBar state={state} seat={0} onAction={() => {}} status="connected" roomCode="ABC123" />,
+    );
+    expect(online).toContain('data-app-status="connected"');
+    expect(online).toContain('app-status-connected');
+    expect(online).toContain('ABC123');
+    // pass-and-play has no room code, and the status span is absent when not passed
+    const offline = renderToStaticMarkup(<ActionBar state={state} seat={0} onAction={() => {}} />);
+    expect(offline).not.toContain('app-status-');
+    expect(offline).not.toContain('app-room');
+  });
+
   it('offers end turn on my turn and disables explore with no legal combo', () => {
     const state = twoPlayerState();
     const player = state.seats[0];

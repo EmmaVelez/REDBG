@@ -65,19 +65,21 @@ h1, h2 { margin: 0 0 8px; }
   height: 100dvh;
   overflow: hidden;
 }
-.app-header {
-  flex: 0 0 auto;
+/* connection status + room code, lower-right corner of the action bar.
+   Lives at the end of .action-buttons (the bar's last row) and pushes
+   itself to the right with an auto margin. */
+.dock-status {
+  margin-left: auto;
   display: flex;
-  gap: 16px;
-  align-items: baseline;
-  padding: 10px 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
 }
-.app-header h1 { font-size: 18px; letter-spacing: 1px; }
-.app-room { color: var(--muted); }
-.app-status { margin-left: auto; color: var(--muted); font-size: 12px; }
+.app-room { color: var(--muted); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+.app-status { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
 .app-status-connected { color: #7bd88f; }
+.app-status-connecting { color: #c9a227; }
+.app-status-disconnected { color: #c05a5a; }
 .app-main {
   display: flex;
   gap: 16px;
@@ -1387,31 +1389,9 @@ h1, h2 { margin: 0 0 8px; }
 }
 
 /* ---- header: brushed-steel bar with a caution line ---- */
-.app-board .app-header {
-  background:
-    repeating-linear-gradient(-45deg, rgba(150, 120, 30, 0.30) 0 10px, rgba(8, 8, 8, 0.30) 10px 20px) bottom left / 100% 3px no-repeat,
-    linear-gradient(180deg, #181c22 0%, #0e1115 100%);
-  border-bottom: 1px solid #2b323c;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 3px 12px rgba(0, 0, 0, 0.65);
-}
-.app-board .app-header h1 {
-  font-size: 15px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #ddd7c8;
-  text-shadow: 0 0 14px rgba(190, 30, 40, 0.30), 0 2px 3px #000;
-}
-.app-board .app-room {
-  color: #8b93a1;
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
-.app-board .app-status {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
+/* dock status cluster: muted steel label, accent only on the state itself */
+.app-board .app-room { color: #8b93a1; }
+.app-board .app-status { font-size: 10px; }
 .app-board .app-status-connected { color: #6fbf7a; }
 .app-board .app-status-connecting { color: #c9a227; }
 .app-board .app-status-disconnected { color: #c05a5a; }
