@@ -99,7 +99,7 @@ function CharacterCard({ def, compact, decorations, hp, maxHp, art }: CharacterC
   const level2At = def.level2At ?? 0;
   const levels = def.levels ?? [];
   return (
-    <div className="card card-character" data-card-id={def.id} data-card-type="character" data-has-art={art !== undefined || undefined}>
+    <div className={`card card-character${def.set === 'promo' ? ' card-promo' : ''}`} data-card-id={def.id} data-card-type="character" data-has-art={art !== undefined || undefined}>
       <div className="cc-head">
         <span className="card-type">[{typeLabel(def.type)}]</span>
         {showRing ? (

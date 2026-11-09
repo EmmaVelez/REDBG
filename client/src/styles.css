@@ -263,6 +263,8 @@ h1, h2 { margin: 0 0 8px; }
   object-position: center;
 }
 .card-character .card-portrait.card-portrait-has-art::after { content: none; }
+/* promo (PR-*) art is still the 320x292 art window, not the full card */
+.card-character.card-promo .card-portrait { aspect-ratio: 320 / 292; }
 
 /* per-type accents (matching the game's color language) */
 .card-weapon    { --card-accent: #8fa3b0; }
@@ -349,8 +351,9 @@ h1, h2 { margin: 0 0 8px; }
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
-  /* match the saved character art (the WHOLE card, 320x456) so it is never
-     letterboxed or cropped */
+  /* match the saved character art so it is never letterboxed or cropped:
+     base characters are the WHOLE card scan (320x456), promos are still
+     the shorter art window (320x292) */
   aspect-ratio: 320 / 456;
   margin: 0;
   border: 1px solid #000;
