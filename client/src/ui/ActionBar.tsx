@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
@@ -79,6 +79,10 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
 
   const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const handScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollHand = (direction: -1 | 1): void => {
+    handScrollRef.current?.scrollBy({ left: direction * 200, behavior: 'smooth' });
+  };
   // Multi-explore: how many of the seat's remaining Explores this action spends.
   const [exploreCount, setExploreCount] = useState(1);
   // Alliance Partner Modification: who leads (takes the damage on a failed
@@ -179,32 +183,52 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
 
   return (
     <div className="action-bar" data-seat={seat}>
-      {player !== undefined && (
-        <ActionBarStats
-          hp={player.hp}
-          maxHp={player.maxHp}
-          gold={player.turnGold}
-          ammo={player.turnAmmo}
-          actions={player.actionsLeft}
-          buys={player.buysLeft}
-        />
-      )}
-
-      {player !== undefined && (
-        <div className="action-identity" data-action-identity>
-          <CharacterCards state={state} seat={seat} />
-          <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />
-          <Hand
-            state={state}
-            seat={seat}
-            onPlay={instanceId => playFromHand(state, seat, instanceId, onAction)}
-            disabled={disabled}
+      {/* band 1 — the player's numbers */}
+      <div className="action-row">
+        {player !== undefined && (
+          <ActionBarStats
+            hp={player.hp}
+            maxHp={player.maxHp}
+            gold={player.turnGold}
+            ammo={player.turnAmmo}
+            actions={player.actionsLeft}
+            buys={player.buysLeft}
           />
-          <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} />
+        )}
+        {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
+      </div>
+
+      {/* band 2 — character, deck, hand, discard */}
+      {player !== undefined && (
+        <div className="action-row action-identity" data-action-identity>
+          <div className="action-col">
+            <span className="action-col-label">Character</span>
+            <CharacterCards state={state} seat={seat} />
+          </div>
+          <div className="action-col">
+            <span className="action-col-label">Deck</span>
+            <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />
+          </div>
+          <div className="action-col action-col-hand">
+            <div className="action-hand-scroll" ref={handScrollRef}>
+              <Hand
+                state={state}
+                seat={seat}
+                onPlay={instanceId => playFromHand(state, seat, instanceId, onAction)}
+                disabled={disabled}
+              />
+            </div>
+            <button type="button" className="hand-scroll hand-scroll-left" onClick={() => scrollHand(-1)} title="Scroll hand left" aria-label="Scroll hand left">◀</button>
+            <button type="button" className="hand-scroll hand-scroll-right" onClick={() => scrollHand(1)} title="Scroll hand right" aria-label="Scroll hand right">▶</button>
+          </div>
+          <div className="action-col">
+            <span className="action-col-label">Discard</span>
+            <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} />
+          </div>
         </div>
       )}
-
-      {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
+      {/* band 3 — prompts and the turn's actions */}
+      <div className="action-row action-row-controls">
       {lastError !== undefined && lastError !== null && lastError !== '' && (
         <div className="action-error" data-action-error role="alert">{lastError}</div>
       )}
@@ -455,10 +479,12 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           End turn
         </button>
 
-        <div className="dock-status" data-app-status={status ?? 'unknown'}>
-          {roomCode !== null && roomCode !== undefined && <span className="app-room">Room {roomCode}</span>}
-          {status !== undefined && <span className={`app-status app-status-${status}`}>{status}</span>}
-        </div>
+      </div>
+
+      <div className="dock-status" data-app-status={status ?? 'unknown'}>
+        {roomCode !== null && roomCode !== undefined && <span className="app-room">Room {roomCode}</span>}
+        {status !== undefined && <span className={`app-status app-status-${status}`}>{status}</span>}
+      </div>
       </div>
     </div>
   );

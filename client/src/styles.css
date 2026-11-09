@@ -1069,17 +1069,17 @@ h1, h2 { margin: 0 0 8px; }
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* display: flex is load-bearing: the row/gap/wrap rules below have been
+/* The action bar is a COLUMN of three bands: stats, identity, controls.
+   display: flex is load-bearing — the direction/gap rules below have been
    dead for the whole life of this file without it. */
 .app-action-dock .action-bar {
   display: flex;
   border: none;
   background: transparent;
   padding: 0;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
 }
 .app-action-dock .action-buttons { flex-shrink: 0; }
 .app-action-dock .action-prompt {
@@ -1696,14 +1696,71 @@ h1, h2 { margin: 0 0 8px; }
     0 3px 12px rgba(0, 0, 0, 0.55);
 }
 
-/* ---- action bar identity: character + partner cards, then deck / hand / discard ---- */
-.action-identity {
+/* ---- action bar: three bands ----
+   band 1 stats | band 2 character/deck/hand/discard | band 3 prompts + buttons */
+.action-row {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   min-width: 0;
 }
+.action-identity {
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 14px;
+}
+.action-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.action-col-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* the hand is the flexible middle region, so it scrolls instead of wrapping */
+.action-col-hand {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+.action-hand-scroll {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+/* auto margins centre the fan while it fits and collapse to 0 (so it stays
+   reachable by scrolling) once it overflows */
+.action-hand-scroll .hand {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  margin-inline: auto;
+}
+.action-hand-scroll .hand-card { margin-right: -18px; }
+.action-hand-scroll .hand-card .card { width: 80px; }
+.hand-scroll {
+  position: absolute;
+  top: 0;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+}
+.hand-scroll-left { left: 0; }
+.hand-scroll-right { right: 0; }
 .app-action-dock .player-character-row {
   gap: 8px;
   flex-wrap: nowrap;
@@ -1720,9 +1777,12 @@ h1, h2 { margin: 0 0 8px; }
 .app-action-dock .player-character-card .card { width: 100px; min-height: 0; }
 .app-action-dock .player-partner-hp,
 .app-action-dock .player-partner-attached { font-size: 9px; white-space: nowrap; }
-.app-action-dock .hand { flex-wrap: nowrap; }
-.app-action-dock .zone-pile { min-width: 52px; }
-/* the hand is the one variable-width element in the bar: keep it compact
-   so stats + identity + buttons still fit on one row at a 1600px viewport */
-.app-action-dock .hand-card { margin-right: -18px; }
-.app-action-dock .hand-card .card { width: 72px; }
+/* deck / discard read as labelled boxes under their header */
+.app-action-dock .zone-pile { min-width: 64px; }
+.app-action-dock .zone-pile-stack { width: 76px; height: 103px; }
+/* prompts grow to fill the controls band; the buttons spread across it */
+.app-action-dock .action-prompts { flex: 1 1 auto; min-width: 260px; }
+.app-action-dock .action-buttons {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
