@@ -176,7 +176,7 @@ export function App(): JSX.Element {
     passPending;
 
   return (
-    <div className="app">
+    <div className="app app-board">
       <header className="app-header">
         <h1>RE Deck Builder</h1>
         {room !== null && <span className="app-room">Room {room.roomCode}</span>}

@@ -1335,3 +1335,335 @@ h1, h2 { margin: 0 0 8px; }
 .custom-cards-summary { cursor: pointer; font-size: 0.9em; color: var(--muted-foreground); }
 .custom-card-row { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; margin: 4px 0; }
 .custom-card-row span { line-height: 1.3; }
+
+/* ==========================================================================
+   M6 · SURVIVAL-HORROR THEME — board skin
+   Appended as an override layer so the base rules above stay intact and the
+   lobby is untouched: everything here is scoped to `.app-board`, which App.tsx
+   adds to the shell only while a game is running.
+   ========================================================================== */
+
+/* ---- the room: cold, dirty, under-lit, with film grain ---- */
+.app-board {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(1500px 760px at 8% -20%, rgba(70, 96, 104, 0.22) 0%, transparent 60%),
+    radial-gradient(1300px 820px at 96% 116%, rgba(126, 24, 28, 0.20) 0%, transparent 58%),
+    radial-gradient(1100px 700px at 50% 42%, transparent 0%, rgba(3, 4, 6, 0.78) 100%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-color: #090b0e;
+}
+
+/* ---- header: brushed-steel bar with a caution line ---- */
+.app-board .app-header {
+  background:
+    repeating-linear-gradient(-45deg, rgba(150, 120, 30, 0.30) 0 10px, rgba(8, 8, 8, 0.30) 10px 20px) bottom left / 100% 3px no-repeat,
+    linear-gradient(180deg, #181c22 0%, #0e1115 100%);
+  border-bottom: 1px solid #2b323c;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 3px 12px rgba(0, 0, 0, 0.65);
+}
+.app-board .app-header h1 {
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ddd7c8;
+  text-shadow: 0 0 14px rgba(190, 30, 40, 0.30), 0 2px 3px #000;
+}
+.app-board .app-room {
+  color: #8b93a1;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.app-board .app-status {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.app-board .app-status-connected { color: #6fbf7a; }
+.app-board .app-status-connecting { color: #c9a227; }
+.app-board .app-status-disconnected { color: #c05a5a; }
+
+/* ---- action dock ---- */
+.app-board .app-action-dock {
+  background:
+    repeating-linear-gradient(-45deg, rgba(150, 120, 30, 0.22) 0 10px, rgba(8, 8, 8, 0.22) 10px 20px) top left / 100% 3px no-repeat,
+    linear-gradient(180deg, #151920 0%, #0c0f13 100%);
+  border-top: 1px solid #2b323c;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 -4px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* ---- section titles: dossier heading with a blood tick and a hairline ---- */
+.app-board .board-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #8d96a4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+.app-board .board-section-title::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 3px;
+  height: 12px;
+  background: linear-gradient(180deg, #8c141a 0%, #460a0e 100%);
+  box-shadow: 0 0 7px rgba(140, 20, 26, 0.55);
+}
+.app-board .board-section-title::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(120, 132, 150, 0.38) 0%, transparent 72%);
+}
+
+/* ---- panels ---- */
+.app-board .player-panel,
+.app-board .play-area,
+.app-board .game-log {
+  background: linear-gradient(180deg, #14181e 0%, #0e1115 100%);
+  border: 1px solid #2a313b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.app-board .player-downed { border-style: dashed; }
+.app-board .player-name { color: #e2ddd0; letter-spacing: 0.04em; }
+.app-board .player-me { color: #6fbf7a; letter-spacing: 0.12em; }
+.app-board .player-character { color: #8d96a4; }
+
+/* ---- log / history / chat ---- */
+.app-board .log-title { color: #8d96a4; }
+.app-board .log-history-scroll,
+.app-board .log-chat {
+  background: #090b0f;
+  border-color: #242a33;
+}
+.app-board .history-turn { color: #c9a227; }
+.app-board .history-seat { color: #7f8896; }
+.app-board .log-section { color: #7f8896; }
+.app-board .log-empty { color: #6b7482; }
+
+/* ---- buttons: machined steel ---- */
+.app-board :where(button) {
+  background: linear-gradient(180deg, #2a3039 0%, #181c22 100%);
+  border: 1px solid #383f4b;
+  border-radius: 4px;
+  color: #d3cfc4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 4px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.app-board :where(button):hover:not(:disabled) {
+  background: linear-gradient(180deg, #343b46 0%, #20252d 100%);
+  border-color: #4a5361;
+  color: #fff;
+}
+.app-board :where(button):active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+.app-board :where(button):disabled {
+  opacity: 0.38;
+  box-shadow: none;
+}
+
+/* card-shaped buttons must keep their own box */
+.app-board .market-pile,
+.app-board .hand-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  text-shadow: none;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* ---- the three action buttons ---- */
+.app-board .btn-primary {
+  background: linear-gradient(180deg, #a81c22 0%, #5e0d12 100%);
+  border: 1px solid #3d070a;
+  border-radius: 5px;
+  color: #f3e6e6;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 9px 24px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 9px rgba(0, 0, 0, 0.65);
+}
+.app-board .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #c4242c 0%, #701015 100%);
+  border-color: #520b0f;
+  color: #fff;
+}
+
+.app-board .explore-button {
+  background: linear-gradient(180deg, #1c4a2a 0%, #0d2716 100%);
+  border: 1px solid #2f6b3f;
+  border-radius: 5px;
+  color: #a8e0b0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.app-board .explore-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #266036 0%, #12331c 100%);
+  border-color: #57a86a;
+  color: #d6f5dc;
+}
+
+.app-board .ability-button {
+  background: linear-gradient(180deg, #2e2440 0%, #181226 100%);
+  border: 1px solid #584a80;
+  border-radius: 5px;
+  color: #c9bce4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.app-board .ability-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3a2e52 0%, #211832 100%);
+  border-color: #8470b8;
+  color: #e6dcf7;
+}
+
+/* ---- stat pills ---- */
+.app-board .action-stat {
+  background: linear-gradient(180deg, #171b21 0%, #101318 100%);
+  border: 1px solid #2d343f;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 5px rgba(0, 0, 0, 0.5);
+  color: #7f8896;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 4px 12px;
+}
+.app-board .action-stat strong { font-size: 15px; letter-spacing: 0; }
+.app-board .action-stat-hp strong { color: #6fbf7a; }
+.app-board .action-stat-gold strong { color: #d4af37; }
+.app-board .action-stat-ammo strong { color: #7fa8c9; }
+.app-board .action-stat-actions strong { color: #c08a9a; }
+.app-board .action-stat-buys strong { color: #c99a5e; }
+
+/* ---- prompts ---- */
+.app-board .action-prompt { border-top-color: #2a313b; }
+.app-board .prompt-text { color: #ddd7c8; }
+.app-board .action-error {
+  color: #ff9d9d;
+  background: rgba(110, 22, 22, 0.32);
+  border-color: #5e2a2a;
+}
+
+/* ---- card frames: darker, dirtier, heavier shadow ---- */
+.app-board .card {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 4px),
+    linear-gradient(160deg, #23272e 0%, #15181d 55%, #0f1114 100%);
+  border-color: color-mix(in srgb, var(--card-accent) 70%, #000);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.045),
+    0 3px 8px rgba(0, 0, 0, 0.65);
+}
+.app-board .card-back {
+  background:
+    radial-gradient(circle at 50% 38%, #1b1f27 0%, #0e1115 70%),
+    linear-gradient(180deg, #14171d 0%, #0a0c10 100%);
+  border-color: #22262e;
+  box-shadow: inset 0 0 0 2px #0c0e12, inset 0 0 0 3px #262b34, 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+.app-board .card-back-emblem { color: #b39255; border-color: #2e2a1e; }
+
+/* ---- scrollbars ---- */
+.app-board ::-webkit-scrollbar { width: 10px; height: 10px; }
+.app-board ::-webkit-scrollbar-track { background: #0b0d11; }
+.app-board ::-webkit-scrollbar-thumb {
+  background: #333a45;
+  border: 2px solid #0b0d11;
+  border-radius: 6px;
+}
+.app-board ::-webkit-scrollbar-thumb:hover { background: #49525f; }
+.app-board ::-webkit-scrollbar-corner { background: transparent; }
+.app-board * {
+  scrollbar-width: thin;
+  scrollbar-color: #333a45 #0b0d11;
+}
+
+/* ---- skill panel (was referencing undefined --card / --accent / --muted-foreground) ---- */
+.app-board .skill-panel {
+  background: linear-gradient(180deg, #14181e 0%, #0e1115 100%);
+  border-top: 1px solid #2a313b;
+}
+.app-board .skill-panel-head { color: #7f8896; }
+.app-board .skill-panel-xp { color: #d4af37; }
+.app-board .skill-row { background: rgba(255, 255, 255, 0.03); color: #cfd4dd; }
+.app-board .skill-row-active { border: 1px solid #d4af37; }
+.app-board .skill-row-inactive { opacity: 0.6; }
+.app-board .skill-row-name { color: #e2ddd0; }
+.app-board .skill-row-pips { color: #7f8896; }
+.app-board .skill-use,
+.app-board .skill-move-xp {
+  background: linear-gradient(180deg, #2a3039 0%, #181c22 100%);
+  border: 1px solid #383f4b;
+  color: #d3cfc4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.app-board .skill-use:hover:not(:disabled),
+.app-board .skill-move-xp:hover:not(:disabled) {
+  background: linear-gradient(180deg, #343b46 0%, #20252d 100%);
+  color: #fff;
+}
+
+/* ---- misc labels ---- */
+.app-board .zone-label,
+.app-board .zone-counts,
+.app-board .mansion-counts,
+.app-board .zone-pile-label,
+.app-board .zone-empty,
+.app-board .hand-empty { color: #7f8896; }
+
+/* ---- M6 refinements: legibility on dark card art ---- */
+.app-board .card-has-art .card-top {
+  background: linear-gradient(180deg, rgba(6, 7, 10, 0.9) 0%, rgba(6, 7, 10, 0) 100%);
+}
+.app-board .card-has-art .card-name,
+.app-board .card-has-art .card-stats,
+.app-board .card-has-art .card-bonus,
+.app-board .card-has-art .card-text {
+  background: rgba(6, 7, 10, 0.82);
+}
+.app-board .card-has-art .card-text { color: #dde2ea; }
+
+/* pile captions under the market cards */
+.app-board .market-pile { color: #9aa3b1; }
+.app-board .pile-count { color: #a8b1bf; }
+.app-board .pile-cost { color: #ffd479; }
+
+/* the "you" panel gets a faint cold glow so the table reads at a glance */
+.app-board .player-panel[data-me="true"] {
+  border-color: #35404a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(120, 150, 170, 0.10),
+    0 3px 12px rgba(0, 0, 0, 0.55);
+}
