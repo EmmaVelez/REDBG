@@ -11,7 +11,7 @@ import { HoverCard } from './HoverCard';
 import { Hand } from './Hand';
 import { Zones } from './Zones';
 import { PlayerPanel } from './PlayerPanel';
-import { CharacterCards } from './CharacterCards';
+import { CharacterCards, attachedOverlap } from './CharacterCards';
 import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
@@ -512,22 +512,56 @@ describe('CharacterCards (action bar)', () => {
 
   it('renders the partner card identically to the player card, with no text underneath', () => {
     const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
-    // both cards take the art-only face
+    // both character cards take the art-only face (the trophy fan's cards are
+    // counted separately below, so match the full class not just the suffix)
     expect(html).toContain('data-character-card');
     expect(html).toContain('data-partner-character-card');
-    expect(html.match(/card-character/g)?.length).toBe(2);
-    expect(html.match(/card-art-only/g)?.length).toBe(2);
+    expect(html.match(/card card-character/g)?.length).toBe(2);
     // no HP / attached text rows under the partner card any more
     expect(html).not.toContain('player-partner-hp');
     expect(html).not.toContain('player-partner-attached');
     expect(html).not.toContain('Attached ');
   });
 
+  it('fans the attached infected out to the right of the character card', () => {
+    const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
+    // the partner has one trophy, the main character none
+    expect(html).toContain('data-partner-attached-fan="1"');
+    expect(html).not.toContain('data-attached-fan=');
+    // the trophy is a real card in the fan, art-only like the hand
+    expect(html).toMatch(/class="card card-weapon[^"]*card-art-only"/);
+    // the overlap is published as a fraction of the card width for the CSS
+    expect(html).toContain(`--cc-overlap:${attachedOverlap(0)}`);
+    expect(html).toContain(`--cc-overlap:${attachedOverlap(1)}`);
+  });
+
+  it('grows the trophy fan overlap with the number of attached cards', () => {
+    const one = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
+    expect(one).toContain(`--cc-overlap:${attachedOverlap(1)}`); // the partner's trophy
+    // a seat with four trophies must overlap more than one with a single trophy
+    const state = twoPlayerState();
+    const ids = ['ma-001#1', 'ma-002#2', 'ma-003#3', 'ma-004#4'];
+    const four = {
+      ...state,
+      cards: {
+        ...state.cards,
+        ...Object.fromEntries(ids.map(id => [id, { instanceId: id, cardId: id.slice(0, 6), location: { zone: 'attached' as const, index: 0, seat: 0 } }])),
+      },
+      seats: state.seats.map((s, i) => (i === 0 ? { ...s, attached: ids } : s)),
+    };
+    const html = renderToStaticMarkup(<CharacterCards state={four} seat={0} />);
+    expect(html).toContain('data-attached-fan="4"');
+    expect(html).toContain(`--cc-overlap:${attachedOverlap(4)}`);
+    expect(Number(attachedOverlap(4))).toBeGreaterThan(Number(attachedOverlap(1)));
+    // and it is capped, so a long row can never stack backwards
+    expect(Number(attachedOverlap(50))).toBeLessThanOrEqual(0.85);
+  });
+
   it('shows each card\'s attached count as a badge, in the style of a zone-pile count', () => {
     const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
     expect(html).toContain('data-attached-count');
     expect(html).toContain('data-partner-attached-count');
-    expect(html.match(/cc-attached/g)?.length).toBe(2);
+    expect(html.match(/class="cc-attached"/g)?.length).toBe(2);
     // the partner has one infected attached, the main character none
     expect(html).toMatch(/data-partner-attached-count[^>]*>\s*1\s*</);
     expect(html).toMatch(/data-attached-count[^>]*>\s*0\s*</);

@@ -313,14 +313,38 @@ h1, h2 { margin: 0 0 8px; }
    never reflows) and lifts it above its neighbours. origin is the bottom-LEFT
    corner: the card is the leftmost control in the bar, so growing from the
    centre would push it off the left edge of the screen, and growing from the
-   bottom edge keeps it on-screen instead of under the dock. */
-.player-character-card { position: relative; }
-.player-character-card .card {
+   bottom edge keeps it on-screen instead of under the dock.
+   The transform is on `.cc-fan` (the character card PLUS its attached-trophy
+   fan) so the trophies enlarge with the character. */
+.player-character-card {
+  position: relative;
+  --cc-w: 80px; /* card width, overridden per breakpoint for the action bar */
+}
+.player-character-card .card { width: var(--cc-w); }
+.cc-fan {
+  position: relative;
   transition: transform 0.12s ease-out;
   transform-origin: bottom left;
 }
 .player-character-card:hover { z-index: 40; }
-.player-character-card:hover .card { transform: scale(2); }
+.player-character-card:hover .cc-fan { transform: scale(2); }
+/* The attached trophies fan out to the right of the character card, overlapping
+   the way the hand does. The fan is absolutely positioned so it never affects
+   layout, and `--cc-overlap` (a fraction of the card width, set from the number
+   of trophies) grows with the count so a long row still fits. */
+.cc-attached-fan {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  display: none;
+  align-items: flex-start;
+}
+.player-character-card:hover .cc-attached-fan { display: flex; }
+.cc-attached-fan .card {
+  width: var(--cc-w);
+  margin-left: calc(var(--cc-overlap, 0.3) * var(--cc-w) * -1);
+}
+.cc-attached-fan .card:first-child { margin-left: 0; }
 /* The enlarged card deliberately overflows the dock (that is the point — it
    grows up over the board), so the dock must stop clipping while one is
    hovered. `:has` scopes it to the hover, so the dock still scrolls normally
@@ -713,9 +737,10 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 0;
   padding-top: 0;
 }
-/* character cards match the hand cards (80px, see
-   .action-hand-scroll .hand-card .card) */
-.player-character-card .card { width: 80px; min-height: 0; }
+/* character cards match the hand cards (see `.action-hand-scroll .hand-card .card`);
+   the width comes from `--cc-w` on `.player-character-card` so the attached-trophy
+   fan can use the same value. */
+.player-character-card .card { min-height: 0; }
 
 /* ---- character skill list ---- */
 .card-skills {
@@ -1893,7 +1918,7 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 0;
   padding-top: 0;
 }
-.app-action-dock .player-character-card .card { width: 80px; min-height: 0; }
+.app-action-dock .player-character-card .card { min-height: 0; }
 /* the partner card renders exactly like the player card now — no text
    underneath; its attached count is the .cc-attached badge on the art. */
 /* deck / discard read as labelled boxes under their header */
@@ -2080,7 +2105,7 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .board-mansion .zone-pile-stack { width: 54px; height: 73px; }
   .app-board .app-action-dock .zone-pile { min-width: 0; }
   .app-board .app-action-dock .zone-pile-stack { width: 54px; height: 73px; }
-  .app-board .app-action-dock .player-character-card .card { width: 56px; }
+  .app-board .app-action-dock .player-character-card { --cc-w: 56px; }
   /* prompts and buttons each take a full row; the buttons wrap instead of
      overflowing the viewport (they measured 403px in a 390px window) */
   .app-board .app-action-dock .action-prompts { flex: 1 1 100%; min-width: 0; }
@@ -2129,7 +2154,7 @@ h1, h2 { margin: 0 0 8px; }
 @media (max-width: 400px) {
   .app-board .market-pile .card { width: 70px; }
   .app-board .app-action-dock .zone-pile-stack { width: 42px; height: 57px; }
-  .app-board .app-action-dock .player-character-card .card { width: 44px; }
+  .app-board .app-action-dock .player-character-card { --cc-w: 44px; }
   .app-board .player-panel { max-width: 162px; }
   /* the five stat pills wrapped onto a second line at 360px, costing the
      board another ~26px; tighter padding keeps them on one row */
