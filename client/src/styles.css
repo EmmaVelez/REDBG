@@ -317,34 +317,35 @@ h1, h2 { margin: 0 0 8px; }
     linear-gradient(var(--cc-line), var(--cc-line)) calc(100% - 4px) calc(100% - 4px) / 2px 2px no-repeat;
 }
 
-.card-character .cc-head {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 14px;
-  padding: 1px 0 3px;
+/* The live health ring is overlaid on the Health badge printed on the card
+   scan, so the card needs no header row and no name bar. Badge geometry was
+   measured on the 320x456 CH art (centre ~(287,35), ~40px across); the promo
+   art is the shorter 320x292 window so its badge sits higher. The percentages
+   resolve against .card-portrait, whose aspect ratio matches the art, so the
+   overlay tracks the card at any size. */
+.card-character {
+  --cc-badge-x: 89.7%;
+  --cc-badge-y: 7.7%;
+  /* ~1.5x the printed badge (which is 12.5% of the art width) so the live
+     ring is legible at hand-card size while still sitting on the badge */
+  --cc-badge-size: 18%;
 }
-.card-character .card-type {
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: var(--cc-line);
-  text-shadow: none;
+.card-character.card-promo {
+  --cc-badge-x: 89.5%;
+  --cc-badge-y: 4.5%;
+  --cc-badge-size: 18%;
 }
-.card-character .cc-hp {
+.card-character .cc-hp-ring {
   position: absolute;
-  right: 0;
-  top: 1px;
-  font-size: 8px;
-  font-weight: 700;
-  color: #ffd9d9;
-  background: #7d1116;
-  border: 1px solid #000;
-  padding: 0 2px;
+  left: var(--cc-badge-x);
+  top: var(--cc-badge-y);
+  width: var(--cc-badge-size);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none;
 }
-.card-character .cc-hp-ring { position: absolute; right: -1px; top: 0; }
+.card-character .cc-hp-ring svg { width: 100%; height: 100%; display: block; }
 
 /* art window — portrait artwork to be supplied later */
 .card-character .card-portrait {
@@ -372,26 +373,7 @@ h1, h2 { margin: 0 0 8px; }
 }
 .card-character .card-portrait::after { content: 'Art'; opacity: 0.55; color: #8b93a3; }
 
-/* red name on a maroon bar */
-.card-character .card-name {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
-  background: linear-gradient(180deg, #7a1218 0%, #4c0a0f 100%);
-  border: 1px solid #000;
-  border-top-width: 0;
-  color: #ff4242;
-  text-shadow: 0 1px 0 #000;
-  text-align: center;
-  text-transform: uppercase;
-  font-weight: 800;
-  font-size: 9px;
-  letter-spacing: 0.5px;
-  padding: 2px 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* the name bar is gone: the card scan already prints the character's name */
 
 /* pale rules panel */
 .card-character .card-skills,
@@ -475,12 +457,16 @@ h1, h2 { margin: 0 0 8px; }
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
 }
 
-/* character popup keeps the pixel frame but scales the type up */
-.hover-card-pop .card-character .card-type { font-size: 11px; }
-.hover-card-pop .card-character .cc-hp { font-size: 10px; top: 2px; right: 1px; }
-.hover-card-pop .card-character .cc-hp-ring svg { width: 34px; height: 34px; }
+/* character popup keeps the pixel frame; the ring scales with the card.
+   The popup is an enlarged reading copy, so it must NOT inherit the
+   hand-card size of the on-board character card. */
+.hover-card-pop .card.card-character {
+  /* wide enough that the skill text wraps at a readable line length — at the
+     old 140px it broke almost every word onto its own line */
+  width: 200px;
+  aspect-ratio: auto;
+}
 .hover-card-pop .card-character .card-portrait::after { font-size: 12px; }
-.hover-card-pop .card-character .card-name { font-size: 14px; padding: 3px 6px; letter-spacing: 2px; }
 .hover-card-pop .card-character .card-skills,
 .hover-card-pop .card-character .card-text { font-size: 11px; padding: 6px; gap: 5px; }
 .hover-card-pop .card-character .skill-box { font-size: 12px; padding: 2px 5px; min-width: 42px; gap: 4px; }
@@ -627,7 +613,9 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 0;
   padding-top: 0;
 }
-.player-character-card .card { width: 140px; min-height: 82px; }
+/* character cards match the hand cards (80px, see
+   .action-hand-scroll .hand-card .card) */
+.player-character-card .card { width: 80px; min-height: 0; }
 
 /* ---- character skill list ---- */
 .card-skills {
@@ -1809,7 +1797,7 @@ h1, h2 { margin: 0 0 8px; }
   margin-top: 0;
   padding-top: 0;
 }
-.app-action-dock .player-character-card .card { width: 100px; min-height: 0; }
+.app-action-dock .player-character-card .card { width: 80px; min-height: 0; }
 .app-action-dock .player-partner-hp,
 .app-action-dock .player-partner-attached { font-size: 9px; white-space: nowrap; }
 /* deck / discard read as labelled boxes under their header */

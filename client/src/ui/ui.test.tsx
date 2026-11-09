@@ -345,13 +345,18 @@ describe('CardView (T03)', () => {
     expect(earned).toContain('skill-locked');
   });
 
-  it('renders a character card with max HP when non-compact and undecorated', () => {
+  it('renders a non-compact character card with its skill list', () => {
     const charDef = PREMIER_CARDS.find(c => c.type === 'character');
     expect(charDef).toBeDefined();
     if (charDef === undefined) return;
-    const html = renderToStaticMarkup(<CardView def={charDef} />);
-    expect(html).toContain('CHARACTER');
-    expect(html).toContain(String(charDef.maxHp ?? -1));
+    const html = renderToStaticMarkup(<CardView def={charDef} decorations={0} />);
+    expect(html).toContain('card-character');
+    expect(html).toContain('card-skills');
+    expect(html).toContain(`data-card-id="${charDef.id}"`);
+    // the [CHARACTER] banner and the name bar are gone: both are printed on the
+    // card art itself, so the app no longer duplicates them
+    expect(html).not.toContain('cc-head');
+    expect(html).not.toContain('card-name');
   });
 });
 
@@ -424,7 +429,8 @@ describe('PlayerPanel (T06)', () => {
     expect(html).toContain('player-character-card');
     expect(html).toContain(`data-card-id="${charDef.id}"`);
     expect(html).toContain(charDef.name);
-    expect(html).toContain('CHARACTER');
+    // the [CHARACTER] banner is printed on the art, not drawn by the app
+    expect(html).not.toContain('cc-head');
     // panel order: player info rows come before the character card
     const infoIdx = html.indexOf('player-pools');
     const charIdx = html.indexOf('player-character-card');

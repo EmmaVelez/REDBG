@@ -100,20 +100,18 @@ function CharacterCard({ def, compact, decorations, hp, maxHp, art }: CharacterC
   const levels = def.levels ?? [];
   return (
     <div className={`card card-character${def.set === 'promo' ? ' card-promo' : ''}`} data-card-id={def.id} data-card-type="character" data-has-art={art !== undefined || undefined}>
-      <div className="cc-head">
-        <span className="card-type">[{typeLabel(def.type)}]</span>
-        {showRing ? (
-          <span className="cc-hp-ring"><HealthRing hp={hp} maxHp={maxHp} size={compact ? 18 : 26} strokeWidth={4} /></span>
-        ) : !compact && def.maxHp !== undefined ? (
-          <span className="cc-hp">HP {def.maxHp}</span>
-        ) : null}
-      </div>
       <div className={`card-portrait${art !== undefined ? ' card-portrait-has-art' : ''}`}>
         {art !== undefined && (
           <img className="card-portrait-img" src={art} alt="" draggable={false} loading="lazy" decoding="async" />
         )}
+        {/* The character card scan already prints the [CHARACTER] banner, the
+            name and the Health badge, so the app draws none of those. The live
+            ring is overlaid on the printed badge instead of sitting in a header
+            row — see the --cc-badge-* custom properties in styles.css. */}
+        {showRing && (
+          <span className="cc-hp-ring"><HealthRing hp={hp} maxHp={maxHp} size={compact ? 24 : 26} strokeWidth={compact ? 3 : 6} /></span>
+        )}
       </div>
-      <div className="card-name">{def.name}</div>
       {!compact && (decorations !== undefined && levels.length > 0 ? (
         <div className="card-skills" data-decorations={decorations} data-level1-at={level1At} data-level2-at={level2At}>
           {levels.map(entry => {
