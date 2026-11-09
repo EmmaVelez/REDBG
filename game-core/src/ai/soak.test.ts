@@ -37,11 +37,12 @@ const MAX_ACTIONS = 4000;
 function zoneInstanceIds(state: GameState): string[] {
   const ids: string[] = [];
   for (const seat of state.seats) {
-    ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached, ...(seat.infectionCards ?? []), ...(seat.partnerAttached ?? []));
+    ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached, ...(seat.counters ?? []), ...(seat.infectionCards ?? []), ...(seat.partnerAttached ?? []));
   }
   for (const pile of Object.values(state.marketPiles)) ids.push(...pile.cards);
   ids.push(...state.mansionDeck, ...state.mansionBottom);
   ids.push(...(state.infectionDeck ?? []));
+  ids.push(...(state.supply ?? []));
   return ids;
 }
 

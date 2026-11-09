@@ -53,6 +53,10 @@ function describe(state: GameState, action: Action): string {
       return name !== null ? `${VERBS[action.type]} ${name}` : VERBS[action.type];
     }
     case 'buy': {
+      // Prefer the physical card the engine recorded on the log entry: a
+      // single-card pile is empty by the time the history is rendered.
+      const named = cardName(state, action.instanceId);
+      if (named !== null) return `${VERBS.buy} ${named}`;
       const pile = state.marketPiles[action.pileId];
       if (pile !== undefined && pile.cards.length > 0) {
         const top = cardName(state, pile.cards[0]);

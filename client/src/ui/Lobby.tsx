@@ -74,8 +74,10 @@ function ScenarioDropdown(props: {
 }
 
 /**
- * Expandable Custom Cards picker — the fan-made card line (MX-001..).
- * Every selected card is shuffled into the Mansion deck for this game.
+ * Expandable Custom Cards picker — the fan-made card line (MX-001.., EX-001..).
+ * Selected cards join the game: Infected and Storage/Box tokens go to the
+ * Mansion deck, Characters enter the deal pool, cost-bearing cards get their
+ * own Resource Area pile, and counters sit in a shared board supply.
  * A native <details> keeps it expandable with no local state.
  */
 function CustomCardsPicker(props: {
@@ -89,7 +91,7 @@ function CustomCardsPicker(props: {
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
-      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected are shuffled into the Mansion deck, Characters enter the deal pool.</p>
+      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected and Storage/Box tokens are shuffled into the Mansion deck, Characters enter the deal pool, cost-bearing cards get their own Resource Area pile, and the Poison counter sits in a shared supply.</p>
       {CUSTOM_CARDS.map(c => (
         <label key={c.id} className="custom-card-row">
           <input

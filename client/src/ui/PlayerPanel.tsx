@@ -64,6 +64,17 @@ export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = tr
         <span title="Discard pile">Discard {player.discard.length}</span>
         <span title="Hand">Hand {player.hand.length}</span>
       </div>
+      {(player.counters ?? []).length > 0 && (
+        <div className="player-row player-counters" data-player-counters>
+          <span className="player-zone-label">Counters</span>
+          <div className="player-public-cards">
+            {(player.counters ?? []).map(id => {
+              const def = defForInstance(state, id);
+              return def === null ? null : <CardView key={id} def={def} compact />;
+            })}
+          </div>
+        </div>
+      )}
       {!isMe && (
         <div className="player-public-zones" data-public-zones>
           <div className="player-public-row">

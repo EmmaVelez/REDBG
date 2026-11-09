@@ -32,6 +32,12 @@ export function typeLabel(t: CardDef['type']): string {
       return 'TOKEN';
     case 'infected':
       return 'INFECTED';
+    case 'event':
+      return 'EVENT';
+    case 'skill':
+      return 'SKILL';
+    case 'counter':
+      return 'COUNTER';
     default:
       return '';
   }
@@ -54,6 +60,12 @@ export function typeClass(t: CardDef['type']): string {
       return 'card-token';
     case 'infected':
       return 'card-infected';
+    case 'event':
+      return 'card-event';
+    case 'skill':
+      return 'card-skill';
+    case 'counter':
+      return 'card-counter';
     default:
       return '';
   }

@@ -139,4 +139,110 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'healOnDefeatWithWeaponTag', tag: 'shotgun', heal: 5, level: 2 },
     ],
   },
+
+  // --- Unofficial Expansion 1 (EX-001..EX-009) ---
+  // Manny's rulings (2026-11-09):
+  // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).
+  // - EX-002: "when gained attach it to your character. the next time an
+  //   infected with 80 or more health is revealed while exploring, defeat it
+  //   immediately and remove this card from the game" (the printed text was
+  //   wrong; the 80 threshold is the INFECTED's Health, not the Character's).
+  // - EX-005 grants +50 Ammo AND +50 Gold (two bonus icons).
+  // - EX-007 returns to its OWN market pile and can be bought again.
+  // - EX-009 is a new 'counter' type kept in a shared board supply; it returns
+  //   there when the attached Character dies.
+  {
+    id: 'ex-001',
+    name: 'Special Rocket Launcher Case',
+    type: 'token',
+    set: 'custom',
+    text: 'Gain 1 "Special Rocket Launcher." Remove this card from the game afterward.',
+    copies: 1,
+    tokenEffects: [{ kind: 'gainCardAndRemoveToken', cardId: 'ex-002' }],
+  },
+  {
+    id: 'ex-002',
+    name: 'Special Rocket Launcher',
+    type: 'weapon',
+    set: 'custom',
+    text: 'When gained, attach this weapon to your Character. The next time an Infected with 80 or more Health is Revealed while Exploring, defeat it immediately and remove this card from the game.',
+    copies: 1,
+    cost: 130,
+    ammoReq: 0,
+    damage: 0,
+    weaponTags: ['explosive'],
+    weaponEffects: [{ kind: 'attachOnGainDefeatInfectedAtOrAboveHp', hp: 80 }],
+  },
+  {
+    id: 'ex-003',
+    name: 'Weapon Case',
+    type: 'token',
+    set: 'custom',
+    text: 'Gain any weapon from the "Resource Area". Remove this card from the game afterward.',
+    copies: 1,
+    tokenEffects: [{ kind: 'gainAnyWeaponAndRemoveToken' }],
+  },
+  {
+    id: 'ex-004',
+    name: 'Ammunition Box',
+    type: 'token',
+    set: 'custom',
+    text: 'Gain 1 "Ammo x50" card. Remove this card from the game afterward.',
+    copies: 1,
+    tokenEffects: [{ kind: 'gainCardAndRemoveToken', cardId: 'ex-005' }],
+  },
+  {
+    id: 'ex-005',
+    name: 'Ammo x50',
+    type: 'ammunition',
+    set: 'custom',
+    text: '+50 Ammo. +50 Gold.',
+    copies: 1,
+    cost: 90,
+    bonuses: { ammo: 50, gold: 50 },
+  },
+  {
+    id: 'ex-006',
+    name: 'Web Spinner',
+    type: 'infected',
+    set: 'custom',
+    text: 'If this "Infected" is not defeated, attach a "Poison" counter to the Character who initiated the Exploration.',
+    copies: 2,
+    hp: 35,
+    attack: 10,
+    decorations: 3,
+    infectedEffects: [{ kind: 'onNotDefeatedAttachCounter', counterCardId: 'ex-009' }],
+  },
+  {
+    id: 'ex-007',
+    name: 'Blue Herb',
+    type: 'item',
+    set: 'custom',
+    text: 'Return this Blue Herb to the "Resource Area" and remove all Poison counters from all your Characters.',
+    copies: 1,
+    cost: 20,
+    itemEffects: [{ kind: 'returnToMarketAndRemoveCounters' }],
+  },
+  {
+    id: 'ex-008',
+    name: 'Yawn',
+    type: 'infected',
+    set: 'custom',
+    text: 'If this "Infected" is not defeated, attach a "Poison" counter to the Character who initiated the Exploration.',
+    copies: 2,
+    hp: 50,
+    attack: 20,
+    decorations: 5,
+    infectedEffects: [{ kind: 'onNotDefeatedAttachCounter', counterCardId: 'ex-009' }],
+  },
+  {
+    id: 'ex-009',
+    name: 'Poison',
+    type: 'counter',
+    set: 'custom',
+    text: 'A maximum of one "Poison" counter may be attached to a Character.\nWhile this card is attached to a Character, that Character takes 5 damage at the beginning of each turn.\nIf the Character dies, return this card to the "Resource Area".',
+    copies: 1,
+    cost: 0,
+    counterEffects: [{ kind: 'damageAtTurnStart', amount: 5 }],
+  },
 ];

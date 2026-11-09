@@ -446,6 +446,30 @@ describe('PlayerPanel (T06)', () => {
     expect(html).toContain('(dead)');
   });
 
+  it('renders attached counters (Unofficial Expansion Poison)', () => {
+    const state = twoPlayerState();
+    const withCounter = {
+      ...state,
+      seats: state.seats.map((s, i) => (i === 0 ? { ...s, counters: ['ex-009#1'] } : s)),
+    };
+    const html = renderToStaticMarkup(<PlayerPanel state={withCounter} seat={0} isMe />);
+    expect(html).toContain('data-player-counters');
+    expect(html).toContain('Counters');
+    // no counters -> no row
+    const plain = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
+    expect(plain).not.toContain('data-player-counters');
+  });
+
+  it('renders the shared counter supply on the board', () => {
+    const state = twoPlayerState();
+    const withSupply = { ...state, supply: ['ex-009#1'] };
+    const html = renderToStaticMarkup(<Board state={withSupply} mySeat={0} onAction={() => { /* noop */ }} />);
+    expect(html).toContain('Counter supply');
+    expect(html).toContain('data-anim-zone="supply"');
+    const plain = renderToStaticMarkup(<Board state={state} mySeat={0} onAction={() => { /* noop */ }} />);
+    expect(plain).not.toContain('Counter supply');
+  });
+
   it('renders the character as a card beneath the player info', () => {
     const state = twoPlayerState();
     const player = state.seats[0];

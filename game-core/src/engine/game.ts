@@ -1,12 +1,13 @@
 import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt, SkillDraftState } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
-import { levelForDecorations, revive, abilitiesForLevel } from './characters';
+import { levelForDecorations, revive, abilitiesForLevel, flipDown } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
+import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
@@ -502,6 +503,20 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   }
   const shuffledSkills: readonly string[] = skillIds.length > 0 ? rngShuffle(skillIds) : [];
 
+  // Unofficial Expansion: the shared counter supply (EX-009 Poison). Counter
+  // cards are never in the market or the Mansion — they live here until an
+  // Infected effect attaches one to a Character, and return here when that
+  // Character dies ("return this card to the Resource Area").
+  const counterDefs = cards.filter(c => c.type === 'counter');
+  const supplyIds: string[] = [];
+  for (const def of counterDefs) {
+    for (let j = 0; j < def.copies; j++) {
+      const id = `${def.id}#${j + 1}`;
+      supplyIds.push(id);
+      register(id, def.id, 'supply');
+    }
+  }
+
   const baseState: GameState = {
     version: 1,
     seed: setup.seed,
@@ -521,6 +536,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     log: [],
     ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
     ...(winInfectedCardId !== undefined ? { endInfectedCardId: winInfectedCardId } : {}),
+    supply: supplyIds,
   };
 
   if (setup.skillSystem !== true) {
@@ -582,7 +598,65 @@ function startTurnInternal(state: GameState): GameState {
     return state;
   }
 
-  const player = state.seats[state.activeSeat] as PlayerState;
+  // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of
+  // the attached Character's turn, before anything else. Reaching 0 Health
+  // downs the Character, which skips the rest of this turn; it revives (at
+  // -20 max Health) at the start of its NEXT turn via the normal downed path.
+  let player = state.seats[state.activeSeat] as PlayerState;
+  const poison = poisonDamageAtTurnStart(state, player);
+  if (poison > 0 && !player.downed && !player.dead) {
+    const newHp = player.hp - poison;
+    if (newHp <= 0) {
+      let poisonRng = state.rngState;
+      const flipResult = flipDown(
+        {
+          hp: player.hp,
+          maxHp: player.maxHp,
+          decorations: player.decorations,
+          level: player.level,
+          downed: player.downed,
+          dead: player.dead,
+          hand: player.hand,
+          discard: player.discard,
+          inventory: player.inventory,
+        },
+        (items) => {
+          const r = shuffle(makeRng(poisonRng), items);
+          poisonRng = r.rng.s;
+          return r.value;
+        },
+      );
+      const downedState: GameState = {
+        ...state,
+        rngState: poisonRng,
+        seats: state.seats.map(x => (x.seat === player.seat
+          ? { ...player, hp: 0, downed: flipResult.downed, hand: flipResult.hand, discard: flipResult.discard, inventory: flipResult.inventory }
+          : x)),
+      };
+      // The Character is face down: its turn ends here (no revive yet).
+      const aliveSeats = downedState.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
+      const ctx = advanceTurn({
+        seatCount: downedState.seats.length,
+        activeSeat: downedState.activeSeat,
+        turnNumber: downedState.turnNumber,
+        aliveSeats,
+      });
+      return {
+        ...downedState,
+        version: downedState.version + 1,
+        activeSeat: ctx.activeSeat,
+        turnNumber: ctx.turnNumber,
+      };
+    }
+    if (newHp !== player.hp) {
+      state = {
+        ...state,
+        seats: state.seats.map(x => (x.seat === player.seat ? { ...x, hp: newHp } : x)),
+      };
+      player = state.seats[state.activeSeat] as PlayerState;
+    }
+  }
+
   const charInst = state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
 
@@ -688,6 +762,7 @@ function startTurnInternal(state: GameState): GameState {
       maxHp: ch.maxHp,
       downed: ch.downed,
       dead: ch.dead,
+      ...(ch.dead ? { counters: [] } : {}),
       hand: d.hand,
       inventory: d.deck,
       discard: d.discard,
@@ -717,11 +792,15 @@ function startTurnInternal(state: GameState): GameState {
       aliveSeats,
     });
 
+    // Unofficial Expansion: a Character who dies returns its counters to the
+    // shared supply ("return this card to the Resource Area").
+    const deathState = ch.dead ? returnCountersToSupply(state, player.seat) : state;
+
     return {
-      ...state,
+      ...deathState,
       version: state.version + 1,
       rngState: d.rngState,
-      seats: state.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
+      seats: deathState.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
       activeSeat: ctx.activeSeat,
       turnNumber: ctx.turnNumber,
     };

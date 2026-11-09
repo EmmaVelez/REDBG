@@ -26,7 +26,8 @@ export type CardType =
   | "token"      // Mansion-only cases (Rocket Launcher Case, Gatling Gun Case)
   | "infected"  // Mansion-only creatures
   | "event"     // Mansion-only events
-  | "skill";    // Mercenaries Skill System (SK-001..SK-030)
+  | "skill"     // Mercenaries Skill System (SK-001..SK-030)
+  | "counter";  // Unofficial Expansion: shared-supply counters (Poison)
 
 /** Zones a card instance can live in. */
 export type CardZone =
@@ -39,6 +40,7 @@ export type CardZone =
   | "discard"
   | "infectionDeck" // Outbreak: face-down Infection Deck
   | "skillArea" // Mercenaries: Skill cards in a player's Skill Area
+  | "supply"      // Unofficial Expansion: shared counter supply by the board
   | "removed";     // removed from the game
 
 export interface CardLocation {
@@ -138,6 +140,10 @@ export interface CardDef {
   readonly skillLevel?: number;
   /** Machine-readable effect keys (see SkillEffect). */
   readonly skillEffects?: readonly SkillEffect[];
+
+  // -- counter (Unofficial Expansion) --
+  /** Machine-readable effect keys (see CounterEffect). */
+  readonly counterEffects?: readonly CounterEffect[];
 }
 
 /**
@@ -187,6 +193,8 @@ export type WeaponEffect =
   | { readonly kind: "revealFromMansionBottom" } // WE-019 Telescopic Sight Rifle
   | { readonly kind: "discardPistolsForDamage"; readonly amount: number } // WE-025 Blowback Pistol
   | { readonly kind: "trashAmmoFromPlayAreaOnUse"; readonly count: number } // WE-030 Hand Cannon
+  // --- Unofficial Expansion (EX-002 Special Rocket Launcher) ---
+  | { readonly kind: "attachOnGainDefeatInfectedAtOrAboveHp"; readonly hp: number } // EX-002: attach on gain; auto-defeat the next Infected with hp >= N revealed while exploring, then remove
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -247,7 +255,8 @@ export type InfectedEffect =
   // --- Custom card line (MX-001..) ---
   | { readonly kind: "onNotDefeatedInsertIntoMansionAt"; readonly position: number } // MX-001 Mr. X
   | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
-  | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
+  // --- Unofficial Expansion (EX-006/EX-008) ---
+  | { readonly kind: "onNotDefeatedAttachCounter"; readonly counterCardId: string } // EX-006 Web Spinner / EX-008 Yawn: attach a Poison counter to the exploring Character
 
 export type ItemEffect =
   | { readonly kind: "healFixed20OrTrashWithSecondFor60" }                   // Green Herb
@@ -258,7 +267,9 @@ export type ItemEffect =
   | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number } // Hidden Treasure
   // --- Outbreak items (MA-054o..MA-055o) ---
   | { readonly kind: "attachAndPreventDamageByMovingToMansionBottom" } // MA-054o Kevlar Jacket
-  | { readonly kind: "antivirusReduceInfectionOrRemove"; readonly threshold: number; readonly amount: number }; // MA-055o Antivirus
+  | { readonly kind: "antivirusReduceInfectionOrRemove"; readonly threshold: number; readonly amount: number } // MA-055o Antivirus
+  // --- Unofficial Expansion (EX-007 Blue Herb) ---
+  | { readonly kind: "returnToMarketAndRemoveCounters" }; // EX-007: return this card to its own market pile; remove all Poison counters from your Characters
 
 export type ActionEffect =
   | { readonly kind: "allWeaponsPlusDamageThisTurn"; readonly amount: number } // Deadly Aim: +10
@@ -326,7 +337,15 @@ export type ActionEffect =
   | { readonly kind: "discardInventoryUntilWeaponForDamage"; readonly amount: number }; // AC-051 Tear Gas
 
 export type TokenEffect =
-  | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string }; // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
+  | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
+  // --- Unofficial Expansion (EX-001/003/004) ---
+  | { readonly kind: "gainCardAndRemoveToken"; readonly cardId: string } // EX-001 -> ex-002, EX-004 -> ex-005
+  | { readonly kind: "gainAnyWeaponAndRemoveToken" }; // EX-003: choose any weapon from the Resource Area
+
+/** Unofficial Expansion counters — cards kept in the shared board supply and
+ *  attached to a Character (Poison). Max one of each counter per Character. */
+export type CounterEffect =
+  | { readonly kind: "damageAtTurnStart"; readonly amount: number }; // EX-009 Poison: 5 damage at the start of the attached Character's turns
 
 /**
  * Mercenaries Skill System effects. A Skill is active once the XP on it reaches
@@ -562,6 +581,11 @@ export interface PlayerState {
   /** Instance ids of defeated Infected attached under the Character (trophies). */
   readonly attached: readonly string[];
 
+  /** Unofficial Expansion: counter instances attached to this Character
+   *  (Poison). Kept separate from `attached` so trophy/Decoration math is
+   *  untouched; max one of each counter per Character. */
+  readonly counters?: readonly string[];
+
   /** Partner character instance id, if any. */
   readonly partnerInstanceId?: string;
   /** Cards attached to the partner (max 2 unless stated). */
@@ -724,6 +748,11 @@ export interface GameState {
   /** Removed-from-game cards. */
   readonly removed: readonly string[];
 
+  /** Unofficial Expansion: the shared counter supply by the board (instance
+   *  ids). A counter cycles between here and a Character's `counters`; when
+   *  the Character dies it returns here ("return to the Resource Area"). */
+  readonly supply?: readonly string[];
+
   /** Outbreak: the Infection Deck (face down above the Mansion). */
   readonly infectionDeck?: readonly string[];
   /** Scenario win trigger: the game ends when this Infected is Defeated
@@ -813,7 +842,7 @@ export type Action =
    */
   | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string; readonly infectionCardIds?: readonly string[] }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
-  | { readonly type: "buy"; readonly seat: number; readonly pileId: string }
+  | { readonly type: "buy"; readonly seat: number; readonly pileId: string; readonly instanceId?: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
   | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }

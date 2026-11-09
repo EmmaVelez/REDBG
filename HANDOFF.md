@@ -1,5 +1,71 @@
 # HANDOFF — resume here
 
+**UNOFFICIAL EXPANSION 1 — EX-001..EX-009 (2026-11-09):** Manny supplied a 3x3
+sheet of nine fan cards ("UNOFFICIAL EXPANSION - 1"). Transcribed with the LOCAL
+Ollama vision model (`SetneufPT/Gemma4-12B-IT-QAT_Q4_64K_16GB-GPU`, vision-capable)
+because `vision_analyze` was 429-rate-limited all session; the printed codes were
+read from per-card bottom-right corner crops (EX-004..009 read in one montage,
+EX-001..003 from a top-row strip — the full-card reads pattern-completed the
+numbers). **Rulings (Manny, 2026-11-09):**
+- **[STORAGE] and [BOX] cards are MANSION TOKENS** (like ma-012/ma-013).
+- **EX-002 Special Rocket Launcher**: the printed text is WRONG. Corrected to
+  "when gained attach it to your character. the next time an infected with 80 or
+  more health is revealed while exploring, defeat it immediately and remove this
+  card from the game" — the 80 threshold is the **INFECTED's** Health, not the
+  Character's.
+- **EX-005 Ammo x50** grants **+50 Ammo AND +50 Gold** (two bonus icons).
+- **EX-007 Blue Herb** returns to its OWN market pile and can be bought again.
+- **EX-009 Poison** is a **new 'counter' card type kept in a shared supply by the
+  board**; it returns there when the attached Character dies.
+- **Copies: 2 each for the two Infected (EX-006/008), 1 each for everything else**
+  (the copies question was skipped; this is the implemented default — change
+  `copies` in `data/custom.ts` if Manny wants otherwise).
+- "Conditions" on EX-006/008 maps to the engine's **Decorations**.
+
+**What was built:** `CardType 'counter'` + `CardZone 'supply'` + `PlayerState.counters`
++ `GameState.supply` + `CardDef.counterEffects`; `engine/counters.ts`
+(`poisonDamageAtTurnStart` / `attachCounterToSeat` / `returnCountersToSupply`);
+new effect kinds `gainCardAndRemoveToken`, `gainAnyWeaponAndRemoveToken` (token),
+`attachOnGainDefeatInfectedAtOrAboveHp` (weapon), `onNotDefeatedAttachCounter`
+(infected), `returnToMarketAndRemoveCounters` (item), `damageAtTurnStart` (counter).
+**Custom MARKET cards are new plumbing**: `pilesForScenario(id, { customCards })`
+gives every selected custom card that prints a cost its own `custom-<id>` pile
+(EX-002/005/007); counters and mansion cards are excluded. `cardsForScenario`
+pulls in a counter that a selected card references (EX-006/008 -> EX-009) even if
+the room did not tick it. `setup()` seeds the shared supply from every `counter`
+card in the list.
+- **EX-002** attaches in `gainCard` (the single gain choke point) and fires from
+  BOTH explore paths — the single explore overrides the outcome, the multi-explore
+  filters the auto-defeated Infected out of the batch (`autoDefeatedEntries`) and
+  still awards its Decorations/trophy. It does NOT fire from the ally-explore path.
+- **EX-006/008** attach the counter in the single-explore, multi-explore AND both
+  AC-042/Las-Plagas deferred (`pendingExplore`) resolvers. Max one per Character.
+- **EX-009** deals its damage at the very top of `startTurnInternal`, BEFORE the
+  downed check; a lethal hit downs the Character and ENDS the turn (revive is next
+  turn via the normal downed path). Death returns the counter to the supply.
+- **EX-007** returns to its home pile. **PITFALL FOUND BY THE SOAK**: a
+  single-card pile is EMPTY once bought, so scanning the piles for a surviving
+  copy of the card found nothing and the herb was orphaned in NO zone — the lookup
+  now falls back to the `custom-<id>` convention (and removes the card if there is
+  no home pile at all, so it can never orphan).
+- **BONUS FIX**: the action log said `bought (custom-ex-007)` for single-card
+  piles. `Action.buy` now carries an optional `instanceId`; the buy handler writes
+  the physical card onto the log entry and `turnHistory.ts` prefers it.
+- **UI**: `typeLabel`/`typeClass` gained counter/event/skill; PlayerPanel renders
+  a `data-player-counters` row; Board renders a `Counter supply` pile; the lobby
+  hint explains where each custom card goes.
+- **Art**: `CARD-ART/EX-001..EX-009.png` sliced from the sheet (3x3 grid, even
+  division + 3px inset, quantized to 256 colours) — verified in the browser.
+- **Gates**: typecheck clean (3 workspaces), game-core **821**, server **102**,
+  client **171**, vite build OK. `engine/unofficialExpansion.test.ts` (**20**
+  tests) covers every card + a 3-seed full bot game asserting conservation and
+  counter cycling. Browser-verified on the prod server: the picker lists all 9,
+  the 3 new piles render with art, the Counter supply renders, a buy logs the card
+  name, and an explore resolves.
+- **Still open:** the ally-explore path (`engine/allyExplore.ts`) does not apply
+  EX-002/EX-006/EX-008 effects; the counters are only on the MAIN Character (a
+  leading partner cannot receive Poison, and Blue Herb clears only the seat's main
+  Character); EX-002 is buyable at 130 as well as granted by EX-001.
 **OWN PANEL REMOVED, FULL ABILITY TEXT, HOVER CARD ON TOP (2026-11-09, commit pending):** three changes.
 1. **The viewing player's `PlayerPanel` is gone from `.board-players`.** `Board.tsx` now renders panels
    only for `player.seat !== mySeat`. Their character/partner cards, HP, decorations, resources, deck

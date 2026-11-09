@@ -559,12 +559,31 @@ export const NIGHTMARE_SCENARIO_DEF = {
   winInfectedCardId: 'ma-054',
 };
 
-export function pilesForScenario(id: ScenarioId): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
+export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[] }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
   const found = SCENARIOS.find(s => s.id === id);
   if (found === undefined) {
     throw new Error(`unknown scenario: ${String(id)}`);
   }
-  return found.piles;
+  const base = found.piles;
+  if (opts?.customCards === undefined) {
+    return base;
+  }
+  // Unofficial Expansion: custom cards that print a cost are REAL market cards
+  // (EX-002/005/007) and need their own Resource Area pile. Infected/token/event
+  // customs go to the Mansion (see setup), counters (EX-009) go to the shared
+  // board supply, and characters/skills are never piled.
+  const known = new Set(base.flatMap(p => p.cardIds));
+  const extra: { pileId: string; cardIds: readonly string[] }[] = [];
+  for (const cardId of opts.customCards) {
+    const def = CUSTOM_CARDS.find(c => c.id === cardId);
+    if (def === undefined) continue;
+    if (def.type === 'counter' || def.type === 'infected' || def.type === 'token' || def.type === 'event') continue;
+    if (def.type === 'character' || def.type === 'skill') continue;
+    if (def.cost === undefined) continue;
+    if (known.has(def.id)) continue;
+    extra.push({ pileId: `custom-${def.id}`, cardIds: [def.id] });
+  }
+  return [...base, ...extra];
 }
 
 export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [
@@ -653,7 +672,18 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
   // option names them. They are NOT part of ALL_CARDS, so this option is the
   // only way they reach a game.
   if (opts?.customCards !== undefined) {
+    // A selected card may depend on another custom card (EX-006/EX-008 attach a
+    // Poison counter, EX-009), so pull the dependency in even when the room did
+    // not tick it explicitly.
+    const wanted = new Set(opts.customCards);
     for (const cardId of opts.customCards) {
+      const def = CUSTOM_CARDS.find(c => c.id === cardId);
+      if (def === undefined) continue;
+      for (const e of def.infectedEffects ?? []) {
+        if (e.kind === 'onNotDefeatedAttachCounter') wanted.add(e.counterCardId);
+      }
+    }
+    for (const cardId of wanted) {
       const def = CUSTOM_CARDS.find(c => c.id === cardId);
       if (def !== undefined && !known.has(def.id)) extras.push(def);
     }

@@ -57,12 +57,56 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
+import { attachCounterToSeat, returnCountersToSupply } from './counters';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
   const inst = state.cards[instanceId];
   if (!inst) return undefined;
   return state.cardDefs[inst.cardId];
+}
+
+/** Every weapon instance currently in a Resource Area pile (EX-003 Weapon Case,
+ *  which lets the taker choose any weapon from the Resource Area). */
+function marketWeaponIds(state: GameState): string[] {
+  const out: string[] = [];
+  for (const pile of Object.values(state.marketPiles)) {
+    for (const id of pile.cards) {
+      if (cardDef(state, id)?.type === 'weapon') out.push(id);
+    }
+  }
+  return out;
+}
+
+/**
+ * Unofficial Expansion: EX-002 Special Rocket Launcher. While attached to the
+ * exploring Character, the launcher auto-defeats the next Infected with `hp` or
+ * more Health revealed during an explore, then is removed from the game.
+ * Returns the launcher instance id to remove, or undefined when it does not fire.
+ */
+function specialRocketLauncherId(state: GameState, seat: number, revealed: CardDef): string | undefined {
+  if (revealed.type !== 'infected') return undefined;
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  for (const id of player.attached) {
+    const def = cardDef(state, id);
+    const eff = (def?.weaponEffects ?? []).find(e => e.kind === 'attachOnGainDefeatInfectedAtOrAboveHp');
+    if (eff !== undefined && eff.kind === 'attachOnGainDefeatInfectedAtOrAboveHp' && (revealed.hp ?? 0) >= eff.hp) {
+      return id;
+    }
+  }
+  return undefined;
+}
+
+/** Remove the EX-002 launcher from the exploring Character and the game. */
+function consumeSpecialRocketLauncher(state: GameState, seat: number, launcherId: string): GameState {
+  return {
+    ...state,
+    removed: [...state.removed, launcherId],
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, attached: s.attached.filter(id => id !== launcherId) }
+      : s)),
+  };
 }
 
 /**
@@ -916,6 +960,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       let partnerHp = played.player.partnerInstanceId ? (state.seats[seat] as PlayerState).hp : played.player.hp;
                       let trashGreenHerbId: string | undefined;
                       let healPartner = false;
+                      let returnToMarket = false;
                 for (const e of def.itemEffects ?? []) {
                         if (e.kind === 'healToFull') {
                           hp = played.player.maxHp;
@@ -930,6 +975,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                             hp = played.player.maxHp;
                             healPartner = true;
                           }
+                        } else if (e.kind === 'returnToMarketAndRemoveCounters') {
+                          // Unofficial Expansion: EX-007 Blue Herb returns to its
+                          // own market pile (reusable) instead of being removed.
+                          returnToMarket = true;
                         }
                       }
                 // Claire Redfield (Alliance): L1 +amount damage when a Green or
@@ -979,11 +1028,44 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         });
         // heal partner: partner is part of same player's partnerInstanceId; if partner exists, heal them via partner HP? Partner HP stored on player? 
       }
+      // Unofficial Expansion: EX-007 Blue Herb returns to its OWN market pile
+      // (so it can be bought again) instead of being removed, and every Poison
+      // counter on the player's Character returns to the shared supply.
+      let finalMarketPiles = state.marketPiles;
+      let finalCards = state.cards;
+      if (returnToMarket) {
+        // Its home pile. Custom cards get a `custom-<id>` pile, but a
+        // single-card pile is EMPTY once the only copy has been bought, so
+        // scanning for a surviving copy is not enough — fall back to the
+        // convention. With no home pile at all the herb is simply removed
+        // (never orphaned in no zone).
+        const pileId = Object.values(state.marketPiles)
+          .find(p => p.cards.some(id => state.cards[id]?.cardId === def.id))?.pileId
+          ?? (state.marketPiles[`custom-${def.id}`] !== undefined ? `custom-${def.id}` : undefined);
+        const pile = pileId !== undefined ? state.marketPiles[pileId] : undefined;
+        if (pileId !== undefined && pile !== undefined) {
+          finalRemoved = finalRemoved.filter(id => id !== instanceId);
+          finalMarketPiles = { ...state.marketPiles, [pileId]: { ...pile, cards: [instanceId, ...pile.cards] } };
+          const existing = state.cards[instanceId];
+          if (existing !== undefined) {
+            finalCards = {
+              ...state.cards,
+              [instanceId]: { instanceId, cardId: existing.cardId, location: { zone: 'marketPile', index: 0, pileId } },
+            };
+          }
+        }
+      }
+      const cleared = returnCountersToSupply(
+        { ...state, cards: finalCards, marketPiles: finalMarketPiles, removed: finalRemoved },
+        seat,
+      );
       return {
-        ...state,
+        ...cleared,
         ...nextBase,
-        seats: finalSeats,
-        removed: finalRemoved,
+        seats: cleared.seats.map(s => (s.seat === seat ? { ...(finalSeats[seat] as PlayerState), counters: s.counters } : s)),
+        removed: cleared.removed,
+        marketPiles: cleared.marketPiles,
+        cards: cleared.cards,
         prompts,
         rngState: played.rngState,
       };
@@ -1097,7 +1179,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               e.kind === 'trashAfterUse' ||
               (e.kind === 'grantExploreAndSuppressLowHpInfected' && e.trashAfterUse === true));
           });
-          const removedAfter = toDiscardExplosives
+          let removedAfter = toDiscardExplosives
             ? [...state.removed, ...trashedAmmo]
             : [...state.removed, ...explosiveIds, ...toTrashAfterUse, ...trashedAmmo];
           const discardAfterExplosives = toDiscardExplosives
@@ -1363,6 +1445,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           else nonInfectedIds.push(id);
         }
 
+        // Unofficial Expansion: EX-002 Special Rocket Launcher — auto-defeats
+        // the first revealed Infected with 80+ Health in the batch, then is
+        // removed from the game. The auto-defeated Infected still counts as a
+        // defeated trophy (Decorations included) but fires no reveal effects.
+        const autoDefeatedEntries: Array<{ id: string; def: CardDef }> = [];
+        const rocketEntry = infectedEntries.find(({ def }) => specialRocketLauncherId(state, seat, def) !== undefined);
+        if (rocketEntry !== undefined) {
+          const launcherId = specialRocketLauncherId(state, seat, rocketEntry.def);
+          if (launcherId !== undefined) {
+            infectedEntries.splice(infectedEntries.indexOf(rocketEntry), 1);
+            autoDefeatedEntries.push(rocketEntry);
+            removedAfter = [...removedAfter, launcherId];
+            state = consumeSpecialRocketLauncher(state, seat, launcherId);
+            player = state.seats[seat] as PlayerState;
+          }
+        }
+
         // ---- Reveal effects for EVERY revealed Infected ----
         let revealPrompts: Prompt[] = [];
         const revealGains: Array<{ seat: number; cardId: string }> = [];
@@ -1478,7 +1577,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               actionsInPlayArea: player.playArea.filter(pid => cardDef(state, pid)?.type === 'action').length,
             });
         const defeated = multi.defeated;
-        const defeatedIds = defeated ? infectedEntries.map(e => e.id) : [];
+        const autoDefeatedIds = autoDefeatedEntries.map(e => e.id);
+        const defeatedIds = defeated ? [...infectedEntries.map(e => e.id), ...autoDefeatedIds] : [...autoDefeatedIds];
         const undefeatedEntries = defeated ? [] : infectedEntries;
         // ---- Outbreak infection tracking ----
         const infectionBySeat = new Map<number, string[]>();
@@ -1692,6 +1792,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (e.kind === 'onNotDefeatedInfectionIncrease') {
                 drawInfectionsFor(infectedEffectSeat(), e.amount + e.perLevel * player.level);
                 zombieBAffected.push(infectedEffectSeat());
+              } else if (e.kind === 'onNotDefeatedAttachCounter') {
+                // Unofficial Expansion: EX-006 / EX-008 attach a Poison counter.
+                state = attachCounterToSeat(state, infectedEffectSeat(), e.counterCardId);
               }
             }
           }
@@ -1851,7 +1954,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           pendingBackstab: undefined,
           attached: defeated
             ? [...(state.seats[seat] as PlayerState).attached, ...defeatedIds, ...chainAttachedIds]
-            : (state.seats[seat] as PlayerState).attached,
+            : [...(state.seats[seat] as PlayerState).attached, ...autoDefeatedIds],
+          // EX-006/EX-008 may have attached a Poison counter since `player` was
+          // read — carry the live value forward.
+          counters: (state.seats[seat] as PlayerState).counters,
           partnerAttached,
           infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
           hp: Math.min((resuscitatePending ? 10 : newHp) + onDefeatHeal, player.maxHp),
@@ -2203,6 +2309,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      // Unofficial Expansion: EX-002 Special Rocket Launcher — the attached
+      // launcher auto-defeats the next Infected with 80+ Health revealed while
+      // this Character explores, then is removed from the game.
+      const rocketLauncherId = revealedDef !== undefined
+        ? specialRocketLauncherId(state, seat, revealedDef)
+        : undefined;
+      let rocketAutoDefeat = false;
+      if (rocketLauncherId !== undefined) {
+        rocketAutoDefeat = true;
+        removedAfter = [...removedAfter, rocketLauncherId];
+        state = consumeSpecialRocketLauncher(state, seat, rocketLauncherId);
+        player = state.seats[seat] as PlayerState;
+      }
+
       // Reactive trash window: if a Las Plagas infected is revealed, eligible
       // players (Jill L2 with Flash Grenade in hand) may react.
       const isLasPlagas = revealedDef?.type === 'infected' && revealedDef?.plagas === true;
@@ -2373,7 +2493,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
         : 0;
 
-      const outcome = resolveExplore({
+      const outcome = rocketAutoDefeat
+        ? { kind: 'defeated' as const, decorations: revealedDef?.decorations ?? 0, damage: 0, hp: revealedDef?.hp ?? 0 }
+        : resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus,
@@ -2881,6 +3003,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             mansionDeck = shuffled.deck;
             mansionBottom = shuffled.bottom;
             outbreakShuffledBack = true;
+          } else if (e.kind === 'onNotDefeatedAttachCounter') {
+            // Unofficial Expansion: EX-006 Web Spinner / EX-008 Yawn attach a
+            // Poison counter to the Character who initiated the Exploration.
+            if (infectedEffectNegated) continue;
+            state = attachCounterToSeat(state, infectedEffectSeat(), e.counterCardId);
           }
         }
       }
@@ -2896,6 +3023,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               discard,
               inventory,
               attached: (state.seats[seat] as PlayerState).attached,
+              // EX-006/EX-008 may have attached a Poison counter to this seat
+              // since `player` was read — carry the live value forward.
+              counters: (state.seats[seat] as PlayerState).counters,
               exploresLeft: exploresLeft + grantedExplores,
               turnAmmo: turnAmmoAfter,
               turnGold: turnGoldAfter,
@@ -3064,6 +3194,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         destination: 'discard',
         reason: 'buy',
       });
+      // The log entry only carries the pileId, and a single-card pile is empty
+      // by the time the history is rendered — record the physical card so the
+      // line can still name it (the custom EX piles are all single-card).
+      {
+        const log = [...s.log];
+        const last = log[log.length - 1];
+        if (last !== undefined && last.action.type === 'buy') {
+          log[log.length - 1] = { ...last, action: { ...last.action, instanceId: boughtInstanceId } };
+        }
+        s = { ...s, log };
+      }
 
       // CH-050 Rebecca Chambers (Mercenaries) L1: "When you buy a card, you may
       // move that card to another player's discard pile."
@@ -4292,7 +4433,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           } else {
             const ric = applyRicardoDamage(s, pe.seat, currentSeat.hp, pe.damageTaken);
             s = ric.state;
-            newPlayer = { ...currentSeat, hp: ric.hp };
+            // EX-006/EX-008: attach a Poison counter to the exploring Character.
+            const counterFx = cardDef(s, pe.revealedInstanceId)?.infectedEffects?.find(e => e.kind === 'onNotDefeatedAttachCounter');
+            if (counterFx !== undefined && counterFx.kind === 'onNotDefeatedAttachCounter') {
+              s = attachCounterToSeat(s, pe.seat, counterFx.counterCardId);
+            }
+            newPlayer = { ...(s.seats[pe.seat] ?? currentSeat), hp: ric.hp };
           }
           // Not defeated: the Infected's own effect places it (MX-001
           // inserts it 5th from the top). The pre-reveal deck still holds
@@ -4352,7 +4498,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           } else {
             const ric = applyRicardoDamage(baseState, pe.seat, currentSeat.hp, neg.negated ? 0 : pe.damageTaken);
             baseState = ric.state;
-            newPlayer = { ...currentSeat, hp: ric.hp };
+            // EX-006/EX-008: attach a Poison counter to the exploring Character.
+            const counterFx = cardDef(baseState, pe.revealedInstanceId)?.infectedEffects?.find(e => e.kind === 'onNotDefeatedAttachCounter');
+            if (counterFx !== undefined && counterFx.kind === 'onNotDefeatedAttachCounter') {
+              baseState = attachCounterToSeat(baseState, pe.seat, counterFx.counterCardId);
+            }
+            newPlayer = { ...(baseState.seats[pe.seat] ?? currentSeat), hp: ric.hp };
           }
           // The Infected's own fate likewise applies to the CURRENT deck (it
           // may have changed while the prompt was open).
@@ -5040,6 +5191,34 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'weaponCaseChooseWeapon') {
+        // EX-003 Weapon Case: the chosen weapon moves from its Resource Area
+        // pile into the taker's discard. The token itself was already removed
+        // from the game when the choice was offered.
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const def = cardDef(state, chosen);
+        if (def === undefined || def.type !== 'weapon') return { ...state, ...nextBase, prompts: newPrompts };
+        let removedFromPile = false;
+        const marketPiles = { ...state.marketPiles };
+        for (const pile of Object.values(marketPiles)) {
+          if (pile.cards.includes(chosen)) {
+            marketPiles[pile.pileId] = { ...pile, cards: pile.cards.filter(id => id !== chosen) };
+            removedFromPile = true;
+            break;
+          }
+        }
+        if (!removedFromPile) return { ...state, ...nextBase, prompts: newPrompts };
+        const stripped: GameState = { ...state, ...nextBase, marketPiles, prompts: newPrompts };
+        return gainCard(stripped, {
+          seat,
+          cardId: def.id,
+          instanceId: chosen,
+          destination: 'discard',
+          reason: 'token',
+        });
+      }
+
       if (kind === 'sherryForceExplore') {
         // FCH-008 Sherry Birkin: the chosen player immediately Explores
         // with Sherry's support (see engine/allyExplore.ts).
@@ -5463,6 +5642,51 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     destination: 'discard',
                     reason: 'token',
                   });
+                }
+                // Unofficial Expansion: EX-001 Special Rocket Launcher Case /
+                // EX-004 Ammunition Box — gain the named card, REMOVE the token
+                // from the game (the printed text says remove, not trash).
+                const grantCardEffect = (takenDef?.tokenEffects ?? []).find(
+                  e => e.kind === 'gainCardAndRemoveToken'
+                );
+                if (grantCardEffect !== undefined && grantCardEffect.kind === 'gainCardAndRemoveToken') {
+                  const granted: GameState = {
+                    ...state,
+                    ...nextBase,
+                    removed: [...state.removed, instanceId],
+                    prompts: newPrompts,
+                  };
+                  return gainCard(granted, {
+                    seat,
+                    cardId: grantCardEffect.cardId,
+                    destination: 'discard',
+                    reason: 'token',
+                  });
+                }
+                // Unofficial Expansion: EX-003 Weapon Case — choose any weapon
+                // from the Resource Area, gain it, remove the token.
+                const anyWeaponEffect = (takenDef?.tokenEffects ?? []).find(
+                  e => e.kind === 'gainAnyWeaponAndRemoveToken'
+                );
+                if (anyWeaponEffect !== undefined && anyWeaponEffect.kind === 'gainAnyWeaponAndRemoveToken') {
+                  const weaponIds = marketWeaponIds(state);
+                  const removedToken: GameState = {
+                    ...state,
+                    ...nextBase,
+                    removed: [...state.removed, instanceId],
+                    prompts: newPrompts,
+                  };
+                  if (weaponIds.length === 0) return removedToken;
+                  return {
+                    ...removedToken,
+                    prompts: [...newPrompts, {
+                      id: `weaponCase-${seat}-v${state.version}`,
+                      seat,
+                      text: 'Weapon Case: choose any weapon from the Resource Area.',
+                      options: weaponIds,
+                      payload: { kind: 'weaponCaseChooseWeapon' },
+                    }],
+                  };
                 }
                 // Yellow Herb (plusMaxHp item): attaching to the character when
                 // gained via Explore — NOT to the discard pile. Raises max HP

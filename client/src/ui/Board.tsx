@@ -25,6 +25,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
   const piles = Object.values(state.marketPiles)
     .filter(p => p.cards.length > 0)
     .sort((a, b) => a.pileId.localeCompare(b.pileId));
+  const supplyIds = state.supply ?? [];
   const canBuy = state.activeSeat === mySeat && state.phase === 'main';
 
   return (
@@ -80,6 +81,22 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
             <span>Bottom: {state.mansionBottom.length}</span>
             <span>Removed: {state.removed.length}</span>
           </div>
+          {supplyIds.length > 0 && (
+            <div className="zone-pile counter-supply" data-anim-zone="supply" data-pile-count={supplyIds.length}>
+              <span className="zone-pile-label">Counter supply</span>
+              <div className="zone-pile-stack">
+                {supplyIds.map(id => {
+                  const def = defForInstance(state, id);
+                  return def === null ? null : (
+                    <span key={id} className="counter-supply-card" title={def.name}>
+                      <CardView def={def} compact artOnly />
+                    </span>
+                  );
+                })}
+              </div>
+              <span className="zone-pile-count">{supplyIds.length}</span>
+            </div>
+          )}
         </div>
       </div>
 

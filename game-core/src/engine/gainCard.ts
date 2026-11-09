@@ -115,5 +115,34 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     };
   }
 
+  // Unofficial Expansion: EX-002 Special Rocket Launcher attaches to the
+  // Character as soon as it is gained — bought, drawn, or granted by EX-001.
+  // The instance leaves whatever destination it landed in and joins `attached`.
+  const attachOnGain = (s.cardDefs[req.cardId]?.weaponEffects ?? []).some(
+    e => e.kind === 'attachOnGainDefeatInfectedAtOrAboveHp',
+  );
+  if (attachOnGain && gainedIds.length > 0) {
+    const movedCards = { ...s.cards };
+    for (const id of gainedIds) {
+      const inst = movedCards[id];
+      if (inst !== undefined) {
+        movedCards[id] = { ...inst, location: { zone: 'attached', index: 0, seat } };
+      }
+    }
+    s = {
+      ...s,
+      cards: movedCards,
+      seats: s.seats.map(p => (p.seat === seat
+        ? {
+            ...p,
+            hand: p.hand.filter(id => !gainedIds.includes(id)),
+            discard: p.discard.filter(id => !gainedIds.includes(id)),
+            inventory: p.inventory.filter(id => !gainedIds.includes(id)),
+            attached: [...p.attached, ...gainedIds],
+          }
+        : p)),
+    };
+  }
+
   return s;
 }
