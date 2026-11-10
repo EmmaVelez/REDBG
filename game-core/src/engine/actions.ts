@@ -7235,6 +7235,64 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      // CV-001 Cover-up: trash this card from hand -> peek the top Mansion
+      // card, then you may move it to the bottom. Two-step chain: the trash
+      // resolves here, and the peek+move is a follow-up prompt.
+      if (kind === 'coverUpTrash') {
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        // Trash the held card (verify it is still in hand — the explore may
+        // have consumed it while the prompt was open).
+        if (instanceId === '' || !player.hand.includes(instanceId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const topId = state.mansionDeck[0];
+        const topDef = topId === undefined ? undefined : cardDef(state, topId);
+        const afterTrash: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: s.hand.filter(id => id !== instanceId) }
+            : s)),
+          removed: [...state.removed, instanceId],
+        };
+        if (topId === undefined) {
+          return { ...afterTrash, mansionDeck: state.mansionDeck, mansionBottom: state.mansionBottom, prompts: newPrompts };
+        }
+        return {
+          ...afterTrash,
+          prompts: [...newPrompts, {
+            id: `coverup-peek-${seat}-v${nextBase.version}`,
+            seat,
+            text: `You look at the top of the Mansion: ${topDef?.name ?? 'an unknown card'} (${topDef?.hp ?? '?'} HP). Move it to the bottom of the Mansion?`,
+            options: ['Move to bottom', 'Leave it'],
+            payload: { kind: 'coverUpPeek', topId },
+          }],
+        };
+      }
+      // CV-001 Cover-up peek: optionally move the peeked top card to the
+            // bottom of the Mansion. sendToBottom only APPENDS to the bottom — the
+            // caller must remove the card from the deck itself (the explore paths
+            // rely on revealTop having popped it; here we filter explicitly).
+            if (kind === 'coverUpPeek') {
+              if (chosenId === 'Move to bottom') {
+                const topId = String(prompt.payload?.topId ?? '');
+                if (topId !== '' && state.mansionDeck[0] === topId) {
+                  const deckWithout = state.mansionDeck.filter(id => id !== topId);
+                  const bottomed = sendToBottom({ deck: deckWithout, bottom: state.mansionBottom }, topId);
+                  return {
+                    ...state,
+                    ...nextBase,
+                    mansionDeck: bottomed.deck,
+                    mansionBottom: bottomed.bottom,
+                    prompts: newPrompts,
+                  };
+                }
+              }
+              return { ...state, ...nextBase, prompts: newPrompts };
+            }
+
       // lookAtMansionTop + unknown payload: informational, no state change
       return {
         ...state,

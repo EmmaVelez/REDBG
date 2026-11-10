@@ -1040,7 +1040,37 @@ function startTurnInternal(state: GameState): GameState {
   const abilityPrompts = turnStartAbilityPrompts(state, turnPlayer, newVersion);
   // Mercenaries Skill System: turn-start "can" Skills (SK-029 reveal Pistols).
   const skillPrompts = state.skillSystem === true ? turnStartSkillPrompts(state, player.seat, newVersion) : [];
-  const turnStartPrompts = [...abilityPrompts, ...skillPrompts];
+  // CV-001 Cover-up: at the beginning of ANY player's turn, every player
+  // holding one in hand may trash it to peek at the top Mansion card and
+  // optionally move it to the bottom. The prompt is addressed to the HOLDER
+  // (who can be the active player or another seat — chooseOption does not
+  // gate on the active seat). Dead/downed players cannot answer a prompt.
+  const coverUpPrompts: Prompt[] = [];
+  for (const s of state.seats) {
+    if (s.dead || s.downed) continue;
+    for (const handId of s.hand) {
+      const inst = state.cards[handId];
+      if (inst === undefined) continue;
+      const def = state.cardDefs[inst.cardId];
+      if (def === undefined) continue;
+      const isCoverUp = (def.actionEffects ?? []).some(e => e.kind === 'trashFromHandAtTurnStartPeekMansionTop');
+      if (!isCoverUp) continue;
+      // One pending offer per held copy: a second turn start must not stack
+      // two prompts for the same instance (dropEmptyPrompts only removes
+      // zero-option prompts; an unanswered offer would duplicate).
+      const alreadyOffered = state.prompts.some(p =>
+        p.payload?.kind === 'coverUpTrash' && p.payload?.instanceId === handId);
+      if (alreadyOffered) continue;
+      coverUpPrompts.push({
+        id: `coverup-${s.seat}-v${newVersion}`,
+        seat: s.seat,
+        text: `Trash this card from your hand to look at the top of the Mansion? (${def.name})`,
+        options: ['Trash', 'Decline'],
+        payload: { kind: 'coverUpTrash', instanceId: handId },
+      });
+    }
+  }
+  const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
   return {
     ...state,

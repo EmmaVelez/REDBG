@@ -278,6 +278,7 @@ export type ActionEffect =
   | { readonly kind: "trashHandCard" }                                       // Ominous Battle (choice via Prompt)
   | { readonly kind: "negateWeaponCost40OrLessFromHand" }                    // Struggle for Survival (reactive)
   | { readonly kind: "lookAtMansionTop"; readonly count: number }           // Mansion Foyer style peek (Prompt ordering)
+  | { readonly kind: "trashFromHandAtTurnStartPeekMansionTop" }   // CV-001 Cover-up: may trash from hand at any turn start to peek the Mansion top and move it to the bottom
   | { readonly kind: "trashUpToTwoFromDiscard" }                             // Shattered Memories (multi-choice)
   | { readonly kind: "upgradeAmmoBy30Gold" }                                 // Item Management: trash 1 Ammo from hand, gain one worth 30 Gold more
   | { readonly kind: "stealRevealedWeaponsFromOpponentsTopCards" }          // Master of Unlocking

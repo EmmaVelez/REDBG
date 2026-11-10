@@ -121,6 +121,17 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    id: 'cv-001',
+    name: 'Cover-up',
+    type: 'action',
+    set: 'custom',
+    text: 'You may Trash this card from your hand at the beginning of any Player\'s turn. In that case, look at the top Card of the Mansion. You may move it to the bottom of the Mansion.',
+    copies: 5,
+    cost: 60,
+    bonuses: { actions: 1, cards: 1 },
+    actionEffects: [{ kind: 'trashFromHandAtTurnStartPeekMansionTop' }],
+  },
+  {
     id: 'bc-001',
     name: 'Billy Coen',
     type: 'character',
