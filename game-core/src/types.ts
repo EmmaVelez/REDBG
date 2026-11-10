@@ -497,6 +497,9 @@ export type CharacterAbility =
   // --- Fan characters (FCH-008..) ---
   | { readonly kind: "cannotUseWeapons"; readonly level: 1 | 2 } // FCH-008 Sherry: she cannot use Weapons
   | { readonly kind: "forceAllyExploreWithSupport"; readonly level: 1 | 2 } // FCH-008 Sherry: once per turn, force another Player to Explore with her
+  // --- Fan characters (JM-001..) ---
+  | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
+  | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats
 
 
 // ---------------------------------------------------------------------------

@@ -42,6 +42,9 @@ import {
   trashCardFromDiscardOnInfectedDefeat,
   trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat,
   applyRicardoDamage,
+  applyTrashTopFromDiscardOnBigHit,
+  trashTopFromDiscardIds,
+  jakeDefeatDecorationBonus,
   ricardoReduction,
   queueRicardoL2Prompt,
   leaderAbilities,
@@ -1560,6 +1563,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               const reduce = characterAbilities(state, s.seat).reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
               const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(40 - reduce, 0));
               state = ric.state;
+              // JM-001 Jake Muller L1: MA-031's 40 Damage is a qualifying hit.
+              state = applyTrashTopFromDiscardOnBigHit(state, s.seat, Math.max(40 - reduce, 0));
               const newHp = ric.hp;
               state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
             }
@@ -1647,6 +1652,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const autoDefeatedIds = autoDefeatedEntries.map(e => e.id);
         const defeatedIds = defeated ? [...infectedEntries.map(e => e.id), ...autoDefeatedIds] : [...autoDefeatedIds];
         const undefeatedEntries = defeated ? [] : infectedEntries;
+        // JM-001 Jake Muller L1: the combined hit is what he "takes". Collected
+        // here, before the defeated/not-defeated split, so the rebuilt seat
+        // and the removed list below can both use it.
+        const jakeTrashed = trashTopFromDiscardIds(state, seat, multi.combinedAttack);
         // ---- Outbreak infection tracking ----
         const infectionBySeat = new Map<number, string[]>();
         for (const s of state.seats) infectionBySeat.set(s.seat, [...(s.infectionCards ?? [])]);
@@ -1730,7 +1739,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // Decorations for every defeated Infected (Combo Pile aware), including
           // any Barry-chain attachments revealed by the batch.
           const allAttached = [...player.attached, ...defeatedIds, ...chainAttachedIds];
-          decorations = player.decorations + decorationDelta(state, player.attached, allAttached);
+          decorations = player.decorations
+            + decorationDelta(state, player.attached, allAttached)
+            // JM-001 Jake Muller L2: +amount for each high-Health Infected he
+            // defeats (Barry-chain trophies included).
+            + jakeDefeatDecorationBonus(state, seat, [...defeatedIds, ...chainAttachedIds]);
           // Level-up thresholds (MA-047 reduces the L2 requirement).
           const charDef = cardDef(state, player.characterInstanceId);
           let level2At = charDef?.level2At ?? 0;
@@ -1952,6 +1965,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [
             ...removedIds,
             ...reaperTrashed.filter(id => !removedIds.includes(id)),
+            // JM-001 Jake Muller L1.
+            ...jakeTrashed.filter(id => !removedIds.includes(id)),
             // Alliance Partner Modification (3) PARTNER DEATH: a Partner at ≤0
             // HP is removed from the game permanently and ALL cards attached to
             // it are trashed. Without this the attached cards simply vanished
@@ -1989,7 +2004,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
         // Downed handling for a surviving leader.
         let handOut: readonly string[] = handAfter;
-        let discardOut: readonly string[] = discardAfterExplosives;
+        // JM-001 Jake Muller L1: the trashed ids leave the Discard Pile.
+        const discardAfterJake = discardAfterExplosives.filter(id => !jakeTrashed.includes(id));
+        let discardOut: readonly string[] = discardAfterJake;
         let inventoryOut: readonly string[] = player.inventory;
         if (newHp <= 0 && !defeated) {
           const resuscitateHolders = state.seats.filter(s => !s.dead &&
@@ -2015,7 +2032,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 downed: false,
                 dead: false,
                 hand: handAfter,
-                discard: discardAfterExplosives,
+                discard: discardAfterJake,
                 inventory: player.inventory,
               },
               rngShuffle,
@@ -2139,6 +2156,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             .reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
           const ric = applyRicardoDamage(state, s.seat, s.hp ?? 0, Math.max(40 - hunkReduce, 0));
           state = ric.state;
+          // JM-001 Jake Muller L1: MA-031's 40 Damage is a qualifying hit.
+          state = applyTrashTopFromDiscardOnBigHit(state, s.seat, Math.max(40 - hunkReduce, 0));
           const newHp = ric.hp;
           state = { ...state, seats: state.seats.map(x => (x.seat === s.seat ? { ...x, hp: newHp } : x)) };
         }
@@ -2859,7 +2878,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // The Decoration total is adjusted for the Combo Pile change so MA-077
         // Chicken — worth 0 while in a Combo Pile by itself — is handled.
         const newAttachedIds = [...player.attached, revealedInstanceId, ...chainAttachedIds];
-        const decorations = player.decorations + decorationDelta(state, player.attached, newAttachedIds);
+        const decorations = player.decorations
+          + decorationDelta(state, player.attached, newAttachedIds)
+          // JM-001 Jake Muller L2: +amount for each high-Health Infected he
+          // defeats (Barry-chain trophies included).
+          + jakeDefeatDecorationBonus(state, seat, [revealedInstanceId, ...chainAttachedIds]);
         const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
           activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
         const charDef = cardDef(state, player.characterInstanceId);
@@ -3024,6 +3047,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (outcome.kind !== 'notDefeated') {
         throw new Error('applyAction: explore: unexpected non-infected reveal');
       }
+      // JM-001 Jake Muller L1: a hit greater than the threshold trashes the top
+      // `count` cards of his Discard Pile. The explore rebuilds the seat below,
+      // so the ids are collected here and subtracted from its discard local.
+      const jakeTrashed = trashTopFromDiscardIds(state, seat, outcome.damageTaken);
       // Hunk L1: damageRedirectToPartner — when Hunk would take damage and has
       // a partner, redirect the damage to his partner instead (partner absorbs
       // it; Hunk takes none). Automatic redirect when a partner is present.
@@ -3076,7 +3103,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
       let hand: readonly string[] = handAfter;
-      let discard: readonly string[] = discardAfterExplosives;
+      // JM-001 Jake Muller L1: the trashed ids leave the Discard Pile.
+      const discardAfterJake = discardAfterExplosives.filter(id => !jakeTrashed.includes(id));
+      let discard: readonly string[] = discardAfterJake;
       let inventory: readonly string[] = player.inventory;
 
       let resuscitatePending = false;
@@ -3107,7 +3136,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               downed: false,
               dead: false,
               hand: handAfter,
-              discard: discardAfterExplosives,
+              discard: discardAfterJake,
               inventory: player.inventory,
             },
             rngShuffle,
@@ -3201,6 +3230,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const removedWithReaper = [
         ...removedFinal,
         ...reaperTrashed.filter(id => !removedFinal.includes(id)),
+        // JM-001 Jake Muller L1.
+        ...jakeTrashed.filter(id => !removedFinal.includes(id)),
         // Alliance Partner Modification (3) PARTNER DEATH: trash every card the
         // dead Partner had attached.
         ...(partnerDied ? reaperPartnerAttached.filter(id => !removedFinal.includes(id)) : []),

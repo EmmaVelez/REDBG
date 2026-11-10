@@ -169,6 +169,27 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'healOnDefeatWithWeaponTag', tag: 'shotgun', heal: 5, level: 2 },
     ],
   },
+  {
+    // Fan card (printed code CH-001, which is already Albert Wesker in the
+    // Premier set, so the id uses Jake's initials like cu-001 / lk-001).
+    id: 'jm-001',
+    name: 'Jake Muller',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: When Jake takes more than 30 Damage, Trash the top 2 cards from your Discard Pile.\nLevel 2: Every Infected with more than 40 Health that Jake defeats gets +1 Decoration.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 0,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'When Jake takes more than 30 Damage, Trash the top 2 cards from your Discard Pile.' },
+      { level: 2, text: 'Every Infected with more than 40 Health that Jake defeats gets +1 Decoration.' },
+    ],
+    abilities: [
+      { kind: 'trashTopFromDiscardOnBigHit', threshold: 30, count: 2, level: 1 },
+      { kind: 'plusDecorationOnDefeatHighHp', threshold: 40, amount: 1, level: 2 },
+    ],
+  },
 
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):

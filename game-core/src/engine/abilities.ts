@@ -787,3 +787,94 @@ export function healOnDefeatWithWeaponTag(
   }
   return heal;
 }
+
+/**
+ * JM-001 Jake Muller L1: "When Jake takes more than -30 Damage, Trash the top
+ * 2 cards from your Discard Pile." Returns the trigger spec, or undefined when
+ * the seat's character has no such ability.
+ */
+export function trashTopFromDiscardOnBigHit(
+  abilities: readonly CharacterAbility[],
+): { readonly threshold: number; readonly count: number } | undefined {
+  for (const a of abilities) {
+    if (a.kind === 'trashTopFromDiscardOnBigHit') return { threshold: a.threshold, count: a.count };
+  }
+  return undefined;
+}
+
+/**
+ * JM-001 Jake Muller L2: "Every Infected with more than 40 Health that Jake
+ * defeats gets +1 Decoration." Returns the trigger spec, or undefined.
+ */
+export function plusDecorationOnDefeatHighHp(
+  abilities: readonly CharacterAbility[],
+): { readonly threshold: number; readonly amount: number } | undefined {
+  for (const a of abilities) {
+    if (a.kind === 'plusDecorationOnDefeatHighHp') return { threshold: a.threshold, amount: a.amount };
+  }
+  return undefined;
+}
+
+/**
+ * The ids JM-001 Jake Muller L1 would trash for a hit of `damage`, or an empty
+ * list when the trigger does not fire. Split out from the applier so callers
+ * that rebuild the seat afterwards (the explore paths) can subtract the ids
+ * from their own discard local instead of losing them.
+ */
+export function trashTopFromDiscardIds(
+  state: GameState,
+  seat: number,
+  damage: number,
+): readonly string[] {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed || damage <= 0) return [];
+  const spec = trashTopFromDiscardOnBigHit(characterAbilities(state, seat));
+  if (spec === undefined || damage <= spec.threshold) return [];
+  return player.discard.slice(0, spec.count);
+}
+
+/**
+ * Applies JM-001 Jake Muller L1 to a hit of `damage`: when the hit is greater
+ * than the threshold, the top `count` cards of the seat's Discard Pile are
+ * trashed (removed from the game). Returns the state unchanged when the
+ * trigger does not fire or the seat has no such ability.
+ *
+ * The "top" of the Discard Pile is index 0, matching what the client shows as
+ * the pile's face card (see ActionBar's `discardTopId`).
+ */
+export function applyTrashTopFromDiscardOnBigHit(
+  state: GameState,
+  seat: number,
+  damage: number,
+): GameState {
+  const trashed = trashTopFromDiscardIds(state, seat, damage);
+  if (trashed.length === 0) return state;
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, discard: s.discard.filter(id => !trashed.includes(id)) }
+      : s)),
+    removed: [...state.removed, ...trashed],
+  };
+}
+
+/**
+ * JM-001 Jake Muller L2: counts the Decoration bonus a seat earns for the
+ * Infected in `defeatedIds` it just defeated — `amount` for each one whose
+ * Health is greater than `threshold`.
+ */
+export function jakeDefeatDecorationBonus(
+  state: GameState,
+  seat: number,
+  defeatedIds: readonly string[],
+): number {
+  const spec = plusDecorationOnDefeatHighHp(characterAbilities(state, seat));
+  if (spec === undefined) return 0;
+  let bonus = 0;
+  for (const id of defeatedIds) {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    if (def?.type === 'infected' && (def.hp ?? 0) > spec.threshold) bonus += spec.amount;
+  }
+  return bonus;
+}
