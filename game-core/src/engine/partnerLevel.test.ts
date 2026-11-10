@@ -99,6 +99,10 @@ const DEFS: Record<string, CardDef> = {
   'it-fads': { id: 'it-fads', name: 'First Aid Spray', type: 'item', set: 'premier', text: 'Heal your Character to full Health.', copies: 1, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
   'it-gh': { id: 'it-gh', name: 'Green Herb', type: 'item', set: 'premier', text: 'Trash: heal 20.', copies: 2, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
   'it-rh': { id: 'it-rh', name: 'Red Herb', type: 'item', set: 'premier', text: 'Trash with a Green Herb: heal to full.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
+  // Free (0 Ammo) weapons, so a Main-led explore stays legal without an Ammo
+  // card in hand — the partner-death tests below assert on the leader, not ammo.
+  'we-six': { id: 'we-six', name: 'Six Shooter', type: 'weapon', set: 'premier', text: '', copies: 1, ammoReq: 0, damage: 30 },
+  'we-knife': { id: 'we-knife', name: 'Survival Knife', type: 'weapon', set: 'premier', text: '', copies: 1, ammoReq: 0, damage: 10 },
 };
 
 function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; seat1?: Partial<PlayerState> } = {}): GameState {
@@ -332,4 +336,79 @@ test('the bot plays a healing item when its Partner is hurt', () => {
     // The Main is already at full Health, so the bot aims the heal at the Partner.
     expect(action.healTarget).toBe('partner');
   }
+});
+
+// --- 7. partner death ---
+
+/**
+ * Alliance Partner Modification (3) PARTNER DEATH: "Partner at ≤0 HP is removed
+ * from the game permanently; trash all cards attached to it."
+ *
+ * Reproduces a reported bug: the Partner died while LEADING an explore with a
+ * Six Shooter and a Knife attached, and the following turn the player could not
+ * explore at all.
+ */
+function partnerDeathState() {
+  return baseState({
+    seat0: {
+      characterInstanceId: 'cm',
+      partnerInstanceId: 'px',
+      partnerAttached: ['pw-six'],
+      partnerHp: 10,
+      partnerMaxHp: 80,
+      decorations: 2,
+      turnAmmo: 20,
+      // Two Explores, so the Main still has one AFTER the Partner-led explore
+      // that kills it.
+      exploresLeft: 2,
+      hand: ['w-knife', 'w-knife2'],
+    },
+    mansionDeck: ['big1'],
+    cards: {
+      'cm': inst('cm', 'ch-main'),
+      'c0': inst('c0', 'ch-main'),
+      'c1': inst('c1', 'ch-main'),
+      'px': inst('px', 'ch-partner'),
+      'pw-six': inst('pw-six', 'we-six'),
+      'w-knife': inst('w-knife', 'we-knife'),
+      'w-knife2': inst('w-knife2', 'we-knife'),
+      'big1': inst('big1', 'ma-big'),
+    },
+  });
+}
+
+test('a Partner killed while leading is removed and its attached cards are trashed', () => {
+  // ma-big has 100 Health, so the knife (10 damage) cannot defeat it and the
+  // leading Partner takes the full 30 - more than its 10 Health.
+  const after = applyAction(partnerDeathState(), {
+    type: 'explore', seat: 0, weapons: ['w-knife'], exploreCount: 1, leader: 'partner',
+  });
+  const p = after.seats[0];
+  expect(p?.partnerInstanceId).toBeUndefined();
+  expect(p?.partnerAttached).toBeUndefined();
+  expect(p?.partnerHp).toBeUndefined();
+  expect(p?.partnerMaxHp).toBeUndefined();
+  // The Main never led, so it took no damage.
+  expect(p?.hp).toBe(100);
+  // The Partner's attached Six Shooter is trashed, not silently dropped from
+  // the player state while lingering in `state.cards`.
+  expect(after.removed).toContain('pw-six');
+});
+
+test('after the Partner dies the Main leads with no extra action', () => {
+  const after = applyAction(partnerDeathState(), {
+    type: 'explore', seat: 0, weapons: ['w-knife'], exploreCount: 1, leader: 'partner',
+  });
+  // The Main can still explore on the second knife (0 Ammo, no abilities
+  // needed) - the dead Partner does not block it.
+  expect(validateAction(after, { type: 'explore', seat: 0, weapons: ['w-knife2'], exploreCount: 1 }).ok).toBe(true);
+  // Naming the dead Partner as leader is refused outright.
+  expect(validateAction(after, { type: 'explore', seat: 0, weapons: ['w-knife2'], exploreCount: 1, leader: 'partner' }))
+    .toEqual({ ok: false, reason: 'explore: no partner' });
+  // And no enumerated explore names the Partner any more.
+  const leaders = enumerateLegalActions(after, 0)
+    .filter(a => a.type === 'explore')
+    .map(a => (a.type === 'explore' ? a.leader : undefined));
+  expect(leaders).not.toContain('partner');
+  expect(leaders.length).toBeGreaterThan(0);
 });

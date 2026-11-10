@@ -15,7 +15,7 @@ import { CharacterCards, attachedOverlap } from './CharacterCards';
 import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
-import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions } from './explorePicker';
+import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions, resolveExploreLeader } from './explorePicker';
 import { Lobby } from './Lobby';
 import { GameLog } from './GameLog';
 import { defForInstance, typeLabel, statLine, costText } from './cards';
@@ -1128,6 +1128,38 @@ describe('ActionBar (T07)', () => {
     expect(html).toContain('data-explore-count-option="2"');
     expect(html).toContain('data-explore-leader');
     expect(html).toContain('data-leader-option="partner"');
+  });
+
+  it('falls back to the Main character once the Partner is gone', () => {
+    // Regression: the ActionBar's leader selection is component state and
+    // survives the Partner's death. While it still read 'partner', every
+    // explore was priced with the (now empty) Partner abilities and sent as
+    // `leader: 'partner'`, which validate rejects with "explore: no partner" -
+    // the player could not explore at all on the following turn.
+    const base = twoPlayerState();
+    const partnerInst = 'we-004#77';
+    const withPartner = {
+      ...base,
+      cards: { ...base.cards, [partnerInst]: { instanceId: partnerInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
+      seats: base.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: 'ch-002#p1', partnerAttached: [partnerInst], turnAmmo: 100 }
+        : s)),
+    };
+    expect(resolveExploreLeader(withPartner, 0, 'partner')).toBe('partner');
+    // The Partner died: its instance and attachments are cleared.
+    const partnerDied = {
+      ...withPartner,
+      seats: withPartner.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: undefined, partnerAttached: undefined }
+        : s)),
+    };
+    expect(resolveExploreLeader(partnerDied, 0, 'partner')).toBe('main');
+    expect(resolveExploreLeader(partnerDied, 0, 'main')).toBe('main');
+    // The fallback is what the picker prices with, so a combo that is legal
+    // for the Main no longer reads as illegal.
+    const { instanceId: handWeapon } = firstWeaponDef(partnerDied);
+    const legal = evaluateExploreCombo(partnerDied, 0, [handWeapon], 1, resolveExploreLeader(partnerDied, 0, 'partner'));
+    expect(legal.legal).toBe(true);
   });
 });
 

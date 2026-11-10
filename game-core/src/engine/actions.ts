@@ -1916,7 +1916,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // ---- Defeat / not-defeated effect hooks (per card) ----
         let fxState: GameState = {
           ...afterPartnerDeath,
-          removed: [...removedIds, ...reaperTrashed.filter(id => !removedIds.includes(id))],
+          removed: [
+            ...removedIds,
+            ...reaperTrashed.filter(id => !removedIds.includes(id)),
+            // Alliance Partner Modification (3) PARTNER DEATH: a Partner at ≤0
+            // HP is removed from the game permanently and ALL cards attached to
+            // it are trashed. Without this the attached cards simply vanished
+            // from the player state while still sitting in `state.cards`.
+            ...(partnerDied ? partnerAttached.filter(id => !removedIds.includes(id)) : []),
+          ],
           mansionDeck: mDeck,
           mansionBottom: mBottom,
         };
@@ -2011,7 +2019,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
           hp: Math.min((resuscitatePending ? 10 : newHp) + onDefeatHeal, player.maxHp),
           ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
-          ...(partnerDied ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined } : {}),
+          ...(partnerDied
+            ? {
+                partnerInstanceId: undefined,
+                partnerAttached: undefined,
+                partnerLeading: undefined,
+                partnerSkillId: undefined,
+                // The Partner is gone, so its Health goes with it - leaving
+                // partnerHp at 0 would leave stale state on the seat.
+                partnerHp: undefined,
+                partnerMaxHp: undefined,
+              }
+            : {}),
           downed,
         });
         for (const g of revealGains) fxState = gainCopy(fxState, g.seat, g.cardId);
@@ -3086,7 +3105,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ...(leadingIsPartner ? { partnerHp: newLeadingHp } : {}),
               partnerAttached: reaperPartnerAttached,
               ...(partnerDied
-                ? { partnerInstanceId: undefined, partnerAttached: undefined, partnerLeading: undefined, partnerSkillId: undefined }
+                ? {
+                    partnerInstanceId: undefined,
+                    partnerAttached: undefined,
+                    partnerLeading: undefined,
+                    partnerSkillId: undefined,
+                    partnerHp: undefined,
+                    partnerMaxHp: undefined,
+                  }
                 : {}),
               downed,
               infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
@@ -3094,7 +3120,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const removedFinal = partnerDied
         ? [...removedAfter, ...afterPartnerDeath.removed.filter(id => !removedAfter.includes(id))]
         : removedAfter;
-      const removedWithReaper = [...removedFinal, ...reaperTrashed.filter(id => !removedFinal.includes(id))];
+      const removedWithReaper = [
+        ...removedFinal,
+        ...reaperTrashed.filter(id => !removedFinal.includes(id)),
+        // Alliance Partner Modification (3) PARTNER DEATH: trash every card the
+        // dead Partner had attached.
+        ...(partnerDied ? reaperPartnerAttached.filter(id => !removedFinal.includes(id)) : []),
+      ];
 
       // Mercenaries: not-defeated infected effects (MA-075/078/079/082/090).
       // Applied on top of the post-explore player so max-HP / inventory / ammo

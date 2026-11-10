@@ -1,5 +1,32 @@
 # HANDOFF — resume here
 
+**Partner death: stale leader selection blocked every explore (2026-11-10):** Manny reported that
+after his Partner died while LEADING an explore (Six Shooter + Knife attached), the following turn he
+could not explore at all. Two defects:
+1. **Client (the blocker).** `ActionBar`'s `leader` is component state (`useState<'main'|'partner'>`)
+   and was never reset when the Partner died. The leader toggle hides itself once
+   `partnerInstanceId` is undefined, but the state survived - so every later explore was priced with
+   `leaderAbilities(state, seat, 'partner')` (which returns `[]` for a dead Partner) and the action
+   was sent as `leader: 'partner'`, which `validate` rejects with `explore: no partner`. The picker
+   also evaluated the combo against `(e.leader ?? 'main') === 'partner'`, so `combo.legal` was false
+   and the Explore button rendered DISABLED. Fixed by adding the pure helper
+   `resolveExploreLeader(state, seat, leader)` in `client/src/ui/explorePicker.ts` (falls back to
+   'main' when the seat has no partner) and using it for the options, the preview and the action, plus
+   an effect that resets the state. **The engine was never at fault here** - `explore` already falls
+   back to the Main when `partnerLeading` is unset, and `enumerate` only offers the Main once the
+   Partner is gone.
+2. **Engine (spec violation, not the blocker).** `docs/rules/ALLIANCE-ENGINE-SPEC.md` (3) PARTNER
+   DEATH: "Partner at ≤0 HP is removed from the game permanently; **trash all cards attached to it**".
+   The death branch only cleared `partnerAttached` - the attached cards (the Six Shooter and Knife)
+   vanished from the player state while still sitting in `state.cards`. Both death sites
+   (`actions.ts` explore path ~line 2014 and the multi-explore path ~line 3088) now append the dead
+   Partner's attached cards to `removed` (the codebase's trash destination - MA-036 Reaper does the
+   same) and also clear `partnerHp`/`partnerMaxHp`, which were left at 0 as stale state.
+   Regression tests: `partnerLevel.test.ts` §7 (death removes the Partner, trashes the attached card,
+   leaves the Main at full Health, and the Main can still explore while `leader: 'partner'` is
+   refused) and `ui.test.tsx` ("falls back to the Main character once the Partner is gone").
+   Gates: game-core 840, client 184, server 102, typecheck clean, vite build OK.
+
 **Unofficial Expansion 1 art re-pulled from Manny's updated sheets (2026-11-10):** Manny sent a
 new EX sheet (840x1216 PNG) and asked for EX-001..EX-009 to be pulled from it. It is a 3x3 grid
 with the **top-middle slot EMPTY (pure white, RGB 255,255,255, std 0)** — that is EX-002's slot,

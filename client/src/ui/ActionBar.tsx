@@ -15,6 +15,7 @@ import {
   exploreCountOptions,
   exploreWeaponOptions,
   legalExplores,
+  resolveExploreLeader,
 } from './explorePicker';
 
 /** Prompt kinds whose numeric options are AMOUNTS (XP), not seat indices. */
@@ -77,11 +78,21 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   // helpers below because the preview must price the LEADING character's
   // abilities, not the Main's.
   const [leader, setLeader] = useState<'main' | 'partner'>('main');
+  // A dead Partner cannot lead. The leader toggle disappears when the Partner
+  // dies, but this state survives the death — without the fallback below every
+  // later explore would still be priced with the (now empty) Partner abilities
+  // and sent as `leader: 'partner'`, which validate rejects with
+  // "explore: no partner". The Main character takes over automatically.
+  const hasPartner = state.seats[seat]?.partnerInstanceId !== undefined;
+  const effectiveLeader = resolveExploreLeader(state, seat, leader);
+  useEffect(() => {
+    if (!hasPartner) setLeader('main');
+  }, [hasPartner]);
 
   // Weapons usable in an explore: hand weapons plus any play-area weapon an
   // ability lets this seat use again (Leon L2 pistolsTwicePerTurn).
-  const weaponOptions = exploreWeaponOptions(state, seat, leader);
-  const best = bestExploreCombo(state, seat, leader);
+  const weaponOptions = exploreWeaponOptions(state, seat, effectiveLeader);
+  const best = bestExploreCombo(state, seat, effectiveLeader);
 
   const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -103,7 +114,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableKey, bestKey]);
 
-  const combo = evaluateExploreCombo(state, seat, selected, exploreCount, leader);
+  const combo = evaluateExploreCombo(state, seat, selected, exploreCount, effectiveLeader);
   const canExplore = explores.length > 0 && prompt === undefined;
   const exploreCounts = exploreCountOptions(state, seat);
   const exploreCountsKey = exploreCounts.join(',');
@@ -434,7 +445,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                 seat,
                 weapons: selected,
                 exploreCount,
-                ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
+                ...(effectiveLeader === 'partner' ? { leader: 'partner' as const } : {}),
                 ...(discardPistols.length > 0 ? { discardedPistols: discardPistols } : {}),
               })}
             >

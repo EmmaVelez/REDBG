@@ -65,6 +65,21 @@ export function legalExplores(state: GameState, seat: number): readonly ExploreA
   );
 }
 
+/**
+ * The leader a seat may actually field. A dead Partner cannot lead, so a
+ * stored 'partner' selection falls back to the Main character — otherwise the
+ * picker prices the combo with the (now empty) Partner abilities and every
+ * explore is sent as `leader: 'partner'`, which validate rejects with
+ * "explore: no partner". Pure, so the fallback is unit-testable.
+ */
+export function resolveExploreLeader(
+  state: GameState,
+  seat: number,
+  leader: 'main' | 'partner',
+): 'main' | 'partner' {
+  return state.seats[seat]?.partnerInstanceId === undefined ? 'main' : leader;
+}
+
 /** Stable key for a weapon-id set + explore count, so selections can be
  *  compared to legal combos. */
 function comboKey(weaponIds: readonly string[], exploreCount: number): string {
