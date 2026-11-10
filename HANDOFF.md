@@ -1,5 +1,32 @@
 # HANDOFF — resume here
 
+**Mansion reveal = battle line + multi-infected one-at-a-time (2026-11-10):** Manny: "update the reveal mansion
+layout, add the player's character and partner card to the left of the weapons used, lead character in the right.
+When multiple infected are revealed animate them into the reveal screen one at a time."
+1. **Layout** (`MansionReveal.tsx` + `styles.css`): the panel is now a 700px-wide BATTLE LINE, left to right —
+   `.mansion-door-party` (the exploring seat's **character + Partner** cards, `compact artOnly`, live HP rings, and a
+   red **LED** tag on whichever one led the explore) | `.mansion-door-weapons` (the unchanged "Weapons used" block,
+   now `max-width: 200px` so a long row wraps instead of stretching the line) | `.mansion-door-card` (the revealed
+   card, still 145px). `flex-wrap: wrap` collapses the line vertically on narrow screens.
+2. **Multiple revealed cards** (`anims.ts`): new `detectReveals(prev, next, mySeat)` returns EVERY card the viewing
+   seat's newest explore revealed, in **reveal order** (the pre-explore `mansionDeck` order IS the reveal order; a
+   WE-019 bottom reveal sorts after the top cards because its instance is in `mansionBottom`). `detectReveal` is now
+   `detectReveals(...)[0] ?? null`, so every existing single-card caller/test is unchanged. A multi-explore
+   (`exploreCount > 1`), a CI-002 Crow chain and a MA-039/MA-072 event expansion all feed the same list.
+3. **Step-through** (`App.tsx`): the reveal state is a `revealQueue` + `revealIndex`. `.mansion-door-card` carries
+   `key={def.id-index}`, so advancing REMOUNTS it and re-runs the new `door-card-in` entrance
+   (`translateX(-46px) scale(0.8)` + fade, 0.35s) — that is what makes the cards arrive ONE AT A TIME. A `1 / 2`
+   progress chip renders when `total > 1`, and the button reads **NEXT** until the last card (**CONTINUE**). The
+   queued pending-death (YOU DIED) screen still fires only after the LAST card is dismissed.
+4. **Party data**: built in `App.tsx` from `explorer.characterInstanceId` / `partnerInstanceId` (resolved with
+   `defForInstance`) plus the explore action's `leader` (default `'main'`); the Partner's HP comes from
+   `partnerHp`/`partnerMaxHp` and BOTH cards get the Main's `decorations` (the Partner levels off the Main's
+   trophies). A forced explore (FCH-008 Sherry) uses the TARGET seat's party — `explorerSeat`, not the viewer.
+**Verified live** (server room, First Timer): `[Hunk + LED] [Combat Knife] [Bui Kichwa]`; a Partner-Mode room:
+`[Hunk 65HP + LED] [Partner 70HP] [Combat Knife x2] [Mimicry Marcus]`; and a throwaway `window.__store` hotseat probe
+(reverted) drove a 2-explore unarmed explore → `1/2 Cerberus` → NEXT → `2/2 CONTINUE` with the entrance animation
+re-running on the remount. Tests: anims +2, ui +3 (the old "prefers a defeated over a re-inserted" case was rewritten
+as the multi-card behaviour it became). Gates: typecheck clean, game-core 853, server 104, client 195, build OK.
 **Leon L2 `pistolsTwicePerTurn` per the official FAQ (2026-11-10):** Manny quoted the Master
 FAQ — *"When he uses a pistol weapon, you can pay its ammo requirement twice for that weapon
 to apply its effect and damage twice"* — and said the game did not do that: it only let a

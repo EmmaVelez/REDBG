@@ -724,6 +724,51 @@ describe('MansionReveal', () => {
     );
     expect(html).not.toContain('data-reveal-weapons');
   });
+
+  it('renders the exploring character and Partner to the left of the weapons', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    const leon = PREMIER_CARDS.find(c => c.id === 'ch-001');
+    const partner = PREMIER_CARDS.find(c => c.type === 'character' && c.id !== 'ch-001');
+    const knife = PREMIER_CARDS.find(c => c.type === 'weapon');
+    if (monster === undefined || leon === undefined || partner === undefined || knife === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal
+        def={monster}
+        resultText="Defeated!"
+        damage={30}
+        weapons={[knife]}
+        party={[{ def: leon, leader: true, hp: 70, maxHp: 80 }, { def: partner, leader: false }]}
+        onContinue={() => {}}
+      />
+    );
+    expect(html).toContain('data-reveal-party');
+    expect(html).toContain('data-leader="true"');
+    expect(html).toContain('LED');
+    // Both character cards are present.
+    expect(html.match(/card card-character/g)?.length).toBe(2);
+  });
+
+  it('shows a progress counter and a Next button for a multi-card reveal', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} index={0} total={3} onContinue={() => {}} />
+    );
+    expect(html).toContain('data-reveal-progress');
+    expect(html).toContain('1 / 3');
+    expect(html).toContain('Next');
+  });
+
+  it('reads Continue on the last card of a multi-card reveal', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} index={2} total={3} onContinue={() => {}} />
+    );
+    expect(html).toContain('3 / 3');
+    expect(html).not.toContain('Next');
+    expect(html).toContain('Continue');
+  });
 });
 
 describe('YouDiedOverlay', () => {

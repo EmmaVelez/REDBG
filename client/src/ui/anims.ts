@@ -112,27 +112,43 @@ function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
 }
 
 /**
- * The card revealed by the viewing player's most recent explore, if any.
- * Requires the newest logged action to be an explore by `mySeat` AND a
- * revealed instance that is now somewhere other than the top of the
- * mansion. Returns null when there is no fresh reveal (bots exploring,
- * reshuffles, non-infected prompts).
+ * The cards revealed by the viewing player's most recent explore, if any, in
+ * REVEAL ORDER (the order they came out of the Mansion — top card first).
+ *
+ * A single explore reveals one card, but a multi-explore (`exploreCount > 1`),
+ * a CI-002 Crow chain or a MA-039/MA-072 event expansion reveals SEVERAL in one
+ * action; the reveal panel steps through them one at a time.
+ *
+ * Requires the newest logged action to be an explore by `mySeat` (or a forced
+ * explore by it) AND a revealed instance that is now somewhere other than the
+ * top of the mansion. Returns null when there is no fresh reveal (bots
+ * exploring, reshuffles, non-infected prompts).
  */
-export function detectReveal(prev: GameState, next: GameState, mySeat: number): Reveal | null {
+export function detectReveals(prev: GameState, next: GameState, mySeat: number): readonly Reveal[] {
   const last = next.log[next.log.length - 1];
-  if (last === undefined) return null;
+  if (last === undefined) return [];
   const action = last.action;
-  if (action.type !== 'explore') return null;
+  if (action.type !== 'explore') return [];
   // A forced explore (FCH-008 Sherry) is shown to the exploring seat AND to the
   // seat that forced it: in pass-and-play that is the device holder, and in a
   // server room the target may be a bot with no client of its own.
-  if (action.seat !== mySeat && action.forcedBy !== mySeat) return null;
+  if (action.seat !== mySeat && action.forcedBy !== mySeat) return [];
 
   const damage = exploreDamage(prev, action.seat, action.weapons);
   const weapons = action.weapons;
+  const base = { explorerSeat: action.seat, damage, weapons };
 
   const prevZones = zoneIndex(prev);
   const nextZones = zoneIndex(next);
+
+  // Revealed cards come out of the deck top-first, so the pre-explore deck
+  // order IS the reveal order. A bottom reveal (WE-019) comes after every top
+  // card — its instance sits in `mansionBottom`, which is scanned second.
+  const revealOrder = new Map<string, number>();
+  prev.mansionDeck.forEach((id, i) => revealOrder.set(id, i));
+  prev.mansionBottom.forEach((id, i) => revealOrder.set(id, prev.mansionDeck.length + i));
+
+  const outcomes = new Map<string, Reveal['outcomeZone']>();
   for (const [instanceId, nextLoc] of nextZones) {
     if (instanceId.startsWith('hidden-')) continue;
     const prevLoc = prevZones.get(instanceId);
@@ -140,7 +156,7 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
     if (prevLoc.zone !== 'mansion') continue;
     if (sameLoc(prevLoc, nextLoc)) continue;
     if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
-      return { instanceId, outcomeZone: nextLoc.zone, explorerSeat: action.seat, damage, weapons };
+      outcomes.set(instanceId, nextLoc.zone);
     }
   }
 
@@ -152,11 +168,21 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
   const revealedCount = Math.max(1, action.exploreCount ?? 1);
   for (const instanceId of prev.mansionDeck.slice(0, revealedCount)) {
     if (instanceId.startsWith('hidden-')) continue;
-    if (next.mansionDeck.includes(instanceId)) {
-      return { instanceId, outcomeZone: 'mansion', explorerSeat: action.seat, damage, weapons };
-    }
+    if (next.mansionDeck.includes(instanceId)) outcomes.set(instanceId, 'mansion');
   }
-  return null;
+
+  return [...outcomes.entries()]
+    .map(([instanceId, outcomeZone]) => ({ instanceId, outcomeZone, ...base }))
+    .sort(
+      (a, b) =>
+        (revealOrder.get(a.instanceId) ?? Number.MAX_SAFE_INTEGER) -
+        (revealOrder.get(b.instanceId) ?? Number.MAX_SAFE_INTEGER),
+    );
+}
+
+/** The first revealed card — the single-card view of `detectReveals`. */
+export function detectReveal(prev: GameState, next: GameState, mySeat: number): Reveal | null {
+  return detectReveals(prev, next, mySeat)[0] ?? null;
 }
 
 /**

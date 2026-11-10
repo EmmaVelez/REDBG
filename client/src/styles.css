@@ -983,6 +983,63 @@ h1, h2 { margin: 0 0 8px; }
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+  /* Each revealed card re-runs this entrance (the element is keyed by card +
+     index), so a multi-explore's cards animate in ONE AT A TIME. */
+  animation: door-card-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+@keyframes door-card-in {
+  from { transform: translateX(-46px) scale(0.8); opacity: 0; }
+  to   { transform: translateX(0) scale(1); opacity: 1; }
+}
+/* The battle line: your character + Partner | weapons used | revealed card. */
+.mansion-door-battle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.mansion-door-party {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mansion-door-party-member {
+  position: relative;
+}
+.mansion-door-party-member .card {
+  width: 72px;
+  min-height: 0;
+  padding: 6px;
+  gap: 2px;
+  font-size: 10px;
+}
+.mansion-door-party-member .card::before { height: 22px; }
+.mansion-door-party-member .card-cost { min-width: 18px; height: 18px; line-height: 16px; font-size: 10px; }
+.mansion-door-party-member .card-name { font-size: 10px; }
+.mansion-door-party-member .card-emoji { font-size: 22px; }
+.mansion-door-leader-tag {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: linear-gradient(180deg, #d8282f 0%, #8f1419 100%);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #5b0d11;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.mansion-door-progress {
+  color: #9aa1ad;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 .mansion-door-card .card {
   background: transparent !important;
@@ -1073,7 +1130,7 @@ h1, h2 { margin: 0 0 8px; }
     linear-gradient(180deg, #1d1911 0%, #0e0b06 100%);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.85), inset 0 0 40px rgba(0, 0, 0, 0.6);
   animation: door-panel-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-  max-width: 340px;
+  max-width: 700px;
   text-align: center;
 }
 @keyframes door-panel-in {
@@ -1122,6 +1179,7 @@ h1, h2 { margin: 0 0 8px; }
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  max-width: 200px;
 }
 .mansion-door-weapons-label {
   color: #9aa1ad;

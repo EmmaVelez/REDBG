@@ -13,8 +13,19 @@ import { Lobby } from './ui/Lobby';
 import { MansionReveal } from './ui/MansionReveal';
 import { SeatSwap } from './ui/SeatSwap';
 import { YouDiedOverlay } from './ui/YouDiedOverlay';
-import { detectPlayerDowned, detectReveal } from './ui/anims';
+import { detectPlayerDowned, detectReveals } from './ui/anims';
 import { defForInstance } from './ui/cards';
+import type { RevealPartyMember } from './ui/MansionReveal';
+
+/** One step of the mansion-door reveal: a revealed card plus its outcome. */
+interface RevealEntry {
+  readonly def: CardDef;
+  readonly resultText: string;
+  readonly damage: number;
+  readonly weapons: readonly CardDef[];
+  readonly explorerSeat: number;
+  readonly party: readonly RevealPartyMember[];
+}
 
 /**
  * M4 wiring: single socket for the app, store as the single source of truth,
@@ -81,7 +92,10 @@ export function App(): JSX.Element {
   // seat's explore revealed an Infected, and hold the table on a readable
   // reveal until the player clicks Continue.
   const prevStateRef = useRef<GameState | null>(null);
-  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[]; explorerSeat: number } | null>(null);
+  // A multi-explore reveals several cards at once; the queue holds them all and
+  // the panel steps through one at a time (the index is the current card).
+  const [revealQueue, setRevealQueue] = useState<RevealEntry[] | null>(null);
+  const [revealIndex, setRevealIndex] = useState(0);
   const [youDied, setYouDied] = useState<boolean | null>(null);
   /** Log sidebar visibility — closed frees the whole sidebar width for the board.
    *  On a narrow screen the log is an off-canvas slide-over, so it starts CLOSED
@@ -154,8 +168,8 @@ export function App(): JSX.Element {
     prevStateRef.current = state;
     if (prev === null || state === null || prev.version === state.version) return;
     const downed = detectPlayerDowned(prev, state, mySeat);
-    const detected = detectReveal(prev, state, mySeat);
-    if (downed !== null && detected !== null) {
+    const detected = detectReveals(prev, state, mySeat);
+    if (downed !== null && detected.length > 0) {
       // Both on the same step: show the reveal first, then YOU DIED.
       pendingDeathRef.current = downed;
     } else if (downed !== null) {
@@ -163,23 +177,64 @@ export function App(): JSX.Element {
       pendingDeathRef.current = null;
       return;
     }
-    if (detected === null) return;
-    const def = defForInstance(state, detected.instanceId);
-    if (def === null) return;
-    const resultText =
-      detected.outcomeZone === 'attached'
-        ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
-        : detected.outcomeZone === 'removed'
-          ? `${def.name} was removed from the Mansion.`
-          : detected.outcomeZone === 'mansion'
-            ? `${def.name} was returned to the Mansion deck.`
-            : `${def.name} escaped to the bottom of the Mansion.`;
-    // Resolve the explore's weapon instances to defs for the reveal panel.
-    const weaponDefs = detected.weapons
-      .map(id => defForInstance(state, id))
-      .filter((d): d is CardDef => d !== null);
-    setReveal({ def, resultText, damage: detected.damage, weapons: weaponDefs, explorerSeat: detected.explorerSeat });
+    if (detected.length === 0) return;
+    const firstReveal = detected[0];
+    if (firstReveal === undefined) return;
+
+    // Who led the explore: the leading character is the one that took the hit,
+    // so the party cards name it for the reveal panel.
+    const lastAction = state.log[state.log.length - 1]?.action;
+    const leader: 'main' | 'partner' =
+      lastAction?.type === 'explore' ? (lastAction.leader ?? 'main') : 'main';
+    const explorer = state.seats[firstReveal.explorerSeat];
+    const party: RevealPartyMember[] = [];
+    if (explorer !== undefined) {
+      const mainDef = defForInstance(state, explorer.characterInstanceId);
+      const partnerDef = defForInstance(state, explorer.partnerInstanceId);
+      if (mainDef !== null) {
+        party.push({
+          def: mainDef,
+          leader: leader === 'main',
+          hp: explorer.hp,
+          maxHp: explorer.maxHp,
+          decorations: explorer.decorations,
+        });
+      }
+      if (partnerDef !== null) {
+        party.push({
+          def: partnerDef,
+          leader: leader === 'partner',
+          hp: explorer.partnerHp ?? explorer.hp,
+          maxHp: explorer.partnerMaxHp ?? explorer.maxHp,
+          decorations: explorer.decorations,
+        });
+      }
+    }
+
+    const queue: RevealEntry[] = [];
+    for (const r of detected) {
+      const def = defForInstance(state, r.instanceId);
+      if (def === null) continue;
+      const resultText =
+        r.outcomeZone === 'attached'
+          ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
+          : r.outcomeZone === 'removed'
+            ? `${def.name} was removed from the Mansion.`
+            : r.outcomeZone === 'mansion'
+              ? `${def.name} was returned to the Mansion deck.`
+              : `${def.name} escaped to the bottom of the Mansion.`;
+      // Resolve the explore's weapon instances to defs for the reveal panel.
+      const weaponDefs = r.weapons
+        .map(id => defForInstance(state, id))
+        .filter((d): d is CardDef => d !== null);
+      queue.push({ def, resultText, damage: r.damage, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
+    }
+    if (queue.length === 0) return;
+    setRevealQueue(queue);
+    setRevealIndex(0);
   }, [state, mySeat]);
+
+  const revealCurrent = revealQueue !== null ? revealQueue[revealIndex] ?? null : null;
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
   const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
@@ -224,7 +279,7 @@ export function App(): JSX.Element {
     gameState.phase !== 'main' ||
     gameState.activeSeat !== mySeat ||
     gameState.prompts.some(p => p.seat === mySeat) ||
-    reveal !== null ||
+    revealCurrent !== null ||
     youDied !== null ||
     passPending;
 
@@ -267,15 +322,25 @@ export function App(): JSX.Element {
           roomCode={room?.roomCode ?? null}
         />
       </footer>
-      {reveal !== null && (
+      {revealCurrent !== null && (
         <MansionReveal
-          def={reveal.def}
-          resultText={reveal.resultText}
-          damage={reveal.damage}
-          weapons={reveal.weapons}
-          damageLabel={reveal.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
+          def={revealCurrent.def}
+          resultText={revealCurrent.resultText}
+          damage={revealCurrent.damage}
+          weapons={revealCurrent.weapons}
+          damageLabel={revealCurrent.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
+          party={revealCurrent.party}
+          index={revealIndex}
+          total={revealQueue?.length ?? 1}
           onContinue={() => {
-            setReveal(null);
+            // Several cards revealed in one explore: step through them one at
+            // a time, then dismiss (and play the queued death screen, if any).
+            if (revealQueue !== null && revealIndex < revealQueue.length - 1) {
+              setRevealIndex(revealIndex + 1);
+              return;
+            }
+            setRevealQueue(null);
+            setRevealIndex(0);
             const queued = pendingDeathRef.current;
             pendingDeathRef.current = null;
             if (queued !== null) {

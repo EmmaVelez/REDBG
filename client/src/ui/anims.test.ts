@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '@re/game-core';
-import { detectPlayerDowned, detectReveal, diffCardMoves } from './anims';
+import { detectPlayerDowned, detectReveal, detectReveals, diffCardMoves } from './anims';
 import { flightPath, splitFlightPhases } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
@@ -214,7 +214,7 @@ describe('detectReveal', () => {
     expect(detectReveal(prev, next, 0)?.outcomeZone).toBe('mansion');
   });
 
-  it('prefers a defeated Infected over a re-inserted one in the same explore', () => {
+  it('reports EVERY revealed card of a multi-explore, in reveal order', () => {
     const prev = makeState({ mansionDeck: ['mx-001#1', 'ma-001#1'], seats: [{ seat: 0 }] });
     const next = makeState({
       version: 2,
@@ -222,7 +222,26 @@ describe('detectReveal', () => {
       seats: [{ seat: 0, attached: ['ma-001#1'] }],
       log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 2 } }],
     });
-    expect(detectReveal(prev, next, 0)?.outcomeZone).toBe('attached');
+    // The top card (mx-001) is revealed first and re-inserted; the second
+    // (ma-001) is defeated and attached. Both are reported, in that order.
+    expect(detectReveals(prev, next, 0).map(r => [r.instanceId, r.outcomeZone])).toEqual([
+      ['mx-001#1', 'mansion'],
+      ['ma-001#1', 'attached'],
+    ]);
+    // The single-card view stays the first revealed card.
+    expect(detectReveal(prev, next, 0)?.instanceId).toBe('mx-001#1');
+  });
+
+  it('reports several defeated Infected from one multi-explore, top card first', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#1', 'ma-002#1', 'ma-003#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['ma-003#1'],
+      seats: [{ seat: 0, attached: ['ma-001#1', 'ma-002#1'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 2 } }],
+    });
+    expect(detectReveals(prev, next, 0).map(r => r.instanceId)).toEqual(['ma-001#1', 'ma-002#1']);
+    expect(detectReveals(prev, next, 0).every(r => r.outcomeZone === 'attached')).toBe(true);
   });
 
   it('does not report a card that merely shifted up when the revealed card left', () => {
