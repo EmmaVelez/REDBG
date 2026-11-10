@@ -24,6 +24,14 @@ describe('HealthRing', () => {
     expect(html).toContain('aria-label="Health 90 of 90"');
   });
 
+  it('the HP number carries the health-ring-label class the text-shadow hangs off', () => {
+    // The 2px all-round shadow on the gauge number is pure CSS
+    // (`.health-ring-label { text-shadow: ... }`), so the class is the contract:
+    // if a refactor drops it, the number goes back to being unreadable over art.
+    const html = renderToStaticMarkup(<HealthRing hp={40} maxHp={80} />);
+    expect(html).toMatch(/<text[^>]*class="health-ring-label"[^>]*>40<\/text>/);
+  });
+
   it('half health fills half the ring (50 of 90 -> 5 filled, 4 empty)', () => {
     const html = renderToStaticMarkup(<HealthRing hp={50} maxHp={90} />);
     expect(html).toContain('data-filled="5"');

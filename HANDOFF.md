@@ -1,5 +1,22 @@
 # HANDOFF — resume here
 
+**Health-gauge number shadow + skill-box decoration cost (2026-11-10):** Two small UI asks from Manny.
+1. **2px shadow all round the gauge number.** `.health-ring-label` (the `<text>` inside every
+   `HealthRing` - characters AND infected cards share the class, so one rule covers every gauge) now
+   carries four directional `text-shadow`s at 2px offset / 2px blur, `rgba(0,0,0,0.85)`. Four shadows
+   rather than one blurred one: `0 0 2px` leaves the diagonals too thin to read as an outline. The
+   shadow is pure CSS, so the class is the whole contract - `HealthRing.test.tsx` gained a test that
+   asserts `<text class="health-ring-label">` survives, because dropping it silently makes the number
+   unreadable over art.
+2. **Decoration cost before the star in the character skill box.** `.skill-box` in `CardView.tsx` read
+   `Lv{level}:★` / `Lv{level}:☆`; it now reads `Lv{level}:{gate}{star}` where `gate` is that tier's
+   `level1At`/`level2At`. Most characters gate L1 at 0, so they read `Lv1:0★` - the 0 means "active
+   from the start", not a typo. The six `ui.test.tsx` assertions that pinned the old `Lv1:★` /
+   `Lv1:☆` strings were updated to the real gates (Chris 0/4, LK-001 1/8, CR-001 0/7, CC-001 2/5,
+   CU-001 3/8, Leon 2/6, Krauser 1/7). Verified in the browser: the skill boxes rendered
+   `Lv1:2☆ / Lv2:4☆ / Lv1:2☆ / Lv2:6☆` and `getComputedStyle` on the gauge label returned the four
+   2px shadows. Gates: client 188, typecheck clean, vite build OK.
+
 **CU-001 Ricardo Irving art re-pulled UNCROPPED (2026-11-10):** Manny sent a single-card image of
 Ricardo Irving (569x800 JPG) and said "update the card art for this one, do not crop". The existing
 `CARD-ART/CU-001.png` was still the old **320x260 ART WINDOW** (portrait only - no `[CHARACTER]`

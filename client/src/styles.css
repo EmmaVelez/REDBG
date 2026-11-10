@@ -738,7 +738,18 @@ h1, h2 { margin: 0 0 8px; }
   flex-shrink: 0;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
-.health-ring-label { font-weight: 700; font-family: inherit; }
+.health-ring-label {
+  font-weight: 700;
+  font-family: inherit;
+  /* 2px of shadow on all four sides, so the number stays legible over any
+     artwork. Four directional shadows rather than one blurred one: a single
+     `0 0 2px` leaves the diagonals too thin to read as an outline. */
+  text-shadow:
+    2px 0 2px rgba(0, 0, 0, 0.85),
+    -2px 0 2px rgba(0, 0, 0, 0.85),
+    0 2px 2px rgba(0, 0, 0, 0.85),
+    0 -2px 2px rgba(0, 0, 0, 0.85);
+}
 .health-segment { transition: stroke 0.25s; }
 .player-character-row {
   display: flex;

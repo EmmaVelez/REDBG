@@ -134,9 +134,10 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
           {levels.map(entry => {
             // Each tier has its own decoration gate. Level 1 uses level1At — 0 for
             // most characters (active and green from the start, e.g. Chris), 1 for
-            // Krauser — and Level 2 uses level2At. The stat box reads "Lv1:★" when
-            // that tier is unlocked and "Lv1:☆" while it is still gated (the gate
-            // itself is in the tooltip and in data-level1-at / data-level2-at).
+            // Krauser — and Level 2 uses level2At. The stat box reads "Lv1:3★" /
+            // "Lv1:3☆", where the number is that tier's Decoration cost (the gate
+            // itself also stays in the tooltip and in data-level1-at /
+            // data-level2-at).
             const gate = entry.level === 1 ? level1At : level2At;
             const unlocked = decorations >= gate;
             return (
@@ -147,7 +148,7 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
                 data-unlocked={unlocked || undefined}
               >
                 <span className="skill-box" title={`Level ${entry.level} · unlocks at ${gate} ★`}>
-                  Lv{entry.level}:{unlocked ? '★' : '☆'}
+                  Lv{entry.level}:{gate}{unlocked ? '★' : '☆'}
                 </span>
                 <span className="skill-text">{entry.text}</span>
               </div>
