@@ -37,6 +37,12 @@ export interface GameServerOptions {
   readonly tokenFn?: () => string;
   /** Injectable RNG for bot actions (deterministic tests). */
   readonly rand?: () => number;
+  /**
+   * Test hook: override the bot-only endgame action budget (production
+   * default 8000). Lets a test exercise the "bots cannot finish" conclusion
+   * without playing tens of thousands of actions.
+   */
+  readonly botEndgameBudget?: number;
 }
 
 export interface GameServer {
@@ -126,14 +132,80 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
     }
   };
 
+  /** Bot actions per advanceBots pass. A YIELD POINT, not a stop: the pass
+   *  returns so the event loop can breathe and the caller can broadcast. */
+  const BOT_PASS_BUDGET = 200;
+  /** Delay between background bot passes (ms). */
+  const BOT_PASS_DELAY_MS = 50;
+  /** Background bot actions allowed in one bot-only stretch. Bounds the cost
+   *  of an endgame the bots cannot finish (a known balance limit). */
+  const BOT_ENDGAME_BUDGET = options.botEndgameBudget ?? 8000;
+  /** roomCode -> bot actions spent in the current bot-only stretch. */
+  const botStretchActions = new Map<string, number>();
+  /** roomCode -> pending background pass (one at a time per room). */
+  const botPassTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * Rank every seat by Decorations then Health — exactly the ranking
+   * `checkWin` uses — for ending a bot-only endgame the bots cannot finish.
+   */
+  const rankByScore = (state: GameState): number[] => {
+    const ranked = state.seats
+      .map((seat, i) => ({ index: i, decorations: seat.decorations, hp: seat.hp }))
+      .sort((a, b) => b.decorations - a.decorations || b.hp - a.hp);
+    const top = ranked[0];
+    if (top === undefined) return [];
+    return ranked
+      .filter(w => w.decorations === top.decorations && w.hp === top.hp)
+      .map(w => w.index)
+      .sort((a, b) => a - b);
+  };
+
+  /**
+   * End a bot-only endgame that has run out of budget: report the match over
+   * with the current score ranking. Without this the room would grind forever
+   * on a game the bots cannot finish.
+   */
+  const concludeBotOnlyGame = (roomCode: string): HostResult | undefined => {
+    const state = hosts.get(roomCode)?.state;
+    if (state === undefined) return undefined;
+    return { ok: true, state, gameOver: true, winners: rankByScore(state), endReason: 'allHumansDead' };
+  };
+
+  /**
+   * Keep the bots playing when no human can move the game forward. A dead (or
+   * departed) human cannot nudge the game, so stopping here would freeze the
+   * room on a bot's turn forever — the reported "frozen waiting for Bot N".
+   */
+  const scheduleBotPass = (roomCode: string): void => {
+    if (botPassTimers.has(roomCode)) return;
+    const timer = setTimeout(() => {
+      botPassTimers.delete(roomCode);
+      const host = hosts.get(roomCode);
+      if (host === undefined || host.state === undefined) return;
+      const result = advanceBots(roomCode);
+      broadcastGameViews(roomCode);
+      if (result !== undefined && result.ok && result.gameOver) {
+        broadcastToRoom(roomCode, { kind: 'gameOver', winners: result.winners, endReason: result.endReason });
+      }
+    }, BOT_PASS_DELAY_MS);
+    botPassTimers.set(roomCode, timer);
+  };
+
   /**
    * After a human move, keep advancing the active bot seats until a human is
-   * active again (or the game is over). Bounded so a bug can't spin forever.
+   * active again (or the game is over).
+   *
+   * The per-pass budget only yields to the event loop; the stretch continues
+   * in background passes until the game ends or a budget cap ends the match.
+   * Stopping mid-stretch would leave the room waiting on a bot's turn with no
+   * human able to move it forward.
    */
   const advanceBots = (roomCode: string): HostResult | undefined => {
     const host = hosts.get(roomCode);
     if (host === undefined || host.state === undefined) return undefined;
-    for (let guard = 0; guard < 2000; guard++) {
+    let acted = 0;
+    for (let guard = 0; guard < BOT_PASS_BUDGET; guard++) {
       const state = host.state;
       if (state === undefined) return undefined;
       const room = roomStore.getRoom(roomCode);
@@ -142,11 +214,28 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
       // pick/keep seat; activeSeat stays 0 until the draft ends.
       const seat = seatAwaitingAction(state);
       const sitter = room.players.find(p => p.seat === seat);
-      if (sitter === undefined || !sitter.isBot) return undefined; // human or no one: stop
+      if (sitter === undefined || !sitter.isBot) {
+        // Reached a human (or an empty seat): the stretch is over.
+        botStretchActions.delete(roomCode);
+        return undefined;
+      }
       const result = host.stepBot(Math.floor(random() * 2 ** 31), 'hard');
       if (result === undefined || !result.ok) return undefined;
-      if (result.gameOver) return result; // ok + over: the caller must broadcast gameOver
+      if (result.gameOver) {
+        botStretchActions.delete(roomCode);
+        return result; // ok + over: the caller must broadcast gameOver
+      }
+      acted++;
     }
+    // Pass budget spent while still on a bot's turn. Keep the stretch going;
+    // a bot-only game never ends at a human's turn, so nothing else would.
+    const spent = (botStretchActions.get(roomCode) ?? 0) + acted;
+    if (spent >= BOT_ENDGAME_BUDGET) {
+      botStretchActions.delete(roomCode);
+      return concludeBotOnlyGame(roomCode);
+    }
+    botStretchActions.set(roomCode, spent);
+    scheduleBotPass(roomCode);
     return undefined;
   };
 
@@ -263,6 +352,13 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
             roomStore.leaveRoom(roomCode, session.clientId);
             session.roomCode = null;
             broadcastRoomState(roomCode);
+            // A room that is now empty takes its bot-endgame state with it.
+            const timer = botPassTimers.get(roomCode);
+            if (timer !== undefined) {
+              clearTimeout(timer);
+              botPassTimers.delete(roomCode);
+            }
+            botStretchActions.delete(roomCode);
           }
         } else {
           watchersOf(roomCode).delete(ws);

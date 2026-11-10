@@ -29,7 +29,7 @@ import type { Room } from './rooms';
  */
 
 export type HostResult =
-  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[]; readonly endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' }
+  | { readonly ok: true; readonly state: GameState; readonly gameOver: boolean; readonly winners: readonly number[]; readonly endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' | 'allHumansDead' }
   | { readonly ok: false; readonly reason: string };
 
 export interface GameHost {
