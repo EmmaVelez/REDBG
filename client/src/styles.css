@@ -266,7 +266,7 @@ h1, h2 { margin: 0 0 8px; }
   left: 0;
   right: 0;
   height: auto;
-  aspect-ratio: 320 / 292;
+  aspect-ratio: 320 / 448;
   transform: translateY(-50%);
 }
 .card-character.card-art-only::after { display: none; } /* corner ticks */
@@ -420,8 +420,10 @@ h1, h2 { margin: 0 0 8px; }
   object-position: center;
 }
 .card-character .card-portrait.card-portrait-has-art::after { content: none; }
-/* promo (PR-*) art is still the 320x292 art window, not the full card */
-.card-character.card-promo .card-portrait { aspect-ratio: 320 / 292; }
+/* promo (PR-*) art is the WHOLE CARD SCAN (320x448 from the 550x770 cell), the
+   same uncropped treatment the regular character art got. The printed health
+   badge still sits in the art's top-right corner. */
+.card-character.card-promo .card-portrait { aspect-ratio: 320 / 448; }
 
 /* per-type accents (matching the game's color language) */
 .card-weapon    { --card-accent: #8fa3b0; }
@@ -477,9 +479,9 @@ h1, h2 { margin: 0 0 8px; }
 /* The live health ring is overlaid on the Health badge printed on the card
    scan, so the card needs no header row and no name bar. Badge geometry was
    measured on the 320x456 CH art (centre ~(287,35), ~40px across); the promo
-   art is the shorter 320x292 window so its badge sits higher. The percentages
-   resolve against .card-portrait, whose aspect ratio matches the art, so the
-   overlay tracks the card at any size. */
+   art is the whole 320x448 card, same template with a slightly thinner header
+   (centre ~(287,30)). The percentages resolve against .card-portrait, whose
+   aspect ratio matches the art, so the overlay tracks the card at any size. */
 .card-character {
   --cc-badge-x: 89.7%;
   --cc-badge-y: 7.7%;
@@ -488,8 +490,8 @@ h1, h2 { margin: 0 0 8px; }
   --cc-badge-size: 18%;
 }
 .card-character.card-promo {
-  --cc-badge-x: 89.5%;
-  --cc-badge-y: 4.5%;
+  --cc-badge-x: 89.7%;
+  --cc-badge-y: 6.7%;
   --cc-badge-size: 18%;
 }
 .card-character .cc-hp-ring {

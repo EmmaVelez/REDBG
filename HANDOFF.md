@@ -1,5 +1,28 @@
 # HANDOFF — resume here
 
+**Promo (PR-*) art re-extracted as WHOLE CARDS (2026-11-09):** Manny supplied the
+promo contact sheet (`...\Tabletop Simulator\Mods\Images\httpssteamusercontentaakamaihdnetugc8597016264951356044441A5720A186471CFB7F9630C44D760C710889.png`,
+5500x5390, cards filling only the top 1539 px: 10 @ 550x770 in row 1 + the stray
+CH-022 Kevin Ryman below) and asked for the promo character cards to be pulled from it,
+replacing the images in use. The existing PR-*.png were the 320x292 ART-WINDOW crops
+(portrait only — no name banner, no ability text), the last holdout after the regular CH
+art went full-card. Now all ten are the WHOLE CARD SCAN: 320x448 (550x770 cell), quantized
+to 256 colours (~101-114 KB each, was ~100 KB at the smaller window). Cell→code mapping
+was confirmed by PIXEL-MATCHING the old crops against the new cells (mean abs diff 4.4-7.5
+for the true match vs 33-74 for the rest) and cross-checked with bottom-right corner OCR —
+the OCR misread r0c8 as PR-001 (it is PR-002); trust the pixel match. Mapping:
+PR-001←r0c5, PR-002←r0c8, PR-003←r0c7, PR-004←r0c9, PR-005←r0c3, PR-006←r0c0,
+PR-007←r0c4, PR-008←r0c6, PR-009←r0c1, PR-010←r0c2. The stray CH-022 was skipped (a
+duplicate the character sheet already covers). CSS: `.card-character.card-promo
+.card-portrait` (and the art-only variant) moved from `aspect-ratio: 320/292` to
+`320/448`, and the promo health-ring badge moved from (89.5%,4.5%) to (89.7%,6.7%) —
+measured by comparing the PR-001 badge against the CH-001 badge in the same crop (same x,
+~5px higher). **Verified in the browser:** the promo card renders the complete card
+(banner, art, name, both abilities) with the ring concentric on the printed badge, and the
+img box (54x76.4) sits inside the card (56x79.8) with `object-fit: contain` so nothing is
+clipped. Note: PR-003..PR-008 have no engine `CardDef` (promo-only cards) but their art is
+kept, as before.
+
 **The Partner is a full second character + bots heal their Partner (2026-11-09):**
 Follow-up to the partner-leveling commit. Four pieces:
 (1) **`seatAbilities(state, seat)`** (engine/abilities.ts) = the Main's abilities PLUS the
