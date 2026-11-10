@@ -1,5 +1,37 @@
 # HANDOFF — resume here
 
+**Non-Infected reveals open the overlay, their prompts render inside it, and the panel locks (2026-11-10):**
+Manny: "Non infected cards should still trigger the mansion reveal screen, prompts caused by revealed non
+infected cards should display in the reveal mansion screen, the reveal screen should lock until all prompts are
+resolved."
+1. **Why they were invisible** (`anims.ts`): for a non-Infected reveal the engine REMOVES the card from the
+   mansion deck and parks it in **NO zone** while its `takeOrBottom` prompt is open. `detectReveals`' zone diff
+   only matched cards that moved `mansion -> attached/mansionBottom/removed`, and the re-insertion scan only
+   matched cards found back in the deck — so a parked card was seen by neither. `Reveal.outcomeZone` gains
+   `'pending'`, and `detectReveals` now also walks the revealed set (the top `exploreCount` of the PRE-explore
+   deck) for a card that is in **no zone at all** in the next state. Everything else is unchanged: re-inserted
+   cards still report `'mansion'`, and the zone diff still catches defeated/escaped/removed plus crow and
+   MA-039/MA-072 expansions that land beyond the top N.
+2. **Prompts inside the panel** (`MansionReveal.tsx`): new `prompts` / `state` / `onChooseOption` props. Pending
+   prompts render as the prompt text + option buttons inside the overlay (it would otherwise cover the ActionBar
+   they used to live in). `locked = prompts.length > 0` disables Continue and shows "Answer the choice above to
+   continue." A `'pending'` outcome reads "`<name>` is revealed — answer the choice below to continue."
+3. **Who gets the buttons** (`App.tsx`): the panel receives the exploring seat's **live** prompts and a
+   `chooseOption` dispatcher, but ONLY when the viewer IS the explorer. The server rejects a `chooseOption`
+   whose seat is not the sender's (`host.ts`: `action.seat !== human.seat`), so a forced-explore watcher
+   (FCH-008 Sherry watching a bot explore) must not be offered buttons it cannot press. The exploring seat can
+   never have a pre-existing prompt (validate gates every action behind "resolve pending prompt first"), so
+   everything pending at reveal time is reveal-caused.
+4. **Shared labels**: `client/src/ui/promptLabels.ts` is the option-label helper extracted from `ActionBar`, so
+   the overlay and the ActionBar render identical option labels.
+**Verified live** via a throwaway `window.__store` hotseat probe (reverted): exploring into the Rocket Launcher
+Case token opened the overlay with the token card, the "Gain the Rocket Launcher weapon" prompt and its TAKE /
+SEND TO BOTTOM OF MANSION buttons inside the panel, Continue disabled (`data-reveal-locked="true"` + the hint);
+clicking TAKE granted the weapon to the discard, dropped `state.prompts` to 0 and re-enabled Continue. A second
+run with the Gatling Gun Case token was screenshot-verified. Tests: anims +2 (limbo detection; ordering with an
+Infected revealed in the same explore), ui +2 (prompt + lock render; Continue enabled when no prompt opened).
+Gates: typecheck clean, game-core 864, server 104, client 201, build OK.
+
 **Mansion reveal = battle line + multi-infected one-at-a-time (2026-11-10):** Manny: "update the reveal mansion
 layout, add the player's character and partner card to the left of the weapons used, lead character in the right.
 When multiple infected are revealed animate them into the reveal screen one at a time."

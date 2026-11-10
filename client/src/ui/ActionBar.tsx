@@ -19,9 +19,7 @@ import {
   grantedExploresForSelection,
   toggleWeaponDouble,
 } from './explorePicker';
-
-/** Prompt kinds whose numeric options are AMOUNTS (XP), not seat indices. */
-const AMOUNT_KINDS = new Set(['we046ChooseAmount', 'skillRemoveXpAmount']);
+import { optionLabel } from './promptLabels';
 
 /** Action types the rest of the UI already exposes (Hand / Board / SkillPanel /
  *  ActionBar). Any OTHER legal action is rendered as a generic button in the
@@ -195,20 +193,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     if (a.character === 'partner') return 'Partner: ' + (levelText ?? 'Use ability');
     return levelText ?? 'Use ability';
   };
-  // Prompt options are card instance ids, 'DONE' for multi-choice chains, seat
-  // numbers for player-choice prompts (Wesker L2 target, Rebecca L1 redirect),
-  // or bare amounts (XP removal). Render a readable label for each.
-  const optionLabel = (opt: string, kind: unknown): string => {
-    if (opt === 'DONE') return 'Done';
-    // XP-amount prompts offer numbers that are amounts, NOT seat indices.
-    if (typeof kind === 'string' && AMOUNT_KINDS.has(kind)) return `${opt} XP`;
-    if (/^\d+$/.test(opt)) {
-      const target = state.seats[Number(opt)];
-      return target !== undefined ? `${target.name} (seat ${target.seat})` : opt;
-    }
-    const def = defForInstance(state, opt) ?? state.cardDefs[opt];
-    return def?.name ?? opt;
-  };
   const phaseNote = state.phase === 'gameOver' ? 'Game over'
     : state.phase === 'turnEnd' ? 'Resolving turn end…'
     : state.activeSeat === seat ? undefined
@@ -292,7 +276,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                     data-option={i}
                     onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
                   >
-                    {optionLabel(opt, p.payload?.kind)}
+                    {optionLabel(state, opt, p.payload?.kind)}
                   </button>
                 ))}
               </div>

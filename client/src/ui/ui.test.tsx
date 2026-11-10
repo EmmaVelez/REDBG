@@ -769,6 +769,46 @@ describe('MansionReveal', () => {
     expect(html).not.toContain('Next');
     expect(html).toContain('Continue');
   });
+
+  it('renders a revealed non-Infected card with its prompt and locks Continue', () => {
+    const item = PREMIER_CARDS.find(c => c.type === 'item');
+    if (item === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal
+        def={item}
+        resultText={`${item.name} is revealed — answer the choice below to continue.`}
+        damage={0}
+        prompts={[
+          {
+            id: 'p1',
+            seat: 0,
+            text: 'Take it or send it to the bottom of the Mansion?',
+            options: ['Take', 'Send to bottom of Mansion'],
+            payload: { kind: 'takeOrBottom', instanceId: item.id },
+          },
+        ]}
+        onContinue={() => {}}
+      />
+    );
+    expect(html).toContain('You found something');
+    expect(html).toContain('data-reveal-prompts');
+    expect(html).toContain('Take it or send it to the bottom of the Mansion?');
+    expect(html).toContain('data-option="0"');
+    expect(html).toContain('Send to bottom of Mansion');
+    expect(html).toContain('data-reveal-locked="true"');
+    expect(html).toContain('Answer the choice above to continue.');
+  });
+
+  it('leaves Continue enabled when the reveal opened no prompt', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} prompts={[]} onContinue={() => {}} />
+    );
+    expect(html).not.toContain('data-reveal-prompts');
+    expect(html).not.toContain('data-reveal-locked');
+    expect(html).toContain('Continue');
+  });
 });
 
 describe('YouDiedOverlay', () => {

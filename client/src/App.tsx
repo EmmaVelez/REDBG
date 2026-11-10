@@ -222,7 +222,9 @@ export function App(): JSX.Element {
             ? `${def.name} was removed from the Mansion.`
             : r.outcomeZone === 'mansion'
               ? `${def.name} was returned to the Mansion deck.`
-              : `${def.name} escaped to the bottom of the Mansion.`;
+              : r.outcomeZone === 'pending'
+                ? `${def.name} is revealed — answer the choice below to continue.`
+                : `${def.name} escaped to the bottom of the Mansion.`;
       // Resolve the explore's weapon instances to defs for the reveal panel.
       const weaponDefs = r.weapons
         .map(id => defForInstance(state, id))
@@ -332,6 +334,11 @@ export function App(): JSX.Element {
           party={revealCurrent.party}
           index={revealIndex}
           total={revealQueue?.length ?? 1}
+          prompts={revealCurrent.explorerSeat === mySeat ? gameState.prompts.filter(p => p.seat === mySeat) : []}
+          state={gameState}
+          onChooseOption={(promptId, option) =>
+            dispatchClient({ kind: 'sendAction', action: { type: 'chooseOption', seat: mySeat, promptId, option } })
+          }
           onContinue={() => {
             // Several cards revealed in one explore: step through them one at
             // a time, then dismiss (and play the queued death screen, if any).

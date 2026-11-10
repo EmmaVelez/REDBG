@@ -1041,6 +1041,59 @@ h1, h2 { margin: 0 0 8px; }
   font-weight: 700;
   letter-spacing: 1px;
 }
+/* Prompts a revealed NON-Infected card left open (Take / Send-to-bottom,
+   Zombie Grab, Antivirus, …). They render INSIDE the reveal panel because the
+   overlay covers the ActionBar they used to live in. */
+.mansion-door-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+}
+.mansion-door-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #3a3223;
+  background: rgba(0, 0, 0, 0.35);
+}
+.mansion-door-prompt-text {
+  color: #e8e2d4;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.mansion-door-prompt-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.mansion-door-prompt-options button {
+  background: linear-gradient(180deg, #2a2f3a 0%, #171a21 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #3a3d47;
+  cursor: pointer;
+}
+.mansion-door-prompt-options button:hover { filter: brightness(1.25); }
+.mansion-door-lock {
+  color: #ffb347;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-height: 14px;
+}
+.mansion-door-continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
 .mansion-door-card .card {
   background: transparent !important;
   border: none !important;

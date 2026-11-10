@@ -22,6 +22,7 @@ function makeState(over: {
   removed?: readonly string[];
   version?: number;
   log?: ReadonlyArray<{ seq: number; action: Record<string, unknown> }>;
+  prompts?: ReadonlyArray<{ id: string; seat: number; text: string; options: readonly string[]; payload?: Readonly<Record<string, string>> }>;
 }): GameState {
   return {
     version: over.version ?? 1,
@@ -59,7 +60,7 @@ function makeState(over: {
     removed: over.removed ?? [],
     cards: {},
     cardDefs: {},
-    prompts: [],
+    prompts: (over.prompts ?? []) as never,
     winners: [],
     log: (over.log ?? []).map(e => ({ seq: e.seq, action: e.action as never })),
   };
@@ -242,6 +243,41 @@ describe('detectReveal', () => {
     });
     expect(detectReveals(prev, next, 0).map(r => r.instanceId)).toEqual(['ma-001#1', 'ma-002#1']);
     expect(detectReveals(prev, next, 0).every(r => r.outcomeZone === 'attached')).toBe(true);
+  });
+
+  it('detects a NON-Infected reveal parked in limbo behind its prompt', () => {
+    // The engine removes a revealed non-Infected card from the deck and parks
+    // it in NO zone while its Take / Send-to-bottom prompt is open.
+    const prev = makeState({ mansionDeck: ['it-002#1', 'ma-001#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['ma-001#1'],
+      seats: [{ seat: 0 }],
+      prompts: [
+        { id: 'p1', seat: 0, text: 'Take it or send it to the bottom?', options: ['Take', 'Send to bottom of Mansion'], payload: { kind: 'takeOrBottom', instanceId: 'it-002#1' } },
+      ],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
+    });
+    expect(detectReveals(prev, next, 0)).toEqual([
+      { instanceId: 'it-002#1', outcomeZone: 'pending', explorerSeat: 0, damage: 0, weapons: [] },
+    ]);
+  });
+
+  it('reports a non-Infected reveal after the Infected it was revealed with', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#1', 'it-002#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0, attached: ['ma-001#1'] }],
+      prompts: [
+        { id: 'p1', seat: 0, text: 'Take it or send it to the bottom?', options: ['Take', 'Send to bottom of Mansion'], payload: { kind: 'takeOrBottom', instanceId: 'it-002#1' } },
+      ],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 2 } }],
+    });
+    expect(detectReveals(prev, next, 0).map(r => [r.instanceId, r.outcomeZone])).toEqual([
+      ['ma-001#1', 'attached'],
+      ['it-002#1', 'pending'],
+    ]);
   });
 
   it('does not report a card that merely shifted up when the revealed card left', () => {

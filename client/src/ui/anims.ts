@@ -97,8 +97,10 @@ function travelsFaceDown(from: AnimZone, to: AnimZone): boolean {
 export interface Reveal {
   readonly instanceId: string;
   /** Zone the revealed card ended up in after the fight resolved. `mansion`
-   *  means it was RE-INSERTED into the deck (MX-001 Mr. X). */
-  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed' | 'mansion';
+   *  means it was RE-INSERTED into the deck (MX-001 Mr. X). `pending` means a
+   *  NON-Infected reveal is parked in limbo while its Take / Send-to-bottom
+   *  prompt is open — it is in no zone at all until the prompt is answered. */
+  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed' | 'mansion' | 'pending';
   /** Seat that actually explored (the forced-explore target, if any). */
   readonly explorerSeat: number;
   /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
@@ -160,15 +162,20 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
     }
   }
 
-  // Re-inserted into the Mansion deck (MX-001 Mr. X: "place it on top of
-  // the mansion as the 5th upcoming card"). Revealing REMOVES the card
-  // from the deck, so a revealed card found back in the deck was
-  // re-inserted — its zone never changed, which the loop above cannot see.
-  // The revealed cards are the top `exploreCount` of the pre-explore deck.
+  // The revealed set is the top `exploreCount` of the pre-explore deck. Two
+  // cases are invisible to the zone diff above:
+  //  - a revealed card found back in the deck was RE-INSERTED (MX-001 Mr. X:
+  //    "place it on top of the mansion as the 5th upcoming card" — revealing
+  //    REMOVES it from the deck, so being back means re-inserted);
+  //  - a revealed NON-Infected card sits in NO zone at all. The engine parks it
+  //    in limbo while its Take / Send-to-bottom prompt is open, so it is
+  //    neither in the deck nor in any seat zone until the prompt is answered.
   const revealedCount = Math.max(1, action.exploreCount ?? 1);
   for (const instanceId of prev.mansionDeck.slice(0, revealedCount)) {
     if (instanceId.startsWith('hidden-')) continue;
+    if (outcomes.has(instanceId)) continue;
     if (next.mansionDeck.includes(instanceId)) outcomes.set(instanceId, 'mansion');
+    else if (!nextZones.has(instanceId)) outcomes.set(instanceId, 'pending');
   }
 
   return [...outcomes.entries()]

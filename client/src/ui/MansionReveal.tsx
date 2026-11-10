@@ -1,19 +1,25 @@
 import type { JSX } from 'react';
-import type { CardDef } from '@re/game-core';
+import type { CardDef, GameState, Prompt } from '@re/game-core';
 import { CardView } from './CardView';
 import { cardArtUrl } from './cardArt';
+import { optionLabel } from './promptLabels';
 
 /**
  * Mansion-door reveal: shown after the owner explores and the fight resolves,
- * pausing the table until the player reads the revealed Infected/token and
- * clicks Continue. The engine resolves combat atomically, so the reveal
- * renders from the outcome (attached / escaped / taken).
+ * pausing the table until the player reads the revealed card and clicks
+ * Continue. The engine resolves combat atomically, so the reveal renders from
+ * the outcome (attached / escaped / taken).
  *
  * The panel is a BATTLE LINE, left to right: the exploring player's character
  * and Partner cards, the Weapons that were used, and the revealed card on the
  * right. A multi-explore reveals several cards in one action — the panel steps
  * through them ONE AT A TIME (`index`/`total`), each entrance re-running the
  * card-in animation via the `key` on `.mansion-door-card`.
+ *
+ * NON-Infected reveals (items, tokens, events with a Take/Send-to-bottom
+ * choice) park the card in limbo and open a prompt. Those prompts render INSIDE
+ * this panel — the overlay would otherwise cover the ActionBar they used to
+ * live in — and the panel LOCKS (Continue disabled) until every one is answered.
  */
 
 /** One of the exploring player's character cards, as shown beside the weapons. */
@@ -42,6 +48,11 @@ export interface MansionRevealProps {
   readonly index?: number;
   /** How many cards this explore revealed. */
   readonly total?: number;
+  /** Prompts the revealed card left open for the exploring seat. */
+  readonly prompts?: readonly Prompt[];
+  /** The game state, for resolving prompt option labels. */
+  readonly state?: GameState;
+  readonly onChooseOption?: (promptId: string, option: number) => void;
   readonly onContinue: () => void;
 }
 
@@ -54,11 +65,15 @@ export function MansionReveal({
   party,
   index = 0,
   total = 1,
+  prompts,
+  state,
+  onChooseOption,
   onContinue,
 }: MansionRevealProps): JSX.Element {
   const isInfected = def.type === 'infected';
   const art = cardArtUrl(def.id);
   const isLast = index >= total - 1;
+  const locked = prompts !== undefined && prompts.length > 0;
   return (
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
@@ -107,12 +122,42 @@ export function MansionReveal({
           </div>
         </div>
         <span className="mansion-door-result">{resultText}</span>
+        {locked && (
+          <div className="mansion-door-prompts" data-reveal-prompts={prompts.length}>
+            {prompts.map((p, promptIndex) => (
+              <div className="mansion-door-prompt" key={p.id} data-prompt={p.id} data-prompt-index={promptIndex}>
+                <span className="mansion-door-prompt-text">{p.text}</span>
+                <div className="mansion-door-prompt-options">
+                  {p.options.map((opt, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      data-option={i}
+                      onClick={() => onChooseOption?.(p.id, i)}
+                    >
+                      {state !== undefined ? optionLabel(state, opt, p.payload?.kind) : opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <span className="mansion-door-result mansion-door-lock" data-reveal-locked={locked || undefined}>
+          {locked ? 'Answer the choice above to continue.' : ''}
+        </span>
         {total > 1 && (
           <span className="mansion-door-progress" data-reveal-progress>
             {index + 1} / {total}
           </span>
         )}
-        <button type="button" className="mansion-door-continue btn-primary" onClick={onContinue}>
+        <button
+          type="button"
+          className="mansion-door-continue btn-primary"
+          onClick={onContinue}
+          disabled={locked}
+          data-reveal-locked={locked || undefined}
+        >
           {isLast ? 'Continue' : 'Next'}
         </button>
       </div>
