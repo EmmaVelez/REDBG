@@ -1,5 +1,20 @@
 # HANDOFF — resume here
 
+**CU-001 Ricardo Irving art re-pulled UNCROPPED (2026-11-10):** Manny sent a single-card image of
+Ricardo Irving (569x800 JPG) and said "update the card art for this one, do not crop". The existing
+`CARD-ART/CU-001.png` was still the old **320x260 ART WINDOW** (portrait only - no `[CHARACTER]`
+banner, no name bar, no ability text), the same crop the CH art used before it went full-card. The new
+file is the WHOLE CARD at 320x450, quantized to 256 colours, 97,049 bytes. The source is framed exactly
+to the card's edges with no background (verified by reading the image: light-green top border with
+`[CHARACTER]` and the 80 Health badge, portrait, tan text box with name + both level lines, and the
+copyright + `CU-001` code line at the bottom). One caveat: the decorative gold flourish at the card's
+top-left is itself clipped by the LEFT edge of the source image - that is how the scan is, not
+something the extraction did. The Health badge measures ~(88.8%, 8.4%) against the standard
+`.card-character` geometry of (89.7%, 7.7%), so no badge override was needed; the art's ratio (0.7111)
+differs slightly from 320x456 (0.7018), so `object-fit: contain` letterboxes it by ~3px top and bottom.
+`cu-001` is a custom character defined in `game-core/src/data/custom.ts`. Verified: vite emits
+`CU-001-DW3Utc3I.png` and :1724 serves it (97,049 bytes).
+
 **FCH-008 Sherry Birkin art re-pulled UNCROPPED (2026-11-10):** Manny sent a single-card image of
 Sherry Birkin (452x630 JPG) and said "pull this art again, no cropping". The existing
 `CARD-ART/FCH-008.png` was still the old **320x260 ART WINDOW** (portrait only - no `[CHARACTER]`
