@@ -1,5 +1,6 @@
 import type { GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { abilitiesForLevel } from '../engine/characters';
+import { buyCostAfterReduction } from '../engine/abilities';
 
 /**
  * Per-point value of the economy resources an action card grants, matching the
@@ -228,7 +229,10 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     const topCardInstance = state.cards[topCardInstanceId];
     if (topCardInstance === undefined) continue;
     const topCardDef = state.cardDefs[topCardInstance.cardId];
-    if (topCardDef === undefined || topCardDef.cost === undefined || topCardDef.cost > player.turnGold) continue;
+    if (topCardDef === undefined || topCardDef.cost === undefined) continue;
+    // Buy-cost discounts (Mikhail L1, Billy melee L1) make the card
+    // affordable at a lower gold total — price it the same way validate does.
+    if (buyCostAfterReduction(abilities, topCardDef) > player.turnGold) continue;
     affordablePiles += 10 + marketPull(topCardDef, abilities, bloat);
   }
   total += affordablePiles;

@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
-import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes } from './weaponReuse';
 import { isSkillActive } from './skill';
@@ -436,17 +436,20 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: `buy: empty pile: ${action.pileId}` };
       }
       const topCardId = pile.cards[0];
-            if (topCardId === undefined) {
-              return { ok: false, reason: `buy: empty pile: ${action.pileId}` };
-            }
-            const topCardDef = cardDef(state, topCardId);
+      if (topCardId === undefined) {
+        return { ok: false, reason: `buy: empty pile: ${action.pileId}` };
+      }
+      const topCardDef = cardDef(state, topCardId);
       if (topCardDef === undefined) {
         return { ok: false, reason: `buy: unknown card: ${topCardId}` };
       }
       if (topCardDef.cost === undefined) {
         return { ok: false, reason: `buy: not for sale: ${topCardId}` };
       }
-      if (player.turnGold < topCardDef.cost) {
+      // Discounts (Mikhail L1, Billy Coen L1 melee) apply to the
+      // affordability check too, or the buy is rejected unless the player
+      // holds the RAW cost even though applyAction would charge less.
+      if (player.turnGold < buyCostAfterReduction(seatAbilities(state, action.seat), topCardDef)) {
         return { ok: false, reason: 'buy: insufficient gold' };
       }
       return { ok: true };

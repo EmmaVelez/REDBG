@@ -47,7 +47,8 @@ import {
   leaderAbilities,
   seatAbilities,
   characterSource,
-} from './abilities';
+    buyCostAfterReduction,
+  } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
 import { gainCard } from './gainCard';
@@ -3308,17 +3309,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
       const boughtInstanceId = pile.cards[0] as string;
       const boughtDef = cardDef(state, boughtInstanceId);
-      let cost = boughtDef?.cost ?? 0;
+      // Mikhail Victor L1 / Billy Coen L1: weapons cost `amount` less to buy
+      // (Billy's reduction is tag-scoped to melee). Shared helper so the
+      // apply path and validate's affordability check cannot drift.
+      const cost = buyCostAfterReduction(characterAbilities(state, seat), boughtDef);
 
-      // Mikhail Victor L1: weapons cost `amount` less to buy.
+      // Carlos Oliveira L2: on buy card cost >= threshold, +amount explore.
       const charInst = state.cards[player.characterInstanceId];
       const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
-      const reductionAbility = charDef?.abilities !== undefined
-        ? abilitiesForLevel(charDef.abilities, player.level).find(a => a.kind === 'weaponBuyCostReduction')
-        : undefined;
-      if (reductionAbility !== undefined && boughtDef?.type === 'weapon') {
-        cost = Math.max(0, cost - (reductionAbility as { amount: number }).amount);
-      }
 
       // Carlos Oliveira L2: on buy card cost >= threshold, +amount explore.
       const exploreAbility = charDef?.abilities !== undefined

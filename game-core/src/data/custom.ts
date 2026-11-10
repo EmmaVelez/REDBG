@@ -121,6 +121,25 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    id: 'bc-001',
+    name: 'Billy Coen',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: \\"Melee\\" weapons cost 10 gold less in your turn.\\nLevel 2: All your \\"melee\\" weapons get +10 damage.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 2,
+    level2At: 5,
+    levels: [
+      { level: 1, text: '\\"Melee\\" weapons cost 10 gold less in your turn.' },
+      { level: 2, text: 'All your \\"melee\\" weapons get +10 damage.' },
+    ],
+    abilities: [
+      { kind: 'weaponBuyCostReduction', tag: 'melee', amount: 10, level: 1 },
+      { kind: 'weaponTagPlusDamage', tag: 'melee', amount: 10, level: 2 },
+    ],
+  },
+  {
     id: 'cc-001',
     name: 'Claire Redfield',
     type: 'character',

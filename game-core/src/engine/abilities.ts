@@ -167,6 +167,20 @@ export function requiredAmmoForWeapons(
   return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abils, defs(id), effectiveWeaponTags(state, seat, id)), 0);
 }
 
+/** Cost of a card for this seat after any weaponBuyCostReduction (Mikhail
+ * Victor L1: all weapons -amount; Billy Coen L1: only weapons carrying the
+ * reduction's tag). Called from validate's affordability check, the buy apply
+ * path, and the bot's affordable-piles pricing so one rule answers everywhere.
+ */
+export function buyCostAfterReduction(abilities: readonly CharacterAbility[], def: CardDef | undefined): number {
+  if (def === undefined || def.cost === undefined) return def?.cost ?? 0;
+  if (def.type !== 'weapon') return def.cost;
+  const reduction = abilities.find(a => a.kind === 'weaponBuyCostReduction');
+  if (reduction === undefined || reduction.kind !== 'weaponBuyCostReduction') return def.cost;
+  if (reduction.tag !== undefined && !(def.weaponTags ?? []).includes(reduction.tag)) return def.cost;
+  return Math.max(0, def.cost - reduction.amount);
+}
+
 /**
  * Flat damage bonus from passive abilities for one attack:
  * - weaponTagPlusDamage per matching weapon (Barry L2 magnums +20,

@@ -423,7 +423,7 @@ export type CharacterAbility =
   | { readonly kind: "onDefeatMoveDiscardToInventoryBottom"; readonly level: 1 | 2 }                      // Luis Sera L2
   | { readonly kind: "goldOnFirstHealThisTurn"; readonly amount: number; readonly level: 1 | 2 }         // Josh Stone L1
   | { readonly kind: "weaponFromDiscardToHandAtTurnStartIfMaxHp"; readonly level: 1 | 2 }               // Josh Stone L2
-  | { readonly kind: "weaponBuyCostReduction"; readonly amount: number; readonly level: 1 | 2 }         // Mikhail Victor L1: weapons cost amount less to buy
+  | { readonly kind: "weaponBuyCostReduction"; readonly amount: number; readonly tag?: WeaponTag; readonly level: 1 | 2 } // Mikhail Victor L1, Billy L1 (tag-scoped): weapons cost amount less to buy
   | { readonly kind: "differentWeaponTypesDamageBonus"; readonly amount: number; readonly level: 1 | 2 }  // Mikhail Victor L2: while using weapons of different types, +amount damage
   | { readonly kind: "goldAtTurnStart"; readonly amount: number; readonly level: 1 | 2 }                      // Carlos Oliveira (Nightmare) L1: at turn start +amount gold
   | { readonly kind: "exploreOnBuyCardCostAtLeast"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // Carlos Oliveira (Nightmare) L2: on buy card cost >= threshold, +amount explore
