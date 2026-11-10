@@ -1,5 +1,26 @@
 # HANDOFF — resume here
 
+**Unofficial Expansion 1 art re-pulled from Manny's updated sheets (2026-11-10):** Manny sent a
+new EX sheet (840x1216 PNG) and asked for EX-001..EX-009 to be pulled from it. It is a 3x3 grid
+with the **top-middle slot EMPTY (pure white, RGB 255,255,255, std 0)** — that is EX-002's slot,
+so the sheet carries only 8 cards. He then sent the EX-002 Special Rocket Launcher card
+separately (1054x1492 PNG, card face only, no background) and said "use this for ex-002".
+Mapping: EX-001<-r0c0, EX-003<-r0c2, EX-004<-r1c0, EX-005<-r1c1, EX-006<-r1c2, EX-007<-r2c0,
+EX-008<-r2c1, EX-009<-r2c2 (confirmed by reading each bottom-right corner crop individually; a
+full-sheet read mislabelled r0c2 as EX-002 - the name "Weapon Case" is EX-003, EX-002 is the
+Special Rocket Launcher weapon card). **Grid boundaries were the tricky part:** the strong
+dark peaks in the edge-strength profile are the CARDS' OWN frames, not gutters - the real
+gutters/margins are only 1-2px. The reliable anchors are the white empty slot (x 283..558) and
+the black outer margins (x 0..0, 833..839, y 0..0, 1214..1215). Correct card rectangles:
+col1 x 1..282, col2 x 283..558, col3 x 559..832; row1 y 1..404, row2 y 414..810, row3 y 813..1215.
+The first attempt used the dark peaks as gutters and cut 4-5px into every card. All nine are now
+quantized to 256 colours at ~274-282 px wide (EX-002 downscaled from 1054 to 282 to match), and
+every crop is tight to the card's decorative frame with **no white border** - which matches the
+rest of the CARD-ART set (MA-001/WE-001/AC-001/IT-002 all measure 0% white border); the OLD EX
+art was the anomaly, carrying a few px of blank card base outside the frame. Note the new renders
+differ from the old artwork (resize-and-diff scores 64-89 mean abs), so these are genuinely new
+images, not the old ones re-cropped.
+
 **Promo (PR-*) art re-extracted as WHOLE CARDS (2026-11-09):** Manny supplied the
 promo contact sheet (`...\Tabletop Simulator\Mods\Images\httpssteamusercontentaakamaihdnetugc8597016264951356044441A5720A186471CFB7F9630C44D760C710889.png`,
 5500x5390, cards filling only the top 1539 px: 10 @ 550x770 in row 1 + the stray
