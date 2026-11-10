@@ -47,7 +47,9 @@ test('setup shape', () => {
   expect(s.phase).toBe('main');
   expect(s.activeSeat).toBe(0);
   expect(s.turnNumber).toBe(1);
-  expect(s.version).toBe(1);
+  // Turn 1 is produced by startTurn (that is where the turn-start pools are
+  // applied), so the opening state is already one version in.
+  expect(s.version).toBe(2);
   expect(s.seed).toBe(1);
   s.seats.forEach(seat => {
     expect(seat.hand.length).toBe(5);
@@ -271,7 +273,7 @@ test('startTurn resets pools', () => {
   expect(p0(t).playArea).toEqual([]);
   expect(t.activeSeat).toBe(0);
   expect(t.turnNumber).toBe(1);
-  expect(t.version).toBe(2);
+  expect(t.version).toBe(3);
 });
 
 test('startTurn offers Krauser L1 the market knife pile top + Decline', () => {
@@ -334,7 +336,7 @@ test('startTurn skips downed player', () => {
   expect(p0(t).hand.length).toBe(5);
   expect(t.activeSeat).toBe(1);
   expect(t.turnNumber).toBe(2);
-  expect(t.version).toBe(2);
+  expect(t.version).toBe(3);
 });
 
 test('startTurn downed death', () => {
@@ -359,7 +361,7 @@ test('startTurn downed death', () => {
 test('startTurn not in main phase', () => {
   const s = setup2(1);
   const result = startTurn({ ...s, phase: 'setup' });
-  expect(result.version).toBe(1);
+  expect(result.version).toBe(2);
   expect(result.phase).toBe('setup');
   expect(result.seats).toBe(s.seats);
 });

@@ -3,6 +3,7 @@ import { makeRng, shuffle } from '../util/rng';
 import { drawWithReshuffle } from './deck';
 import { flipDown } from './characters';
 import { characterAbilities, applyHpLoss, applyRicardoDamage, effectiveWeaponTags, isPistolWeapon } from './abilities';
+import { startTurn } from './game';
 
 /**
  * Mercenaries Skill System — shared queries and the opening draft.
@@ -216,7 +217,11 @@ export function advanceDraft(state: GameState, seat: number, chosenId: string): 
     if (keepSeat >= n) done = true;
   }
   if (done) {
-    return finishDraft(state, { ...draft, kept: newKept, final });
+    // The draft is over: the opening turn starts now, exactly as it does
+    // after every endTurn. Without this the first turn would run on the raw
+    // setup pools and skip every turn-start effect (CR-001's +1 Buy,
+    // Carlos's Gold, the Skill System's opening ammo/gold, ...).
+    return startTurn(finishDraft(state, { ...draft, kept: newKept, final }));
   }
   const nextDraft: SkillDraftState = { ...draft, kept: newKept, final, keepSeat, keepPicks };
   return withDraftPrompt({ ...state, skillDraft: nextDraft });

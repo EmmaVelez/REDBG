@@ -1,5 +1,25 @@
 # HANDOFF — resume here
 
+**Turn 1 never went through startTurn, so every turn-start effect was dead on the opening turn (2026-11-10):**
+Manny: "CR-001 dosent give the player it's automatic +1 buy each turn from it'S LEvel 1 ability".
+1. **Root cause**: `startTurn` is the only place the turn-start pools are applied (`buysLeft: 1 + plusBuyBonus(seatAbils)`,
+   Carlos's `goldAtTurnStart`, Ada's `turnStartActionIfHpAtMost`, Wesker's forced Explore, skill ammo/gold) and the
+   only place beginning-of-turn ability prompts are raised. But every caller (`server/src/host.ts`, `client/src/hotseat.ts`,
+   `ai/sim.ts`) calls it **only after `endTurn`**, and `setup` returned the raw seat pools. So turn 1 ran on the setup
+   values: CR-001 had 1 Buy, and every other turn-start effect was skipped too.
+2. **Fix**: `setup` now returns `startTurn(baseState)` on the non-skill path, so the opening turn is produced exactly
+   like every later turn. The Skill System needed the same at the other entry point into `phase: 'main'`:
+   `advanceDraft` now returns `startTurn(finishDraft(...))` when the draft completes (skill.ts imports `startTurn`
+   from game.ts; the cycle is safe because both modules only use each other's exports inside functions).
+3. **Version baseline moved**: the opening state is now `version: 2` (startTurn bumps it), so 9 version assertions
+   in `game.test.ts` / `replay.test.ts` were re-based (+1) with a comment on the setup one.
+**Verified**: `setup` with cr-001 → `buysLeft 2`, `version 2`, `turnNumber 1`; after a full 5-round draft the same.
+Tests: new `engine/firstTurnStart.test.ts` (4) — turn-1 Buy for CR-001, 1 Buy for a character without the ability,
+opening hand untouched, and the post-draft pools. Gates: typecheck clean (3 workspaces), client 202, server 104.
+**Browser-verified** over the real WebSocket protocol (the dev server must be RESTARTED after game-core edits — it
+runs `tsx src/main.ts` with no watch): room `9W5UUN`, seat 0 = `cr-001#1`, `buysLeft 2`, `turnNumber 1`, `version 2`,
+and the client status bar reads `BUYS 2` with "Lv1:0★ You get +1 Buy."
+
 **Non-Infected reveals open the overlay, their prompts render inside it, and the panel locks (2026-11-10):**
 Manny: "Non infected cards should still trigger the mansion reveal screen, prompts caused by revealed non
 infected cards should display in the reveal mansion screen, the reveal screen should lock until all prompts are

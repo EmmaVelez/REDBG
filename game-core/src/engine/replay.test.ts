@@ -36,7 +36,8 @@ test('record appends', () => {
   const r = record(s0, { type: 'endTurn', seat: 0 });
   expect(r.log.length).toBe(1);
   expect(r.log[0]?.action.type).toBe('endTurn');
-  expect(r.version).toBe(2);
+  // setup already ran the opening startTurn, so the baseline is 2.
+  expect(r.version).toBe(3);
   expect(r.seats).toBe(s0.seats);
 });
 
@@ -46,14 +47,14 @@ test('record twice', () => {
   expect(r2.log.length).toBe(2);
   expect(r2.log[0]?.seq).toBe(1);
   expect(r2.log[1]?.seq).toBe(2);
-  expect(r2.version).toBe(3);
+  expect(r2.version).toBe(4);
   expect(r2.seats).toBe(s0.seats);
 });
 
 test('replay empty actions', () => {
   const replayed = replay(spec(1), CARDS, PILES, []);
   expect(replayed.log.length).toBe(0);
-  expect(replayed.version).toBe(1);
+  expect(replayed.version).toBe(2);
   expect(replayed.phase).toBe('main');
   expect(replayed.seats.length).toBe(2);
 });
@@ -66,7 +67,7 @@ test('replay single buy', () => {
   ];
   const replayed = replay(spec(1), CARDS, PILES, acts);
   expect(replayed.log.length).toBe(3);
-  expect(replayed.version).toBe(4);
+  expect(replayed.version).toBe(5);
   expect((replayed.seats[0] as PlayerState).turnGold).toBe(0);
   expect(replayed.marketPiles.hg?.cards.length).toBe(8);
 });
@@ -83,7 +84,7 @@ test('replay two buys', () => {
   ];
   const replayed = replay(spec(1), CARDS, PILES, acts);
   expect(replayed.log.length).toBe(6);
-  expect(replayed.version).toBe(7);
+  expect(replayed.version).toBe(8);
   expect((replayed.seats[0] as PlayerState).turnGold).toBe(0);
   expect((replayed.seats[0] as PlayerState).buysLeft).toBe(0);
   expect((replayed.seats[1] as PlayerState).turnGold).toBe(10);

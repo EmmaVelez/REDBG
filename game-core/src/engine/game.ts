@@ -550,8 +550,13 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     supply: supplyIds,
   };
 
+  // Turn 1 has to go through startTurn just like every later turn: it is what
+  // applies the turn-start pools (CR-001's +1 Buy, Carlos's Gold, Ada's
+  // +1 Action, Wesker's forced Explore, skill ammo/gold) and fires the
+  // beginning-of-turn ability prompts. Without it the opening turn ran on the
+  // raw setup pools and silently ignored all of those.
   if (setup.skillSystem !== true) {
-    return baseState;
+    return startTurn(baseState);
   }
 
   // Safety net: the Skill System is a Game Modification that needs its own
