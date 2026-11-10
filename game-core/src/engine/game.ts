@@ -4,7 +4,7 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel, flipDown } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
@@ -26,8 +26,21 @@ function turnStartAbilityPrompts(
 ): GameState['prompts'] {
   const charInst = state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
-  if (charDef === undefined) return [];
-  const abilities = abilitiesForLevel(charDef.abilities, player.level);
+  const partnerInst = player.partnerInstanceId !== undefined ? state.cards[player.partnerInstanceId] : undefined;
+  const partnerDef = partnerInst === undefined ? undefined : state.cardDefs[partnerInst.cardId];
+  if (charDef === undefined && partnerDef === undefined) return [];
+  // Alliance Partner Modification: the Partner's turn-start abilities are the
+  // player's too.
+  const abilities = seatAbilities(state, player.seat);
+  /** Level text for a turn-start ability, from whichever character owns it. */
+  const abilityText = (kind: string): string => {
+    for (const def of [charDef, partnerDef]) {
+      if (def === undefined) continue;
+      const entry = (def.levels ?? []).find(l => (def.abilities ?? []).some(a => a.kind === kind && a.level <= l.level));
+      if (entry !== undefined) return entry.text;
+    }
+    return charDef?.text ?? partnerDef?.text ?? '';
+  };
 
   const isKnifeTop = (instanceId: string): boolean => {
     const inst = state.cards[instanceId];
@@ -37,8 +50,6 @@ function turnStartAbilityPrompts(
   };
 
   const prompts: Prompt[] = [];
-  const l1Text = charDef.levels?.find(l => l.level === 1)?.text ?? charDef.text;
-  const l2Text = charDef.levels?.find(l => l.level === 2)?.text ?? charDef.text;
 
   if (abilities.some(a => a.kind === 'gainKnifeAtTurnStart')) {
     const options: string[] = [];
@@ -52,7 +63,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('gainKnifeAtTurnStart'),
         options: [...options, 'Decline'],
         payload: { kind: 'gainKnifeAtTurnStart' },
       });
@@ -68,7 +79,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('skipTurnForSuperNextTurn'),
       options: ['Skip my turn', 'Decline'],
       payload: { kind: 'skipTurn' },
     });
@@ -81,7 +92,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('giveOneCardToPlayerThenMaybeAnother'),
         options: [...others.map(s => String(s.seat)), 'Decline'],
         payload: { kind: 'giveOneCardToPlayer' },
       });
@@ -93,7 +104,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('revealHandForDamageIfTwoTypes'),
       options: ['Reveal my hand', 'Decline'],
       payload: { kind: 'revealHandTwoTypes' },
     });
@@ -106,7 +117,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('turnStartDamageForExplore'),
       options: ['Take 10 Damage for +1 Explore', 'Decline'],
       payload: { kind: 'turnStartDamageForExplore', amount: String(hunkAmount) },
     });
@@ -117,7 +128,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l2Text,
+      text: abilityText('turnStartRevealActionsForCards'),
       options: [...player.hand, 'DONE'],
       payload: { kind: 'turnStartRevealActionsForCards', count: '0' },
     });
@@ -129,7 +140,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('rebeccaDiscardForInfection'),
       options: [...player.hand, 'DONE'],
       payload: { kind: 'rebeccaDiscardForInfection', count: '0' },
     });
@@ -141,7 +152,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('luisPlusOneCard'),
         options: ['Yes', 'No'],
         payload: { kind: 'luisPlusOneCard' },
       });
@@ -156,7 +167,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('weskerPlusOneCard'),
         options: ['Yes', 'No'],
         payload: { kind: 'weskerPlusOneCard' },
       });
@@ -169,7 +180,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('sergeiSelfDamage'),
       options: [`Take ${ab.damage} damage for +${ab.amount} damage`, 'Decline'],
       payload: { kind: 'sergeiSelfDamage' },
     });
@@ -189,7 +200,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('recoverWeaponFromDiscardToHand'),
         options: [...weaponsInDiscard, 'Decline'],
         payload: { kind: 'recoverWeaponFromDiscardToHand' },
       });
@@ -205,7 +216,7 @@ function turnStartAbilityPrompts(
       prompts.push({
         id: `ability-${player.seat}-v${newVersion}`,
         seat: player.seat,
-        text: l1Text,
+        text: abilityText('zombieCTurnStartInfectionSwap'),
         options: [...infectionInHand, 'Decline'],
         payload: { kind: 'zombieCTurnStartInfectionSwap' },
       });
@@ -219,7 +230,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `claire-buy-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l1Text,
+      text: abilityText('claireBuyForAmmo'),
       options: ['Yes', 'No'],
       payload: { kind: 'claireBuyForAmmo', amount: String(claireBuy.amount) },
     });
@@ -232,7 +243,7 @@ function turnStartAbilityPrompts(
     prompts.push({
       id: `specialist-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: l2Text,
+      text: abilityText('specialistActionsForBuy'),
       options: ['Yes', 'No'],
       payload: { kind: 'specialistActionsForBuy', actions: String(specialist.actions), buy: String(specialist.buy) },
     });
@@ -838,10 +849,18 @@ function startTurnInternal(state: GameState): GameState {
 
   const skillTurn = turnStartSkillEffects(state, player.seat);
 
+  // Alliance Partner Modification: the Partner is a second Character under the
+  // player's control, so its abilities are the seat's too. Self-healing is the
+  // exception — `healAtTurnStart` restores that Character's OWN Health, so the
+  // Partner's recovery goes to partnerHp, not the Main's.
+  const mainAbils = abilitiesForLevel(charDef?.abilities, player.level);
+  const seatAbils = seatAbilities(state, player.seat);
+  const partnerAbils = partnerAbilities(state, player.seat);
+
   // CH-044 Jack Krauser (Mercenaries) L1: at the beginning of your turn, if you
   // have the lowest Decorations among all Players (ties count), Jack deals an
   // additional 10 Damage during this turn.
-  const krauserAbility = abilitiesForLevel(charDef?.abilities, player.level)
+  const krauserAbility = seatAbils
     .find(a => a.kind === 'turnStartLowestDecorationsDamage');
   const krauserBonus = (() => {
     if (krauserAbility === undefined || krauserAbility.kind !== 'turnStartLowestDecorationsDamage') return 0;
@@ -854,39 +873,45 @@ function startTurnInternal(state: GameState): GameState {
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
-    hp: Math.min(player.hp + herbHeal + healAtTurnStart(abilitiesForLevel(charDef?.abilities, player.level)) + skillTurn.heal, player.maxHp),
+    hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal, player.maxHp),
+    // The Partner's own recovery (Steve Burnside L1 and the like) restores the
+    // Partner's separate Health, never the Main Character's.
+    ...(player.partnerInstanceId !== undefined
+      ? {
+          partnerHp: Math.min(
+            (player.partnerHp ?? player.hp) + healAtTurnStart(partnerAbils),
+            player.partnerMaxHp ?? player.maxHp,
+          ),
+        }
+      : {}),
     pendingHerbHeal: 0,
     turnAmmo: skillTurn.ammo,
-    turnGold: ((herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'))
-      ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldOnFirstHealThisTurn') as { amount: number }).amount
+    turnGold: ((herbHeal > 0 && seatAbils.some(a => a.kind === 'goldOnFirstHealThisTurn'))
+      ? (seatAbils.find(a => a.kind === 'goldOnFirstHealThisTurn') as { amount: number }).amount
       : 0) +
-      (abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldAtTurnStart')
-        ? (abilitiesForLevel(charDef?.abilities, player.level).find(a => a.kind === 'goldAtTurnStart') as { amount: number }).amount
+      (seatAbils.some(a => a.kind === 'goldAtTurnStart')
+        ? (seatAbils.find(a => a.kind === 'goldAtTurnStart') as { amount: number }).amount
         : 0) + skillTurn.gold,
-    healedFirstTimeThisTurn: herbHeal > 0 && abilitiesForLevel(charDef?.abilities, player.level).some(a => a.kind === 'goldOnFirstHealThisTurn'),
+    healedFirstTimeThisTurn: herbHeal > 0 && seatAbils.some(a => a.kind === 'goldOnFirstHealThisTurn'),
     actionsLeft: (() => {
       const base = (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0);
       // IN-001 Claw caps the Actions available next turn.
       const capped = player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
       // Ada Wong (Outbreak CH-027) L1: +1 Action at turn start when Health is
       // at or below the threshold.
-      const adaBonus = abilitiesForLevel(charDef?.abilities, player.level)
+      const adaBonus = seatAbils
         .filter(a => a.kind === 'turnStartActionIfHpAtMost' && player.hp <= a.threshold).length;
       return capped + adaBonus;
     })(),
     // CR-001 Claire Redfield L1 (TACTICIAN): flat +amount Buy.
-    buysLeft: 1 + plusBuyBonus(abilitiesForLevel(charDef?.abilities, player.level)),
+    buysLeft: 1 + plusBuyBonus(seatAbils),
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
     // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).
     exploresLeft:
       player.skipNextTurn ? 0 :
       (player.mustExplore === true ? 2 : 1) +
-      (abilitiesForLevel(charDef?.abilities, player.level).some(
-        a => a.kind === 'extraExploreAtTurnStart'
-      )
-        ? 1
-        : 0) + skillTurn.explores,
+      (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores,
     weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
@@ -974,7 +999,7 @@ function startTurnInternal(state: GameState): GameState {
   let infectionDecreased = false;
   if (
     turnPlayer.infectionCards !== undefined && turnPlayer.infectionCards.length > 0 &&
-    abilitiesForLevel(charDef?.abilities, turnPlayer.level).some(a => a.kind === 'turnStartDecreaseInfection')
+    seatAbilities(state, turnPlayer.seat).some(a => a.kind === 'turnStartDecreaseInfection')
   ) {
     const removedInfection = turnPlayer.infectionCards[turnPlayer.infectionCards.length - 1] as string;
     turnPlayer = { ...turnPlayer, infectionCards: turnPlayer.infectionCards.slice(0, -1) };
@@ -997,7 +1022,7 @@ function startTurnInternal(state: GameState): GameState {
   }
   // Excella Gionne (CH-021) L2: +3 cards at turn start at Infection Level 8+.
   let excellaDraw = 0;
-  for (const a of abilitiesForLevel(charDef?.abilities, turnPlayer.level)) {
+  for (const a of seatAbilities(state, turnPlayer.seat)) {
     if (a.kind === 'turnStartCardsIfInfectionAtLeast' && (turnPlayer.infectionCards?.length ?? 0) >= a.threshold) {
       excellaDraw += a.amount;
     }

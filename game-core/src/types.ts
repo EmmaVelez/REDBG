@@ -843,7 +843,7 @@ export type Action =
   | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string; readonly infectionCardIds?: readonly string[] }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string; readonly instanceId?: string }
-  | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number }
+  | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number; readonly character?: "main" | "partner" }
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
   | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }
   | { readonly type: "endTurn"; readonly seat: number }

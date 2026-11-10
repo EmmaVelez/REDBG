@@ -45,6 +45,79 @@ export function partnerAbilities(state: GameState, seat: number): readonly Chara
 }
 
 /**
+ * Abilities that describe ONE character's own limits or self-targeting effects,
+ * so they must never be unioned across the Main and Partner: Krauser as a
+ * Partner cannot limit the Main to one weapon, Sherry as a Partner cannot
+ * disarm the Main, Chris as a Partner cannot make the Main unhealable, and Ada's
+ * "lethal damage leaves her at 10" must not catch the Main.
+ *
+ * Everything here still resolves normally through `characterAbilities` (the
+ * Main) and `leaderAbilities` (whoever is fighting) — this set only governs the
+ * union in `seatAbilities`.
+ */
+const PER_CHARACTER_ONLY: ReadonlySet<string> = new Set([
+  // Restrictions on one character's own weapon use / attach options.
+  'cannotUseWeapons',
+  'singleWeaponLimiter',
+  'weaponCostCap',
+  'noHealingNoNonInfectedAttach',
+  // Self-targeting: they change what happens to one specific character.
+  'setHpToOnLethal',
+  'infectedDamageReduction',
+  'weaponDamageReduction',
+  'damageReductionForAmmo',
+  'exploreDamageReductionPerHandCard',
+]);
+
+/**
+ * Every ability the seat can call on: the Main character's plus the Partner's.
+ *
+ * Alliance Partner Modification — the Partner is "another Character under your
+ * control", and a seat shares one hand / discard / inventory / play area, so its
+ * abilities are the player's too ("effects that you as the Player will be able
+ * to harness"). `PER_CHARACTER_ONLY` keeps one character's personal limits from
+ * leaking onto the other.
+ */
+export function seatAbilities(state: GameState, seat: number): readonly CharacterAbility[] {
+  const main = characterAbilities(state, seat);
+  const partner = partnerAbilities(state, seat).filter(a => !PER_CHARACTER_ONLY.has(a.kind));
+  if (main.length === 0) return partner;
+  if (partner.length === 0) return main;
+  return [...main, ...partner];
+}
+
+/** The Main or Partner's own card def plus the level it has resolved to. */
+export interface CharacterAbilitySource {
+  readonly def: CardDef;
+  readonly level: 0 | 1 | 2;
+}
+
+/**
+ * Resolve the Main or Partner character's def and level, for actions that name
+ * a character (`useCharacterAbility`). The Partner's level follows the Main
+ * character's Decorations (Alliance Partner Modification), so it is derived
+ * rather than read off PlayerState.
+ */
+export function characterSource(
+  state: GameState,
+  seat: number,
+  character: 'main' | 'partner',
+): CharacterAbilitySource | undefined {
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  const instanceId = character === 'partner' ? player.partnerInstanceId : player.characterInstanceId;
+  if (instanceId === undefined) return undefined;
+  const inst = state.cards[instanceId];
+  if (inst === undefined) return undefined;
+  const def = state.cardDefs[inst.cardId];
+  if (def === undefined) return undefined;
+  const level = character === 'partner'
+    ? levelForDecorations(def.level1At, def.level2At, player.decorations)
+    : player.level;
+  return { def, level };
+}
+
+/**
  * Abilities of whichever character is leading the Explore.
  *
  * The leading character is the one fighting, so its restrictions and bonuses

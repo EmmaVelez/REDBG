@@ -1,5 +1,7 @@
 import { validateAction } from './validate';
-import { partnerAbilities, leaderAbilities } from './abilities';
+import { applyAction } from './actions';
+import { startTurn } from './game';
+import { partnerAbilities, leaderAbilities, seatAbilities } from './abilities';
 import { enumerateLegalActions } from '../ai/enumerate';
 import { chooseGreedyAction } from '../ai/policy';
 import type { GameState, CardInstance, CardDef, PlayerState } from '../types';
@@ -73,6 +75,30 @@ const DEFS: Record<string, CardDef> = {
   // Too tough for w20 (40 damage) to defeat, so the leader actually takes the
   // 30 damage — needed to tell the two leaders apart.
   'ma-big': { id: 'ma-big', name: 'Armored Majini', type: 'infected', set: 'premier', text: '', copies: 2, hp: 100, attack: 30, decorations: 3 },
+  // Steve Burnside (Alliance) CH-013 L1: recover 10 HP at turn start.
+  'ch-steve': {
+    id: 'ch-steve', name: 'Steve Burnside', type: 'character', set: 'alliance', text: '', copies: 1,
+    maxHp: 70, level1At: 5,
+    levels: [{ level: 1, text: 'Recover 10 Health at the beginning of each turn.' }],
+    abilities: [{ kind: 'healAtTurnStart', amount: 10, level: 1 }],
+  },
+  // Barry Burton L1: one of his weapons gets +5 damage for the turn (manual).
+  'ch-barry': {
+    id: 'ch-barry', name: 'Barry Burton', type: 'character', set: 'premier', text: '', copies: 1,
+    maxHp: 90, level1At: 0,
+    levels: [{ level: 1, text: 'When attacking/exploring, one of Barry\'s weapons gets +5 damage for the turn.' }],
+    abilities: [{ kind: 'plusDamageThisTurn', amount: 5, level: 1 }],
+  },
+  // Jack Krauser (Alliance) CH-014 L1: cannot use more than one weapon.
+  'ch-krauser': {
+    id: 'ch-krauser', name: 'Jack Krauser', type: 'character', set: 'alliance', text: '', copies: 1,
+    maxHp: 90, level1At: 0,
+    levels: [{ level: 1, text: 'Jack cannot use more than one weapon.' }],
+    abilities: [{ kind: 'singleWeaponLimiter', level: 1 }],
+  },
+  'it-fads': { id: 'it-fads', name: 'First Aid Spray', type: 'item', set: 'premier', text: 'Heal your Character to full Health.', copies: 1, cost: 60, itemEffects: [{ kind: 'healToFull' }] },
+  'it-gh': { id: 'it-gh', name: 'Green Herb', type: 'item', set: 'premier', text: 'Trash: heal 20.', copies: 2, cost: 20, itemEffects: [{ kind: 'healFixed20OrTrashWithSecondFor60' }] },
+  'it-rh': { id: 'it-rh', name: 'Red Herb', type: 'item', set: 'premier', text: 'Trash with a Green Herb: heal to full.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
 };
 
 function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; seat1?: Partial<PlayerState> } = {}): GameState {
@@ -184,4 +210,99 @@ test('the bot prefers a partner-led explore when the Partner is the healthier ch
   const action = chooseGreedyAction(s, 0);
   expect(action.type).toBe('explore');
   if (action.type === 'explore') expect(action.leader).toBe('partner');
+});
+
+// --- 4. the Partner is a full second character: its abilities are the seat's ---
+
+/** A partner-mode seat whose Main has no abilities and whose Partner is `cardId`. */
+function partnerSeat(partnerCardId: string, over: Partial<PlayerState> = {}): GameState {
+  const partnerInst = 'px';
+  return baseState({
+    seat0: { characterInstanceId: 'cm', partnerInstanceId: partnerInst, ...over },
+    cards: {
+      'cm': inst('cm', 'ch-main'), 'c0': inst('c0', 'ch-main'), 'c1': inst('c1', 'ch-main'),
+      [partnerInst]: inst(partnerInst, partnerCardId),
+      'w1': inst('w1', 'w20'), 'inf1': inst('inf1', 'ma-3'),
+    },
+  });
+}
+
+test('seatAbilities unions the Main and Partner abilities', () => {
+  const s = partnerSeat('ch-barry');
+  expect(seatAbilities(s, 0).map(a => a.kind)).toEqual(['plusDamageThisTurn']);
+  // No partner -> just the Main's (empty here).
+  expect(seatAbilities(baseState(), 0)).toEqual([]);
+});
+
+test("per-character restrictions are not unioned onto the other character", () => {
+  // The Partner is Krauser (singleWeaponLimiter): the Main must still be free
+  // to bring two weapons, so the restriction stays on the Partner alone.
+  const s = partnerSeat('ch-krauser');
+  expect(seatAbilities(s, 0)).toEqual([]);
+  expect(partnerAbilities(s, 0).map(a => a.kind)).toEqual(['singleWeaponLimiter']);
+});
+
+test('the Partner heals its own Health at the beginning of the turn', () => {
+  // Steve Burnside L1: recover 10 HP at the start of each turn. The Main is at
+  // full Health, so any recovery must land on the Partner's separate Health.
+  const s = partnerSeat('ch-steve', { decorations: 5, hp: 100, partnerHp: 40, partnerMaxHp: 70 });
+  const after = startTurn({ ...s, activeSeat: 0 });
+  expect(after.seats[0]?.hp).toBe(100);
+  expect(after.seats[0]?.partnerHp).toBe(50);
+});
+
+test('the Partner manual abilities are usable', () => {
+  const s = partnerSeat('ch-barry');
+  // The Main has no abilities, so index 0 is not a Main ability.
+  expect(validateAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }).ok).toBe(false);
+  const action = { type: 'useCharacterAbility' as const, seat: 0, abilityIndex: 0, character: 'partner' as const };
+  expect(validateAction(s, action).ok).toBe(true);
+  expect(applyAction(s, action).seats[0]?.weaponDamageBonusThisTurn).toBe(5);
+});
+
+test('bots enumerate the Partner manual abilities', () => {
+  const s = partnerSeat('ch-barry');
+  const partnerMoves = enumerateLegalActions(s, 0).filter(
+    a => a.type === 'useCharacterAbility' && a.character === 'partner',
+  );
+  expect(partnerMoves.length).toBe(1);
+});
+
+// --- 5. healing reaches the Partner ---
+
+test('a First Aid Spray heals both Characters', () => {
+  const s = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['spray'] });
+  const after = applyAction({ ...s, cards: { ...s.cards, spray: inst('spray', 'it-fads') } },
+    { type: 'playItem', seat: 0, instanceId: 'spray' });
+  expect(after.seats[0]?.hp).toBe(100);
+  expect(after.seats[0]?.partnerHp).toBe(100);
+});
+
+test('a Green Herb heal reaches both Characters', () => {
+  const base = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['gh'] });
+  const s = { ...base, cards: { ...base.cards, gh: inst('gh', 'it-gh') } };
+  const played = applyAction(s, { type: 'playItem', seat: 0, instanceId: 'gh' });
+  const prompt = played.prompts.find(p => p.payload?.kind === 'healGreenHerb');
+  expect(prompt).toBeDefined();
+  const healed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+  expect(healed.seats[0]?.hp).toBe(50);
+  expect(healed.seats[0]?.partnerHp).toBe(60);
+});
+
+test('a Red Herb heals both Characters to full', () => {
+  const base = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['rh', 'gh'] });
+  const s = { ...base, cards: { ...base.cards, rh: inst('rh', 'it-rh'), gh: inst('gh', 'it-gh') } };
+  const after = applyAction(s, { type: 'playItem', seat: 0, instanceId: 'rh' });
+  expect(after.seats[0]?.hp).toBe(100);
+  expect(after.seats[0]?.partnerHp).toBe(100);
+});
+
+// --- 6. the bot looks after its Partner ---
+
+test('the bot plays a healing item when its Partner is hurt', () => {
+  const base = partnerSeat('ch-main', { hp: 100, partnerHp: 20, turnGold: 0, turnAmmo: 0, hand: ['spray'] });
+  const s = { ...base, cards: { ...base.cards, spray: inst('spray', 'it-fads') } };
+  const action = chooseGreedyAction(s, 0);
+  expect(action.type).toBe('playItem');
+  if (action.type === 'playItem') expect(action.instanceId).toBe('spray');
 });

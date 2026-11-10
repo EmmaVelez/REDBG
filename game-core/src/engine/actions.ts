@@ -45,6 +45,8 @@ import {
   ricardoReduction,
   queueRicardoL2Prompt,
   leaderAbilities,
+  seatAbilities,
+  characterSource,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -124,7 +126,7 @@ function zombieBPrompts(state: GameState, affectedSeat: number, version: number)
   const affectedName = state.seats[affectedSeat]?.name ?? 'A character';
   for (const s of state.seats) {
     if (s.dead || s.isInfectedCharacter !== true) continue;
-    if (!characterAbilities(state, s.seat).some(a => a.kind === 'zombieBInfectionIncrease')) continue;
+    if (!seatAbilities(state, s.seat).some(a => a.kind === 'zombieBInfectionIncrease')) continue;
     const infectionInHand = s.hand.filter(id => state.cards[id]?.cardId.startsWith('in-'));
     if (infectionInHand.length === 0) continue;
     out.push({
@@ -166,7 +168,7 @@ function trashRedirectPrompt(
   prompts: GameState['prompts'],
   version: number
 ): GameState['prompts'] {
-  if (!characterAbilities(state, seat).some(a => a.kind === 'trashRedirectToPlayerDiscard')) {
+  if (!seatAbilities(state, seat).some(a => a.kind === 'trashRedirectToPlayerDiscard')) {
     return prompts;
   }
   const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
@@ -457,7 +459,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             // when the Play Area is discarded at end of turn.
             const attachesToPartner = (def.id === 'ac-013' || def.id === 'ac-014' || def.id === 'ac-020')
               && player.partnerInstanceId !== undefined
-              && (played.player.partnerAttached ?? []).length < partnerAttachCap(characterAbilities(state, seat));
+              && (played.player.partnerAttached ?? []).length < partnerAttachCap(seatAbilities(state, seat));
             let partnerAttached = played.player.partnerAttached ?? [];
             if (attachesToPartner) {
               partnerAttached = [...partnerAttached, instanceId];
@@ -469,7 +471,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 : played.player.playArea,
               partnerAttached,
               weaponDamageBonusThisTurn,
-              turnGold: played.player.turnGold + actionBonus(characterAbilities(state, seat), def) + trashEffectBonus(characterAbilities(state, seat), def),
+              turnGold: played.player.turnGold + actionBonus(seatAbilities(state, seat), def) + trashEffectBonus(seatAbilities(state, seat), def),
             };
             let ac015Rng = played.rngState;
             if (def.id === 'ac-015' && !player.partnerInstanceId) {
@@ -958,13 +960,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       let hp = played.player.hp;
                       let maxHp = played.player.maxHp;
                       let promptKind: string | undefined;
-                      let partnerHp = played.player.partnerInstanceId ? (state.seats[seat] as PlayerState).hp : played.player.hp;
+                      // Alliance Partner Modification: the Partner is a second
+                      // Character with its own Health, and a healing item helps
+                      // the whole team — the player (and the bots) look after
+                      // both. `healSelfAndPartnerToFull` (Red Herb) always did.
+                      const partnerHp0 = played.player.partnerInstanceId !== undefined
+                        ? (played.player.partnerHp ?? player.partnerHp)
+                        : undefined;
+                      let partnerHp = partnerHp0;
+                      const partnerMaxHp = played.player.partnerMaxHp ?? player.partnerMaxHp ?? played.player.maxHp;
+                      const fullHealBoth = (): void => {
+                        hp = maxHp;
+                        if (partnerHp !== undefined) partnerHp = partnerMaxHp;
+                      };
                       let trashGreenHerbId: string | undefined;
-                      let healPartner = false;
                       let returnToMarket = false;
                 for (const e of def.itemEffects ?? []) {
                         if (e.kind === 'healToFull') {
-                          hp = played.player.maxHp;
+                          fullHealBoth();
                         } else if (e.kind === 'plusMaxHp') {
                           maxHp = played.player.maxHp + e.amount;
                         } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
@@ -973,8 +986,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                           const green = played.player.hand.find(id => isGreenHerb(state, id));
                           if (green) {
                             trashGreenHerbId = green;
-                            hp = played.player.maxHp;
-                            healPartner = true;
+                            fullHealBoth();
                           }
                         } else if (e.kind === 'returnToMarketAndRemoveCounters') {
                           // Unofficial Expansion: EX-007 Blue Herb returns to its
@@ -984,7 +996,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       }
                 // Claire Redfield (Alliance): L1 +amount damage when a Green or
                 // Red Herb is trashed from hand; L2 double damage when both are.
-                const claireAbilities = characterAbilities(state, seat);
+                const claireAbilities = seatAbilities(state, seat);
                 const claireBonus = herbTrashDamageBonus(claireAbilities);
                 const claireDoubleDamage = hasDoubleDamageOnBothHerbs(claireAbilities);
                 const trashedHerbKinds = new Set(def.itemEffects?.map(e => e.kind) ?? []);
@@ -1010,6 +1022,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ...played.player,
         hp,
         maxHp,
+        ...(partnerHp !== undefined ? { partnerHp } : {}),
         weaponDamageBonusThisTurn:
           (played.player.weaponDamageBonusThisTurn ?? 0) + ((trashedGreen || trashedRed) ? claireBonus : 0),
         ...(trashedRed && trashGreenHerbId !== undefined && claireDoubleDamage
@@ -1088,7 +1101,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             );
 
             // Claire: ammunition cards give extra Ammo (L1) / Gold (L2).
-            const extra = ammunitionCardBonus(characterAbilities(state, seat), def);
+            const extra = ammunitionCardBonus(seatAbilities(state, seat), def);
             const playerAfterBonus: PlayerState =
               extra.ammo === 0 && extra.gold === 0
                 ? played.player
@@ -3212,7 +3225,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
       // CH-050 Rebecca Chambers (Mercenaries) L1: "When you buy a card, you may
       // move that card to another player's discard pile."
-      if (characterAbilities(s, seat).some(a => a.kind === 'buyRedirectToPlayerDiscard')) {
+      if (seatAbilities(s, seat).some(a => a.kind === 'buyRedirectToPlayerDiscard')) {
         const others = s.seats.filter(x => x.seat !== seat && !x.dead && !x.downed);
         if (others.length > 0) {
           return {
@@ -3234,8 +3247,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
     case 'useCharacterAbility': {
           const { seat, abilityIndex } = action;
           const player = state.seats[seat] as PlayerState;
-          const charInst = state.cards[player.characterInstanceId];
-          const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+          // Alliance Partner Modification: the ability may belong to the Main
+          // character or to the Partner.
+          const source = characterSource(state, seat, action.character ?? 'main');
+          const charDef = source?.def;
           const ability = charDef?.abilities?.[abilityIndex];
           if (charDef === undefined || ability === undefined) {
             // validate already guaranteed these exist; guard for the type system.
@@ -3361,7 +3376,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'discardAnyForAmmo': {
               // Chris Redfield (Outbreak) L1: discard any number of cards from
               // hand, then gain +amount Ammo for each card discarded.
-              const amount = (characterAbilities(state, seat).find(a => a.kind === 'discardAnyForAmmo') as { amount: number } | undefined)?.amount ?? 0;
+              const amount = (seatAbilities(state, seat).find(a => a.kind === 'discardAnyForAmmo') as { amount: number } | undefined)?.amount ?? 0;
               return {
                 ...state,
                 ...nextBase,
@@ -3381,7 +3396,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // Excella Gionne (Outbreak) L1: +1 Infection Level for +amount Gold.
               const deck = state.infectionDeck ?? [];
               const topInfection = deck[0];
-              const amount = (characterAbilities(state, seat).find(a => a.kind === 'gainInfectionForGold') as { amount: number } | undefined)?.amount ?? 0;
+              const amount = (seatAbilities(state, seat).find(a => a.kind === 'gainInfectionForGold') as { amount: number } | undefined)?.amount ?? 0;
               return {
                 ...state,
                 ...nextBase,
@@ -3441,7 +3456,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'gainSpecificWeaponIntoInventory': {
               // Kevin Ryman (Outbreak) L1: shuffle a Samurai Edge from the
               // Resource Area (or from outside the game) into the Inventory.
-              const cardId = (characterAbilities(state, seat).find(a => a.kind === 'gainSpecificWeaponIntoInventory') as { cardId: string } | undefined)?.cardId ?? 'we-027';
+              const cardId = (seatAbilities(state, seat).find(a => a.kind === 'gainSpecificWeaponIntoInventory') as { cardId: string } | undefined)?.cardId ?? 'we-027';
               let gainedId: string | undefined = undefined;
               const piles = { ...state.marketPiles };
               for (const pile of Object.values(piles)) {
@@ -3467,7 +3482,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             case 'movePlayAreaWeaponToInventoryTop': {
               // Kevin Ryman (Outbreak) L2: move a Pistol from the Play Area to
               // the top of the Inventory.
-              const tag = (characterAbilities(state, seat).find(a => a.kind === 'movePlayAreaWeaponToInventoryTop') as { tag: string } | undefined)?.tag ?? 'pistol';
+              const tag = (seatAbilities(state, seat).find(a => a.kind === 'movePlayAreaWeaponToInventoryTop') as { tag: string } | undefined)?.tag ?? 'pistol';
               const candidates = player.playArea.filter(id => {
                 const d = cardDef(state, id);
                 return d?.type === 'weapon' && (d.weaponTags ?? []).includes(tag as never);
@@ -3647,6 +3662,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 return { ...state, ...nextBase };
               }
               const discarded = player.hand[idx]!;
+              // Steve's recovery is his own: when the Partner owns the
+              // ability, the Health goes to the Partner's separate pool.
+              const healTarget: Partial<PlayerState> = action.character === 'partner'
+                ? { partnerHp: Math.min((player.partnerHp ?? player.hp) + ability.heal, player.partnerMaxHp ?? player.maxHp) }
+                : { hp: Math.min(player.hp + ability.heal, player.maxHp) };
               return {
                 ...state,
                 ...nextBase,
@@ -3655,7 +3675,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       ...player,
                       hand: player.hand.filter(id => id !== discarded),
                       discard: [...player.discard, discarded],
-                      hp: Math.min(player.hp + ability.heal, player.maxHp),
+                      ...healTarget,
                       weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.damage,
                     }
                   : s)),
@@ -3795,7 +3815,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           let attached = [...(player.partnerAttached ?? [])];
           const hand = player.hand.filter(id => id !== instanceId);
           let newDiscard = [...player.discard];
-          const attachCap = partnerAttachCap(characterAbilities(state, seat));
+          const attachCap = partnerAttachCap(seatAbilities(state, seat));
           if (attached.length >= attachCap && replaceIndex !== undefined && replaceIndex >= 0 && replaceIndex < attachCap) {
             const removed = attached[replaceIndex];
             if (removed !== undefined) {
@@ -3978,7 +3998,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           // CH-031 Zombie A: when this infected character attacks, all other
           // non-infected characters that are not being attacked take damage.
-          const aoeAmount = characterAbilities(state, seat)
+          const aoeAmount = seatAbilities(state, seat)
             .filter(a => a.kind === 'zombieAAoEOnAttack')
             .reduce((sum, a) => (a.kind === 'zombieAAoEOnAttack' ? sum + a.amount : sum), 0);
           // CH-032 Zombie B reacts to the target's Infection Level rising.
@@ -5566,20 +5586,37 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // CH-037 Josh Stone L1: +gold the first time he is healed this turn.
               const joshGold = ((): number => {
                 if (player.healedFirstTimeThisTurn) return 0;
-                const ab = characterAbilities(state, seat).find(a => a.kind === 'goldOnFirstHealThisTurn') as
+                const ab = seatAbilities(state, seat).find(a => a.kind === 'goldOnFirstHealThisTurn') as
                   | { amount: number }
                   | undefined;
                 return ab?.amount ?? 0;
               })();
+              // Alliance Partner Modification: the heal reaches both Characters.
+              const healSeats = (amount: number, extra?: Partial<PlayerState>): readonly PlayerState[] =>
+                state.seats.map(s => {
+                  if (s.seat !== seat) return s;
+                  return {
+                    ...s,
+                    ...extra,
+                    hp: Math.min(s.hp + amount + healBonus, s.maxHp),
+                    ...(s.partnerInstanceId !== undefined
+                      ? {
+                          partnerHp: Math.min(
+                            (s.partnerHp ?? s.hp) + amount + healBonus,
+                            s.partnerMaxHp ?? s.maxHp,
+                          ),
+                        }
+                      : {}),
+                  };
+                });
               if (option === 0) {
                 return {
                   ...state,
                   ...nextBase,
-                  seats: state.seats.map(s =>
-                    s.seat === seat
-                      ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp), turnGold: player.turnGold + joshGold, healedFirstTimeThisTurn: true }
-                      : s,
-                  ),
+                  seats: healSeats(20, {
+                    turnGold: player.turnGold + joshGold,
+                    healedFirstTimeThisTurn: true,
+                  }),
                   prompts: withHealPrompts(newPrompts),
                 };
               }
@@ -5590,24 +5627,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 return {
                   ...state,
                   ...nextBase,
-                  seats: state.seats.map(s =>
-                    s.seat === seat ? { ...player, hp: Math.min(player.hp + 20 + healBonus, player.maxHp) } : s,
-                  ),
+                  seats: healSeats(20),
                   prompts: withHealPrompts(newPrompts),
                 };
               }
               return {
                 ...state,
                 ...nextBase,
-                seats: state.seats.map(s =>
-                  s.seat === seat
-                    ? {
-                        ...player,
-                        hp: Math.min(player.hp + 60 + healBonus, player.maxHp),
-                        hand: player.hand.filter(id => id !== otherHerb),
-                      }
-                    : s,
-                ),
+                seats: healSeats(60, { hand: player.hand.filter(id => id !== otherHerb) }),
                 removed: [...state.removed, otherHerb],
                 prompts: withHealPrompts(newPrompts),
               };
@@ -6676,7 +6703,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'sergeiSelfDamage') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
-        const ab = characterAbilities(state, seat).find(a => a.kind === 'optionalSelfDamageForDamageThisTurn') as
+        const ab = seatAbilities(state, seat).find(a => a.kind === 'optionalSelfDamageForDamageThisTurn') as
           | { damage: number; amount: number }
           | undefined;
         if (ab === undefined) return { ...state, ...nextBase, prompts: newPrompts };

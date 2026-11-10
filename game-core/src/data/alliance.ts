@@ -118,7 +118,7 @@ export const ALLIANCE_CARDS: ReadonlyArray<CardDef> = [
   // ITEMS
   // ========================================================================
   
-  { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: '+20 max HP.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
+  { id: 'it-004', name: 'Red Herb', type: 'item', set: 'alliance', text: 'Trash with a Green Herb: heal yourself and your Partner to full Health.', copies: 2, cost: 20, itemEffects: [{ kind: 'healSelfAndPartnerToFull' }] },
   
   // ========================================================================
   // ACTIONS

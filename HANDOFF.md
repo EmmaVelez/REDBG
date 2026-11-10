@@ -1,5 +1,45 @@
 # HANDOFF — resume here
 
+**The Partner is a full second character + bots heal their Partner (2026-11-09):**
+Follow-up to the partner-leveling commit. Four pieces:
+(1) **`seatAbilities(state, seat)`** (engine/abilities.ts) = the Main's abilities PLUS the
+Partner's — the Partner is "another Character under your control" and a seat shares one
+hand/discard/inventory, so its abilities are the player's. A `PER_CHARACTER_ONLY` set
+(`cannotUseWeapons`, `singleWeaponLimiter`, `weaponCostCap`, `noHealingNoNonInfectedAttach`,
+`setHpToOnLethal`, `infectedDamageReduction`, `weaponDamageReduction`,
+`damageReductionForAmmo`, `exploreDamageReductionPerHandCard`) keeps one character's personal
+limits from leaking onto the other — Krauser as a Partner must not cap the Main at one weapon.
+Routed the player-scoped consumers through it: `validate` hasAbilityKind (heal/attach blocks,
+weapon reuse), `mercenaries` weaponAmmoReq, and in `actions.ts` trashRedirect,
+partnerAttachCap (×2), actionBonus/trashEffectBonus, Claire's herb-trash, ammunitionCardBonus,
+buyRedirect, discardAnyForAmmo, gainInfectionForGold, gainSpecificWeaponIntoInventory,
+movePlayAreaWeaponToInventoryTop, zombieB/ AoE, goldOnFirstHealThisTurn, Sergei self-damage.
+**Bug caught by the test:** the first `seatAbilities` returned the Partner's list unfiltered
+when the Main had no abilities — the filter now runs before the early returns.
+(2) **Turn start** (`game.ts`): `turnStartAbilityPrompts` and the infection/decrease +
+Excella draw now read `seatAbilities`, and each prompt's text is looked up from the character
+that actually owns the ability (`abilityText(kind)`). The Partner's `healAtTurnStart` now
+restores **partnerHp**, never the Main's (Steve Burnside L1). `turnStartDecreaseInfection`,
+`turnStartCardsIfInfectionAtLeast`, goldAtTurnStart, goldOnFirstHealThisTurn,
+turnStartActionIfHpAtMost, plusBuyBonus and extraExploreAtTurnStart all use the union.
+(3) **Manual abilities**: `useCharacterAbility` gained `character?: 'main' | 'partner'`;
+`characterSource(state, seat, character)` resolves the def + level (the Partner's level still
+derived from the Main's Decorations). `enumerate` emits both characters' abilities, and the
+ActionBar labels the Partner's with a "Partner: " prefix (`data-ability-character`). Steve's L2
+`discardCardForHealAndDamage` heals partnerHp when the Partner owns it.
+(4) **Healing reaches the Partner.** The old `playItem` code computed `healPartner` and never
+used it (dead variable + a comment asking "Partner HP stored on player?"). Now First Aid Spray,
+Green Herb (both the Heal 20 and Heal 60 paths) and the Red Herb all heal BOTH characters —
+the Red Herb's effect was already named `healSelfAndPartnerToFull`, and `actions.test.ts`'s
+fixture text was always "heal yourself and your partner to full Health" (the data file's
+"+20 max HP" text was wrong; fixed). **Design decision to flag:** healing items help the whole
+team rather than a chosen target — say the word if you want a Main/Partner target choice.
+**Bots:** with healing reaching both, the First Aid Spray (no prompt, so the 1-ply evaluation
+sees the Health) makes the bot heal a hurt Partner; `evaluate.ts` already scores `partnerHp`.
+**Tests:** game-core 16 in `engine/partnerLevel.test.ts` (union, restriction exclusion, turn-start
+partner heal, partner manual ability usable + enumerated, heal-both ×3, bot plays a heal when
+the Partner is hurt), client 183 (+1 partner ability button). Gates: typecheck clean, server 102.
+
 **Partner leveling + bots leading with the Partner (2026-11-09):** Manny asked two
 questions, both answered "no" and both now fixed.
 (1) *"Is the partner leveling up as the main character collects enough decorations?"*

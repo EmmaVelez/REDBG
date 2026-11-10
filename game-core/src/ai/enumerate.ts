@@ -144,21 +144,32 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
   }
 
   // --- 6. useCharacterAbility ---
-  const charInstData = state.cards[player.characterInstanceId];
-  if (charInstData) {
-    const charDef = state.cardDefs[charInstData.cardId];
-    if (charDef?.abilities) {
-      for (let i = 0; i < charDef.abilities.length; i++) {
-        const ability = charDef.abilities[i];
-        // PR-002 Jill's skip-turn ability is turn-start only (prompt); no manual button.
-        if (ability?.kind === 'skipTurnForSuperNextTurn') continue;
-        if (ability?.kind === 'gainKnifeAtTurnStart') continue;
-        generatedActions.push({
-          type: 'useCharacterAbility',
-          seat,
-          abilityIndex: i,
-        });
-      }
+  // Both characters' abilities are the player's: the Main's always, and the
+  // Partner's too (Alliance Partner Modification). `character` names which
+  // character's list `abilityIndex` indexes into.
+  const abilityTargets: ReadonlyArray<readonly ['main' | 'partner', CardDef | undefined]> = [
+    ['main', (() => {
+      const d = state.cards[player.characterInstanceId];
+      return d === undefined ? undefined : state.cardDefs[d.cardId];
+    })()],
+    ['partner', (() => {
+      const d = player.partnerInstanceId !== undefined ? state.cards[player.partnerInstanceId] : undefined;
+      return d === undefined ? undefined : state.cardDefs[d.cardId];
+    })()],
+  ];
+  for (const [character, charDef] of abilityTargets) {
+    if (!charDef?.abilities) continue;
+    for (let i = 0; i < charDef.abilities.length; i++) {
+      const ability = charDef.abilities[i];
+      // PR-002 Jill's skip-turn ability is turn-start only (prompt); no manual button.
+      if (ability?.kind === 'skipTurnForSuperNextTurn') continue;
+      if (ability?.kind === 'gainKnifeAtTurnStart') continue;
+      generatedActions.push({
+        type: 'useCharacterAbility',
+        seat,
+        abilityIndex: i,
+        ...(character === 'partner' ? { character: 'partner' as const } : {}),
+      });
     }
   }
 

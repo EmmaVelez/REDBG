@@ -999,6 +999,36 @@ describe('ActionBar (T07)', () => {
     expect(html1).toContain('+5 damage');
   });
 
+  it("labels a Partner's manual ability button from the Partner's own card", () => {
+    // Alliance Partner Modification: the Partner's abilities are the player's
+    // too, so its manual abilities get their own button, labelled as the
+    // Partner's rather than the Main character's.
+    const base = twoPlayerState();
+    const partnerCharInst = 'ch-005#p1';
+    const armed: GameState = {
+      ...base,
+      cardDefs: {
+        ...base.cardDefs,
+        'ch-005': {
+          ...(base.cardDefs['ch-005'] as CardDef),
+          level1At: 0,
+          abilities: [{ kind: 'plusDamageThisTurn' as const, amount: 5, level: 1 as const }],
+        },
+      },
+      cards: {
+        ...base.cards,
+        [partnerCharInst]: { instanceId: partnerCharInst, cardId: 'ch-005', location: { zone: 'attached' as const, index: 0, seat: 0 } },
+      },
+      seats: base.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: partnerCharInst, partnerAttached: [], level: 0, decorations: 0 }
+        : s)),
+    };
+    const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
+    expect(html).toContain('data-ability-character="partner"');
+    expect(html).toContain('Partner:');
+    expect(html).toContain('+5 damage');
+  });
+
   it('explore count options are bounded by the pool and the Mansion', () => {
     const state = twoPlayerState();
     const armed = {

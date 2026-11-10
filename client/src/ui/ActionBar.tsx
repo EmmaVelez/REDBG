@@ -161,8 +161,14 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const discardTopDef = discardTopId === undefined ? null : defForInstance(state, discardTopId);
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
-  const abilityLabel = (abilityIndex: number): string => {
-    const levelText = charDef?.levels?.find(l => l.level === (charDef.abilities?.[abilityIndex]?.level ?? 1))?.text;
+  const partnerInst = player?.partnerInstanceId === undefined ? undefined : state.cards[player.partnerInstanceId];
+  const partnerDef = partnerInst === undefined ? undefined : state.cardDefs[partnerInst.cardId];
+  // Alliance Partner Modification: a legal ability button may belong to the
+  // Partner, so label it from that character's own level text.
+  const abilityLabel = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
+    const def = a.character === 'partner' ? partnerDef : charDef;
+    const levelText = def?.levels?.find(l => l.level === (def.abilities?.[a.abilityIndex]?.level ?? 1))?.text;
+    if (a.character === 'partner') return 'Partner: ' + (levelText ?? 'Use ability');
     return levelText ?? 'Use ability';
   };
   // Prompt options are card instance ids, 'DONE' for multi-choice chains, seat
@@ -455,11 +461,12 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             type="button"
             className="ability-button"
             data-ability-index={a.abilityIndex}
+            data-ability-character={a.character ?? 'main'}
             onClick={() => onAction(a)}
             disabled={disabled}
-            title={abilityLabel(a.abilityIndex)}
+            title={abilityLabel(a)}
           >
-            Ability: {abilityLabel(a.abilityIndex)}
+            Ability: {abilityLabel(a)}
           </button>
         ))}
 

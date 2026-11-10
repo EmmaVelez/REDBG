@@ -1,5 +1,5 @@
 import type { CardDef, CharacterAbility, GameState } from '../types';
-import { characterAbilities, effectiveWeaponTags } from './abilities';
+import { seatAbilities, effectiveWeaponTags } from './abilities';
 
 /**
  * Weapon-reuse rules — "use this weapon more than once per turn".
@@ -17,7 +17,7 @@ function weaponDef(state: GameState, weaponId: string): CardDef | undefined {
 }
 
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
-  return characterAbilities(state, seat).some(a => a.kind === kind);
+  return seatAbilities(state, seat).some(a => a.kind === kind);
 }
 
 /**

@@ -1,14 +1,14 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
-import { characterAbilities, weaponCostCap, partnerAttachCap, leaderAbilities } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource } from './abilities';
 import { allyExploreAmmoCost } from './allyExplore';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 
-/** True when the seat's character has the given ability kind (level-gated). */
+/** True when the seat has the given ability kind (level-gated, Main or Partner). */
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
-  return characterAbilities(state, seat).some(a => a.kind === kind);
+  return seatAbilities(state, seat).some(a => a.kind === kind);
 }
 
 /** Chris L1 restriction flag. */
@@ -435,10 +435,16 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'useCharacterAbility: not your turn' };
       }
-      const charInst = state.cards[player.characterInstanceId];
-            const charDef = charInst ? state.cardDefs[charInst.cardId] : undefined;
-            if (charDef === undefined || charDef.abilities === undefined) {
-              return { ok: false, reason: `useCharacterAbility: unknown character: ${player.characterInstanceId}` };
+      // Alliance Partner Modification: the ability may belong to the Main
+      // character or to the Partner (whose level follows the Main's Decorations).
+      const source = characterSource(state, action.seat, action.character ?? 'main');
+      if (source === undefined) {
+        return { ok: false, reason: `useCharacterAbility: unknown character: ${action.character ?? 'main'}` };
+      }
+      const charDef = source.def;
+      const charLevel = source.level;
+            if (charDef.abilities === undefined) {
+              return { ok: false, reason: `useCharacterAbility: character has no abilities` };
             }
             if (action.abilityIndex < 0 || action.abilityIndex >= charDef.abilities.length) {
               return { ok: false, reason: `useCharacterAbility: bad ability index: ${action.abilityIndex}` };
@@ -448,7 +454,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               return { ok: false, reason: `useCharacterAbility: bad ability index: ${action.abilityIndex}` };
             }
             // Abilities must be unlocked at the character's current level.
-                  if (ability.level > player.level) {
+                  if (ability.level > charLevel) {
                     return { ok: false, reason: 'useCharacterAbility: ability not unlocked' };
                   }
       switch (ability.kind) {
@@ -688,7 +694,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'attachToPartner: Chris cannot attach non-Infected cards' };
       }
       const attached = player.partnerAttached ?? [];
-      const attachCap = partnerAttachCap(characterAbilities(state, action.seat));
+      const attachCap = partnerAttachCap(seatAbilities(state, action.seat));
       if (attached.length >= attachCap) {
         if (action.replaceIndex === undefined || action.replaceIndex < 0 || action.replaceIndex >= attachCap) {
           return { ok: false, reason: 'attachToPartner: replaceIndex required when partner full' };
