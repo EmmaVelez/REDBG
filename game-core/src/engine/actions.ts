@@ -44,6 +44,7 @@ import {
   applyRicardoDamage,
   ricardoReduction,
   queueRicardoL2Prompt,
+  leaderAbilities,
 } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -1116,13 +1117,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           // Ammo comes from the cumulative ammo resource, not from cards in hand.
           // Passive abilities can reduce the cost (Leon L1 pistols, Sheva L2 rifles).
-          const abilities = characterAbilities(state, seat);
+          // The leading character is the one fighting, so its abilities apply —
+          // a partner-led explore uses the Partner's (level derived from the
+          // Main character's Decorations), not the Main character's.
+          const abilities = leaderAbilities(state, seat, exploreLeader);
           // Chris Redfield (Alliance): L1 -20 ammo when using exactly one
           // weapon; L2 -20 ammo for the weapon types he chose this turn.
           const chrisSingleDiscount = weapons.length === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
           const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
           const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
-          const requiredAmmo = requiredAmmoForExplore(state, seat, weapons);
+          const requiredAmmo = requiredAmmoForExplore(state, seat, weapons, abilities);
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
           // WE-025 Blowback Pistol: "Discard any number of 'Pistol' cards from
@@ -1253,7 +1257,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : 0;
             return {
               damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0)),
-              ammoReq: isGatling ? 0 : isX ? assigned : exploreAmmoReq(state, seat, instId ?? '', weapons.length),
+              ammoReq: isGatling ? 0 : isX ? assigned : exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities),
               weaponEffects: (instId !== undefined && player.copiedWeaponEffects?.instanceId === instId)
                 ? [...(w?.weaponEffects ?? []), ...player.copiedWeaponEffects.effects]
                 : w?.weaponEffects,
@@ -1263,7 +1267,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           // David King (Outbreak) L2: when he uses a Knife weapon, he may also
           // use one from his discard pile.
-          const davidAbilities = characterAbilities(state, seat);
+          const davidAbilities = abilities;
           if (davidAbilities.some(a => a.kind === 'knifeFromDiscardForExplore')) {
             const usesKnife = exploreWeapons.some(w => (w.tags ?? []).includes('knife'));
             if (usesKnife) {
@@ -1782,7 +1786,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             state = ric.state;
             newLeadingHp = ric.hp;
           } else {
-            const reduce = player.downed || player.dead ? 0 : ricardoReduction(characterAbilities(state, seat), kevlar.damage);
+            const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
             newLeadingHp = baseLeadingHp - Math.max(kevlar.damage - reduce, 0);
             if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
           }
@@ -2772,7 +2776,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         // Luis Sera (Nightmare) L2: on defeating an Infected, may move any
         // number of cards from the discard pile to the bottom of the Inventory.
-        const luisPrompts = movesDiscardToInventoryOnDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+        const luisPrompts = movesDiscardToInventoryOnDefeat(abilities) && newPlayer.discard.length > 0
           ? [...defeatPrompts, {
               id: 'p' + (defeatPrompts.length + 1),
               seat,
@@ -2784,7 +2788,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Carlos Oliveira (Alliance) L2: a perfect explore (damage dealt equals
         // the Revealed Infected's health) lets him take one card from his
         // Discard Pile into his hand.
-        const carlosPrompts = hasPerfectExploreReward(characterAbilities(state, seat)) &&
+        const carlosPrompts = hasPerfectExploreReward(abilities) &&
           outcome.damage === outcome.hp && newPlayer.discard.length > 0
           ? [...luisPrompts, {
               id: 'p' + (luisPrompts.length + 1),
@@ -2796,7 +2800,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           : luisPrompts;
         // Mysterious Mask (Nightmare) L1: on defeating an Infected, may trash a
         // card from the discard pile.
-        const maskPrompts = trashCardFromDiscardOnInfectedDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+        const maskPrompts = trashCardFromDiscardOnInfectedDefeat(abilities) && newPlayer.discard.length > 0
           ? [...carlosPrompts, {
               id: 'p' + (carlosPrompts.length + 1),
               seat,
@@ -2807,7 +2811,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           : carlosPrompts;
         // Leon S. Kennedy (Nightmare) L1: on defeating an Infected, may trash a
         // discard card then gain one costing up to 20 more.
-        const leonPrompts = trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat(characterAbilities(state, seat)) && newPlayer.discard.length > 0
+        const leonPrompts = trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat(abilities) && newPlayer.discard.length > 0
           ? [...maskPrompts, {
               id: 'p' + (maskPrompts.length + 1),
               seat,
@@ -2881,7 +2885,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Hunk L1: damageRedirectToPartner — when Hunk would take damage and has
       // a partner, redirect the damage to his partner instead (partner absorbs
       // it; Hunk takes none). Automatic redirect when a partner is present.
-      const hasDamageRedirect = characterAbilities(state, seat).some(a => a.kind === 'damageRedirectToPartner');
+      const hasDamageRedirect = abilities.some(a => a.kind === 'damageRedirectToPartner');
       const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
       const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
       // Ada (Nightmare) L2: lethal damage sets her HP to 10 instead of 0 -
@@ -2923,7 +2927,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         state = ric.state;
         newLeadingHp = ric.hp;
       } else {
-        const reduce = player.downed || player.dead ? 0 : ricardoReduction(characterAbilities(state, seat), kevlar.damage);
+        const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
         newLeadingHp = Math.max(baseLeadingHp - Math.max(kevlar.damage - reduce, 0), 0);
         if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
       }

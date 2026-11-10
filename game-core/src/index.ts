@@ -3,7 +3,7 @@ export { setup, startTurn, checkWin } from "./engine/game";
 export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { exploreDamage } from "./engine/explore";
-export { requiredAmmoForWeapons, ammoReqForWeapon } from "./engine/abilities";
+export { requiredAmmoForWeapons, ammoReqForWeapon, leaderAbilities } from "./engine/abilities";
 export {
   explorableWeapons,
   canReuseWeapon,

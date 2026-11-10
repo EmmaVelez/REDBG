@@ -1,4 +1,4 @@
-import type { GameState } from '../types';
+import type { CharacterAbility, GameState } from '../types';
 import {
   characterAbilities,
   ammoReqForWeapon,
@@ -23,15 +23,21 @@ export function exploreAmmoReq(
   seat: number,
   weaponId: string,
   weaponCount: number,
+  /**
+   * Abilities to price the weapon with. Callers that resolve a leader pass the
+   * leading character's abilities (partner-led explores use the Partner's);
+   * omitted means the Main character's, which is every pre-partner call site.
+   */
+  abilities?: readonly CharacterAbility[],
 ): number {
   const player = state.seats[seat];
   const inst = state.cards[weaponId];
   const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
-  const abilities = characterAbilities(state, seat);
+  const abils = abilities ?? characterAbilities(state, seat);
 
-  let req = ammoReqForWeapon(abilities, def, effectiveWeaponTags(state, seat, weaponId));
-  if (weaponCount === 1) req -= singleWeaponAmmoDiscount(abilities);
-  const typeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
+  let req = ammoReqForWeapon(abils, def, effectiveWeaponTags(state, seat, weaponId));
+  if (weaponCount === 1) req -= singleWeaponAmmoDiscount(abils);
+  const typeDiscount = chosenWeaponTypeAmmoDiscount(abils);
   if (def?.weaponType !== undefined && (player?.chrisAmmoDiscountTypes ?? []).includes(def.weaponType)) {
     req -= typeDiscount;
   }
@@ -61,6 +67,7 @@ export function requiredAmmoForExplore(
   state: GameState,
   seat: number,
   weaponIds: readonly string[],
+  abilities?: readonly CharacterAbility[],
 ): number {
-  return weaponIds.reduce((sum, id) => sum + exploreAmmoReq(state, seat, id, weaponIds.length), 0);
+  return weaponIds.reduce((sum, id) => sum + exploreAmmoReq(state, seat, id, weaponIds.length, abilities), 0);
 }

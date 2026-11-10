@@ -7,6 +7,7 @@ import {
   exploreDamage,
   requiredAmmoForWeapons,
   isPartnerWeapon,
+  leaderAbilities,
 } from '@re/game-core';
 import { defForInstance } from './cards';
 
@@ -37,14 +38,19 @@ export interface ExploreWeaponOption {
 }
 
 /** Weapons the seat may use in an explore right now, with display metadata. */
-export function exploreWeaponOptions(state: GameState, seat: number): readonly ExploreWeaponOption[] {
+export function exploreWeaponOptions(
+  state: GameState,
+  seat: number,
+  leader?: 'main' | 'partner',
+): readonly ExploreWeaponOption[] {
+  const abilities = leaderAbilities(state, seat, leader ?? 'main');
   return explorableWeapons(state, seat).map(instanceId => {
     const def = defForInstance(state, instanceId);
     return {
       instanceId,
       name: def?.name ?? instanceId,
       damage: def?.type === 'weapon' ? def.damage ?? 0 : 0,
-      ammo: requiredAmmoForWeapons(state, seat, [instanceId], wid => defForInstance(state, wid) ?? undefined),
+      ammo: requiredAmmoForWeapons(state, seat, [instanceId], wid => defForInstance(state, wid) ?? undefined, abilities),
       reusable: canReuseWeapon(state, seat, instanceId),
       remainingUses: remainingWeaponUses(state, seat, instanceId),
       partner: isPartnerWeapon(state, seat, instanceId),
@@ -69,16 +75,21 @@ function comboKey(weaponIds: readonly string[], exploreCount: number): string {
  * The fullest legal combo — most weapons, then most damage, then least ammo.
  * This is the default selection and the one-click Explore target.
  */
-export function bestExploreCombo(state: GameState, seat: number): readonly string[] | null {
+export function bestExploreCombo(
+  state: GameState,
+  seat: number,
+  leader?: 'main' | 'partner',
+): readonly string[] | null {
   const legal = legalExplores(state, seat);
   if (legal.length === 0) return null;
+  const abilities = leaderAbilities(state, seat, leader ?? 'main');
   const damageOf = (ids: readonly string[]): number =>
     ids.reduce((sum, id) => {
       const def = defForInstance(state, id);
       return sum + (def !== null && def.type === 'weapon' ? def.damage ?? 0 : 0);
     }, 0);
   const ammoOf = (ids: readonly string[]): number =>
-    requiredAmmoForWeapons(state, seat, ids, wid => defForInstance(state, wid) ?? undefined);
+    requiredAmmoForWeapons(state, seat, ids, wid => defForInstance(state, wid) ?? undefined, abilities);
   const best = legal.reduce<ExploreAction>((b, a) => {
     if (a.weapons.length !== b.weapons.length) return a.weapons.length > b.weapons.length ? a : b;
     const d = damageOf(a.weapons);
@@ -117,14 +128,21 @@ export function evaluateExploreCombo(
   seat: number,
   weaponIds: readonly string[],
   exploreCount = 1,
+  leader?: 'main' | 'partner',
 ): ComboEvaluation {
-  const damage = exploreDamage(state, seat, weaponIds);
-  const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined);
+  const who = leader ?? 'main';
+  const abilities = leaderAbilities(state, seat, who);
+  const damage = exploreDamage(state, seat, weaponIds, who);
+  const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined, abilities);
 
   if (weaponIds.length === 0) {
     return { damage: 0, ammo: 0, legal: false, reason: 'Select at least one weapon.' };
   }
-  const isLegal = legalExplores(state, seat).some(e => comboKey(e.weapons, e.exploreCount) === comboKey(weaponIds, exploreCount));
+  // Legality is checked against the SELECTED leader: a combo that is only
+  // affordable because of the Partner's abilities must not read as illegal
+  // while the Main leads, and vice versa.
+  const isLegal = legalExplores(state, seat).some(e =>
+    (e.leader ?? 'main') === who && comboKey(e.weapons, e.exploreCount) === comboKey(weaponIds, exploreCount));
   if (isLegal) {
     return { damage, ammo, legal: true, reason: null };
   }

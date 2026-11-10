@@ -72,10 +72,16 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const prompts = state.prompts.filter(p => p.seat === seat);
   const prompt = prompts[0];
 
+  // Alliance Partner Modification: who leads (takes the damage on a failed
+  // explore). Defaults to the Main character. Declared before the picker
+  // helpers below because the preview must price the LEADING character's
+  // abilities, not the Main's.
+  const [leader, setLeader] = useState<'main' | 'partner'>('main');
+
   // Weapons usable in an explore: hand weapons plus any play-area weapon an
   // ability lets this seat use again (Leon L2 pistolsTwicePerTurn).
-  const weaponOptions = exploreWeaponOptions(state, seat);
-  const best = bestExploreCombo(state, seat);
+  const weaponOptions = exploreWeaponOptions(state, seat, leader);
+  const best = bestExploreCombo(state, seat, leader);
 
   const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -85,9 +91,6 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   };
   // Multi-explore: how many of the seat's remaining Explores this action spends.
   const [exploreCount, setExploreCount] = useState(1);
-  // Alliance Partner Modification: who leads (takes the damage on a failed
-  // explore). Defaults to the Main character.
-  const [leader, setLeader] = useState<'main' | 'partner'>('main');
 
   // Re-pick the default combo when the available weapons change (an explore
   // moves a weapon to the play area; end of turn clears it) or when the best
@@ -100,7 +103,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableKey, bestKey]);
 
-  const combo = evaluateExploreCombo(state, seat, selected, exploreCount);
+  const combo = evaluateExploreCombo(state, seat, selected, exploreCount, leader);
   const canExplore = explores.length > 0 && prompt === undefined;
   const exploreCounts = exploreCountOptions(state, seat);
   const exploreCountsKey = exploreCounts.join(',');

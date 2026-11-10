@@ -86,7 +86,12 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
           style={{ '--cc-overlap': attachedOverlap(partnerAttached.length) } as CSSProperties}
         >
           <div className="cc-fan">
-            <CardView def={partnerDef} compact artOnly decorations={0} hp={hp} maxHp={maxHp} />
+            {/* Alliance Partner Modification: "Your Partner's level is determined
+                by the total Decorations attached to your Main Character." The
+                Partner holds no Decorations of its own, so feed it the Main
+                character's count to render the correct level badge / skill
+                gating. */}
+            <CardView def={partnerDef} compact artOnly decorations={player.decorations} hp={hp} maxHp={maxHp} />
             {partnerAttached.length > 0 && (
               <div className="cc-attached-fan" data-partner-attached-fan={partnerAttached.length}>
                 {partnerAttached.map(x => (

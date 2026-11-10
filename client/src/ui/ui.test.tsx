@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { Action, GameState } from '@re/game-core';
+import type { Action, CardDef, GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
@@ -561,6 +561,20 @@ describe('CharacterCards (action bar)', () => {
     expect(html).not.toContain('Attached ');
   });
 
+  it("levels the Partner card from the Main character's Decorations", () => {
+    // Alliance Partner Modification: "Your Partner's level is determined by the
+    // total Decorations attached to your Main Character." Both cards therefore
+    // publish the Main character's Decorations, so the Partner's level badge
+    // and skill gating advance as the Main collects trophies.
+    const base = withPartner();
+    const state = {
+      ...base,
+      seats: base.seats.map((s, i) => (i === 0 ? { ...s, decorations: 6 } : s)),
+    };
+    const html = renderToStaticMarkup(<CharacterCards state={state} seat={0} />);
+    expect(html.match(/data-decorations="6"/g)?.length).toBe(2);
+  });
+
   it('fans the attached infected out to the right of the character card', () => {
     const html = renderToStaticMarkup(<CharacterCards state={withPartner()} seat={0} />);
     // the partner has one trophy, the main character none
@@ -1009,6 +1023,46 @@ describe('ActionBar (T07)', () => {
     expect(result.reason).toContain('Not enough explores');
     // The same combo with a legal count is fine.
     expect(evaluateExploreCombo(armed, 0, [handgunInst as string], 2).legal).toBe(true);
+  });
+
+  it('prices the explore preview with the selected leader abilities', () => {
+    const state = twoPlayerState();
+    const partnerInst = 'we-004#77';
+    const partnerCharInst = 'ch-002#p1';
+    const handgunInst = state.seats[0]?.hand.find(id => state.cards[id]?.cardId === 'we-009');
+    expect(handgunInst).toBeDefined();
+    // Give the Partner Leon S. Kennedy L1: all Pistol weapons -10 Ammo. The
+    // Handgun costs 20, so the Main-led explore is unaffordable with 10 Ammo
+    // while the Partner-led one is exactly payable.
+    const armed = {
+      ...state,
+      cardDefs: {
+        ...state.cardDefs,
+        'ch-002': {
+          ...(state.cardDefs['ch-002'] as CardDef),
+          level1At: 0,
+          abilities: [{ kind: 'ammoReqReduction' as const, tag: 'pistol' as const, amount: 10, level: 1 as const }],
+        },
+      },
+      cards: {
+        ...state.cards,
+        [partnerCharInst]: { instanceId: partnerCharInst, cardId: 'ch-002', location: { zone: 'attached' as const, index: 0, seat: 0 } },
+        [partnerInst]: { instanceId: partnerInst, cardId: 'we-004', location: { zone: 'hand' as const, index: 5, seat: 0 } },
+      },
+      seats: state.seats.map((s, i) => (i === 0
+        ? { ...s, partnerInstanceId: partnerCharInst, partnerAttached: [partnerInst], turnAmmo: 10 }
+        : s)),
+    };
+    const mainLed = evaluateExploreCombo(armed, 0, [handgunInst as string], 1, 'main');
+    const partnerLed = evaluateExploreCombo(armed, 0, [handgunInst as string], 1, 'partner');
+    expect(mainLed.legal).toBe(false);
+    expect(partnerLed.legal).toBe(true);
+    expect(mainLed.ammo).toBe(20);
+    expect(partnerLed.ammo).toBe(10);
+    // The weapon list prices the same way.
+    const partnerPriced = exploreWeaponOptions(armed, 0, 'partner')
+      .find(o => o.instanceId === handgunInst);
+    expect(partnerPriced?.ammo).toBe(10);
   });
 
   it('explore picker marks a partner-attached weapon and keeps it out of the hand', () => {

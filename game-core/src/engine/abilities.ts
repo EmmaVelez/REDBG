@@ -1,6 +1,6 @@
 import type { CharacterAbility, GameState, PlayerState, CardDef, WeaponTag, Prompt } from '../types';
 import { drawWithReshuffle } from './deck';
-import { abilitiesForLevel } from './characters';
+import { abilitiesForLevel, levelForDecorations } from './characters';
 
 /**
  * Passive character-ability queries (batch 1: damage/ammo/economy passives).
@@ -20,6 +20,44 @@ export function characterAbilities(state: GameState, seat: number): readonly Cha
   const def = state.cardDefs[inst.cardId];
   if (def === undefined) return [];
   return abilitiesForLevel(def.abilities, player.level);
+}
+
+/**
+ * The Partner's abilities (Alliance Partner Modification).
+ *
+ * The rulebook: "Your Partner's level is determined by the total Decorations
+ * attached to your Main Character, and follows all the same rules outlined in
+ * the LEVEL UP! Section." A Partner never holds Decorations of its own, so its
+ * level is derived from the Main character's Decorations on the fly — there is
+ * no stored partner level to go stale.
+ */
+export function partnerAbilities(state: GameState, seat: number): readonly CharacterAbility[] {
+  const player = state.seats[seat];
+  if (player === undefined || player.partnerInstanceId === undefined) return [];
+  const inst = state.cards[player.partnerInstanceId];
+  if (inst === undefined) return [];
+  const def = state.cardDefs[inst.cardId];
+  if (def === undefined) return [];
+  return abilitiesForLevel(
+    def.abilities,
+    levelForDecorations(def.level1At, def.level2At, player.decorations),
+  );
+}
+
+/**
+ * Abilities of whichever character is leading the Explore.
+ *
+ * The leading character is the one fighting, so its restrictions and bonuses
+ * apply — not the other character's. Before partner mode this was always the
+ * Main character; `partnerLeading`/`action.leader` only decide who takes the
+ * damage, so a partner-led explore must also resolve its own abilities.
+ */
+export function leaderAbilities(
+  state: GameState,
+  seat: number,
+  leader: 'main' | 'partner',
+): readonly CharacterAbility[] {
+  return leader === 'partner' ? partnerAbilities(state, seat) : characterAbilities(state, seat);
 }
 
 /**
@@ -48,10 +86,12 @@ export function requiredAmmoForWeapons(
   state: GameState,
   seat: number,
   weaponIds: readonly string[],
-  defs: (id: string) => CardDef | undefined
+  defs: (id: string) => CardDef | undefined,
+  /** Leading character's abilities; omitted means the Main character's. */
+  abilities?: readonly CharacterAbility[],
 ): number {
-  const abilities = characterAbilities(state, seat);
-  return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abilities, defs(id), effectiveWeaponTags(state, seat, id)), 0);
+  const abils = abilities ?? characterAbilities(state, seat);
+  return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abils, defs(id), effectiveWeaponTags(state, seat, id)), 0);
 }
 
 /**

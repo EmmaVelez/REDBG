@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
-import { characterAbilities, weaponCostCap, partnerAttachCap } from './abilities';
+import { characterAbilities, weaponCostCap, partnerAttachCap, leaderAbilities } from './abilities';
 import { allyExploreAmmoCost } from './allyExplore';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
@@ -237,19 +237,24 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.leader === 'partner' && player.partnerInstanceId === undefined) {
         return { ok: false, reason: 'explore: no partner' };
       }
+      // The leading character is the one fighting, so its abilities gate the
+      // explore — a partner-led explore uses the Partner's abilities (level
+      // derived from the Main character's Decorations), not the Main's.
+      const leader: 'main' | 'partner' = action.leader === 'partner' ? 'partner' : 'main';
+      const leaderAbils = leaderAbilities(state, action.seat, leader);
       if (action.weapons.length === 0) {
         return { ok: false, reason: 'explore: no weapons' };
       }
       // FCH-008 Sherry Birkin: she cannot use Weapons at all.
-      if (characterAbilities(state, action.seat).some(a => a.kind === 'cannotUseWeapons')) {
+      if (leaderAbils.some(a => a.kind === 'cannotUseWeapons')) {
         return { ok: false, reason: 'explore: cannot use weapons' };
       }
       // singleWeaponLimiter: cannot use >1 weapon in one explore.
-      if (action.weapons.length > 1 && characterAbilities(state, action.seat).some(a => a.kind === 'singleWeaponLimiter')) {
+      if (action.weapons.length > 1 && leaderAbils.some(a => a.kind === 'singleWeaponLimiter')) {
         return { ok: false, reason: 'explore: single weapon limiter' };
       }
       // weaponCostCap (Josh L1): cannot use weapons costing maxCost or more.
-      const costCap = weaponCostCap(characterAbilities(state, action.seat));
+      const costCap = weaponCostCap(leaderAbils);
       if (costCap !== undefined && action.weapons.some(id => (cardDef(state, id)?.cost ?? 0) >= costCap)) {
         return { ok: false, reason: 'explore: weapon cost cap' };
       }
@@ -282,7 +287,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             }
             // Ability-aware ammo cost (Leon L1 pistols -10, Sheva L2 rifles -20,
             // Skill discounts, Claire/Jill Mercenaries modifiers).
-            const requiredAmmo = requiredAmmoForExplore(state, action.seat, action.weapons);
+            const requiredAmmo = requiredAmmoForExplore(state, action.seat, action.weapons, leaderAbils);
             if (player.turnAmmo < requiredAmmo) {
               return { ok: false, reason: 'explore: insufficient ammo' };
             }

@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, dualWieldBonus } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, dualWieldBonus, leaderAbilities } from './abilities';
 import { exploreAmmoReq } from './ammo';
 
 export interface ExploreWeapon {
@@ -93,10 +93,20 @@ export function computeDamage(params: DamageParams): number {
  * character turn bonus). `state` must be the PRE-explore state so the turn
  * ammo pool and weaponDamageBonusThisTurn are still intact.
  */
-export function exploreDamage(state: GameState, seat: number, weaponIds: readonly string[]): number {
+export function exploreDamage(
+  state: GameState,
+  seat: number,
+  weaponIds: readonly string[],
+  /**
+   * Who leads the explore. The leader is the one fighting, so its abilities
+   * feed the preview; omitted means the Main character (every pre-partner
+   * call site).
+   */
+  leader?: 'main' | 'partner',
+): number {
   const player = state.seats[seat];
   if (player === undefined) return 0;
-  const abilities = characterAbilities(state, seat);
+  const abilities = leaderAbilities(state, seat, leader ?? 'main');
   const defs = (weaponIds ?? []).map(id => {
     const inst = state.cards[id];
     return inst === undefined ? undefined : state.cardDefs[inst.cardId];

@@ -1,5 +1,41 @@
 # HANDOFF — resume here
 
+**Partner leveling + bots leading with the Partner (2026-11-09):** Manny asked two
+questions, both answered "no" and both now fixed.
+(1) *"Is the partner leveling up as the main character collects enough decorations?"*
+It was not. The Alliance rulebook says the Partner's level follows the **Main
+character's Decorations**, but `PlayerState` had no partner level at all, nothing
+in `engine/` ever resolved the partner's own card def, and `CharacterCards.tsx`
+hard-coded `decorations={0}` on the partner card. Now `partnerAbilities(state, seat)`
+(`engine/abilities.ts`) derives the partner's level on the fly via
+`levelForDecorations(def.level1At, def.level2At, player.decorations)` — no stored
+field to go stale, because a Partner never holds Decorations of its own. The
+client feeds `player.decorations` to the partner `CardView`, so its level badge and
+skill gating advance with the Main's trophies.
+(2) *"Do the bots ever have their partners lead explores?"* They did not:
+`enumerate.ts` emitted explores with no `leader` and the file said "bots should not
+pick manually", so `exploreLeader` always fell back to `'main'`. `enumerate.ts` now
+emits BOTH leaders whenever the seat has a partner (`leader: 'partner'` on the
+second), and the comment now says bots express the choice on the explore action.
+**The leader is the one fighting, so its abilities apply.** `leaderAbilities(state,
+seat, leader)` is the new resolver; the explore path (actions.ts `abilities`,
+`requiredAmmoForExplore`, `exploreAmmoReq`, `davidAbilities`, `ricardoReduction`,
+the Luis/Carlos/Mask/Leon defeat prompts, `damageRedirectToPartner`) and
+`validateExplore` (`cannotUseWeapons`, `singleWeaponLimiter`, `weaponCostCap`,
+ammo) all resolve the leader. `exploreDamage` / `requiredAmmoForWeapons` /
+`requiredAmmoForExplore` / `exploreAmmoReq` gained optional ability/leader params
+(defaults keep every pre-partner call site unchanged), and the client's explore
+picker (`explorePicker.ts` + `ActionBar.tsx`) passes the selected leader so the
+preview prices the leading character and legality is checked per leader.
+**Known boundary (not fixed, deliberately):** the Partner's abilities fire when it
+LEADS an explore; abilities that act outside the explore (Steve's turn-start heal,
+Josh's attach cap, manual abilities) still read the Main's, and `useCharacterAbility`
+still indexes the Main's ability list so a Partner's manual ability cannot be
+triggered. Say the word if you want the Partner as a full second character.
+**Tests:** game-core **828** (was 821; +7 in `engine/partnerLevel.test.ts`), client
+**182** (was 181; +1 leader-priced preview), server **102**. Gates: typecheck clean,
+vite build OK, soak unchanged at ~235s.
+
 **UNOFFICIAL EXPANSION 1 — EX-001..EX-009 (2026-11-09):** Manny supplied a 3x3
 sheet of nine fan cards ("UNOFFICIAL EXPANSION - 1"). Transcribed with the LOCAL
 Ollama vision model (`SetneufPT/Gemma4-12B-IT-QAT_Q4_64K_16GB-GPU`, vision-capable)

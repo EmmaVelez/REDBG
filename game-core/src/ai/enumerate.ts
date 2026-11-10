@@ -88,13 +88,24 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       // legal for humans via the picker; the bot's 1-ply evaluation only needs
       // the two extremes to weigh single vs combined battles.
       const exploreCounts: readonly number[] = player.exploresLeft > 1 ? [1, player.exploresLeft] : [1];
-      for (const exploreCount of exploreCounts) {
-        generatedActions.push({
-          type: 'explore',
-          seat,
-          weapons: combo,
-          exploreCount,
-        });
+      // Alliance Partner Modification: the player chooses who leads before the
+      // reveal ("your Leading Character takes the full Damage ... After your
+      // Leading Character has taken Damage, the Infected is passed to your
+      // Partner"). Both leaders are legal, so the bot must be able to consider
+      // each — leading with a high-Health Partner to protect a low-Health Main
+      // is often the better play, and the leader's own abilities apply.
+      const leaders: readonly ('main' | 'partner')[] =
+        player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
+      for (const leader of leaders) {
+        for (const exploreCount of exploreCounts) {
+          generatedActions.push({
+            type: 'explore',
+            seat,
+            weapons: combo,
+            exploreCount,
+            ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
+          });
+        }
       }
     }
 
@@ -168,7 +179,9 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
         }
       }
     }
-  // partner mode leader selection is handled automatically; bots should not pick manually
+  // partner mode leader selection: bots do not call chooseExploreLeader; they
+  // express the choice on the explore action itself (leader: 'partner', see the
+  // explore enumeration above). chooseExploreLeader stays a human-only action.
 
   }
 
