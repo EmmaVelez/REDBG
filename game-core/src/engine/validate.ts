@@ -1,7 +1,7 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
-import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
+import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -281,9 +281,15 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (costCap !== undefined && action.weapons.some(id => (cardDef(state, id)?.cost ?? 0) >= costCap)) {
         return { ok: false, reason: 'explore: weapon cost cap' };
       }
-      const weaponSet = new Set(action.weapons);
-      if (weaponSet.size !== action.weapons.length) {
-        return { ok: false, reason: `explore: duplicate weapon: ${action.weapons.find((id, index) => action.weapons.indexOf(id) !== index)}` };
+      // One entry in `weapons` is one USE. A weapon may appear more than once
+      // only while a reuse ability leaves uses available (Leon L2 pistols:
+      // "pay its ammo requirement twice for that weapon to apply its effect
+      // and damage twice"). Anything beyond the per-turn cap is rejected.
+      for (const weaponId of action.weapons) {
+        const uses = action.weapons.filter(id => id === weaponId).length;
+        if (!canUseWeaponTimes(state, action.seat, weaponId, uses)) {
+          return { ok: false, reason: `explore: weapon already used: ${weaponId}` };
+        }
       }
       for (const weaponId of action.weapons) {
               // Weapon-reuse abilities (Leon L2 pistolsTwicePerTurn): a weapon

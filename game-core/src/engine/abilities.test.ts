@@ -447,7 +447,7 @@ describe('batch-2 exotic passives through applyAction', () => {
     expect(validateAction(e1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 }).ok).toBe(true);
     const e2 = applyAction(e1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
     // third use rejected (cap 2)
-    expect(validateAction(e2, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon not in hand: we-009#1' });
+    expect(validateAction(e2, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon already used: we-009#1' });
     // Below L2 the second use is illegal
     const l1 = { ...withPistol, seats: withPistol.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const } : p)) };
     const f1 = applyAction(l1, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });

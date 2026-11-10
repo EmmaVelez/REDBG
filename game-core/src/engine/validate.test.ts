@@ -109,8 +109,10 @@ describe('validateAction', () => {
       expect(validateAction(baseState({ seat0: { turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['m-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: not a weapon: m-1' });
     });
 
-    it('explore duplicate weapon', () => {
-      expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1', 'w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: duplicate weapon: w-1' });
+    it('explore duplicate weapon (no reuse ability)', () => {
+      // we-1 has no Pistol tag and the seat has no reuse ability, so its cap
+      // is one use per turn — declaring it twice is over the cap.
+      expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 20 } }), { type: 'explore', seat: 0, weapons: ['w-1', 'w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: weapon already used: w-1' });
     });
 
     it('explore ok with ammo cards still in hand (pool-based ammo, cards not consumed)', () => {

@@ -4,10 +4,14 @@ import { seatAbilities, effectiveWeaponTags } from './abilities';
 /**
  * Weapon-reuse rules — "use this weapon more than once per turn".
  *
- * The engine's one such ability is Leon L2 `pistolsTwicePerTurn`: a Pistol
- * already sitting in the play area may be used in a second explore the same
- * turn (the first use moved it out of hand). Validation, action enumeration
- * and the UI all read these helpers so the rule cannot drift between layers.
+ * The engine's one such ability is Leon L2 `pistolsTwicePerTurn`: a Pistol can
+ * be used TWICE per turn. The two uses may be spent as one double use in a
+ * single explore (the official FAQ: "pay its ammo requirement twice for that
+ * weapon to apply its effect and damage twice") or split across two explores
+ * (the first use moves it out of hand, so the second comes from the play
+ * area). One entry in an explore action's `weapons` array is one use.
+ * Validation, action enumeration and the UI all read these helpers so the
+ * rule cannot drift between layers.
  */
 
 function weaponDef(state: GameState, weaponId: string): CardDef | undefined {
@@ -24,6 +28,10 @@ function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['
  * How many times this weapon has already been used in an explore THIS turn —
  * log scan back to the seat's last endTurn (the in-flight explore is not in
  * the log yet, so it is never counted here).
+ *
+ * Every entry in a logged explore's `weapons` array is one USE, so a weapon
+ * declared twice in one explore (Leon L2: pay the ammo twice, effect and
+ * damage twice) counts as two uses.
  */
 export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: string): number {
   let uses = 0;
@@ -31,8 +39,10 @@ export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: str
     const logged = state.log[i]?.action;
     if (logged === undefined) continue;
     if (logged.type === 'endTurn' && logged.seat === seat) break;
-    if (logged.type === 'explore' && logged.seat === seat && logged.weapons.includes(weaponId)) {
-      uses += 1;
+    if (logged.type === 'explore' && logged.seat === seat) {
+      for (const id of logged.weapons) {
+        if (id === weaponId) uses += 1;
+      }
     }
   }
   return uses;
@@ -52,6 +62,16 @@ export function maxWeaponUses(state: GameState, seat: number, weaponId: string):
 /** Uses still available this turn beyond those already spent (0 = exhausted). */
 export function remainingWeaponUses(state: GameState, seat: number, weaponId: string): number {
   return Math.max(maxWeaponUses(state, seat, weaponId) - weaponUsesThisTurn(state, seat, weaponId), 0);
+}
+
+/**
+ * True when this weapon could be used `times` MORE times this turn. `times` is
+ * how many entries the explore action would carry for this instance — 2 is the
+ * Leon L2 double use ("pay its ammo requirement twice for that weapon to apply
+ * its effect and damage twice"), which spends both uses at once.
+ */
+export function canUseWeaponTimes(state: GameState, seat: number, weaponId: string, times: number): boolean {
+  return weaponUsesThisTurn(state, seat, weaponId) + times <= maxWeaponUses(state, seat, weaponId);
 }
 
 /**

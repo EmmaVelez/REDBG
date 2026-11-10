@@ -69,6 +69,20 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
   return state.cardDefs[inst.cardId];
 }
 
+/**
+ * Distinct weapon instance ids, order preserved. One entry in an explore
+ * action's `weapons` array is one USE, so a weapon declared twice (Leon L2:
+ * pay the ammo twice, effect and damage twice) is still ONE card — the play
+ * area, trash and explosive lists must not pick up a second copy of it.
+ */
+function uniqueWeapons(ids: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 /** Every weapon instance currently in a Resource Area pile (EX-003 Weapon Case,
  *  which lets the taker choose any weapon from the Resource Area). */
 function marketWeaponIds(state: GameState): string[] {
@@ -1191,8 +1205,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // play area, trashed, or removed by use.
           const partnerWeaponSet = new Set(player.partnerAttached ?? []);
           // Leon L2 pistol reuse: a pistol already in the play area stays there
-          // (it was not just moved from hand); only fresh weapons get added below.
-          const freshWeapons = weapons.filter(id => !player.playArea.includes(id) && !partnerWeaponSet.has(id));
+          // (it was not just moved from hand); only fresh weapons get added
+          // below. A weapon declared twice is still one card, so de-dupe.
+          const freshWeapons = uniqueWeapons(weapons).filter(id => !player.playArea.includes(id) && !partnerWeaponSet.has(id));
           // Explosive weapons are trashed after use (all-explosives rule);
           // Jill L2 sends them to her discard pile instead. WE-018/we-018g
           // Grenade Launcher does the same for every Explosive used this turn.
@@ -1221,7 +1236,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             trashedAmmo.push(playAreaAfter[idx] as string);
             playAreaAfter = [...playAreaAfter.slice(0, idx), ...playAreaAfter.slice(idx + 1)];
           }
-          const toTrashAfterUse = weapons.filter(id => {
+          const toTrashAfterUse = uniqueWeapons(weapons).filter(id => {
             if (partnerWeaponSet.has(id)) return false;
             const def = cardDef(state, id);
             return def?.weaponEffects?.some(e =>

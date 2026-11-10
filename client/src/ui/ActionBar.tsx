@@ -17,6 +17,7 @@ import {
   legalExplores,
   resolveExploreLeader,
   grantedExploresForSelection,
+  toggleWeaponDouble,
 } from './explorePicker';
 
 /** Prompt kinds whose numeric options are AMOUNTS (XP), not seat indices. */
@@ -323,34 +324,52 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
       {pickerOpen && canExplore && (
         <div className="explore-picker" data-explore-picker>
           <div className="explore-picker-list">
-            {weaponOptions.map(opt => (
-              <label key={opt.instanceId} className="explore-option" data-explore-option={opt.instanceId}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(opt.instanceId)}
-                  disabled={disabled}
-                  onChange={() => toggleWeapon(opt.instanceId)}
-                />
-                <span className="explore-option-name">{opt.name}</span>
-                <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
-                {opt.partner && (
-                  <span
-                    className="explore-option-partner"
-                    title="Attached to your Partner. It joins this explore but stays attached."
-                  >
-                    partner
-                  </span>
-                )}
-                {opt.reusable && (
-                  <span
-                    className="explore-option-reuse"
-                    title="This weapon is in your play area and an ability lets you use it again this turn."
-                  >
-                    use again ({opt.remainingUses} left)
-                  </span>
-                )}
-              </label>
-            ))}
+            {weaponOptions.map(opt => {
+              const times = selected.filter(id => id === opt.instanceId).length;
+              return (
+                <div key={opt.instanceId} className="explore-option" data-explore-option={opt.instanceId}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={times >= 1}
+                      disabled={disabled}
+                      onChange={() => toggleWeapon(opt.instanceId)}
+                    />
+                    <span className="explore-option-name">{opt.name}</span>
+                    <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
+                  </label>
+                  {opt.partner && (
+                    <span
+                      className="explore-option-partner"
+                      title="Attached to your Partner. It joins this explore but stays attached."
+                    >
+                      partner
+                    </span>
+                  )}
+                  {opt.reusable && (
+                    <span
+                      className="explore-option-reuse"
+                      title="This weapon is in your play area and an ability lets you use it again this turn."
+                    >
+                      use again ({opt.remainingUses} left)
+                    </span>
+                  )}
+                  {opt.remainingUses >= 2 && (
+                    <button
+                      type="button"
+                      className="explore-option-double"
+                      data-explore-double={opt.instanceId}
+                      data-active={times >= 2}
+                      disabled={disabled}
+                      onClick={() => setSelected(toggleWeaponDouble(selected, opt.instanceId, opt.remainingUses))}
+                      title="Use this weapon twice in one explore: pay its Ammo Requirement twice, and its effect and damage apply twice."
+                    >
+                      {times >= 2 ? '×2 ✓' : '×2'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="explore-picker-total" data-explore-total>
             {combo.damage} damage · {combo.ammo} ammo

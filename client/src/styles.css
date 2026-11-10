@@ -1549,6 +1549,27 @@ h1, h2 { margin: 0 0 8px; }
   cursor: pointer;
 }
 .explore-option input { margin: 0; }
+.explore-option label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+}
+/* Leon L2 double use: pay the ammo twice, effect and damage twice. */
+.explore-option-double {
+  font-size: 11px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.explore-option-double[data-active='true'] {
+  color: var(--gold);
+  border-color: var(--gold);
+}
 .explore-option-name { font-weight: 700; }
 .explore-option-stats { color: var(--muted); white-space: nowrap; }
 .explore-option-reuse {

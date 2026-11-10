@@ -10,6 +10,7 @@ export {
   remainingWeaponUses,
   maxWeaponUses,
   weaponUsesThisTurn,
+  canUseWeaponTimes,
   isPartnerWeapon,
 } from "./engine/weaponReuse";
 export { sanitize, viewForSeat } from "./engine/view";

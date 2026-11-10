@@ -1,5 +1,28 @@
 # HANDOFF — resume here
 
+**Leon L2 `pistolsTwicePerTurn` per the official FAQ (2026-11-10):** Manny quoted the Master
+FAQ — *"When he uses a pistol weapon, you can pay its ammo requirement twice for that weapon
+to apply its effect and damage twice"* — and said the game did not do that: it only let a
+Pistol be REUSED in a later explore. Now ONE entry in an explore action's `weapons` array is
+one USE, so the same Pistol instance may appear twice in a SINGLE explore: the ammo is paid
+twice, the damage is dealt twice, and every `weaponEffects` entry fires twice
+(`grantExplores`, `gainCardsAndActions`, `plusDamagePerExtraWeapon`, …). The two uses may
+still be SPLIT across two explores (the old play-area reuse, kept), and the per-turn cap of 2
+is enforced by a new `canUseWeaponTimes` helper — `weaponUsesThisTurn` now counts
+OCCURRENCES in the log, not log entries, so a double use spends both uses. Wiring:
+`validate.ts` (the "duplicate weapon" rejection became a per-weapon cap check),
+`actions.ts` (new `uniqueWeapons` de-dupes the play-area / trash-after-use / explosive lists —
+a weapon used twice is still ONE card), `enumerate.ts` (offers one doubled variant per combo
+so the bots AND the client's legality check can reach it), `client/src/ui/explorePicker.ts`
+(new pure `toggleWeaponDouble`) and `ActionBar.tsx` (a "×2" button on every weapon option with
+`remainingUses >= 2`; the checkbox still toggles one use). Spec: `SPEC_LEON_L2.md`; tests:
+new `game-core/src/engine/leonL2.test.ts` (+11) and 3 in `client/src/ui/ui.test.tsx`. Gates:
+typecheck ×3 clean, game-core 864, server 104, client 88, vite build OK, full-game soak 23/30
+natural — IDENTICAL to the stashed pre-change baseline (verified by `git stash -u` + re-run),
+so no balance regression. Noticed but NOT done (separate feature): SK-021 Weapon Master LV.3
+(`exploreDuplicateWeaponEffect`) is armed as `duplicateWeaponEffect` but never consumed in the
+explore path — it duplicates only the EFFECT, not the damage, so it needs its own wiring.
+
 **Health-gauge number shadow + skill-box decoration cost (2026-11-10):** Two small UI asks from Manny.
 1. **2px shadow all round the gauge number.** `.health-ring-label` (the `<text>` inside every
    `HealthRing` - characters AND infected cards share the class, so one rule covers every gauge) now
@@ -1208,3 +1231,4 @@ engine are unused union members in `types.ts`
 3. M5-T05 DONE (commit 0083419): FAQ checklist at `docs/rules/FAQ-VERIFICATION.md`. FAQ-3 (Gatling Gun Majini) was a gap — the engine boosted the player's damage instead of the Infected's attack; Manny ruled Infected's attack, and `resolveExplore`/`resolveMultiExplore` now add it to `boostedAttack`/`atk` (regression tests in `explore.test.ts`).
 4. Verify the gate personally (tsc + vitest in the affected workspace) before reporting green.
 5. GRANTED EXPLORES (commit 41757a2): a weapon that grants Explores (Pump-Action/Automatic/Riot/Triple Barreled Shotguns, Stun Rod, Flashbang) can now spend them in the SAME explore — `exploreCount` is bounded by `exploresLeft + grantedExploresFor(weapons)` (validate.ts) and the reducer adds the grant back after spending. The ActionBar's "Explores to use" selector lists 1..pool and a hint names the granting weapon; `exploreCountOptions`/`grantedExploresForSelection` in `client/src/ui/explorePicker.ts` mirror the engine helper. `enumerate.ts` offers 1 and the full pool so bots use it too. Fixed a latent multi-explore conservation bug this exposed: MA-092's "Gain 1 copy" was applied to a pre-gain seat snapshot and dropped from the discard (`gainCopyTracked` in mercenaries.ts now reports the created ids; regression test in multiExplore.test.ts).
+6. LEON L2 DOUBLE USE (this change): `weapons: [pistolId, pistolId]` in ONE explore = the official FAQ play (pay the ammo twice, effect and damage twice). `weaponReuse.ts` gained `canUseWeaponTimes` and `weaponUsesThisTurn` counts occurrences; `validate.ts` rejects only beyond the per-turn cap; `actions.ts` de-dupes the play-area/trash lists via `uniqueWeapons`; `enumerate.ts` offers the doubled combo; the ActionBar has a "×2" button. If a future ability grants MORE than 2 uses (or duplicates only the effect, like SK-021), extend `maxWeaponUses` and the `toggleWeaponDouble` cap — the rest of the pipeline already treats each array entry as one use.

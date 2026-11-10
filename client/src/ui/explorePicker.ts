@@ -67,6 +67,28 @@ export function legalExplores(state: GameState, seat: number): readonly ExploreA
 }
 
 /**
+ * Toggle a weapon between ONE use and TWO uses in the explore selection.
+ *
+ * Leon L2 (official FAQ): "When he uses a pistol weapon, you can pay its ammo
+ * requirement twice for that weapon to apply its effect and damage twice."
+ * One entry in the selection is one use, so the double use is the same
+ * instance id twice. `remainingUses` is the per-turn cap left for this weapon
+ * (2 for a Pistol under Leon L2), so the toggle never exceeds it.
+ */
+export function toggleWeaponDouble(
+  selected: readonly string[],
+  instanceId: string,
+  remainingUses: number,
+): readonly string[] {
+  const count = selected.filter(id => id === instanceId).length;
+  if (count >= 2) return selected.filter(id => id !== instanceId);
+  const out = selected.filter(id => id !== instanceId);
+  const times = remainingUses >= 2 ? 2 : 1;
+  for (let i = 0; i < times; i++) out.push(instanceId);
+  return out;
+}
+
+/**
  * The leader a seat may actually field. A dead Partner cannot lead, so a
  * stored 'partner' selection falls back to the Main character — otherwise the
  * picker prices the combo with the (now empty) Partner abilities and every

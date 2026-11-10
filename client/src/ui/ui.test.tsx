@@ -15,7 +15,7 @@ import { CharacterCards, attachedOverlap } from './CharacterCards';
 import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
-import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions, resolveExploreLeader } from './explorePicker';
+import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions, resolveExploreLeader, toggleWeaponDouble } from './explorePicker';
 import { Lobby } from './Lobby';
 import { GameLog } from './GameLog';
 import { defForInstance, typeLabel, statLine, costText } from './cards';
@@ -941,6 +941,39 @@ describe('ActionBar (T07)', () => {
     s = applyAction(s, { type: 'explore', seat: 0, weapons: [pistolInst], exploreCount: 1 });
     const options = exploreWeaponOptions(s, 0);
     expect(options.map(o => o.instanceId)).not.toContain(pistolInst);
+  });
+
+  it('explore picker prices a double use: double damage, double ammo', () => {
+    // Leon L2 official FAQ: "you can pay its ammo requirement twice for that
+    // weapon to apply its effect and damage twice."
+    const pistolInst = 'we-009#77';
+    const armed = withWeapon(leonState(), 'we-009', pistolInst);
+    const s = {
+      ...armed,
+      seats: armed.seats.map((p, i) => (i === 0 ? { ...p, turnAmmo: 60, exploresLeft: 2 } : p)),
+    };
+    const opt = exploreWeaponOptions(s, 0).find(o => o.instanceId === pistolInst);
+    expect(opt?.remainingUses).toBe(2);
+
+    const once = evaluateExploreCombo(s, 0, [pistolInst]);
+    expect(once.legal).toBe(true);
+    expect(once.damage).toBe(10);
+    expect(once.ammo).toBe(10);
+
+    const twice = evaluateExploreCombo(s, 0, [pistolInst, pistolInst]);
+    expect(twice.legal).toBe(true);
+    expect(twice.damage).toBe(20);
+    expect(twice.ammo).toBe(20);
+  });
+
+  it('toggleWeaponDouble switches a weapon between one and two uses', () => {
+    expect(toggleWeaponDouble([], 'w', 2)).toEqual(['w', 'w']);
+    expect(toggleWeaponDouble(['w'], 'w', 2)).toEqual(['w', 'w']);
+    expect(toggleWeaponDouble(['w', 'w'], 'w', 2)).toEqual([]);
+    // A weapon with only one use left can never be doubled.
+    expect(toggleWeaponDouble([], 'w', 1)).toEqual(['w']);
+    // Other selections are preserved.
+    expect(toggleWeaponDouble(['k'], 'w', 2)).toEqual(['k', 'w', 'w']);
   });
 
   it('explore picker disables the explore action when the selection is unaffordable', () => {

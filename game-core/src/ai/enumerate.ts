@@ -1,7 +1,7 @@
 
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
-import { explorableWeapons } from '../engine/weaponReuse';
+import { explorableWeapons, remainingWeaponUses } from '../engine/weaponReuse';
 import { characterAbilities, weaponCostCap } from '../engine/abilities';
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
@@ -98,38 +98,47 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
           if (weapon !== undefined) combo.push(weapon);
         }
       }
-      // Multi-explore (rulebook "Extra Explore"): the bot considers spending
-      // 1 Explore and spending its whole pool (all-in). Intermediate counts are
-      // legal for humans via the picker; the bot's 1-ply evaluation only needs
-      // the two extremes to weigh single vs combined battles. The pool
-      // includes the Explores the combo itself grants (a Pump-Action Shotgun's
-      // "+1 Explore" can be spent in the same action).
-      const granted = grantedExploresFor(
-        combo.map(id => {
-          const ci = state.cards[id];
-          return ci === undefined ? undefined : state.cardDefs[ci.cardId];
-        }),
-      );
-      const exploreCounts: readonly number[] = player.exploresLeft + granted > 1
-        ? [1, player.exploresLeft + granted]
-        : [1];
-      // Alliance Partner Modification: the player chooses who leads before the
-      // reveal ("your Leading Character takes the full Damage ... After your
-      // Leading Character has taken Damage, the Infected is passed to your
-      // Partner"). Both leaders are legal, so the bot must be able to consider
-      // each — leading with a high-Health Partner to protect a low-Health Main
-      // is often the better play, and the leader's own abilities apply.
-      const leaders: readonly ('main' | 'partner')[] =
-        player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
-      for (const leader of leaders) {
-        for (const exploreCount of exploreCounts) {
-          generatedActions.push({
-            type: 'explore',
-            seat,
-            weapons: combo,
-            exploreCount,
-            ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
-          });
+      // Leon L2 double use (official FAQ): a weapon with uses left may be
+      // declared TWICE in one explore — pay its ammo requirement twice and its
+      // effect and damage apply twice. Offer one doubled variant per combo so
+      // the bot (and the client's legality check) can reach it.
+      const combos: string[][] = [combo];
+      const firstReusable = combo.find(id => remainingWeaponUses(state, seat, id) >= 2);
+      if (firstReusable !== undefined) combos.push([...combo, firstReusable]);
+      for (const comboOf of combos) {
+        // Multi-explore (rulebook "Extra Explore"): the bot considers spending
+        // 1 Explore and spending its whole pool (all-in). Intermediate counts are
+        // legal for humans via the picker; the bot's 1-ply evaluation only needs
+        // the two extremes to weigh single vs combined battles. The pool
+        // includes the Explores the combo itself grants (a Pump-Action Shotgun's
+        // "+1 Explore" can be spent in the same action).
+        const granted = grantedExploresFor(
+          comboOf.map(id => {
+            const ci = state.cards[id];
+            return ci === undefined ? undefined : state.cardDefs[ci.cardId];
+          }),
+        );
+        const exploreCounts: readonly number[] = player.exploresLeft + granted > 1
+          ? [1, player.exploresLeft + granted]
+          : [1];
+        // Alliance Partner Modification: the player chooses who leads before the
+        // reveal ("your Leading Character takes the full Damage ... After your
+        // Leading Character has taken Damage, the Infected is passed to your
+        // Partner"). Both leaders are legal, so the bot must be able to consider
+        // each — leading with a high-Health Partner to protect a low-Health Main
+        // is often the better play, and the leader's own abilities apply.
+        const leaders: readonly ('main' | 'partner')[] =
+          player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
+        for (const leader of leaders) {
+          for (const exploreCount of exploreCounts) {
+            generatedActions.push({
+              type: 'explore',
+              seat,
+              weapons: comboOf,
+              exploreCount,
+              ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
+            });
+          }
         }
       }
     }
