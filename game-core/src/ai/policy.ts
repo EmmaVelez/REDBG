@@ -97,6 +97,11 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     if (sameCoreState(state, next)) {
       continue;
     }
+    // An unarmed explore is only worth playing when a forced-Explore
+    // obligation leaves no alternative; voluntarily it just takes a hit.
+    if (action.type === 'explore' && action.weapons.length === 0 && state.seats[seat]?.mustExplore !== true) {
+      continue;
+    }
 
     // b. Score the resulting state — with honest end-turn carry-over: endTurn
         // keeps the seat's turn pools in the raw post-state, but the game loop's
@@ -117,7 +122,7 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
           seat,
           { clampDiscardToHeld: action.type === 'buy' ? false : true },
         );
-        const score = action.type === 'explore' ? raw + EXPLORE_BIAS : raw;
+        const score = action.type === 'explore' && action.weapons.length > 0 ? raw + EXPLORE_BIAS : raw;
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).
@@ -303,6 +308,8 @@ export function choosePlayoutAction(state: GameState, seat: number): Action {
       continue;
     }
     if (sameCoreState(state, next)) continue;
+    // See chooseGreedyAction: never volunteer an unarmed explore.
+    if (action.type === 'explore' && action.weapons.length === 0 && state.seats[seat]?.mustExplore !== true) continue;
 
     const endsTurn = action.type === 'endTurn' || isSkipTurnOption(state, action);
     const raw = evaluateState(
@@ -310,7 +317,7 @@ export function choosePlayoutAction(state: GameState, seat: number): Action {
       seat,
       { clampDiscardToHeld: action.type === 'buy' ? false : true },
     );
-    const score = action.type === 'explore' ? raw + EXPLORE_BIAS : raw;
+    const score = action.type === 'explore' && action.weapons.length > 0 ? raw + EXPLORE_BIAS : raw;
 
     const kind = candidateKind(action);
     const prev = byKind.get(kind);

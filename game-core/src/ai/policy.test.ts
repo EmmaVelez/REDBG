@@ -66,6 +66,7 @@ function manualArgmax(s: GameState, seat: number): Action {
         next.phase === s.phase && next.activeSeat === s.activeSeat && next.turnNumber === s.turnNumber) {
       continue; // no-op
     }
+    if (a.type === 'explore' && a.weapons.length === 0 && s.seats[seat]?.mustExplore !== true) continue;
     const score = a.type === 'endTurn'
       ? evaluateState(
           {

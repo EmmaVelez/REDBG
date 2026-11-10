@@ -333,10 +333,11 @@ describe('batch-2 exotic passives through applyAction', () => {
     }
   });
 
-  it('mustExplore: weapon-but-no-ammo is not an explore option (endTurn allowed, no deadlock)', () => {
-    // Regression: canExploreAtAll only checked "holds a weapon". A Handgun
-    // (ammoReq 20) with turnAmmo 0 cannot legally be explored, so blocking
-    // endTurn deadlocked the player (bots threw 'must Explore first' in sim).
+  it('mustExplore: an unarmed explore is always available, so endTurn stays blocked (no deadlock)', () => {
+    // User ruling: a player may always Explore with zero Weapons, so a forced
+    // Explore is fulfilable even with no weapon and no Ammo. The obligation
+    // blocks endTurn in every case; the old weapon/ammo guard let a weaponless
+    // target end its turn and silently drop the obligation.
     const s0 = gameWith('ch-001');
     const handgun = 'we-009#x1';
     const rigged: GameState = {
@@ -349,26 +350,24 @@ describe('batch-2 exotic passives through applyAction', () => {
         [handgun]: { instanceId: handgun, cardId: 'we-009', location: { zone: 'hand', index: 0 } },
       },
     };
-    // no ammo: the handgun explore is illegal, so endTurn must be allowed
-    expect(validateAction(rigged, { type: 'endTurn', seat: 0 })).toEqual({ ok: true });
+    // The armed explore is unaffordable, but the UNARMED explore is legal, so
+    // endTurn stays blocked.
+    expect(validateAction(rigged, { type: 'endTurn', seat: 0 })).toEqual({ ok: false, reason: 'endTurn: must Explore first (Wesker ability)' });
     expect(validateAction(rigged, { type: 'explore', seat: 0, weapons: [handgun], exploreCount: 1 }).ok).toBe(false);
-    // with enough ammo: the explore IS available, so endTurn stays blocked
-    const withAmmo: GameState = {
+    expect(validateAction(rigged, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 }).ok).toBe(true);
+    // Weaponless + no ammo: still blocked, and the unarmed explore is the out.
+    const weaponless: GameState = {
       ...rigged,
-      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, turnAmmo: 20 } : p)),
+      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, hand: [] } : p)),
     };
-    expect(validateAction(withAmmo, { type: 'endTurn', seat: 0 })).toEqual({ ok: false, reason: 'endTurn: must Explore first (Wesker ability)' });
-    // melee knife with no ammo is also an explore option -> endTurn blocked
-    const knife = 'we-004#x1';
-    const withKnife: GameState = {
+    expect(validateAction(weaponless, { type: 'endTurn', seat: 0 }).ok).toBe(false);
+    expect(validateAction(weaponless, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 }).ok).toBe(true);
+    // No explores left: the obligation cannot be met, so endTurn is allowed.
+    const spent: GameState = {
       ...rigged,
-      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, hand: [handgun, knife] } : p)),
-      cards: {
-        ...rigged.cards,
-        [knife]: { instanceId: knife, cardId: 'we-004', location: { zone: 'hand', index: 1 } },
-      },
+      seats: rigged.seats.map((p, i) => (i === 0 ? { ...p, exploresLeft: 0 } : p)),
     };
-    expect(validateAction(withKnife, { type: 'endTurn', seat: 0 }).ok).toBe(false);
+    expect(validateAction(spent, { type: 'endTurn', seat: 0 })).toEqual({ ok: true });
   });
 
   it('Wesker L2 target gets 2 Explores at their turn start', () => {

@@ -112,7 +112,8 @@ describe('enumerateLegalActions', () => {
         const filteredExplores = acts.filter(a => a.type === 'explore' && a.seat === 0) as Array<Extract<Action, { type: 'explore' }>>;
 
         /*
-        Reasoning for expected filtered set (3 total — 10 ammo in the pool):
+        Reasoning for expected filtered set (4 total — 10 ammo in the pool):
+        0. Unarmed (no weapons): always LEGAL
         1. Single we-2#1 (Req 0): pool 10 >= 0 -> LEGAL
         2. Single we-3#1 (Req 10): pool 10 >= 10 -> LEGAL
         3. Single we-1#1 (Req 20): pool 10 < 20 -> ILLEGAL (Rejected by validator)
@@ -130,7 +131,7 @@ describe('enumerateLegalActions', () => {
         const actualStrings = filteredExplores.map(a => JSON.stringify({ w: a.weapons }));
 
         expect(actualStrings).toEqual(expect.arrayContaining(expectedStrings));
-        expect(filteredExplores.length).toBe(3);
+        expect(filteredExplores.length).toBe(4);
       });
 
   // 6. 'ability actions for each character ability index'
@@ -189,23 +190,24 @@ describe('enumerateLegalActions', () => {
     expect(acts1).toEqual(acts2);
   });
 
-  // 10. 'no explores when hand has no weapons'
-  test('no explores when hand has no weapons', () => {
+  // 10. 'unarmed explore is always offered'
+  test('unarmed explore is offered even when the hand has no weapons', () => {
     const s = baseState({ seats: [player(0, { hand: ['am-1#1', 'ac-1#1'] }), player(1)] });
     const acts = enumerateLegalActions(s, 0);
     const explores = acts.filter(a => a.type === 'explore');
-    expect(explores.length).toBe(0);
+    expect(explores.length).toBe(1);
+    expect(explores[0]?.weapons).toEqual([]);
   });
 
   // 10b. REGRESSION (user report): hand of 3 knives (2x Combat Knife +
   // Survival Knife equivalents, we-2 x3, all ammoReq 0) must offer the full
   // 3-weapon explore — previously only singles and pairs were enumerated.
-  test('three zero-ammo knives enumerate all 7 non-empty subsets including the 3-weapon explore', () => {
+  test('three zero-ammo knives enumerate all 8 subsets (7 non-empty + unarmed) including the 3-weapon explore', () => {
     const s = stateWithWeapons({ hand: ['we-2#1', 'we-2#2', 'we-2#3'] }, ['we-2#2', 'we-2#3']);
     const acts = enumerateLegalActions(s, 0);
     const explores = acts.filter(a => a.type === 'explore');
-    // 2^3 - 1 = 7 subsets, all ammo-free so all legal
-    expect(explores.length).toBe(7);
+    // 2^3 = 8 subsets (7 non-empty + the unarmed explore), all ammo-free so all legal
+    expect(explores.length).toBe(8);
     const triple = explores.find(a => a.weapons.length === 3);
     expect(triple).toBeDefined();
     expect(triple?.weapons).toEqual(expect.arrayContaining(['we-2#1', 'we-2#2', 'we-2#3']));

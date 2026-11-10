@@ -1,7 +1,7 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
-import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
+import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -30,25 +30,25 @@ function characterCannotBeHealed(state: GameState, seat: number, character: 'mai
 }
 
 /**
- * True when at least one LEGAL explore exists for this player right now:
- * explores remain, and some usable weapon (hand OR reusable play-area) is
- * affordable from the turn ammo pool. Used so Wesker's forced-Explore
- * obligation can never deadlock the target (weaponless OR weapon-but-no-ammo
- * players may endTurn, which clears the flag). A weapon that cannot be paid
- * for is not an explore option.
+ * True when at least one LEGAL explore exists for this player right now.
+ * A player may always Explore unarmed: the rulebook lets them declare zero
+ * Weapons ("plays all of their Weapons they will be using"), so lacking a
+ * weapon or Ammo never makes an explore impossible. The only things that do
+ * are having no Explores left, an empty Mansion, or a leader who cannot use
+ * Weapons at all (FCH-008 Sherry). Used so Wesker's forced-Explore obligation
+ * can never deadlock the target: endTurn stays blocked until they explore.
  */
-function canExploreLegally(
-  state: GameState,
-  seat: number,
-  player: { readonly hand: readonly string[]; readonly exploresLeft: number; readonly turnAmmo: number },
-): boolean {
+function canExploreLegally(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined) return false;
+  if (player.downed || player.dead) return false;
   if (player.exploresLeft < 1) return false;
-  return explorableWeapons(state, seat).some(id => {
-    const def = cardDef(state, id);
-    if (def === undefined || def.type !== 'weapon') return false;
-    const req = requiredAmmoForExplore(state, seat, [id]);
-    return req <= player.turnAmmo;
-  });
+  if (deckCount({ deck: state.mansionDeck, bottom: state.mansionBottom }) < 1) return false;
+  const leaders: readonly ('main' | 'partner')[] =
+    player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
+  return leaders.some(
+    leader => !leaderAbilities(state, seat, leader).some(a => a.kind === 'cannotUseWeapons'),
+  );
 }
 
 function cardDef(state: GameState, instanceId: string): CardDef | undefined {
@@ -267,9 +267,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       // derived from the Main character's Decorations), not the Main's.
       const leader: 'main' | 'partner' = action.leader === 'partner' ? 'partner' : 'main';
       const leaderAbils = leaderAbilities(state, action.seat, leader);
-      if (action.weapons.length === 0) {
-        return { ok: false, reason: 'explore: no weapons' };
-      }
+      // An unarmed explore is legal: the player simply declares zero Weapons.
       // FCH-008 Sherry Birkin: she cannot use Weapons at all.
       if (leaderAbils.some(a => a.kind === 'cannotUseWeapons')) {
         return { ok: false, reason: 'explore: cannot use weapons' };
@@ -759,7 +757,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'endTurn: not your turn' };
       }
-      if (player.mustExplore === true && canExploreLegally(state, action.seat, player)) {
+      if (player.mustExplore === true && canExploreLegally(state, action.seat)) {
         return { ok: false, reason: 'endTurn: must Explore first (Wesker ability)' };
       }
       return { ok: true };

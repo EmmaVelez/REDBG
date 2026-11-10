@@ -61,7 +61,7 @@ describe('chooseBotAction', () => {
     const order = enumerateLegalActions(s, seat).map(a => a.type);
     // The fixture player is level 1 with generic L1+L2 abilities: only the L1
     // ability (index 0) passes validation, so exactly one useCharacterAbility.
-    expect(order).toEqual(['playActionCard', 'playAmmo', 'explore', 'explore', 'explore', 'useCharacterAbility', 'endTurn']);
+    expect(order).toEqual(['playActionCard', 'playAmmo', 'explore', 'explore', 'explore', 'explore', 'useCharacterAbility', 'endTurn']);
 
     // Check greedy action
     expect(chooseBotAction(s, seat, 'hard', () => 0.1)).toEqual(choosePlayoutAction(s, seat));

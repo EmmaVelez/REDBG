@@ -973,7 +973,7 @@ describe('ActionBar (T07)', () => {
     };
     const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
     expect(html).toContain('data-explore-choose');
-    expect(html).toContain('data-combos="3"'); // 2 weapons -> 3 non-empty subsets
+    expect(html).toContain('data-combos="4"'); // 2 weapons -> 3 non-empty subsets + the unarmed explore
   });
 
   it('shows a waiting note off turn', () => {

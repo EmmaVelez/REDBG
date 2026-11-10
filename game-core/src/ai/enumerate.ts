@@ -84,7 +84,9 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     // 3-weapon explore. Subsets are bitmask-enumerated; hands are small
     // (<=10 cards typical), and validate filters ammo-illegal combos.
     const maxSubsetWeapons = Math.min(weaponsAvailable.length, 10);
-    for (let mask = 1; mask < (1 << maxSubsetWeapons); mask++) {
+    // mask 0 is the unarmed explore (zero Weapons) — always legal, and
+    // the only way a weaponless player can meet a forced-Explore obligation.
+    for (let mask = 0; mask < (1 << maxSubsetWeapons); mask++) {
       const combo: string[] = [];
       if (singleWeaponLimiter) {
         let pc = 0; let m = mask; while (m) { pc += m & 1; m >>= 1; }

@@ -164,16 +164,17 @@ export function evaluateExploreCombo(
   const damage = exploreDamage(state, seat, weaponIds, who);
   const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined, abilities);
 
-  if (weaponIds.length === 0) {
-    return { damage: 0, ammo: 0, legal: false, reason: 'Select at least one weapon.' };
-  }
   // Legality is checked against the SELECTED leader: a combo that is only
   // affordable because of the Partner's abilities must not read as illegal
-  // while the Main leads, and vice versa.
+  // while the Main leads, and vice versa. The empty selection is the unarmed
+  // explore, which the engine enumerates whenever exploring is possible.
   const isLegal = legalExplores(state, seat).some(e =>
     (e.leader ?? 'main') === who && comboKey(e.weapons, e.exploreCount) === comboKey(weaponIds, exploreCount));
   if (isLegal) {
     return { damage, ammo, legal: true, reason: null };
+  }
+  if (weaponIds.length === 0) {
+    return { damage: 0, ammo: 0, legal: false, reason: 'Select at least one weapon.' };
   }
   const player = state.seats[seat];
   if (player !== undefined && ammo > player.turnAmmo) {

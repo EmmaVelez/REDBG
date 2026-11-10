@@ -97,8 +97,8 @@ describe('validateAction', () => {
       expect(validateAction(baseState({ seat0: { hand: ['w-1'], turnAmmo: 10 } }), { type: 'explore', seat: 0, weapons: ['w-1'], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: insufficient ammo' });
     });
 
-    it('explore no weapons', () => {
-      expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toEqual({ ok: false, reason: 'explore: no weapons' });
+    it('explore with no weapons is legal (unarmed explore)', () => {
+      expect(validateAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toEqual({ ok: true });
     });
 
     it('explore weapon not in hand', () => {

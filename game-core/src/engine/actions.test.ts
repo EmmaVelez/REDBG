@@ -848,7 +848,7 @@ test('Rebecca L2 is level-locked at level 1 (index 1)', () => {
 
 test('invalid action throws', () => {
   expect(() => applyAction(baseState({ seat0: { hand: ['zzz'] } }), { type: 'playActionCard', seat: 0, instanceId: 'zzz' })).toThrow('applyAction: playActionCard: unknown card: zzz');
-  expect(() => applyAction(baseState(), { type: 'explore', seat: 0, weapons: [], exploreCount: 1 })).toThrow('applyAction: explore: no weapons');
+  expect(() => applyAction(baseState(), { type: 'explore', seat: 0, weapons: ['zzz'], exploreCount: 1 })).toThrow('applyAction: explore: weapon not in hand: zzz');
 });
 
 test('startGame throws', () => {
