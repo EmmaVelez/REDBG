@@ -99,6 +99,8 @@ export interface Reveal {
   /** Zone the revealed card ended up in after the fight resolved. `mansion`
    *  means it was RE-INSERTED into the deck (MX-001 Mr. X). */
   readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed' | 'mansion';
+  /** Seat that actually explored (the forced-explore target, if any). */
+  readonly explorerSeat: number;
   /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
   readonly damage: number;
   /** Weapon instance ids the exploring player used for this attack. */
@@ -120,7 +122,11 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
   const last = next.log[next.log.length - 1];
   if (last === undefined) return null;
   const action = last.action;
-  if (action.type !== 'explore' || action.seat !== mySeat) return null;
+  if (action.type !== 'explore') return null;
+  // A forced explore (FCH-008 Sherry) is shown to the exploring seat AND to the
+  // seat that forced it: in pass-and-play that is the device holder, and in a
+  // server room the target may be a bot with no client of its own.
+  if (action.seat !== mySeat && action.forcedBy !== mySeat) return null;
 
   const damage = exploreDamage(prev, action.seat, action.weapons);
   const weapons = action.weapons;
@@ -134,7 +140,7 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
     if (prevLoc.zone !== 'mansion') continue;
     if (sameLoc(prevLoc, nextLoc)) continue;
     if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
-      return { instanceId, outcomeZone: nextLoc.zone, damage, weapons };
+      return { instanceId, outcomeZone: nextLoc.zone, explorerSeat: action.seat, damage, weapons };
     }
   }
 
@@ -147,7 +153,7 @@ export function detectReveal(prev: GameState, next: GameState, mySeat: number): 
   for (const instanceId of prev.mansionDeck.slice(0, revealedCount)) {
     if (instanceId.startsWith('hidden-')) continue;
     if (next.mansionDeck.includes(instanceId)) {
-      return { instanceId, outcomeZone: 'mansion', damage, weapons };
+      return { instanceId, outcomeZone: 'mansion', explorerSeat: action.seat, damage, weapons };
     }
   }
   return null;

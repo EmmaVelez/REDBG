@@ -48,6 +48,35 @@ art was the anomaly, carrying a few px of blank card base outside the frame. Not
 differ from the old artwork (resize-and-diff scores 64-89 mean abs), so these are genuinely new
 images, not the old ones re-cropped.
 
+**SHERRY FORCED EXPLORE: NO-OP + REVEAL OVERLAY FIXED (2026-11-09):** Manny: "When
+sherry uses her ability to force another player to explore, nothing happens the reveal
+doesn't play". Three coupled causes, all fixed:
+1. **Engine no-op** (`engine/allyExplore.ts`): `resolveAllyExplore` returned the state
+   UNCHANGED when the combined arsenal was empty (`if (weaponIds.length === 0) return
+   state`) and on `insufficientAmmo`. The card says Sherry FORCES the explore, so it
+   must happen — unarmed if necessary. Removed the empty-arsenal early return; the
+   insufficient case now selects the weapons that fit (cheapest first) through the new
+   exported `allyExploreUsedWeaponIds`. An empty arsenal is a valid result.
+2. **Client/server disagreement** (`engine/validate.ts`): `forceAllyExploreWithSupport`
+   required Sherry to afford the target's arsenal, but the client enumerates from its
+   SANITIZED view (other seats' hands are `hidden-*`), so the ability button appeared
+   and the server then rejected it ("not enough Ammo to assist"). Removed the
+   hand-dependent Ammo precondition — the ability is offered whenever another living
+   player exists. Regression test asserts `enumerateLegalActions` agrees between the
+   full state and `sanitize(state, 0)`.
+3. **Reveal overlay never fired** (`client/src/ui/anims.ts`, `engine/actions.ts`): a
+   forced explore resolves through `chooseOption`, and `detectReveal` only accepted a
+   literal `explore` action by the viewing seat. The reducer now appends an `explore`
+   log entry (new optional `Action.explore.forcedBy`) so the overlay fires and the turn
+   history shows the target's explore; `detectReveal` accepts it for the exploring seat
+   OR the forcing seat, and `MansionReveal` reads "Damage dealt" for a viewer who is
+   not the explorer. **Browser-verified** (server room, Sherry + bot): with 0 Ammo the
+   ability opens the prompt, the bot explores with the combined 0-cost knives, and the
+   overlay shows the Hunter, "Damage dealt: 20", the four knives and "escaped to the
+   bottom of the Mansion"; the history reads "Bot 2: explored the Mansion with Combat
+   Knife x4". Also verified with Ammo spent (Licker, "Damage dealt: 15").
+   Tests: `engine/fanSherry.test.ts` +3, `client/src/ui/anims.test.ts` +3.
+
 **Promo (PR-*) art re-extracted as WHOLE CARDS (2026-11-09):** Manny supplied the
 promo contact sheet (`...\Tabletop Simulator\Mods\Images\httpssteamusercontentaakamaihdnetugc8597016264951356044441A5720A186471CFB7F9630C44D760C710889.png`,
 5500x5390, cards filling only the top 1539 px: 10 @ 550x770 in row 1 + the stray

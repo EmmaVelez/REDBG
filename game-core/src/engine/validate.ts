@@ -1,6 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource } from './abilities';
-import { allyExploreAmmoCost } from './allyExplore';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
@@ -527,12 +526,13 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             if (others.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: no other players' };
             }
-            // The forced explore spends the combined arsenals, so Sherry must be
-            // able to pay the Ammo for at least one candidate target.
-            const affordable = others.some(o => allyExploreAmmoCost(state, action.seat, o.seat) <= player.turnAmmo + (state.seats[o.seat]?.turnAmmo ?? 0));
-            if (!affordable) {
-              return { ok: false, reason: 'useCharacterAbility: not enough Ammo to assist' };
-            }
+            // NOTE: deliberately NO Ammo precondition. The forced explore always
+            // happens (the card says Sherry forces it); the resolution spends
+            // whichever weapons the combined Ammo can pay for, and an empty
+            // arsenal still explores unarmed. A hand-dependent check here would
+            // also DISAGREE between the server (full state) and the client
+            // (other seats' hands are sanitized to hidden-*), offering an
+            // ability button the server then rejects.
           }
           if (ability.kind === 'exchangeHandWithInventoryTop') {
             if (player.hand.length === 0 || player.inventory.length === 0) {

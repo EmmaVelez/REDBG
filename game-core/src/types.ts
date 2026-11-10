@@ -835,7 +835,7 @@ export type Action =
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string; readonly healTarget?: "main" | "partner" }
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
-  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[]; readonly leader?: "main" | "partner" }
+  | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[]; readonly leader?: "main" | "partner"; /** FCH-008 Sherry: the seat whose ability forced this explore (absent for a normal explore). */ readonly forcedBy?: number }
   /** Outbreak: spend 1 Explore to Attack another Character (instead of
    *  revealing the Mansion). Non-Infected attackers must name a weapon.
    *  Infected attackers deal their base Damage.

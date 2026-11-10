@@ -142,7 +142,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0, attached: ['ma-001#7'] }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('detects an escaped Infected: mansion -> mansionBottom', () => {
@@ -154,7 +154,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('captures the weapon ids used for the explore', () => {
@@ -200,7 +200,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }],
       log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'mx-001#1', outcomeZone: 'mansion', damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'mx-001#1', outcomeZone: 'mansion', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('detects a re-inserted Infected even when it lands back on top', () => {
@@ -234,7 +234,7 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }],
       log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#1', outcomeZone: 'mansionBottom', damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#1', outcomeZone: 'mansionBottom', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('returns null when the newest action is not an explore', () => {
@@ -246,6 +246,41 @@ describe('detectReveal', () => {
       log: [],
     });
     expect(detectReveal(prev, next, 0)).toBeNull();
+  });
+
+  it('detects a forced explore (Sherry) for the exploring seat', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1, forcedBy: 0 } }],
+    });
+    expect(detectReveal(prev, next, 1)).toEqual({
+      instanceId: 'ma-001#7', outcomeZone: 'attached', explorerSeat: 1, damage: 0, weapons: [],
+    });
+  });
+
+  it('detects a forced explore (Sherry) for the seat that forced it', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1, forcedBy: 0 } }],
+    });
+    expect(detectReveal(prev, next, 0)?.instanceId).toBe('ma-001#7');
+  });
+
+  it('does not report a forced explore to an unrelated seat', () => {
+    const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }, { seat: 2 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }, { seat: 2 }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1, forcedBy: 0 } }],
+    });
+    expect(detectReveal(prev, next, 2)).toBeNull();
   });
 });
 

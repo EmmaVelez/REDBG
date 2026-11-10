@@ -81,7 +81,7 @@ export function App(): JSX.Element {
   // seat's explore revealed an Infected, and hold the table on a readable
   // reveal until the player clicks Continue.
   const prevStateRef = useRef<GameState | null>(null);
-  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[] } | null>(null);
+  const [reveal, setReveal] = useState<{ def: CardDef; resultText: string; damage: number; weapons: readonly CardDef[]; explorerSeat: number } | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
   /** Log sidebar visibility — closed frees the whole sidebar width for the board.
    *  On a narrow screen the log is an off-canvas slide-over, so it starts CLOSED
@@ -178,7 +178,7 @@ export function App(): JSX.Element {
     const weaponDefs = detected.weapons
       .map(id => defForInstance(state, id))
       .filter((d): d is CardDef => d !== null);
-    setReveal({ def, resultText, damage: detected.damage, weapons: weaponDefs });
+    setReveal({ def, resultText, damage: detected.damage, weapons: weaponDefs, explorerSeat: detected.explorerSeat });
   }, [state, mySeat]);
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
@@ -273,6 +273,7 @@ export function App(): JSX.Element {
           resultText={reveal.resultText}
           damage={reveal.damage}
           weapons={reveal.weapons}
+          damageLabel={reveal.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
           onContinue={() => {
             setReveal(null);
             const queued = pendingDeathRef.current;
@@ -297,6 +298,7 @@ export function App(): JSX.Element {
         <SeatSwap
           mode="gameOver"
           winners={gameOver?.winners}
+          endReason={gameOver?.endReason}
           playerNames={seatNames}
           onContinue={() =>
             hotseat !== null

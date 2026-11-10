@@ -3,6 +3,8 @@ import type { GameState, PlayerState } from '../types';
 import { setup, startTurn } from './game';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
+import { sanitize } from './view';
+import { enumerateLegalActions } from '../ai/enumerate';
 import { CUSTOM_CARDS } from '../data/custom';
 import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK, cardsForScenario } from '../data/cards';
 
@@ -178,5 +180,63 @@ describe('FCH-008 — force another Player to Explore with her', () => {
   it('does not fire when the target is dead', () => {
     const s = startTurn(sherryGame({ level: 1, turnAmmo: 50, hp: 0, dead: true }));
     expect(validateAction(s, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 }).ok).toBe(false);
+  });
+
+  it('logs the forced explore so the client reveal overlay can fire', () => {
+    // The forced explore is not a player-submitted explore action, so the
+    // reducer records one (with `forcedBy`) — otherwise detectReveal never
+    // fires and the reveal overlay never plays.
+    const s = withTurnAmmo(startTurn(sherryGame({ level: 1 })), 0, 100);
+    const { state: s1 } = addWeapon(s, 1, 'we-009');
+    const { state: s2 } = addWeapon(s1, 0, 'we-009');
+    const { state: s3 } = setMansionTop(s2, ['ma-002']);
+    const used = applyAction(s3, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    const prompt = findPrompt(used, 'sherryForceExplore');
+    expect(prompt).toBeDefined();
+    if (prompt === undefined) return;
+    const after = applyAction(used, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    expect(after.log[after.log.length - 1]?.action).toMatchObject({
+      type: 'explore', seat: 1, exploreCount: 1, forcedBy: 0,
+    });
+  });
+
+  it('enumerates identically from the full state and the sanitized view', () => {
+    // The client enumerates actions from its SANITIZED view (other seats' hands
+    // are hidden-*); the server enumerates from the full state. A hand-dependent
+    // validity check would offer an ability button the server then rejects.
+    const s = withTurnAmmo(startTurn(sherryGame({ level: 1 })), 0, 0);
+    const { state: s1 } = addWeapon(s, 1, 'we-009'); // target holds a 20-ammo Handgun
+    const has = (st: GameState): boolean => enumerateLegalActions(st, 0).some(
+      a => a.type === 'useCharacterAbility' && a.abilityIndex === 1,
+    );
+    expect(has(s1)).toBe(true);
+    expect(has(sanitize(s1, 0))).toBe(true);
+  });
+
+  it('still explores when neither hand holds a weapon (unarmed)', () => {
+    // Regression: the old `if (weaponIds.length === 0) return state` made the
+    // ability silently do nothing when neither Sherry nor the target had a
+    // weapon. The card forces the explore regardless.
+    const base = startTurn(sherryGame({ level: 1 }));
+    const stripped = {
+      ...base,
+      seats: base.seats.map(p => ({
+        ...p,
+        hand: p.hand.filter(id => base.cardDefs[base.cards[id]?.cardId ?? '']?.type !== 'weapon'),
+      })),
+    };
+    const { state: s3 } = setMansionTop(stripped, ['ma-006']); // Licker: 40 HP, 30 attack
+    const used = applyAction(s3, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
+    const prompt = findPrompt(used, 'sherryForceExplore');
+    expect(prompt).toBeDefined();
+    if (prompt === undefined) return;
+    const after = applyAction(used, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
+    // Unarmed: 0 damage < 40 HP -> not defeated, the full 30 damage is split.
+    expect(after.seats[1]?.hp).toBe(80 - 15);
+    expect(after.seats[0]?.hp).toBe(50 - 15);
+    // The exploring player still drew a new hand.
+    expect(after.seats[1]?.hand.length).toBe(5);
+    // The Infected went to the bottom of the Mansion.
+    expect(after.seats[0]?.decorations).toBe(0);
   });
 });

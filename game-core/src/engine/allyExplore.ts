@@ -41,6 +41,32 @@ export function allyExploreAmmoCost(state: GameState, sherrySeat: number, target
   return weaponIds.reduce((sum, id) => sum + exploreAmmoReq(state, targetSeat, id, weaponIds.length), 0);
 }
 
+/**
+ * The weapon ids a forced explore would ACTUALLY use: the whole combined
+ * arsenal when the combined Ammo covers it, otherwise the weapons that fit
+ * (cheapest first). An empty arsenal is a valid result — the explore still
+ * happens unarmed.
+ */
+export function allyExploreUsedWeaponIds(state: GameState, sherrySeat: number, targetSeat: number): readonly string[] {
+  const weaponIds = allyExploreWeaponIds(state, sherrySeat, targetSeat);
+  const combinedAmmo = (state.seats[targetSeat]?.turnAmmo ?? 0) + (state.seats[sherrySeat]?.turnAmmo ?? 0);
+  const fullReq = weaponIds.reduce(
+    (sum, id) => sum + exploreAmmoReq(state, targetSeat, id, weaponIds.length),
+    0,
+  );
+  if (fullReq <= combinedAmmo) return weaponIds;
+  const budget = { remaining: combinedAmmo };
+  return weaponIds
+    .map(id => ({ id, cost: exploreAmmoReq(state, targetSeat, id, weaponIds.length) }))
+    .sort((a, b) => a.cost - b.cost)
+    .filter(e => {
+      if (e.cost > budget.remaining) return false;
+      budget.remaining -= e.cost;
+      return true;
+    })
+    .map(e => e.id);
+}
+
 export function resolveAllyExplore(
   state: GameState,
   sherrySeat: number,
@@ -50,8 +76,10 @@ export function resolveAllyExplore(
   const target = state.seats[targetSeat];
   if (sherry === undefined || target === undefined) return state;
 
-  const weaponIds = allyExploreWeaponIds(state, sherrySeat, targetSeat);
-  if (weaponIds.length === 0) return state;
+  // An empty arsenal is NOT a no-op: the card says Sherry forces the explore,
+  // so the target still reveals the Mansion (unarmed) and takes the hit. The
+  // old `if (weaponIds.length === 0) return state` made the ability silently do
+  // nothing whenever neither hand held a weapon.
 
   const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
   const revealedId = rev.revealedInstanceId;
@@ -60,10 +88,15 @@ export function resolveAllyExplore(
   let mansionBottom = rev.mansion.bottom;
 
   const targetAbilities = characterAbilities(state, targetSeat);
-  const weaponDefs = weaponIds.map(id => cardDef(state, id));
-  const weapons: ExploreWeapon[] = weaponIds.map((id, i) => ({
+  // Both the exploring player's and Sherry's Ammo may pay for the explore.
+  const combinedAmmo = (target.turnAmmo ?? 0) + (sherry.turnAmmo ?? 0);
+  // If the combined Ammo cannot pay for the whole arsenal, use the weapons that
+  // fit (cheapest first) rather than doing nothing — the explore still happens.
+  const usedWeaponIds = allyExploreUsedWeaponIds(state, sherrySeat, targetSeat);
+  const weaponDefs = usedWeaponIds.map(id => cardDef(state, id));
+  const weapons: ExploreWeapon[] = usedWeaponIds.map((id, i) => ({
     damage: weaponDefs[i]?.damage ?? 0,
-    ammoReq: exploreAmmoReq(state, targetSeat, id, weaponIds.length),
+    ammoReq: exploreAmmoReq(state, targetSeat, id, usedWeaponIds.length),
     weaponEffects: weaponDefs[i]?.weaponEffects,
     tags: weaponDefs[i]?.weaponTags,
   }));
@@ -72,8 +105,7 @@ export function resolveAllyExplore(
 
   const outcome: ExploreOutcome = resolveExplore({
     weapons,
-    // Both the exploring player's and Sherry's Ammo may pay for the explore.
-    ammo: (target.turnAmmo ?? 0) + (sherry.turnAmmo ?? 0),
+    ammo: combinedAmmo,
     bonusDamage,
     revealed: revealedDef ?? ({} as CardDef),
     damageReduction: infectedDamageReduction(targetAbilities),
@@ -87,10 +119,10 @@ export function resolveAllyExplore(
   if (outcome.kind === 'insufficientAmmo') return state;
 
   // Weapons leave their owner's hand and join that owner's play area.
-  const targetWeapons = weaponIds.filter(id => target.hand.includes(id));
-  const sherryWeapons = weaponIds.filter(id => sherry.hand.includes(id));
+  const targetWeapons = usedWeaponIds.filter(id => target.hand.includes(id));
+  const sherryWeapons = usedWeaponIds.filter(id => sherry.hand.includes(id));
   const stripWeapons = (p: PlayerState): PlayerState =>
-    ({ ...p, hand: p.hand.filter(id => !weaponIds.includes(id)) });
+    ({ ...p, hand: p.hand.filter(id => !usedWeaponIds.includes(id)) });
 
   const ammoSpent = weapons.reduce((sum, w) => sum + w.ammoReq, 0);
   let next: GameState = {

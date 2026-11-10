@@ -55,7 +55,7 @@ import { dropEmptyPrompts } from './prompts';
 import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
 import { makeRng, shuffle } from '../util/rng';
 
-import { resolveAllyExplore } from './allyExplore';
+import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
@@ -3657,7 +3657,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             case 'forceAllyExploreWithSupport': {
               // FCH-008 Sherry Birkin: choose another player; they
-              // immediately Explore with Sherry's support.
+              // immediately Explore with Sherry's support. Every living
+              // opponent is offered — the explore always happens, and the
+              // resolution spends whichever weapons the combined Ammo can pay
+              // for (an empty arsenal still explores unarmed).
               const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);
               return {
                 ...state,
@@ -5313,9 +5316,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetSeat = Number(prompt.options[option]);
         if (Number.isNaN(targetSeat)) return { ...state, ...nextBase, prompts: newPrompts };
         const resolved = resolveAllyExplore(state, seat, targetSeat);
+        // Record the forced explore in the log. It is not a player-submitted
+        // explore action, so without this entry the client's reveal overlay
+        // never fires for it and the turn history omits what the target did.
+        // `forcedBy` lets the overlay show for Sherry too (she is the one who
+        // forced it, and in pass-and-play she is the device holder).
+        const forcedExplore: Action = {
+          type: 'explore',
+          seat: targetSeat,
+          weapons: allyExploreUsedWeaponIds(state, seat, targetSeat),
+          exploreCount: 1,
+          forcedBy: seat,
+        };
         return {
           ...resolved,
           ...nextBase,
+          log: [...nextBase.log, { seq: nextBase.log.length + 1, action: forcedExplore }],
           prompts: [...newPrompts, ...resolved.prompts.filter(p => p.id !== prompt.id)],
         };
       }
