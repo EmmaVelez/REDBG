@@ -255,6 +255,7 @@ export type InfectedEffect =
   // --- Custom card line (MX-001..) ---
   | { readonly kind: "onNotDefeatedInsertIntoMansionAt"; readonly position: number } // MX-001 Mr. X
   | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
+  | { readonly kind: "onRevealFlatDamageToNonExploringCharacters"; readonly amount: number } // MA-025 NYX
   // --- Unofficial Expansion (EX-006/EX-008) ---
   | { readonly kind: "onNotDefeatedAttachCounter"; readonly counterCardId: string } // EX-006 Web Spinner / EX-008 Yawn: attach a Poison counter to the exploring Character
 

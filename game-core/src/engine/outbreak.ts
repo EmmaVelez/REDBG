@@ -61,6 +61,31 @@ export function applyOutbreakRevealEffects(state: GameState, ctx: OutbreakReveal
         s = { ...s, seats: s.seats.map(x => (x.seat === ctx.seat ? { ...x, hp: newHp } : x)) };
         break;
       }
+      case 'onRevealFlatDamageToNonExploringCharacters': {
+        // MA-025 NYX: "When this infected is revealed, all non-exploring
+        // characters take 40 damage." Iterate over all other seats and apply
+        // damage respecting Kevlar jacket absorption and Ricardo's reduction
+        // (the latter applies when those characters are retaliating against
+        // this infection's attack). Face-down (dead/downed) characters are
+        // skipped entirely.
+        for (const seatState of s.seats) {
+          const seatIdx = seatState.seat;
+          if (seatIdx === ctx.seat) continue; // skip the exploring character
+          if (seatState.dead || seatState.downed) continue; // skip face-down chars
+          const kevlar = applyDamageWithKevlar(s, seatIdx, e.amount);
+          s = kevlar.state;
+          movedToBottom = [...movedToBottom, ...kevlar.movedIds];
+          // Ricardo's HP-based reduction: when a Character has taken damage
+          // this turn, their attack during battles drops by 1 for every HP
+          // below max, up to -30. We apply that here as part of the damage
+          // chain because the character may retaliate immediately.
+          const ric = applyRicardoDamage(s, seatIdx, seatState.hp, kevlar.damage);
+          s = ric.state;
+          const newHp = ric.hp;
+          s = { ...s, seats: s.seats.map(x => (x.seat === seatIdx ? { ...x, hp: newHp } : x)) };
+        }
+        break;
+      }
       case 'onRevealBonusIfZombieAttached': {
         // MA-048 Crimson Head: +10 HP and +10 Damage this turn when the
         // exploring character has an attached Infected with "Zombie" in its name.

@@ -26,6 +26,18 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     infectedEffects: [{ kind: 'onNotDefeatedInsertIntoMansionAt', position: 5 }],
   },
   {
+    id: 'nyx-001',
+    name: 'NYX',
+    type: 'infected',
+    set: 'custom',
+    text: 'When this infected is revealed, all non-exploring characters take 40 damage.',
+    copies: 1,
+    hp: 80,
+    attack: 60,
+    decorations: 7,
+    infectedEffects: [{ kind: 'onRevealFlatDamageToNonExploringCharacters', amount: 40 }],
+  },
+  {
     id: 'cu-001',
     name: 'Ricardo Irving',
     type: 'character',
