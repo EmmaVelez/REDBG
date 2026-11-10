@@ -219,7 +219,9 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     type: 'item',
     set: 'custom',
     text: 'Return this Blue Herb to the "Resource Area" and remove all Poison counters from all your Characters.',
-    copies: 1,
+    // The Poison bundle stacks FIVE Blue Herbs in the Resource Area (Manny's
+    // ruling): the counter is meant to be a recurring cure, not a one-shot.
+    copies: 5,
     cost: 20,
     itemEffects: [{ kind: 'returnToMarketAndRemoveCounters' }],
   },

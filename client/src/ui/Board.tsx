@@ -26,6 +26,10 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
     .filter(p => p.cards.length > 0)
     .sort((a, b) => a.pileId.localeCompare(b.pileId));
   const supplyIds = state.supply ?? [];
+  // The counter supply is only worth showing once a counter is actually
+  // attached to a Character — before that it is just an unused pile (and the
+  // board should not advertise a Poison mechanic nothing has triggered).
+  const counterAttached = state.seats.some(s => (s.counters ?? []).length > 0);
   const canBuy = state.activeSeat === mySeat && state.phase === 'main';
 
   return (
@@ -81,7 +85,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
             <span>Bottom: {state.mansionBottom.length}</span>
             <span>Removed: {state.removed.length}</span>
           </div>
-          {supplyIds.length > 0 && (
+          {counterAttached && (
             <div className="zone-pile counter-supply" data-anim-zone="supply" data-pile-count={supplyIds.length}>
               <span className="zone-pile-label">Counter supply</span>
               <div className="zone-pile-stack">

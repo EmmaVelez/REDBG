@@ -460,10 +460,18 @@ describe('PlayerPanel (T06)', () => {
     expect(plain).not.toContain('data-player-counters');
   });
 
-  it('renders the shared counter supply on the board', () => {
+  it('renders the shared counter supply on the board only once a counter is attached', () => {
     const state = twoPlayerState();
-    const withSupply = { ...state, supply: ['ex-009#1'] };
-    const html = renderToStaticMarkup(<Board state={withSupply} mySeat={0} onAction={() => { /* noop */ }} />);
+    // The supply alone (nothing attached yet) must NOT advertise the pile.
+    const supplyOnly = { ...state, supply: ['ex-009#1'] };
+    const hidden = renderToStaticMarkup(<Board state={supplyOnly} mySeat={0} onAction={() => { /* noop */ }} />);
+    expect(hidden).not.toContain('Counter supply');
+    // A counter attached to a Character brings the supply into view.
+    const attached = {
+      ...supplyOnly,
+      seats: state.seats.map((s, i) => (i === 0 ? { ...s, counters: ['ex-009#1'] } : s)),
+    };
+    const html = renderToStaticMarkup(<Board state={attached} mySeat={0} onAction={() => { /* noop */ }} />);
     expect(html).toContain('Counter supply');
     expect(html).toContain('data-anim-zone="supply"');
     const plain = renderToStaticMarkup(<Board state={state} mySeat={0} onAction={() => { /* noop */ }} />);
@@ -1225,6 +1233,15 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('data-testid="custom-card-mx-001"');
     expect(html).toContain('Mr. X');
     expect(html).toContain('Custom Cards (0 selected)');
+  });
+
+  it('offers one Poison check instead of the four EX-006..EX-009 cards', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(html).toContain('data-testid="custom-card-poison"');
+    expect(html).toContain('POISON');
+    for (const id of ['ex-006', 'ex-007', 'ex-008', 'ex-009']) {
+      expect(html).not.toContain(`data-testid="custom-card-${id}"`);
+    }
   });
 
   it('shows the host custom-card picker bound to the room selection', () => {

@@ -27,6 +27,29 @@ differs slightly from the character sheet's 320x456 (0.7018); `object-fit: conta
 `.card-character` geometry of (89.7%, 7.7%), so no badge override was needed. FCH-008 is the ONLY
 `FCH-*` card with art - the rest of that character set has no sheet. Verified: vite emits
 `FCH-008-DHnWXYg8.png` and :1724 serves it (109,281 bytes).
+**POISON IS NOW A SINGLE LOBBY CHECK + THE COUNTER SUPPLY IS HIDDEN UNTIL USED (2026-11-10):**
+Manny: "Remove ex-006 through ex-009 from the custom card check list, replace it with a
+single check called 'poison'; when selected add 2 x ex-006 and 2 x ex-008 to the mansion,
+add a stack of 5 blue herbs to the resource pile. The game board shouldn't show poison
+counters until they are attached to a character."
+1. **One lobby check** (`client/src/ui/Lobby.tsx`): EX-006..EX-009 are filtered out of the
+   Custom Cards picker and replaced by a single `POISON` check. Selecting it stores the
+   option id `'poison'` in the room's `customCards`.
+2. **The bundle** (`game-core/src/data/cards.ts`): new `POISON_OPTION_ID`, `POISON_BUNDLE`
+   (ex-006/007/008/009) and `expandCustomCards()`, used by both `cardsForScenario` and
+   `pilesForScenario` so the server host and pass-and-play agree. EX-007's `copies` is now
+   5, so the bundle's `custom-ex-007` pile is a 5-card stack (was 1). EX-009 is pulled in as
+   the shared-supply counter the two Infected attach.
+3. **The board** (`client/src/ui/Board.tsx`): the "Counter supply" pile renders only once at
+   least one counter is attached to a Character
+   (`state.seats.some(s => (s.counters ?? []).length > 0)`), instead of whenever the supply
+   is non-empty.
+**Browser-verified** (server room, POISON selected): the picker lists EX-001..EX-005 plus
+POISON (no EX-006..009); the `custom-ex-007` pile reads "5 left"; the Mansion is 42
+(38 + 2x EX-006 + 2x EX-008); the Counter supply pile is absent until a counter attaches.
+Tests: `engine/unofficialExpansion.test.ts` +2 (bundle selection, bundle seeding),
+`client/src/ui/ui.test.tsx` +2 (Poison check replaces the four cards, supply hidden until
+attached). Gates: typecheck clean, game-core 848, client 188, server 104.
 
 **Partner death: stale leader selection blocked every explore (2026-11-10):** Manny reported that
 after his Partner died while LEADING an explore (Six Shooter + Knife attached), the following turn he

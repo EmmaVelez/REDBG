@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS } from '@re/game-core';
+import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE } from '@re/game-core';
 
 /** Custom characters are only selectable when the room enabled them. */
 function selectableCharacters(room: RoomSnapshot): ReadonlyArray<typeof PREMIER_CARDS[number]> {
@@ -76,8 +76,10 @@ function ScenarioDropdown(props: {
 /**
  * Expandable Custom Cards picker — the fan-made card line (MX-001.., EX-001..).
  * Selected cards join the game: Infected and Storage/Box tokens go to the
- * Mansion deck, Characters enter the deal pool, cost-bearing cards get their
- * own Resource Area pile, and counters sit in a shared board supply.
+ * Mansion deck, Characters enter the deal pool, and cost-bearing cards get their
+ * own Resource Area pile. EX-006..EX-009 are NOT listed individually — they are
+ * enabled together by the single "Poison" check (the two Poison-spreading
+ * Infected, the 5-card Blue Herb stack and the Poison counter supply).
  * A native <details> keeps it expandable with no local state.
  */
 function CustomCardsPicker(props: {
@@ -85,14 +87,15 @@ function CustomCardsPicker(props: {
   readonly onChange: (ids: readonly string[]) => void;
   readonly disabled?: boolean;
 }): JSX.Element {
+  const bundled = new Set(POISON_BUNDLE);
   const toggle = (id: string, checked: boolean): void => {
     props.onChange(checked ? [...props.selected, id] : props.selected.filter(x => x !== id));
   };
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
-      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected and Storage/Box tokens are shuffled into the Mansion deck, Characters enter the deal pool, cost-bearing cards get their own Resource Area pile, and the Poison counter sits in a shared supply.</p>
-      {CUSTOM_CARDS.map(c => (
+      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected and Storage/Box tokens are shuffled into the Mansion deck, Characters enter the deal pool, and cost-bearing cards get their own Resource Area pile. The Poison check enables the whole Poison sub-system (Web Spinner + Yawn in the Mansion, a 5-card Blue Herb stack, and the Poison counter).</p>
+      {CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => (
         <label key={c.id} className="custom-card-row">
           <input
             type="checkbox"
@@ -104,6 +107,16 @@ function CustomCardsPicker(props: {
           <span>{c.id.toUpperCase()} {c.name} — {c.text}</span>
         </label>
       ))}
+      <label className="custom-card-row">
+        <input
+          type="checkbox"
+          checked={props.selected.includes(POISON_OPTION_ID)}
+          disabled={props.disabled === true}
+          onChange={e => toggle(POISON_OPTION_ID, e.target.checked)}
+          data-testid={`custom-card-${POISON_OPTION_ID}`}
+        />
+        <span>POISON — Poison counters: 2 Web Spinner and 2 Yawn shuffled into the Mansion, a stack of 5 Blue Herbs in the Resource Area, and the Poison counter supply.</span>
+      </label>
     </details>
   );
 }

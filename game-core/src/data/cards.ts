@@ -559,6 +559,33 @@ export const NIGHTMARE_SCENARIO_DEF = {
   winInfectedCardId: 'ma-054',
 };
 
+/**
+ * Lobby option id for the Poison bundle. It is NOT a card — selecting it in the
+ * Custom Cards picker enables the whole Poison sub-system with one check.
+ */
+export const POISON_OPTION_ID = 'poison';
+
+/**
+ * The cards the Poison bundle puts into the game (Manny's ruling):
+ *  - EX-006 Web Spinner and EX-008 Yawn (2 copies each) go to the Mansion;
+ *  - EX-007 Blue Herb gets a 5-card stack in the Resource Area;
+ *  - EX-009 Poison is the shared-supply counter the two Infected attach.
+ */
+export const POISON_BUNDLE: readonly string[] = ['ex-006', 'ex-007', 'ex-008', 'ex-009'];
+
+/** Expand lobby options ('poison') into the card ids they enable. */
+export function expandCustomCards(ids: readonly string[]): readonly string[] {
+  const out = new Set<string>();
+  for (const id of ids) {
+    if (id === POISON_OPTION_ID) {
+      for (const cardId of POISON_BUNDLE) out.add(cardId);
+    } else {
+      out.add(id);
+    }
+  }
+  return [...out];
+}
+
 export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[] }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
   const found = SCENARIOS.find(s => s.id === id);
   if (found === undefined) {
@@ -574,7 +601,7 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
   // board supply, and characters/skills are never piled.
   const known = new Set(base.flatMap(p => p.cardIds));
   const extra: { pileId: string; cardIds: readonly string[] }[] = [];
-  for (const cardId of opts.customCards) {
+  for (const cardId of expandCustomCards(opts.customCards)) {
     const def = CUSTOM_CARDS.find(c => c.id === cardId);
     if (def === undefined) continue;
     if (def.type === 'counter' || def.type === 'infected' || def.type === 'token' || def.type === 'event') continue;
@@ -672,11 +699,13 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
   // option names them. They are NOT part of ALL_CARDS, so this option is the
   // only way they reach a game.
   if (opts?.customCards !== undefined) {
+    // 'poison' is a lobby option, not a card: expand it into the bundle first.
+    const selected = expandCustomCards(opts.customCards);
     // A selected card may depend on another custom card (EX-006/EX-008 attach a
     // Poison counter, EX-009), so pull the dependency in even when the room did
     // not tick it explicitly.
-    const wanted = new Set(opts.customCards);
-    for (const cardId of opts.customCards) {
+    const wanted = new Set(selected);
+    for (const cardId of selected) {
       const def = CUSTOM_CARDS.find(c => c.id === cardId);
       if (def === undefined) continue;
       for (const e of def.infectedEffects ?? []) {

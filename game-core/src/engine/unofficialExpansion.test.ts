@@ -100,6 +100,20 @@ describe('Unofficial Expansion data', () => {
     expect(off.some(c => c.id === 'ex-009')).toBe(false);
   });
 
+  it('the Poison lobby option enables the whole bundle with one check', () => {
+    const on = cardsForScenario('firstTimer', { customCards: ['poison'] });
+    for (const id of ['ex-006', 'ex-007', 'ex-008', 'ex-009']) {
+      expect(on.some(c => c.id === id), id).toBe(true);
+    }
+    const piles = pilesForScenario('firstTimer', { customCards: ['poison'] });
+    expect(piles.map(p => p.pileId)).toContain('custom-ex-007');
+    // Not selected -> none of the bundle reaches the game.
+    const offCards = cardsForScenario('firstTimer', { customCards: ['ex-001'] });
+    expect(offCards.some(c => c.id === 'ex-009')).toBe(false);
+    const offPiles = pilesForScenario('firstTimer', { customCards: ['ex-001'] });
+    expect(offPiles.map(p => p.pileId)).not.toContain('custom-ex-007');
+  });
+
   it('gives the cost-bearing customs their own market piles, and never piles the counter', () => {
     const piles = pilesForScenario('firstTimer', { customCards: IDS });
     const pileIds = piles.map(p => p.pileId);
@@ -118,6 +132,28 @@ describe('Unofficial Expansion data', () => {
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-004')).toHaveLength(1);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-006')).toHaveLength(2);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-008')).toHaveLength(2);
+    expect(s.supply).toContain('ex-009#1');
+    // The Poison bundle stacks FIVE Blue Herbs in the Resource Area.
+    expect(s.marketPiles['custom-ex-007']?.cards).toHaveLength(5);
+  });
+
+  it('the Poison bundle alone seeds 2+2 Infected, a 5-card herb stack and the counter', () => {
+    const s = setup(
+      {
+        seed: 11,
+        players: [
+          { name: 'P', controller: 'human', characterCardId: 'ch-002' },
+          { name: 'Foe', controller: 'human', characterCardId: 'ch-003' },
+        ],
+      },
+      cardsForScenario('firstTimer', { customCards: ['poison'] }),
+      pilesForScenario('firstTimer', { customCards: ['poison'] }),
+      STANDARD_MANSION_DECK,
+    );
+    const mansion = [...s.mansionDeck, ...s.mansionBottom];
+    expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-006')).toHaveLength(2);
+    expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-008')).toHaveLength(2);
+    expect(s.marketPiles['custom-ex-007']?.cards).toHaveLength(5);
     expect(s.supply).toContain('ex-009#1');
   });
 });
