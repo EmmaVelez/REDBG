@@ -833,7 +833,7 @@ export interface LoggedAction {
 export type Action = 
   | { readonly type: "startGame"; readonly setup: GameSetup } 
   | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
-  | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string } 
+  | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string; readonly healTarget?: "main" | "partner" }
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[]; readonly leader?: "main" | "partner" }
   /** Outbreak: spend 1 Explore to Attack another Character (instead of

@@ -27,18 +27,31 @@ turnStartActionIfHpAtMost, plusBuyBonus and extraExploreAtTurnStart all use the 
 derived from the Main's Decorations). `enumerate` emits both characters' abilities, and the
 ActionBar labels the Partner's with a "Partner: " prefix (`data-ability-character`). Steve's L2
 `discardCardForHealAndDamage` heals partnerHp when the Partner owns it.
-(4) **Healing reaches the Partner.** The old `playItem` code computed `healPartner` and never
-used it (dead variable + a comment asking "Partner HP stored on player?"). Now First Aid Spray,
-Green Herb (both the Heal 20 and Heal 60 paths) and the Red Herb all heal BOTH characters —
-the Red Herb's effect was already named `healSelfAndPartnerToFull`, and `actions.test.ts`'s
-fixture text was always "heal yourself and your partner to full Health" (the data file's
-"+20 max HP" text was wrong; fixed). **Design decision to flag:** healing items help the whole
-team rather than a chosen target — say the word if you want a Main/Partner target choice.
-**Bots:** with healing reaching both, the First Aid Spray (no prompt, so the 1-ply evaluation
-sees the Health) makes the bot heal a hurt Partner; `evaluate.ts` already scores `partnerHp`.
-**Tests:** game-core 16 in `engine/partnerLevel.test.ts` (union, restriction exclusion, turn-start
-partner heal, partner manual ability usable + enumerated, heal-both ×3, bot plays a heal when
-the Partner is hurt), client 183 (+1 partner ability button). Gates: typecheck clean, server 102.
+(4) **Healing targets ONE character (Red Herb excepted).** Manny's ruling: "the red
+herb healing is the only one that applies to both character and partner at once, all
+other healing items need to have a specific character as a target." The old `playItem`
+code computed `healPartner` and never used it (dead variable + a comment asking
+"Partner HP stored on player?"). Now `playItem` takes `healTarget?: 'main' | 'partner'`:
+First Aid Spray (`healToFull`) and Green Herb (`healFixed20OrTrashWithSecondFor60`) heal
+exactly the named character; the Red Herb (`healSelfAndPartnerToFull`) still heals BOTH and
+ignores the target. When a partner is alive and the action names no target, the engine asks
+first (`healTarget` prompt with ['Heal Main','Heal Partner'] for the spray; the Green Herb's
+existing `healGreenHerb` prompt grows target-qualified options — `Heal Main 20`,
+`Heal Partner 20`, … — decoded back into (target, amount) from the option index; with no
+partner the labels stay the plain "Heal 20"/"Heal 60" they have always been). Naming the
+target also applies the heal immediately instead of raising a prompt, which is what lets the
+BOT aim a heal. `enumerate` emits both targets for the bot when a partner is alive.
+`characterCannotBeHealed` now checks the TARGET character, so Chris as the Main can still
+heal his Partner (and a partner who is Chris cannot be targeted). The data file's Red Herb
+text ("+20 max HP") contradicted its own effect; fixed to "Trash with a Green Herb: heal
+yourself and your Partner to full Health."
+**Bots:** the First Aid Spray has no prompt, so the 1-ply evaluation sees the restored
+Health and the bot plays it at the Partner; `evaluate.ts` already scores `partnerHp`.
+**Tests:** game-core **838** (was 837; 17 in `engine/partnerLevel.test.ts` — union,
+restriction exclusion, turn-start partner heal, partner manual ability usable + enumerated,
+First Aid Spray target selection + prompt, Green Herb target selection, Red Herb heals both,
+no-partner unchanged, bot aims a heal at the Partner), client **183**, server **102**.
+Gates: typecheck clean, vite build OK.
 
 **Partner leveling + bots leading with the Partner (2026-11-09):** Manny asked two
 questions, both answered "no" and both now fixed.

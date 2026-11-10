@@ -960,24 +960,42 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       let hp = played.player.hp;
                       let maxHp = played.player.maxHp;
                       let promptKind: string | undefined;
-                      // Alliance Partner Modification: the Partner is a second
-                      // Character with its own Health, and a healing item helps
-                      // the whole team — the player (and the bots) look after
-                      // both. `healSelfAndPartnerToFull` (Red Herb) always did.
+                      // Alliance Partner Modification: the Partner has its own
+                      // Health, and it is a separate target. Only the Red Herb
+                      // heals both characters at once — First Aid Spray and the
+                      // Green Herb heal exactly ONE character.
                       const partnerHp0 = played.player.partnerInstanceId !== undefined
                         ? (played.player.partnerHp ?? player.partnerHp)
                         : undefined;
                       let partnerHp = partnerHp0;
                       const partnerMaxHp = played.player.partnerMaxHp ?? player.partnerMaxHp ?? played.player.maxHp;
-                      const fullHealBoth = (): void => {
-                        hp = maxHp;
-                        if (partnerHp !== undefined) partnerHp = partnerMaxHp;
+                      const healTarget: 'main' | 'partner' = action.healTarget ?? 'main';
+                      const partnerAlive = played.player.partnerInstanceId !== undefined;
+                      /** Heal exactly one character; undefined amount = to full. */
+                      const healOne = (amount: number | undefined): void => {
+                        if (healTarget === 'partner' && partnerHp !== undefined) {
+                          partnerHp = amount === undefined ? partnerMaxHp : Math.min(partnerHp + amount, partnerMaxHp);
+                        } else {
+                          hp = amount === undefined ? maxHp : Math.min(hp + amount, maxHp);
+                        }
                       };
+                      const healEffects = (def.itemEffects ?? []).filter(
+                        e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60',
+                      );
+                      // A partner is alive and the player has not named a
+                      // target: ask first, then apply the heal on resolution.
+                      const needsTargetPrompt = healEffects.length > 0 && partnerAlive && action.healTarget === undefined;
+                      if (needsTargetPrompt) {
+                        promptKind = healEffects[0]?.kind === 'healToFull' ? 'healTarget' : 'healGreenHerb';
+                      }
                       let trashGreenHerbId: string | undefined;
                       let returnToMarket = false;
                 for (const e of def.itemEffects ?? []) {
+                        if (needsTargetPrompt && (e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60')) {
+                          continue; // applied when the target is chosen
+                        }
                         if (e.kind === 'healToFull') {
-                          fullHealBoth();
+                          healOne(undefined);
                         } else if (e.kind === 'plusMaxHp') {
                           maxHp = played.player.maxHp + e.amount;
                         } else if (e.kind === 'healFixed20OrTrashWithSecondFor60') {
@@ -986,7 +1004,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                           const green = played.player.hand.find(id => isGreenHerb(state, id));
                           if (green) {
                             trashGreenHerbId = green;
-                            fullHealBoth();
+                            hp = maxHp;
+                            if (partnerHp !== undefined) partnerHp = partnerMaxHp;
                           }
                         } else if (e.kind === 'returnToMarketAndRemoveCounters') {
                           // Unofficial Expansion: EX-007 Blue Herb returns to its
@@ -1005,14 +1024,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 if (promptKind !== undefined) {
                   // Heal 60 is only legal when the player still holds another Green
                   // Herb in hand (the played one is already gone). Both are trashed.
+                  // With a partner alive the options name the target too.
                   const hasSecondHerb = played.player.hand.some(id => isGreenHerb(state, id));
+                  const amounts: readonly number[] = hasSecondHerb ? [20, 60] : [20];
+                  const targets: readonly string[] = partnerAlive ? ['Main', 'Partner'] : ['Main'];
+                  const options: string[] = [];
+                  if (promptKind === 'healTarget') {
+                    options.push('Heal Main', 'Heal Partner');
+                  } else {
+                    // Without a partner the labels stay the plain
+                    // "Heal 20" / "Heal 60" they have always been.
+                    for (const t of targets) {
+                      for (const a of amounts) options.push(partnerAlive ? `Heal ${t} ${a}` : `Heal ${a}`);
+                    }
+                  }
                   prompts = [
                     ...prompts,
                     {
                       id: 'p' + (state.prompts.length + 1),
                       seat,
                       text: def.text,
-                      options: hasSecondHerb ? ['Heal 20', 'Heal 60'] : ['Heal 20'],
+                      options,
                       payload: { kind: promptKind },
                     },
                   ];
@@ -5591,54 +5623,85 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   | undefined;
                 return ab?.amount ?? 0;
               })();
-              // Alliance Partner Modification: the heal reaches both Characters.
-              const healSeats = (amount: number, extra?: Partial<PlayerState>): readonly PlayerState[] =>
+              // Alliance Partner Modification: the Green Herb heals exactly ONE
+              // character. The prompt options are ordered target-major, then
+              // amount, so the index decodes back into (target, amount).
+              const targets: readonly ('main' | 'partner')[] =
+                player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
+              const amounts: readonly number[] =
+                player.hand.some(id => isGreenHerb(state, id)) ? [20, 60] : [20];
+              const healSeat = targets[Math.floor(option / amounts.length)] ?? 'main';
+              const healAmount = amounts[option % amounts.length] ?? 20;
+              const healSeats = (extra?: Partial<PlayerState>): readonly PlayerState[] =>
                 state.seats.map(s => {
                   if (s.seat !== seat) return s;
                   return {
                     ...s,
                     ...extra,
-                    hp: Math.min(s.hp + amount + healBonus, s.maxHp),
-                    ...(s.partnerInstanceId !== undefined
+                    hp: healSeat === 'main'
+                      ? Math.min(s.hp + healAmount + healBonus, s.maxHp)
+                      : s.hp,
+                    ...(healSeat === 'partner' && s.partnerInstanceId !== undefined
                       ? {
                           partnerHp: Math.min(
-                            (s.partnerHp ?? s.hp) + amount + healBonus,
+                            (s.partnerHp ?? s.hp) + healAmount + healBonus,
                             s.partnerMaxHp ?? s.maxHp,
                           ),
                         }
                       : {}),
                   };
                 });
-              if (option === 0) {
+              if (healAmount === 20) {
                 return {
                   ...state,
                   ...nextBase,
-                  seats: healSeats(20, {
+                  seats: healSeats({
                     turnGold: player.turnGold + joshGold,
                     healedFirstTimeThisTurn: true,
                   }),
                   prompts: withHealPrompts(newPrompts),
                 };
               }
-              // option === 1: Heal 60 requires a second Green Herb in hand; both
-              // the played herb (already in removed) and the hand herb are trashed.
+              // Heal 60 requires a second Green Herb in hand; both the played
+              // herb (already in removed) and the hand herb are trashed.
               const otherHerb = player.hand.find(id => isGreenHerb(state, id));
               if (otherHerb === undefined) {
                 return {
                   ...state,
                   ...nextBase,
-                  seats: healSeats(20),
+                  seats: healSeats(),
                   prompts: withHealPrompts(newPrompts),
                 };
               }
               return {
                 ...state,
                 ...nextBase,
-                seats: healSeats(60, { hand: player.hand.filter(id => id !== otherHerb) }),
+                seats: healSeats({ hand: player.hand.filter(id => id !== otherHerb) }),
                 removed: [...state.removed, otherHerb],
                 prompts: withHealPrompts(newPrompts),
               };
             }
+
+      if (kind === 'healTarget') {
+        // First Aid Spray: heal exactly ONE character to full. The options are
+        // ['Heal Main', 'Heal Partner'].
+        const healSeat: 'main' | 'partner' = option === 1 ? 'partner' : 'main';
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => {
+            if (s.seat !== seat) return s;
+            return {
+              ...s,
+              hp: healSeat === 'main' ? s.maxHp : s.hp,
+              ...(healSeat === 'partner' && s.partnerInstanceId !== undefined
+                ? { partnerHp: s.partnerMaxHp ?? s.maxHp }
+                : {}),
+            };
+          }),
+          prompts: newPrompts,
+        };
+      }
 
       if (kind === 'skillHealTrashFromDiscard' && chosenId !== undefined && chosenId !== 'Decline') {
         return {

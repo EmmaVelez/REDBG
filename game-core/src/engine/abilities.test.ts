@@ -273,7 +273,7 @@ describe('passive abilities through applyAction (level-gated)', () => {
   });
 });
 describe('batch-2 exotic passives through applyAction', () => {
-  it('Chris L1: healing items are rejected', () => {
+  it('Chris L1: a healing item cannot target him', () => {
     const s = gameWith('ch-008'); // Chris L1 gate = 0 -> starts with L1
     const herb = findHand(s, 'item');
     // ensure a green herb instance exists in hand
@@ -286,7 +286,7 @@ describe('batch-2 exotic passives through applyAction', () => {
     };
     void herb;
     const res = validateAction(withHerb, { type: 'playItem', seat: 0, instanceId: 'it-001#1' });
-    expect(res).toEqual({ ok: false, reason: 'playItem: Chris cannot be healed' });
+    expect(res).toEqual({ ok: false, reason: 'playItem: that character cannot be healed' });
     // Another character CAN play the same herb
     const jill = gameWith('ch-009');
     const jillHerb: GameState = {

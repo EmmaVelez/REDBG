@@ -17,6 +17,19 @@ function hasNoHealingAbility(state: GameState, seat: number): boolean {
 }
 
 /**
+ * True when the NAMED character has Chris's "cannot be healed" restriction at
+ * its current level. Healing an item at a Partner is legal even when the Main
+ * character is Chris — the restriction belongs to one character, not the seat.
+ */
+function characterCannotBeHealed(state: GameState, seat: number, character: 'main' | 'partner'): boolean {
+  const source = characterSource(state, seat, character);
+  if (source === undefined) return false;
+  return (source.def.abilities ?? []).some(
+    a => a.kind === 'noHealingNoNonInfectedAttach' && a.level <= source.level,
+  );
+}
+
+/**
  * True when at least one LEGAL explore exists for this player right now:
  * explores remain, and some usable weapon (hand OR reusable play-area) is
  * affordable from the turn ammo pool. Used so Wesker's forced-Explore
@@ -136,14 +149,22 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (!player.hand.includes(action.instanceId)) {
         return { ok: false, reason: `playItem: card not in hand: ${action.instanceId}` };
       }
-      // Chris L1: cannot be healed — healing items are not playable by him.
+      // Chris L1: a character that cannot be healed cannot be the TARGET of a
+      // healing item. Healing your Partner is still legal when the Main
+      // character is Chris (and vice versa).
       {
         const itemDef = cardDef(state, action.instanceId);
         const heals = (itemDef?.itemEffects ?? []).some(
           e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60'
         );
-        if (heals && hasNoHealingAbility(state, action.seat)) {
-          return { ok: false, reason: 'playItem: Chris cannot be healed' };
+        if (heals) {
+          const target = action.healTarget ?? 'main';
+          if (target === 'partner' && !player.partnerInstanceId) {
+            return { ok: false, reason: 'playItem: no partner to heal' };
+          }
+          if (characterCannotBeHealed(state, action.seat, target)) {
+            return { ok: false, reason: 'playItem: that character cannot be healed' };
+          }
         }
       }
       const itemCardDef = cardDef(state, action.instanceId);

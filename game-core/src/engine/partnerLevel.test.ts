@@ -270,31 +270,54 @@ test('bots enumerate the Partner manual abilities', () => {
 
 // --- 5. healing reaches the Partner ---
 
-test('a First Aid Spray heals both Characters', () => {
+test('a First Aid Spray heals exactly one character', () => {
   const s = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['spray'] });
-  const after = applyAction({ ...s, cards: { ...s.cards, spray: inst('spray', 'it-fads') } },
-    { type: 'playItem', seat: 0, instanceId: 'spray' });
-  expect(after.seats[0]?.hp).toBe(100);
-  expect(after.seats[0]?.partnerHp).toBe(100);
+  const base = { ...s, cards: { ...s.cards, spray: inst('spray', 'it-fads') } };
+  // Naming the target applies the heal immediately.
+  const main = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'spray', healTarget: 'main' });
+  expect(main.seats[0]?.hp).toBe(100);
+  expect(main.seats[0]?.partnerHp).toBe(40);
+  const partner = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'spray', healTarget: 'partner' });
+  expect(partner.seats[0]?.hp).toBe(30);
+  expect(partner.seats[0]?.partnerHp).toBe(100);
+  // No target named -> the game asks which character receives it.
+  const asked = applyAction(base, { type: 'playItem', seat: 0, instanceId: 'spray' });
+  const prompt = asked.prompts.find(p => p.payload?.kind === 'healTarget');
+  expect(prompt).toBeDefined();
+  expect(prompt?.options).toEqual(['Heal Main', 'Heal Partner']);
+  expect(asked.seats[0]?.hp).toBe(30);
+  expect(asked.seats[0]?.partnerHp).toBe(40);
+  const healed = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 1 });
+  expect(healed.seats[0]?.hp).toBe(30);
+  expect(healed.seats[0]?.partnerHp).toBe(100);
 });
 
-test('a Green Herb heal reaches both Characters', () => {
+test('a Green Herb heal targets exactly one character', () => {
   const base = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['gh'] });
   const s = { ...base, cards: { ...base.cards, gh: inst('gh', 'it-gh') } };
   const played = applyAction(s, { type: 'playItem', seat: 0, instanceId: 'gh' });
   const prompt = played.prompts.find(p => p.payload?.kind === 'healGreenHerb');
   expect(prompt).toBeDefined();
-  const healed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
-  expect(healed.seats[0]?.hp).toBe(50);
+  expect(prompt?.options).toEqual(['Heal Main 20', 'Heal Partner 20']);
+  const healed = applyAction(played, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 1 });
+  expect(healed.seats[0]?.hp).toBe(30);
   expect(healed.seats[0]?.partnerHp).toBe(60);
 });
 
-test('a Red Herb heals both Characters to full', () => {
+test('a Red Herb is the one item that heals both at once', () => {
   const base = partnerSeat('ch-main', { hp: 30, partnerHp: 40, hand: ['rh', 'gh'] });
   const s = { ...base, cards: { ...base.cards, rh: inst('rh', 'it-rh'), gh: inst('gh', 'it-gh') } };
   const after = applyAction(s, { type: 'playItem', seat: 0, instanceId: 'rh' });
   expect(after.seats[0]?.hp).toBe(100);
   expect(after.seats[0]?.partnerHp).toBe(100);
+});
+
+test('without a Partner a healing item needs no target', () => {
+  const base = baseState({ seat0: { hp: 30, hand: ['spray'] } });
+  const s = { ...base, cards: { ...base.cards, spray: inst('spray', 'it-fads') } };
+  const after = applyAction(s, { type: 'playItem', seat: 0, instanceId: 'spray' });
+  expect(after.seats[0]?.hp).toBe(100);
+  expect(after.prompts).toEqual([]);
 });
 
 // --- 6. the bot looks after its Partner ---
@@ -304,5 +327,9 @@ test('the bot plays a healing item when its Partner is hurt', () => {
   const s = { ...base, cards: { ...base.cards, spray: inst('spray', 'it-fads') } };
   const action = chooseGreedyAction(s, 0);
   expect(action.type).toBe('playItem');
-  if (action.type === 'playItem') expect(action.instanceId).toBe('spray');
+  if (action.type === 'playItem') {
+    expect(action.instanceId).toBe('spray');
+    // The Main is already at full Health, so the bot aims the heal at the Partner.
+    expect(action.healTarget).toBe('partner');
+  }
 });

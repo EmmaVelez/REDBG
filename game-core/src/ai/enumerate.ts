@@ -32,7 +32,19 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     if (cardData) {
       const cardDef = state.cardDefs[cardData.cardId];
       if (cardDef?.type === 'item') {
-        generatedActions.push({ type: 'playItem', seat, instanceId });
+        // Alliance Partner Modification: a healing item (other than the Red
+        // Herb) heals exactly ONE character. The bot considers both targets
+        // so it can look after a hurt Partner; naming the target also applies
+        // the heal immediately rather than waiting on a target prompt.
+        const targetedHeal = (cardDef.itemEffects ?? []).some(
+          e => e.kind === 'healToFull' || e.kind === 'healFixed20OrTrashWithSecondFor60',
+        );
+        if (targetedHeal && player.partnerInstanceId !== undefined) {
+          generatedActions.push({ type: 'playItem', seat, instanceId, healTarget: 'main' });
+          generatedActions.push({ type: 'playItem', seat, instanceId, healTarget: 'partner' });
+        } else {
+          generatedActions.push({ type: 'playItem', seat, instanceId });
+        }
       }
     }
   }
