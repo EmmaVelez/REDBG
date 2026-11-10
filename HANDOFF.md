@@ -1,5 +1,18 @@
 # HANDOFF — resume here
 
+**FCH-008 Sherry Birkin art re-pulled UNCROPPED (2026-11-10):** Manny sent a single-card image of
+Sherry Birkin (452x630 JPG) and said "pull this art again, no cropping". The existing
+`CARD-ART/FCH-008.png` was still the old **320x260 ART WINDOW** (portrait only - no `[CHARACTER]`
+banner, no name bar, no ability text), the same crop the CH art used before it went full-card; every
+other character card (CH-*, PR-*) is now the whole 320x456 / 320x448 scan. The new file is the WHOLE
+CARD at 320x446 (the source is 452x630, ratio 0.7175, trimmed exactly to the card's own border with no
+background - verified by reading the image), quantized to 256 colours, 109,281 bytes. Note the ratio
+differs slightly from the character sheet's 320x456 (0.7018); `object-fit: contain` letterboxes it by
+~5px top and bottom, and the Health badge still measures (89.6%, 7.1%) against the standard
+`.card-character` geometry of (89.7%, 7.7%), so no badge override was needed. FCH-008 is the ONLY
+`FCH-*` card with art - the rest of that character set has no sheet. Verified: vite emits
+`FCH-008-DHnWXYg8.png` and :1724 serves it (109,281 bytes).
+
 **Partner death: stale leader selection blocked every explore (2026-11-10):** Manny reported that
 after his Partner died while LEADING an explore (Six Shooter + Knife attached), the following turn he
 could not explore at all. Two defects:
