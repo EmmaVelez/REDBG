@@ -146,6 +146,29 @@ export function resolveAllyExplore(
   };
 
   if (outcome.kind === 'nonInfected') {
+    // EV-001 Zombie Grab: its own reveal branch (same contract as a normal
+    // explore) — trash a weapon from the target's POST-explore hand or
+    // discard, or take 20 damage, then shuffle the card back into the Mansion.
+    // The weapon options must not read the pre-strip hand: the explore has
+    // already moved the used weapons to the play area.
+    if (revealedDef?.type === 'event' && revealedDef.id === 'ev-001') {
+      const grabWeapons = [
+        ...(next.seats[targetSeat]?.hand ?? []),
+        ...(next.seats[targetSeat]?.discard ?? []),
+      ].filter(id => cardDef(state, id)?.type === 'weapon');
+      return {
+        ...next,
+        mansionDeck,
+        mansionBottom,
+        prompts: [...next.prompts, {
+          id: `ally-zombie-grab-${sherrySeat}-${targetSeat}-${next.version}`,
+          seat: targetSeat,
+          text: revealedDef?.text ?? '',
+          options: [...grabWeapons, 'Take 20 damage'],
+          payload: { kind: 'zombieGrab', amount: '20', instanceId: revealedId },
+        }],
+      };
+    }
     // The exploring player decides, exactly as in a normal explore.
     return {
       ...next,

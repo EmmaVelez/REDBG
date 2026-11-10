@@ -136,3 +136,43 @@ describe('EV-001 Zombie Grab resolution', () => {
     expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
   });
 });
+
+describe('EV-001 Zombie Grab across every reveal path', () => {
+  it('multi-explore offering the grab choice, never a take/bottom', () => {
+    const { state, ids } = setMansionTop(
+      grabGame({ level: 1, hp: 80, turnAmmo: 40, exploresLeft: 4, turnGold: 10 }),
+      ['ev-001', 'it-001'],
+    );
+    const { state: s1, id: used } = addWeapon(state, 0, 'we-009');
+    const { state: s2, id: spare } = addWeapon(s1, 0, 'we-004');
+    const revealed = applyAction(s2, { type: 'explore', seat: 0, weapons: [used, spare], exploreCount: 2 });
+    const grab = findPrompt(revealed, 'zombieGrab');
+    expect(grab).toBeDefined();
+    if (grab === undefined) return;
+    expect(grab.options).toContain('Take 20 damage');
+    // the second (non-infected) card still gets its take/bottom choice
+    const nonInfected = findPrompt(revealed, 'takeOrBottom');
+    expect(nonInfected).toBeDefined();
+    const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: grab.id, option: grab.options.indexOf('Take 20 damage') });
+    expect(after.seats[0]?.hp).toBe(60);
+    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
+    expect(after.removed).not.toContain(ids[0]);
+  });
+
+  it('Crow chain reveal still offers the grab choice and shuffles back', () => {
+    const { state, ids } = setMansionTop(
+      grabGame({ level: 1, hp: 80, turnAmmo: 40, exploresLeft: 4, turnGold: 10 }),
+      ['ci-002', 'ev-001'],
+    );
+    const { state: s1, id: used } = addWeapon(state, 0, 'we-009');
+    const { state: s2, id: spare } = addWeapon(s1, 0, 'we-004');
+    const revealed = applyAction(s2, { type: 'explore', seat: 0, weapons: [used], exploreCount: 1 });
+    const grab = findPrompt(revealed, 'zombieGrab');
+    expect(grab).toBeDefined();
+    if (grab === undefined) return;
+    expect(grab.options).toContain(spare);
+    const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: grab.id, option: grab.options.indexOf(spare) });
+    expect(after.removed).toContain(spare);
+    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[1]);
+  });
+});

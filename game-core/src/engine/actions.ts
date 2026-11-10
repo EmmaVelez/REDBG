@@ -1497,11 +1497,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
         const infectedEntries: Array<{ id: string; def: CardDef }> = [];
         const nonInfectedIds: string[] = [];
+        const zombieGrabIds: string[] = [];
         for (const id of revealedIds) {
           if (eventIdsToRemove.includes(id)) continue;
           const d = cardDef(state, id);
           if (d === undefined) continue;
           if (d.type === 'infected') infectedEntries.push({ id, def: d });
+          // EV-001 Zombie Grab: its OWN reveal branch, never a take/bottom
+          // choice or a silent shuffle-back (check BEFORE expansionIds — a
+          // Crow chain or MA-039/072 expansion reveal must offer the choice).
+          else if (d.type === 'event' && d.id === 'ev-001') zombieGrabIds.push(id);
           else if (expansionIds.includes(id)) shuffleBackIds.push(id);
           else nonInfectedIds.push(id);
         }
@@ -1902,6 +1907,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           options: ['Take', 'Send to bottom of Mansion'],
           payload: { kind: 'takeOrBottom', instanceId: id },
         }));
+        // EV-001 Zombie Grab: the multi-explore equivalent of the
+        // single-explore event branch. Options read handAfter /
+        // discardAfterExplosives (the explore moved the used weapon to the
+        // play area); the card parks in limbo until the choice is answered
+        // and is shuffled back into the Mansion by the zombieGrab resolver.
+        const zombieGrabPrompts: Prompt[] = zombieGrabIds.map((id, i) => ({
+          id: `p${state.prompts.length + outcomePrompts.length + nonInfectedIds.length + i + 1}`,
+          seat,
+          text: cardDef(state, id)?.text ?? '',
+          options: [
+            ...[...handAfter, ...discardAfterExplosives].filter(wid => cardDef(state, wid)?.type === 'weapon'),
+            'Take 20 damage',
+          ],
+          payload: { kind: 'zombieGrab', amount: '20', instanceId: id },
+        }));
         for (const id of undefeatedEntries.map(e => e.id)) {
           const def = cardDef(state, id);
           const shuffles = (def?.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle')) ?? false;
@@ -2065,7 +2085,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck: mDeck,
           mansionBottom: mBottom,
           rngState: fxState.rngState,
-          prompts: [...fxState.prompts, ...outcomePrompts, ...defeatFxPrompts, ...nonInfectedPrompts, ...resuscitatePrompts, ...zombieBPromptsOut],
+          prompts: [...fxState.prompts, ...outcomePrompts, ...defeatFxPrompts, ...nonInfectedPrompts, ...zombieGrabPrompts, ...resuscitatePrompts, ...zombieBPromptsOut],
           ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
@@ -2266,15 +2286,32 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'stunRodChooseInfected' },
             }]
           : [];
-        const removedIds = [revealedInstanceId, secondId];
-        // shuffle non-infected back to bottom
+        const grabSecond = secondDef?.id === 'ev-001';
+        const removedIds = [revealedInstanceId, secondId].filter(id => {
+          const d = cardDef(state, id);
+          return (d?.type === 'infected' || d?.type === 'event') && d?.id !== 'ev-001';
+        });
+        // shuffle non-infected back to bottom (EV-001 parks in limbo until
+        // its choice is answered, then the resolver shuffles it back)
         const toShuffleBack = [revealedInstanceId, secondId].filter(id => {
           const d = cardDef(state, id);
-          return d?.type !== 'infected';
+          return d?.type !== 'infected' && d?.id !== 'ev-001';
         });
         if (toShuffleBack.length > 0) {
           mansionBottom = [...mansionBottom, ...toShuffleBack];
         }
+        const grabPromptsMa039: Prompt[] = grabSecond
+          ? [{
+              id: `zombieGrab-${seat}-v${state.version}`,
+              seat,
+              text: secondDef?.text ?? '',
+              options: [
+                ...[...handAfter, ...discardAfterExplosives].filter(wid => cardDef(state, wid)?.type === 'weapon'),
+                'Take 20 damage',
+              ],
+              payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
+            }]
+          : [];
         return {
           ...state,
           ...nextBase,
@@ -2285,7 +2322,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck,
           mansionBottom,
           rngState: currentRng,
-          prompts: [...state.prompts, ...stunPrompts],
+          prompts: [...state.prompts, ...stunPrompts, ...grabPromptsMa039],
         };
       }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
@@ -2344,8 +2381,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             prompts: state.prompts,
           };
         }
-        const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, secondId, rngShuffle);
+        const grabSecondMa072 = secondDef?.id === 'ev-001';
+        // EV-001 parks in limbo until its choice is answered; only the
+        // P.R.L. 412 itself is shuffled back here.
+        const shuffled = grabSecondMa072
+          ? { deck: mansionDeck, bottom: mansionBottom }
+          : shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, secondId, rngShuffle);
         const shuffled2 = shuffleBack(shuffled, revealedInstanceId, rngShuffle);
+        const grabPromptsMa072: Prompt[] = grabSecondMa072
+          ? [{
+              id: `zombieGrab-${seat}-v${state.version}`,
+              seat,
+              text: secondDef?.text ?? '',
+              options: [
+                ...[...handAfter, ...discardAfterExplosives].filter(wid => cardDef(state, wid)?.type === 'weapon'),
+                'Take 20 damage',
+              ],
+              payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
+            }]
+          : [];
         return {
           ...state,
           ...nextBase,
@@ -2353,7 +2407,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck: shuffled2.deck,
           mansionBottom: shuffled2.bottom,
           rngState: currentRng,
-          prompts: state.prompts,
+          prompts: [...state.prompts, ...grabPromptsMa072],
         };
       }
 
