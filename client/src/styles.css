@@ -67,6 +67,11 @@ h1, h2 { margin: 0 0 8px; }
   /* the action dock is a fixed overlay, so it is out of flow: reserve its
      measured height (published as --dock-h by App.tsx) instead */
   padding-bottom: var(--dock-h, 0px);
+  /* Character-card geometry. Defined here rather than on
+     .player-character-card so the action bar's Skill Area can cap itself at
+     the cards' height (.action-identity's --cc-h) from the same source. */
+  --cc-w: 80px;
+  --cc-scale: 2.5;
 }
 /* connection status + room code: they are stat chips in the action bar's stats
    row now (see .action-stat-room / .action-stat-status), not a corner group */
@@ -339,8 +344,8 @@ h1, h2 { margin: 0 0 8px; }
    fan) so the trophies enlarge with the character. */
 .player-character-card {
   position: relative;
-  --cc-w: 80px; /* card width, overridden per breakpoint for the action bar */
-  --cc-scale: 2.5; /* hover enlargement; the panel's viewport cap divides by it */
+  /* --cc-w (card width) and --cc-scale (hover enlargement) live on .app so
+     the Skill Area can derive its height cap from the same values. */
 }
 .player-character-card .card { width: var(--cc-w); }
 .cc-fan {
@@ -1717,14 +1722,25 @@ h1, h2 { margin: 0 0 8px; }
   min-width: 104px;
   max-width: 170px;
 }
+/* Slots are compact so two of them fit alongside the character cards (the
+   reference layout); a full draft of five scrolls. */
 .skill-panel .skill-row {
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
-  padding: 4px 6px;
+  gap: 1px;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1.2;
 }
+.skill-panel .skill-row-name { font-size: 10px; }
+.skill-panel .skill-row-pips { font-size: 9px; }
 .skill-panel .skill-use,
-.skill-panel .skill-move-xp { align-self: center; }
+.skill-panel .skill-move-xp {
+  align-self: center;
+  padding: 0 6px;
+  font-size: 9px;
+  line-height: 1.4;
+}
 .skill-panel-head { display: flex; gap: 8px; align-items: baseline; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
 .skill-panel-xp { color: var(--accent); font-weight: 700; }
 .skill-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.04); }
@@ -2066,6 +2082,11 @@ h1, h2 { margin: 0 0 8px; }
   align-items: flex-end;
   flex-wrap: nowrap;
   gap: 14px;
+  /* Height cap for the Skill Area: the character cards are --cc-w wide at a
+     320/456 aspect ratio (.card.card-character.card-art-only), so
+     --cc-w * 456 / 320 tall. The Skill Area scrolls instead of growing the
+     row past them. */
+  --cc-h: calc(var(--cc-w) * 456 / 320);
 }
 .action-col {
   display: flex;
@@ -2075,8 +2096,15 @@ h1, h2 { margin: 0 0 8px; }
   flex: 0 0 auto;
   min-width: 0;
 }
-/* the Skill Area column stretches its slots to a common width */
-.action-col-skills { align-items: stretch; }
+/* the Skill Area column stretches its slots to a common width; it is capped at
+   the character cards' height and scrolls when a seat holds more skills than
+   that (a full draft is five). */
+.action-col-skills {
+  align-items: stretch;
+  max-height: var(--cc-h);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 /* no `.action-col-label` any more: the character card needs no caption, and
    the deck/discard piles carry their own `.zone-pile-label`. */
 /* the hand is the flexible middle region, so it scrolls instead of wrapping */
