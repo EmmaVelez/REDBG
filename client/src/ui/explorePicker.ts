@@ -5,6 +5,7 @@ import {
   canReuseWeapon,
   remainingWeaponUses,
   exploreDamage,
+  grantedExploresFor,
   requiredAmmoForWeapons,
   isPartnerWeapon,
   leaderAbilities,
@@ -116,15 +117,28 @@ export function bestExploreCombo(
 }
 
 /** Explore counts the player may pick for one explore action (1..pool, and
- *  never more than the Mansion can reveal). */
-export function exploreCountOptions(state: GameState, seat: number): readonly number[] {
+ *  never more than the Mansion can reveal). The pool includes the Explores the
+ *  SELECTED weapons grant this turn, so a weapon like the Pump-Action Shotgun
+ *  can have its "+1 Explore" spent in the same action (revealing two cards at
+ *  once) or saved for a later, separate explore. */
+export function exploreCountOptions(
+  state: GameState,
+  seat: number,
+  weaponIds: readonly string[] = [],
+): readonly number[] {
   const player = state.seats[seat];
   if (player === undefined) return [1];
   const mansionSize = state.mansionDeck.length + state.mansionBottom.length;
-  const max = Math.max(1, Math.min(player.exploresLeft, mansionSize));
+  const granted = grantedExploresFor(weaponIds.map(id => defForInstance(state, id) ?? undefined));
+  const max = Math.max(1, Math.min(player.exploresLeft + granted, mansionSize));
   const out: number[] = [];
   for (let i = 1; i <= max; i++) out.push(i);
   return out;
+}
+
+/** The Explores the currently selected weapons grant this turn. */
+export function grantedExploresForSelection(state: GameState, weaponIds: readonly string[]): number {
+  return grantedExploresFor(weaponIds.map(id => defForInstance(state, id) ?? undefined));
 }
 
 export interface ComboEvaluation {
@@ -170,12 +184,13 @@ export function evaluateExploreCombo(
       reason: `Not enough ammo — needs ${ammo}, you have ${player.turnAmmo}.`,
     };
   }
-  if (player !== undefined && exploreCount > player.exploresLeft) {
+  const granted = grantedExploresFor(weaponIds.map(id => defForInstance(state, id) ?? undefined));
+  if (player !== undefined && exploreCount > player.exploresLeft + granted) {
     return {
       damage,
       ammo,
       legal: false,
-      reason: `Not enough explores — needs ${exploreCount}, you have ${player.exploresLeft}.`,
+      reason: `Not enough explores — needs ${exploreCount}, you have ${player.exploresLeft}${granted > 0 ? ` (+${granted} from the selected weapons)` : ''}.`,
     };
   }
   return { damage, ammo, legal: false, reason: 'That weapon combination is not legal.' };

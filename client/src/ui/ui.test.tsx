@@ -1064,6 +1064,27 @@ describe('ActionBar (T07)', () => {
     expect(evaluateExploreCombo(armed, 0, [handgunInst as string], 2).legal).toBe(true);
   });
 
+  it('explore count options include the Explores the selected weapons grant', () => {
+    const state = twoPlayerState();
+    const shotgun = 'we-013#t1';
+    const base = withWeapon(state, 'we-013', shotgun);
+    const armed = { ...base, seats: base.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 40, exploresLeft: 1 } : s)) };
+    // 1 Explore left + 1 granted by the Pump-Action Shotgun = 2.
+    expect(Math.max(...exploreCountOptions(armed, 0, [shotgun]))).toBe(2);
+    // Without it, the pool is just the 1 Explore left.
+    expect(Math.max(...exploreCountOptions(armed, 0, []))).toBe(1);
+  });
+
+  it('shows the granted-Explore hint when a granting weapon is in the combo', () => {
+    const state = twoPlayerState();
+    const shotgun = 'we-013#t1';
+    const base = withWeapon(state, 'we-013', shotgun);
+    const armed = { ...base, seats: base.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 40, exploresLeft: 1 } : s)) };
+    const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
+    expect(html).toContain('data-explore-granted-hint');
+    expect(html).toContain('Pump-Action Shotgun');
+  });
+
   it('prices the explore preview with the selected leader abilities', () => {
     const state = twoPlayerState();
     const partnerInst = 'we-004#77';

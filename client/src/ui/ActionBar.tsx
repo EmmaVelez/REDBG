@@ -16,6 +16,7 @@ import {
   exploreWeaponOptions,
   legalExplores,
   resolveExploreLeader,
+  grantedExploresForSelection,
 } from './explorePicker';
 
 /** Prompt kinds whose numeric options are AMOUNTS (XP), not seat indices. */
@@ -116,7 +117,18 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
 
   const combo = evaluateExploreCombo(state, seat, selected, exploreCount, effectiveLeader);
   const canExplore = explores.length > 0 && prompt === undefined;
-  const exploreCounts = exploreCountOptions(state, seat);
+  const exploreCounts = exploreCountOptions(state, seat, selected);
+  // Explores the selected weapons grant this turn (Pump-Action Shotgun et al.) —
+  // they can be spent in THIS explore (revealing that many cards at once) or
+  // saved for a later, separate explore.
+  const grantedExplores = grantedExploresForSelection(state, selected);
+  const grantedWeaponNames: string[] = [];
+  for (const id of selected) {
+    const d = defForInstance(state, id);
+    if (d !== null && (d.weaponEffects ?? []).some(e => e.kind === 'grantExplores' || e.kind === 'grantExploreAndSuppressLowHpInfected')) {
+      grantedWeaponNames.push(d.name);
+    }
+  }
   const exploreCountsKey = exploreCounts.join(',');
   useEffect(() => {
     const max = exploreCounts[exploreCounts.length - 1] ?? 1;
@@ -390,6 +402,12 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                   {n}
                 </button>
               ))}
+            </div>
+          )}
+          {grantedExplores > 0 && (
+            <div className="explore-granted-hint" data-explore-granted-hint>
+              +{grantedExplores} Explore{grantedExplores === 1 ? '' : 's'} from {grantedWeaponNames.join(', ') || 'the selected weapon'} —
+              use {exploreCounts[exploreCounts.length - 1] ?? 1} to reveal that many cards now, or fewer to save some for later.
             </div>
           )}
           {player?.partnerInstanceId !== undefined && (

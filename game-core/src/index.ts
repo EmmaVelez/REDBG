@@ -2,7 +2,7 @@ export * from "./types";
 export { setup, startTurn, checkWin } from "./engine/game";
 export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
-export { exploreDamage } from "./engine/explore";
+export { exploreDamage, grantedExploresFor } from "./engine/explore";
 export { requiredAmmoForWeapons, ammoReqForWeapon, leaderAbilities } from "./engine/abilities";
 export {
   explorableWeapons,

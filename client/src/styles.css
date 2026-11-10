@@ -1562,6 +1562,13 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 12px;
 }
 .explore-picker-actions { display: flex; gap: 6px; }
+/* A weapon that grants Explores (Pump-Action Shotgun et al.) — tell the player
+   the +N can be spent in THIS explore or saved for a later one. */
+.explore-granted-hint {
+  color: #ffd27f;
+  font-size: 11px;
+  padding: 2px 4px;
+}
 
 /* ---- Mercenaries Skill System panel ---- */
 .skill-panel {

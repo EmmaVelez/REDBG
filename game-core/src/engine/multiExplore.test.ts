@@ -208,3 +208,105 @@ test('a partner weapon cannot be used twice in one turn', () => {
   expect(first.seats[0]?.exploresLeft).toBe(1);
   expect(validateAction(first, { type: 'explore', seat: 0, weapons: ['pw'], exploreCount: 1 }).ok).toBe(false);
 });
+
+/** Pump-Action Shotgun: grants +1 Explore, so it can be spent in the same action. */
+function shotgunState(over: Partial<PlayerState> = {}): GameState {
+  const def: CardDef = {
+    id: 'w-shotgun', name: 'Pump-Action Shotgun', type: 'weapon', set: 'premier', text: '',
+    copies: 1, ammoReq: 0, damage: 25, weaponEffects: [{ kind: 'grantExplores', amount: 1 }],
+  };
+  return {
+    ...baseState({
+      seat0: { hand: ['w-shotgun'], exploresLeft: 1, turnAmmo: 0, ...over },
+      cards: {
+        'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'), 'w-shotgun': inst('w-shotgun', 'w-shotgun'),
+        'inf1': inst('inf1', 'ma-1'), 'inf2': inst('inf2', 'ma-2'), 'inf3': inst('inf3', 'ma-3'),
+      },
+    }),
+    // baseState pins cardDefs to DEFS, so add the shotgun def alongside it.
+    cardDefs: { ...DEFS, 'w-shotgun': def },
+  };
+}
+
+test('a granted Explore can be spent in the SAME explore (immediate multi-explore)', () => {
+  // 1 Explore left + 1 granted = exploreCount 2 is legal, and the granted
+  // Explore is spent in the SAME action: TWO cards are revealed at once.
+  const s = shotgunState();
+  expect(validateAction(s, { type: 'explore', seat: 0, weapons: ['w-shotgun'], exploreCount: 2 }).ok).toBe(true);
+  const after = applyAction(s, { type: 'explore', seat: 0, weapons: ['w-shotgun'], exploreCount: 2 });
+  // ma-1 (20 HP) + ma-2 (15 HP) = 35 combined vs 25 damage -> not defeated,
+  // combined attack 20 + 10 = 30.
+  expect(after.seats[0]?.hp).toBe(70);
+  // 1 - 2 + 1 = 0: the granted Explore was consumed by the second reveal.
+  expect(after.seats[0]?.exploresLeft).toBe(0);
+});
+
+test('a granted Explore can instead be saved for a later, separate explore', () => {
+  const after = applyAction(shotgunState(), { type: 'explore', seat: 0, weapons: ['w-shotgun'], exploreCount: 1 });
+  // Only ma-1 is revealed; 25 damage defeats it.
+  expect(after.seats[0]?.hp).toBe(100);
+  expect(after.seats[0]?.attached).toContain('inf1');
+  // 1 - 1 + 1 = 1: the granted Explore is still available for a later explore.
+  expect(after.seats[0]?.exploresLeft).toBe(1);
+});
+
+test('exploreCount cannot exceed the pool plus the granted Explores', () => {
+  // exploresLeft 1 + granted 1 = 2, so 3 is rejected.
+  expect(validateAction(shotgunState(), { type: 'explore', seat: 0, weapons: ['w-shotgun'], exploreCount: 3 }).ok).toBe(false);
+});
+
+test('enumeration offers the granted Explore as an explore count', () => {
+  const counts = new Set(
+    enumerateLegalActions(shotgunState(), 0)
+      .filter((a): a is Extract<typeof a, { type: 'explore' }> => a.type === 'explore')
+      .map(a => a.exploreCount),
+  );
+  expect(counts.has(1)).toBe(true);
+  expect(counts.has(2)).toBe(true);
+});
+
+test('a multi-explore reveal gain (MA-092) lands in the discard, not in limbo', () => {
+  // MA-092: every player gains a copy of the lowest-cost Resource card. The
+  // multi-explore path rebuilds the exploring seat from a pre-gain snapshot, so
+  // the gained copy used to stay registered in state.cards but in no zone.
+  const ma092: CardDef = {
+    id: 'ma-092', name: 'Town Majini (Motorcycle)', type: 'infected', set: 'mercenaries', text: '',
+    copies: 3, hp: 25, attack: 10, decorations: 2,
+    infectedEffects: [{ kind: 'onRevealAllPlayersGainLowestCostResource' }],
+  };
+  const s: GameState = {
+    ...baseState({
+      seat0: { hand: ['w40'], exploresLeft: 2, turnAmmo: 0 },
+      mansionDeck: ['ma092', 'inf2'],
+      cards: {
+        'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'), 'w40': inst('w40', 'w40'),
+        'res1': inst('res1', 'it-1'),
+        'ma092': inst('ma092', 'ma-092'), 'inf2': inst('inf2', 'ma-2'),
+      },
+    }),
+    // baseState pins marketPiles to an empty `hg` pile.
+    marketPiles: { herb: { pileId: 'herb', cards: ['res1'] } },
+    cardDefs: { ...DEFS, 'ma-092': ma092 },
+  };
+  const after = applyAction(s, { type: 'explore', seat: 0, weapons: ['w40'], exploreCount: 2 });
+  // Conservation: every registered instance is in exactly one zone.
+  const zones = new Set<string>();
+  const addAll = (list: readonly string[]) => { for (const id of list) zones.add(id); };
+  for (const st of after.seats) {
+    for (const z of ['hand', 'inventory', 'discard', 'playArea', 'attached', 'counters', 'infectionCards', 'partnerAttached']) {
+      addAll((st as unknown as Record<string, readonly string[]>)[z] ?? []);
+    }
+  }
+  for (const pile of Object.values(after.marketPiles)) addAll(pile.cards);
+  addAll(after.mansionDeck);
+  addAll(after.mansionBottom);
+  addAll(after.removed);
+  // Character cards are registered outside every zone by design (setup does
+  // not place them), so they are accounted for separately.
+  const orphans = Object.keys(after.cards).filter(id =>
+    !zones.has(id) && after.cardDefs[after.cards[id]?.cardId ?? '']?.type !== 'character');
+  expect(orphans).toEqual([]);
+  // The gained Green Herb copy is a real card in each seat's discard.
+  expect(after.seats[0]?.discard.some(id => after.cards[id]?.cardId === 'it-1')).toBe(true);
+  expect(after.seats[1]?.discard.some(id => after.cards[id]?.cardId === 'it-1')).toBe(true);
+});

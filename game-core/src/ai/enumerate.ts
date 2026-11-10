@@ -5,6 +5,7 @@ import { explorableWeapons } from '../engine/weaponReuse';
 import { characterAbilities, weaponCostCap } from '../engine/abilities';
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
+import { grantedExploresFor } from '../engine/explore';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -98,8 +99,18 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       // Multi-explore (rulebook "Extra Explore"): the bot considers spending
       // 1 Explore and spending its whole pool (all-in). Intermediate counts are
       // legal for humans via the picker; the bot's 1-ply evaluation only needs
-      // the two extremes to weigh single vs combined battles.
-      const exploreCounts: readonly number[] = player.exploresLeft > 1 ? [1, player.exploresLeft] : [1];
+      // the two extremes to weigh single vs combined battles. The pool
+      // includes the Explores the combo itself grants (a Pump-Action Shotgun's
+      // "+1 Explore" can be spent in the same action).
+      const granted = grantedExploresFor(
+        combo.map(id => {
+          const ci = state.cards[id];
+          return ci === undefined ? undefined : state.cardDefs[ci.cardId];
+        }),
+      );
+      const exploreCounts: readonly number[] = player.exploresLeft + granted > 1
+        ? [1, player.exploresLeft + granted]
+        : [1];
       // Alliance Partner Modification: the player chooses who leads before the
       // reveal ("your Leading Character takes the full Damage ... After your
       // Leading Character has taken Damage, the Infected is passed to your

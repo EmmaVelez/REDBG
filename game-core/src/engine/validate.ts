@@ -4,6 +4,7 @@ import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, explorableWeapons, isPartnerWeapon, remainingWeaponUses } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
+import { grantedExploresFor } from './explore';
 
 /** True when the seat has the given ability kind (level-gated, Main or Partner). */
 function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
@@ -242,13 +243,17 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'explore: no explores left' };
       }
       // Multi-explore (rulebook "Extra Explore"): the player chooses how many
-      // of their remaining Explores this action spends. exploreCount is the
-      // number of Mansion cards revealed and battled as ONE combined
-      // engagement, so it is bounded by both the pool and the Mansion size.
+      // Explores this action spends. exploreCount is the number of Mansion cards
+      // revealed and battled as ONE combined engagement, so it is bounded by the
+      // Mansion size and by the Explores the player can put into it: the ones
+      // they still hold PLUS the ones the selected weapons grant this turn
+      // (a Pump-Action Shotgun's "+1 Explore" can be spent in the same action,
+      // revealing two cards at once, or saved for a later explore).
       if (!Number.isInteger(action.exploreCount) || action.exploreCount < 1) {
         return { ok: false, reason: 'explore: bad explore count' };
       }
-      if (action.exploreCount > player.exploresLeft) {
+      const grantedExplores = grantedExploresFor(action.weapons.map(id => cardDef(state, id)));
+      if (action.exploreCount > player.exploresLeft + grantedExplores) {
         return { ok: false, reason: 'explore: not enough explores' };
       }
       if (action.exploreCount > deckCount({ deck: state.mansionDeck, bottom: state.mansionBottom })) {

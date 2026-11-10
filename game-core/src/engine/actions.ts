@@ -2,7 +2,7 @@ import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } fr
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
-import { resolveExplore, computeDamage, resolveMultiExplore } from './explore';
+import { resolveExplore, computeDamage, resolveMultiExplore, grantedExploresFor } from './explore';
 import type { MultiExploreTarget } from './explore';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
@@ -57,7 +57,7 @@ import { makeRng, shuffle } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
-import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
+import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
@@ -1236,12 +1236,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : discardAfterPistols;
           const exploresLeft = player.exploresLeft - exploreCount;
           // grantExplores weapon effect: +explores when this weapon is used.
-          const grantedExplores = weapons.reduce((sum, id) => {
-            const def = cardDef(state, id);
-            const eff = def?.weaponEffects?.find(e => e.kind === 'grantExplores');
-            const flash = def?.weaponEffects?.find(e => e.kind === 'grantExploreAndSuppressLowHpInfected');
-            return sum + (eff && eff.kind === 'grantExplores' ? eff.amount : 0) + (flash !== undefined ? 1 : 0);
-          }, 0);
+          // The player may spend those explores in THIS action (see validate)
+          // or save them for a later, separate explore.
+          const grantedExplores = grantedExploresFor(weapons.map(id => cardDef(state, id)));
 
           // Nightmare: weapon effects that fire when the weapon is used
           // (WE-032/033 Silver Ghost / Punisher, WE-036/037 rifles, WE-038).
@@ -2033,12 +2030,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : {}),
           downed,
         });
-        for (const g of revealGains) fxState = gainCopy(fxState, g.seat, g.cardId);
+        // MA-092 "Gain 1 copy" lands in the discard. newPlayer was built before
+        // these gains, so carry the gained copies into the exploring seat's
+        // discard — otherwise they stay registered but in no zone.
+        const gainedDiscardIds: string[] = [];
+        for (const g of revealGains) {
+          const r = gainCopyTracked(fxState, g.seat, g.cardId);
+          fxState = r.state;
+          if (g.seat === seat) gainedDiscardIds.push(...r.ids);
+        }
+        const finalPlayer: PlayerState = gainedDiscardIds.length > 0
+          ? { ...newPlayer, discard: [...newPlayer.discard, ...gainedDiscardIds] }
+          : newPlayer;
         const zombieBPromptsOut = zombieBAffected.flatMap(seatIdx => zombieBPrompts(fxState, seatIdx, fxState.version));
         return {
           ...fxState,
           ...nextBase,
-          seats: fxState.seats.map(s => (s.seat === seat ? newPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
+          seats: fxState.seats.map(s => (s.seat === seat ? finalPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
           mansionDeck: mDeck,
           mansionBottom: mBottom,
           rngState: fxState.rngState,

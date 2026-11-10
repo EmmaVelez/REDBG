@@ -10,6 +10,26 @@ export interface ExploreWeapon {
   readonly tags?: readonly WeaponTag[];
 }
 
+/**
+ * Total Explores a set of weapon defs grant this turn: `grantExplores`
+ * (Pump-Action/Automatic/Riot/Triple Barreled Shotguns, Stun Rod) plus
+ * WE-040 Flashbang's `grantExploreAndSuppressLowHpInfected`.
+ *
+ * These explores are granted by USING the weapon, so a player may spend them
+ * in the SAME explore action (the multi-explore batch then reveals that many
+ * cards at once) or save them for a later, separate explore.
+ */
+export function grantedExploresFor(weaponDefs: readonly (CardDef | undefined)[]): number {
+  let total = 0;
+  for (const def of weaponDefs) {
+    for (const e of def?.weaponEffects ?? []) {
+      if (e.kind === 'grantExplores') total += e.amount;
+      else if (e.kind === 'grantExploreAndSuppressLowHpInfected') total += 1;
+    }
+  }
+  return total;
+}
+
 export interface DamageParams {
   readonly weapons: readonly ExploreWeapon[];
   readonly ammo: number;

@@ -193,6 +193,22 @@ export function gainCopy(state: GameState, seat: number, cardId: string): GameSt
   return gainCard(state, { seat, cardId, destination: 'discard', reason: 'other' });
 }
 
+/** Gain a fresh copy and report the instance ids created.
+ *
+ *  The multi-explore path rebuilds the exploring seat from a pre-gain snapshot,
+ *  so it needs the ids to carry the gained copies into the discard — otherwise
+ *  they stay registered in `state.cards` but sit in no zone (a conservation
+ *  failure the full-game soak catches). */
+export function gainCopyTracked(
+  state: GameState,
+  seat: number,
+  cardId: string,
+): { state: GameState; ids: readonly string[] } {
+  const before = new Set(Object.keys(state.cards));
+  const next = gainCard(state, { seat, cardId, destination: 'discard', reason: 'other' });
+  return { state: next, ids: Object.keys(next.cards).filter(id => !before.has(id)) };
+}
+
 /** All non-empty market pile ids. */
 export function nonEmptyPileIds(state: GameState): readonly string[] {
   return Object.values(state.marketPiles)
