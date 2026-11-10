@@ -1702,16 +1702,29 @@ h1, h2 { margin: 0 0 8px; }
   padding: 2px 4px;
 }
 
-/* ---- Mercenaries Skill System panel ---- */
+/* ---- Mercenaries Skill System panel ----
+   The Skill Area lives in the action identity row, immediately RIGHT of the
+   character/partner cards (Manny's layout reference): a vertical stack of
+   slots under a SKILLS/XP header, bottom-aligned with the deck and hand. */
 .skill-panel {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: var(--card);
-  border-top: 1px solid var(--border);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border-top: none;
+  min-width: 104px;
+  max-width: 170px;
 }
+.skill-panel .skill-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 6px;
+}
+.skill-panel .skill-use,
+.skill-panel .skill-move-xp { align-self: center; }
 .skill-panel-head { display: flex; gap: 8px; align-items: baseline; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
 .skill-panel-xp { color: var(--accent); font-weight: 700; }
 .skill-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.04); }
@@ -1977,9 +1990,11 @@ h1, h2 { margin: 0 0 8px; }
 }
 
 /* ---- skill panel (was referencing undefined --card / --accent / --muted-foreground) ---- */
+/* the panel is a bare column inside the action identity row now — it carries no
+   card background or top rule of its own. */
 .app-board .skill-panel {
-  background: linear-gradient(180deg, #14181e 0%, #0e1115 100%);
-  border-top: 1px solid #2a313b;
+  background: transparent;
+  border-top: none;
 }
 .app-board .skill-panel-head { color: #7f8896; }
 .app-board .skill-panel-xp { color: #d4af37; }
@@ -2060,6 +2075,8 @@ h1, h2 { margin: 0 0 8px; }
   flex: 0 0 auto;
   min-width: 0;
 }
+/* the Skill Area column stretches its slots to a common width */
+.action-col-skills { align-items: stretch; }
 /* no `.action-col-label` any more: the character card needs no caption, and
    the deck/discard piles carry their own `.zone-pile-label`. */
 /* the hand is the flexible middle region, so it scrolls instead of wrapping */

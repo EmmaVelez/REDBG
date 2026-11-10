@@ -10,6 +10,7 @@ import {
   cardsForScenario,
   pilesForScenario,
   CUSTOM_CARDS,
+  MERCENARIES_CARDS,
 } from '@re/game-core';
 import { ActionBar } from './ActionBar';
 
@@ -147,5 +148,26 @@ describe('ActionBar unhandled actions fallback', () => {
     };
     const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
     expect(html).toContain('Attach Handgun to Partner');
+  });
+
+  it('renders the Skill Area immediately right of the character/partner cards', () => {
+    const base = startTurn(setup(
+      { seed: 11, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'human' }], skillSystem: true },
+      [...PREMIER_CARDS, ...MERCENARIES_CARDS],
+      FIRST_TIMER_PILES,
+    ));
+    // Give seat 0 a Skill Area holding one Skill (skipping the draft).
+    const skillInst = 'sk-001#probe';
+    const s: GameState = {
+      ...base,
+      seats: base.seats.map((p, i) => (i === 0 ? { ...p, skills: [skillInst] } : p)),
+      cards: { ...base.cards, [skillInst]: { instanceId: skillInst, cardId: 'sk-001', location: { zone: 'playArea', index: 0 } } },
+    };
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html).toContain('data-testid="skill-panel"');
+    expect(html).toContain('Extension LV.1');
+    // Order: character/partner cards, then the Skill Area, then the deck.
+    expect(html.indexOf('data-character-row')).toBeLessThan(html.indexOf('data-skill-column'));
+    expect(html.indexOf('data-skill-column')).toBeLessThan(html.indexOf('data-anim-zone="deck"'));
   });
 });

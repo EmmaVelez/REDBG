@@ -6,6 +6,7 @@ import type { ConnectionStatus } from '../net/ws';
 import { ActionBarStats } from './ActionBarStats';
 import { CharacterCards } from './CharacterCards';
 import { Hand } from './Hand';
+import { SkillPanel } from './SkillPanel';
 import { ZonePile } from './ZonePile';
 import { playFromHand } from './playFromHand';
 import { defForInstance } from './cards';
@@ -224,6 +225,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
         <div className="action-row action-identity" data-action-identity>
           <div className="action-col">
             <CharacterCards state={state} seat={seat} />
+          </div>
+          {/* Skill Area sits immediately right of the character/partner cards
+              (Manny's layout reference), before the deck. */}
+          <div className="action-col action-col-skills" data-skill-column>
+            <SkillPanel state={state} seat={seat} onAction={onAction} disabled={disabled} />
           </div>
           <div className="action-col">
             <ZonePile label="Deck" count={player.inventory.length} animZone="deck" seat={seat} />

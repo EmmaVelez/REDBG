@@ -6,7 +6,6 @@ import { seatAwaitingAction } from '@re/game-core';
 import { useGameStore } from './store';
 import { createGameSocket } from './net/ws';
 import { ActionBar } from './ui/ActionBar';
-import { SkillPanel } from './ui/SkillPanel';
 import { Board } from './ui/Board';
 import { GameLog } from './ui/GameLog';
 import { Lobby } from './ui/Lobby';
@@ -306,12 +305,6 @@ export function App(): JSX.Element {
         />
       )}
       <footer className="app-action-dock" ref={setDockEl}>
-        <SkillPanel
-          state={gameState}
-          seat={mySeat}
-          onAction={a => dispatchClient({ kind: 'sendAction', action: a })}
-          disabled={disabled}
-        />
         <ActionBar
           state={gameState}
           seat={mySeat}
