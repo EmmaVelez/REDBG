@@ -89,14 +89,17 @@ function CustomCardsPicker(props: {
     props.onChange(checked ? [...props.selected, id] : props.selected.filter(x => x !== id));
   };
 
-  // Group cards by type
-  const characters = CUSTOM_CARDS.filter(c => c.type === 'character');
-  const infectionTokens = CUSTOM_CARDS.filter(c => c.type === 'infected' || c.type === 'token');
-  const resourceAreaCards = CUSTOM_CARDS.filter(c => 
-    c.type === 'weapon' || c.type === 'ammunition' || c.type === 'item'
+  // Group cards by type. Cards inside the POISON_BUNDLE are represented by
+  // the single bundle check below, so they are left out of the groups.
+  const characters = CUSTOM_CARDS.filter(c => c.type === 'character' && !bundled.has(c.id));
+  const infectionTokens = CUSTOM_CARDS.filter(c =>
+    (c.type === 'infected' || c.type === 'token') && !bundled.has(c.id)
   );
-  const otherCards = CUSTOM_CARDS.filter(c => 
-    c.type === 'event' || c.type === 'action' || c.type === 'counter'
+  const resourceAreaCards = CUSTOM_CARDS.filter(c =>
+    (c.type === 'weapon' || c.type === 'ammunition' || c.type === 'item') && !bundled.has(c.id)
+  );
+  const otherCards = CUSTOM_CARDS.filter(c =>
+    (c.type === 'event' || c.type === 'action' || c.type === 'counter') && !bundled.has(c.id)
   );
 
   return (
