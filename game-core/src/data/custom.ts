@@ -401,7 +401,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
   },
   // ── Mansion attachment event cards ────────────────────────────────
   {
-    id: 'ce-001',
+    id: 'ce-003',
     name: 'Rampage',
     type: 'event',
     set: 'custom',
@@ -488,6 +488,19 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentEffects: [
       { kind: 'plusHpForLowHpInfected', hpThreshold: 40, bonus: 10 },
       { kind: 'bonusXpPerExplore', amount: 1 },
+    ],
+  },
+  {
+    id: 'ce-001',
+    name: 'The Maze',
+    type: 'event',
+    set: 'custom',
+    text: '"Shotgun" Weapons can be used twice in a turn. If a player has more than one Action card in their play area all their Weapons get -10 Damage.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [
+      { kind: 'shotgunTwicePerTurn' },
+      { kind: 'damagePenaltyForMultipleActions', actions: 1, penalty: 10 },
     ],
   },
 ];

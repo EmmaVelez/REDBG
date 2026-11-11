@@ -186,11 +186,11 @@ describe('custom ammunition cards', () => {
 // ---------------------------------------------------------------------------
 
 describe('custom attachment event cards', () => {
-  it('Rampage (ce-001) is correctly defined', () => {
-    const c = CUSTOM_CARDS.find(x => x.id === 'ce-001');
+  it('Rampage (ce-003) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-003');
     expect(c).toBeDefined();
     expect(c).toEqual(expect.objectContaining({
-      id: 'ce-001',
+      id: 'ce-003',
       name: 'Rampage',
       type: 'event',
       set: 'custom',
@@ -202,7 +202,7 @@ describe('custom attachment event cards', () => {
 
   it('Rampage is included in the custom mansion deck', () => {
     const pool = customPool();
-    const rampage = pool.find(c => c.id === 'ce-001');
+    const rampage = pool.find(c => c.id === 'ce-003');
     expect(rampage).toBeDefined();
     expect(rampage!.type).toBe('event');
     expect(rampage!.attachmentMode).toBe(1);
@@ -210,7 +210,7 @@ describe('custom attachment event cards', () => {
 
   it('setup includes Rampage in the Mansion when custom cards are enabled', () => {
     const s = customGame();
-    const rampageCopies = s.mansionDeck.filter(id => id.startsWith('ce-001'));
+    const rampageCopies = s.mansionDeck.filter(id => id.startsWith('ce-003'));
     expect(rampageCopies).toHaveLength(1);
   });
 
@@ -382,6 +382,31 @@ describe('custom attachment event cards', () => {
     expect(vm).toBeDefined();
     expect(vm!.type).toBe('event');
     expect(vm!.attachmentMode).toBe(1);
+  });
+
+  it('The Maze (ce-001) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-001');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-001',
+      name: 'The Maze',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: expect.arrayContaining([
+        { kind: 'shotgunTwicePerTurn' },
+        { kind: 'damagePenaltyForMultipleActions', actions: 1, penalty: 10 },
+      ]),
+    }));
+  });
+
+  it('The Maze is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const maze = pool.find(c => c.id === 'ce-001');
+    expect(maze).toBeDefined();
+    expect(maze!.type).toBe('event');
+    expect(maze!.attachmentMode).toBe(1);
   });
 });
 

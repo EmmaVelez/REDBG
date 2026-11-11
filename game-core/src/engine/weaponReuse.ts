@@ -1,5 +1,6 @@
 import type { CardDef, CharacterAbility, GameState } from '../types';
 import { seatAbilities, effectiveWeaponTags } from './abilities';
+import { hasShotgunTwicePerTurn } from './game';
 
 /**
  * Weapon-reuse rules — "use this weapon more than once per turn".
@@ -50,13 +51,14 @@ export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: str
 
 /**
  * Uses per turn a weapon gets under the seat's reuse abilities (1 = no reuse).
- * Leon L2 doubles Pistols; everything else stays at one use per turn.
+ * Leon L2 doubles Pistols; The Maze attachment doubles Shotguns; everything else stays at one use per turn.
  */
 export function maxWeaponUses(state: GameState, seat: number, weaponId: string): number {
   const def = weaponDef(state, weaponId);
-  const reusable = hasAbilityKind(state, seat, 'pistolsTwicePerTurn') &&
-    effectiveWeaponTags(state, seat, weaponId).includes('pistol');
-  return reusable ? 2 : 1;
+  const tags = effectiveWeaponTags(state, seat, weaponId);
+  const pistolReuse = hasAbilityKind(state, seat, 'pistolsTwicePerTurn') && tags.includes('pistol');
+  const shotgunReuse = hasShotgunTwicePerTurn(state) && tags.includes('shotgun');
+  return (pistolReuse || shotgunReuse) ? 2 : 1;
 }
 
 /** Uses still available this turn beyond those already spent (0 = exhausted). */

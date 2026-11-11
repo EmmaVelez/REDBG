@@ -121,6 +121,27 @@ export function virusMutatesBonus(state: GameState): { hpThreshold: number; hpBo
   return { hpThreshold, hpBonus, xpBonus };
 }
 
+/** Check if any active mansion attachment allows shotgun weapons to be used twice. */
+export function hasShotgunTwicePerTurn(state: GameState): boolean {
+  return hasMansionAttachmentEffect(state, 'shotgunTwicePerTurn');
+}
+
+/** Get The Maze damage penalty: if play area has >N actions, weapons get -penalty damage. */
+export function mazeDamagePenalty(state: GameState, actionCountInPlayArea: number): number {
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'damagePenaltyForMultipleActions' && actionCountInPlayArea > effect.actions) {
+        return effect.penalty;
+      }
+    }
+  }
+  return 0;
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.

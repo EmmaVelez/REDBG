@@ -375,6 +375,8 @@ export type AttachmentEffect =
   | { readonly kind: "actionsCapAndRemoveOnDowned"; readonly actions: number } // Final Action: cap actions at N, remove when character loses all health
   | { readonly kind: "plusHpForLowHpInfected"; readonly hpThreshold: number; readonly bonus: number } // Virus Mutates: infected with <=N hp get +bonus hp
   | { readonly kind: "bonusXpPerExplore"; readonly amount: number } // Virus Mutates: players gain N extra XP for exploring
+  | { readonly kind: "shotgunTwicePerTurn" } // The Maze: shotgun weapons can be used twice per turn
+  | { readonly kind: "damagePenaltyForMultipleActions"; readonly actions: number; readonly penalty: number } // The Maze: if play area has >N actions, weapons get -penalty damage
 ;
 
 /**

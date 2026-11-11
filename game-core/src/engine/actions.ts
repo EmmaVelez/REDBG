@@ -68,7 +68,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1774,7 +1774,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const damage = computeDamage({
           weapons: exploreWeapons,
           ammo: ammoForEffects,
-          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus,
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
           knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
           ammoCardsInPlayArea,
           inventoryCount: player.inventory.length,
@@ -2447,7 +2447,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (revealedDef && false) {}
         // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
         const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
-        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
@@ -2528,7 +2528,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
-        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage, knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         let ricHp = player.hp;
         if (evDamage >= 80) {
           const ricBarrel = applyRicardoDamage(state, seat, player.hp, 30);
@@ -2906,7 +2906,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
-              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus,
+              bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
               ammoCardsInPlayArea,
               revealed: {
                 ...revealedDef,
