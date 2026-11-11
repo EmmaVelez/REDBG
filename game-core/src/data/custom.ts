@@ -164,6 +164,25 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    id: 'fch-001',
+    name: 'Carlos Oliveira',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Once during your turn, draw one card from your inventory. If it is a Weapon or Ammo card, add it to your hand, otherwise discard it.\\nLevel 2: At the beginning of your turn search your discard pile for an Ammo card and add it to your hand.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 2,
+    level2At: 5,
+    levels: [
+      { level: 1, text: 'Once during your turn, draw one card from your inventory. If it is a Weapon or Ammo card, add it to your hand, otherwise discard it.' },
+      { level: 2, text: 'At the beginning of your turn search your discard pile for an Ammo card and add it to your hand.' },
+    ],
+    abilities: [
+      { kind: 'drawFromInventoryOncePerTurn', level: 1 },
+      { kind: 'searchDiscardForAmmoAtTurnStart', level: 2 },
+    ],
+  },
+  {
     id: 'cr-001',
     name: 'Claire Redfield',
     type: 'character',

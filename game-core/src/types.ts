@@ -539,6 +539,8 @@ export type CharacterAbility =
   | { readonly kind: "goldWhenDiscardingAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // RC-001 Rebecca L2: when discarding due to card effect during turn, gain +amount gold
   | { readonly kind: "healIfDidNotExplore"; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L1: if didn't explore this turn, heal N at end of turn
   | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L2: Machine Gun weapons get +N damage
+  | { readonly kind: "drawFromInventoryOncePerTurn"; readonly level: 1 | 2 } // FCH-001 Carlos L1: once per turn, draw from inventory; weapon/ammo to hand, else discard
+  | { readonly kind: "searchDiscardForAmmoAtTurnStart"; readonly level: 1 | 2 } // FCH-001 Carlos L2: at turn start, search discard for an Ammo card to hand
   // --- Fan characters (JM-001..) ---
   | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
   | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats

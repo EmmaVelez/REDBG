@@ -578,6 +578,25 @@ describe('custom attachment event cards', () => {
     }));
   });
 
+  it('Carlos Oliveira (fch-001) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'fch-001');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'fch-001',
+      name: 'Carlos Oliveira',
+      type: 'character',
+      set: 'custom',
+      copies: 1,
+      maxHp: 80,
+      level1At: 2,
+      level2At: 5,
+      abilities: [
+        { kind: 'drawFromInventoryOncePerTurn', level: 1 },
+        { kind: 'searchDiscardForAmmoAtTurnStart', level: 2 },
+      ],
+    }));
+  });
+
   it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
     const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
     // Knife pile should include Combat Knife

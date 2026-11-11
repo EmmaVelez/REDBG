@@ -284,6 +284,25 @@ function turnStartAbilityPrompts(
     });
   }
 
+  // FCH-001 Carlos Oliveira L2: at turn start, search discard for an Ammo card.
+  if (abilities.some(a => a.kind === 'searchDiscardForAmmoAtTurnStart')) {
+    const ammoInDiscard = player.discard.filter(id => {
+      const inst = state.cards[id];
+      if (!inst) return false;
+      const def = state.cardDefs[inst.cardId];
+      return def?.type === 'ammunition';
+    });
+    if (ammoInDiscard.length > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: abilityText('searchDiscardForAmmoAtTurnStart'),
+        options: [...ammoInDiscard, 'Decline'],
+        payload: { kind: 'carlosSearchAmmo' },
+      });
+    }
+  }
+
   // PR-010 Hunk L1: reveal hand; 2+ different card types -> +10 damage this turn.
   if (abilities.some(a => a.kind === 'revealHandForDamageIfTwoTypes') && player.hand.length > 0) {
     prompts.push({

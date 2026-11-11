@@ -103,15 +103,61 @@ function CustomCardsPicker(props: {
   const otherCards = CUSTOM_CARDS.filter(c =>
     (c.type === 'event' || c.type === 'action' || c.type === 'counter') && !bundled.has(c.id)
   );
+  const allCustomCardIds = CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => c.id);
+
+  const allSelected = allCustomCardIds.every(id => props.selected.includes(id));
+  const toggleAll = (checked: boolean): void => {
+    if (checked) {
+      // Add all custom cards
+      const toAdd = allCustomCardIds.filter(id => !props.selected.includes(id));
+      props.onChange([...props.selected, ...toAdd]);
+    } else {
+      // Remove all custom cards
+      props.onChange(props.selected.filter(id => !allCustomCardIds.includes(id)));
+    }
+  };
+
+  const allCharactersSelected = characters.every(c => props.selected.includes(c.id));
+  const toggleAllCharacters = (checked: boolean): void => {
+    const charIds = characters.map(c => c.id);
+    if (checked) {
+      const toAdd = charIds.filter(id => !props.selected.includes(id));
+      props.onChange([...props.selected, ...toAdd]);
+    } else {
+      props.onChange(props.selected.filter(id => !charIds.includes(id)));
+    }
+  };
 
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
       <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected/Tokens and other Mansion cards go to the Mansion deck, Characters enter the deal pool, Weapons/Ammo/Items get Resource Area piles.</p>
 
+      {/* Add All Custom Cards */}
+      <label className="custom-card-row custom-card-row-all">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          disabled={props.disabled === true}
+          onChange={e => toggleAll(e.target.checked)}
+          data-testid="custom-card-all"
+        />
+        <span><strong>Add All Custom Cards</strong></span>
+      </label>
+
       {/* Character Cards Section */}
       <details className="custom-card-section">
         <summary className="custom-card-section-title"> Characters</summary>
+        <label className="custom-card-row custom-card-row-sub">
+          <input
+            type="checkbox"
+            checked={allCharactersSelected}
+            disabled={props.disabled === true}
+            onChange={e => toggleAllCharacters(e.target.checked)}
+            data-testid="custom-card-all-characters"
+          />
+          <span><em>Add All Characters</em></span>
+        </label>
         {characters.map(c => (
           <label key={c.id} className="custom-card-row">
             <input

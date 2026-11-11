@@ -3873,6 +3873,53 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'drawFromInventoryOncePerTurn': {
+              // FCH-001 Carlos Oliveira L1: draw top of inventory; Weapon/Ammo
+              // goes to hand, anything else is discarded.
+              const invTopId = player.inventory[0];
+              if (invTopId === undefined) {
+                return {
+                  ...state,
+                  ...nextBase,
+                  prompts: [
+                    ...state.prompts,
+                    {
+                      id: promptId,
+                      seat,
+                      text: 'Your Inventory is empty.',
+                      options: ['OK'],
+                      payload: { kind: 'carlosDrawFromInventory' },
+                    },
+                  ],
+                };
+              }
+              const invTopDef = cardDef(state, invTopId);
+              const isWeaponOrAmmo = invTopDef?.type === 'weapon' || invTopDef?.type === 'ammunition';
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? {
+                      ...s,
+                      inventory: s.inventory.slice(1),
+                      hand: isWeaponOrAmmo ? [...s.hand, invTopId] : s.hand,
+                      discard: isWeaponOrAmmo ? s.discard : [...s.discard, invTopId],
+                    }
+                  : s)),
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: isWeaponOrAmmo
+                      ? `You draw ${invTopDef?.name ?? 'a card'} — it goes to your hand.`
+                      : `You draw ${invTopDef?.name ?? 'a card'} — it is discarded.`,
+                    options: ['OK'],
+                    payload: { kind: 'carlosDrawFromInventory' },
+                  },
+                ],
+              };
+            }
             case 'discardActionCardFromHandForPlusTwoCards': {
               // Mysterious Mask (Nightmare) L2: discard one Action card from
               // hand for +2 cards.
@@ -6304,6 +6351,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           seats: state.seats.map(s =>
             s.seat === seat ? { ...p, hand: p.hand.filter(id => id !== chosenId), discard: [...p.discard, chosenId], turnGold: p.turnGold + goldBonus } : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'carlosSearchAmmo') {
+        // FCH-001 Carlos Oliveira L2: search discard for an Ammo card to hand.
+        const chosenId = prompt.options[option];
+        if (chosenId === 'Decline' || chosenId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const p = state.seats[seat];
+        if (p === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...p, hand: [...p.hand, chosenId], discard: p.discard.filter(id => id !== chosenId) } : s,
           ),
           prompts: newPrompts,
         };
