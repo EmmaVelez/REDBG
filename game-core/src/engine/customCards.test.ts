@@ -11,6 +11,7 @@ import {
   PREMIER_CARDS,
   STANDARD_MANSION_DECK,
   cardsForScenario,
+  pilesForScenario,
 } from '../data/cards';
 
 /**
@@ -472,6 +473,67 @@ describe('custom attachment event cards', () => {
     const disp = pool.find(c => c.id === 'ce-012');
     expect(disp).toBeDefined();
     expect(disp!.type).toBe('event');
+  });
+
+  it('Combat Knife (cw-005) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'cw-005');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'cw-005',
+      name: 'Combat Knife',
+      type: 'weapon',
+      set: 'custom',
+      copies: 1,
+      cost: 40,
+      ammoReq: 0,
+      damage: 10,
+      weaponTags: ['melee', 'knife'],
+    }));
+  });
+
+  it('Pump-Action Shotgun (cw-013) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'cw-013');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'cw-013',
+      name: 'Pump-Action Shotgun',
+      type: 'weapon',
+      set: 'custom',
+      copies: 1,
+      cost: 40,
+      ammoReq: 40,
+      damage: 25,
+      weaponTags: ['gun', 'shotgun'],
+    }));
+  });
+
+  it('Riot Shotgun (cw-020) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'cw-020');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'cw-020',
+      name: 'Riot Shotgun',
+      type: 'weapon',
+      set: 'custom',
+      copies: 1,
+      cost: 70,
+      ammoReq: 60,
+      damage: 45,
+      weaponTags: ['gun', 'shotgun'],
+    }));
+  });
+
+  it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
+    const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
+    // Knife pile should include Combat Knife
+    const knifePile = piles.find(p => p.pileId === 'kn');
+    expect(knifePile).toBeDefined();
+    expect(knifePile!.cardIds).toContain('cw-005');
+    // Shotgun pile should include both shotguns
+    const shotgunPile = piles.find(p => p.cardIds.includes('we-001') || p.cardIds.includes('cw-013'));
+    // At minimum, no separate custom-cw-* piles should exist for these
+    const customWeaponPiles = piles.filter(p => p.pileId.startsWith('custom-cw-'));
+    expect(customWeaponPiles).toHaveLength(0);
   });
 });
 

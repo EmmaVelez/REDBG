@@ -601,8 +601,29 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
   // board supply, and characters/skills are never piled. A custom card flagged
   // `mansion` (IT-000 Antique Coin) is a Mansion card even though it prints a
   // cost, so it never gets a market pile.
+  // Custom weapons (CW-*) are shuffled into the scenario pile whose cards share
+  // the same primary weapon type (shotgun/knife/handgun/etc) instead of getting
+  // their own pile.
   const known = new Set(base.flatMap(p => p.cardIds));
   const extra: { pileId: string; cardIds: readonly string[] }[] = [];
+  // Track which base pile IDs have been merged with custom weapons so we can
+  // exclude them from the final result (we'll add the merged version to extra).
+  const mergedBasePileIds = new Set<string>();
+  // Build a map of weapon type -> pileId for existing piles so custom weapons
+  // can be merged into the matching pile.
+  const typeToPile = new Map<string, string>();
+  for (const pile of base) {
+    for (const cardId of pile.cardIds) {
+      const def = PREMIER_CARDS.find(c => c.id === cardId) ?? ALL_CARDS.find(c => c.id === cardId);
+      if (def?.type === 'weapon' && def.weaponTags && def.weaponTags.length > 0) {
+        // Use the first tag as the primary type for matching
+        const primaryType = def.weaponTags[0];
+        if (primaryType !== undefined && !typeToPile.has(primaryType)) {
+          typeToPile.set(primaryType, pile.pileId);
+        }
+      }
+    }
+  }
   for (const cardId of expandCustomCards(opts.customCards)) {
     const def = CUSTOM_CARDS.find(c => c.id === cardId);
     if (def === undefined) continue;
@@ -611,9 +632,39 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
     if (def.type === 'character' || def.type === 'skill') continue;
     if (def.cost === undefined) continue;
     if (known.has(def.id)) continue;
+    // Custom weapons: merge into the scenario pile with matching weapon type
+    if (def.type === 'weapon' && def.weaponTags && def.weaponTags.length > 0) {
+      const primaryType = def.weaponTags[0];
+      if (primaryType !== undefined) {
+        const matchingPileId = typeToPile.get(primaryType);
+        if (matchingPileId !== undefined) {
+          // Mark the base pile as merged so we exclude it from the final result
+          mergedBasePileIds.add(matchingPileId);
+          // Find or create the merged pile in extra
+          const existingIdx = extra.findIndex(p => p.pileId === matchingPileId);
+          if (existingIdx >= 0) {
+            const existing = extra[existingIdx];
+            if (existing !== undefined) {
+              extra[existingIdx] = { pileId: existing.pileId, cardIds: [...existing.cardIds, def.id] };
+            }
+          } else {
+            // Find in base and create merged version
+            const basePile = base.find(p => p.pileId === matchingPileId);
+            if (basePile !== undefined) {
+              extra.push({ pileId: matchingPileId, cardIds: [...basePile.cardIds, def.id] });
+            } else {
+              extra.push({ pileId: `custom-${def.id}`, cardIds: [def.id] });
+            }
+          }
+          continue;
+        }
+      }
+    }
     extra.push({ pileId: `custom-${def.id}`, cardIds: [def.id] });
   }
-  return [...base, ...extra];
+  // Return base piles (excluding merged ones) plus extra piles
+  const filteredBase = base.filter(p => !mergedBasePileIds.has(p.pileId));
+  return [...filteredBase, ...extra];
 }
 
 export const STARTING_DECK: ReadonlyArray<{ cardId: string; count: number }> = [

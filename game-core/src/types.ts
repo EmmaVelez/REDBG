@@ -206,6 +206,9 @@ export type WeaponEffect =
   | { readonly kind: "trashAmmoFromPlayAreaOnUse"; readonly count: number } // WE-030 Hand Cannon
   // --- Unofficial Expansion (EX-002 Special Rocket Launcher) ---
   | { readonly kind: "attachOnGainDefeatInfectedAtOrAboveHp"; readonly hp: number } // EX-002: attach on gain; auto-defeat the next Infected with hp >= N revealed while exploring, then remove
+  // --- Custom weapons (CW-005..) ---
+  | { readonly kind: "plusDamageIfRevealedInfectedHpAtLeast"; readonly threshold: number; readonly amount: number } // CW-005 Combat Knife: +N damage when infected with >= threshold HP is revealed
+  | { readonly kind: "optionalSelfDamageForDamageAndType"; readonly damage: number; readonly amount: number; readonly type: WeaponTag } // CW-013 Pump-Action: take N damage to gain +amount damage and the type
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
