@@ -25,6 +25,9 @@ export interface SimConfig {
   readonly outbreakMode?: boolean;
   /** Partner Modification rules (Alliance). */
   readonly partnerMode?: boolean;
+  /** Called with each applied action; can be used for live telemetry or
+   *  unit tests that assert action sequences. */
+  readonly onAction?: (action: Action, stateBefore: GameState) => void;
 }
 
 export interface SimResult {
@@ -78,7 +81,7 @@ export function playBotGame(config: SimConfig): SimResult {
   const initialState = setup(setupConfig, cards, piles, mansionCards, winInfectedCardId);
   const rand = rngFromSeed(config.seed);
 
-  return playBotGameFrom(initialState, config.difficulties, rand, config.maxActions);
+  return playBotGameFrom(initialState, config.difficulties, rand, config.maxActions, config.onAction);
 }
 
 /**
@@ -94,7 +97,8 @@ export function playBotGameFrom(
   state: GameState,
   difficulties: readonly BotDifficulty[],
   rand: () => number,
-  maxActions: number
+  maxActions: number,
+  onAction?: (action: Action, stateBefore: GameState) => void
 ): SimResult {
   let current = state;
   let actions = 0;
@@ -116,6 +120,10 @@ export function playBotGameFrom(
 
     // 2c. Choose action
     const action = chooseBotAction(current, seat, difficulty, rand);
+
+    if (onAction) {
+      onAction(action, current);
+    }
 
     // 2d. Apply action (throws if illegal, which should not happen)
     current = applyAction(current, action);
