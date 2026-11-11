@@ -131,10 +131,12 @@ describe('ActionBar unhandled actions fallback', () => {
 
   it('renders Alliance attachToPartner actions as buttons', () => {
     // Wesker (ch-001) has no "cannot attach non-Infected cards" restriction.
+    // Partner is Leon (ch-002), who also has no restriction, so a weapon
+    // can be attached to the partner.
     const base = startTurn(setup(
       { seed: 11, players: [
-        { name: 'Me', controller: 'human', characterCardId: 'ch-001' },
-        { name: 'Bot', controller: 'human', characterCardId: 'ch-002' },
+        { name: 'Me', controller: 'human', characterCardId: 'ch-001', partnerCharacterId: 'ch-002' },
+        { name: 'Bot', controller: 'human', characterCardId: 'ch-003' },
       ], partnerMode: true },
       PREMIER_CARDS,
       FIRST_TIMER_PILES,

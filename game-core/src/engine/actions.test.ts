@@ -41,6 +41,7 @@ const DEFS: Record<string, CardDef> = {
   'ma-1': { id: 'ma-1', name: 'Majini', type: 'infected', set: 'premier', text: 'Majini', copies: 3, hp: 20, attack: 20, decorations: 1 },
   'ma-10': { id: 'ma-10', name: 'Uroboros Aheri', type: 'infected', set: 'premier', text: 'Uroboros', copies: 1, hp: 90, attack: 70, decorations: 8, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] },
   'ch-1': { id: 'ch-1', name: 'Chris', type: 'character', set: 'premier', text: 'Chris', copies: 1, maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] },
+  'ch-008': { id: 'ch-008', name: 'Chris Redfield', type: 'character', set: 'premier', text: 'Chris cannot be healed and cannot attach non-Infected cards.', copies: 1, level1At: 0, level2At: 4, maxHp: 120, abilities: [{ kind: 'noHealingNoNonInfectedAttach', level: 1 }, { kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 2 }] },
   'ch-sheva': { id: 'ch-sheva', name: 'Sheva', type: 'character', set: 'premier', text: 'Sheva', copies: 1, maxHp: 80, level1At: 2, level2At: 4, abilities: [{ kind: 'exchangeHandWithInventoryTop', level: 1 }, { kind: 'ammoReqReduction', tag: 'rifle', amount: 20, level: 2 }] },
   'ch-barry': { id: 'ch-barry', name: 'Barry', type: 'character', set: 'premier', text: 'Barry', copies: 1, maxHp: 90, level1At: 2, level2At: 7, abilities: [{ kind: 'plusDamageThisTurn', amount: 5, level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'magnum', amount: 20, level: 2 }] },
   'ch-ada': { id: 'ch-ada', name: 'Ada', type: 'character', set: 'premier', text: 'Ada', copies: 1, maxHp: 80, level1At: 4, level2At: 8, abilities: [{ kind: 'revealMansionTopNoEffect', level: 1 }, { kind: 'actionBonus', amount: 40, level: 2 }] },
@@ -84,7 +85,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
       'w5': inst('w5', 'w9-1'), 'w20': inst('w20', 'w20-1'),
       'dw1': inst('dw1', 'w9-1'),
       'mkr1': inst('mkr1', 'we-1'), 'inf1': inst('inf1', 'ma-1'), 'uro1': inst('uro1', 'ma-10'), 'gh1': inst('gh1', 'it-1'),
-      'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
+      'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'), 'c008': inst('c008', 'ch-008'),
       'cs': inst('cs', 'ch-sheva'), 'cb': inst('cb', 'ch-barry'), 'ca': inst('ca', 'ch-ada'), 'cr': inst('cr', 'ch-becky'), 'cada': inst('cada', 'ch-ada-n'), 'cl': inst('cl', 'ch-luis'), 'cw': inst('cw', 'ch-wesker-n'), 'cla': inst('cla', 'ch-leon-a'), 'cbilly': inst('cbilly', 'ch-billy'), 'amx': inst('amx', 'am-001'), 'ckra': inst('ckra', 'ch-krauser-a'), 'csteve': inst('csteve', 'ch-steve'), 'ac18': inst('ac18', 'ac-018'), 'cchris': inst('cchris', 'ch-chris-a'), 'wp': inst('wp', 'we-pistol'), 'wk': inst('wk', 'we-knife'), 'cjill': inst('cjill', 'ch-jill-a'), 'fg1': inst('fg1', 'we-017'), 'inf2': inst('inf2', 'ma-025'), 'cjosh': inst('cjosh', 'ch-josh-a'), 'wex': inst('wex', 'we-expensive'), 'cclaire': inst('cclaire', 'ch-claire-a'), 'rh1': inst('rh1', 'it-004'), 'ccarlos': inst('ccarlos', 'ch-carlos-a'), 'w30': inst('w30', 'w30-1'),
       'inv1': inst('inv1', 'am-1'), 'inv2': inst('inv2', 'am-1'), 'inv3': inst('inv3', 'am-1'), 'inv4': inst('inv4', 'am-1'), 'inv5': inst('inv5', 'am-1'), 'inv6': inst('inv6', 'am-1'), 'inv7': inst('inv7', 'am-1'), 'inv8': inst('inv8', 'am-1'),
     },
@@ -341,6 +342,19 @@ test('Alliance Josh L2: partner may attach up to 4 cards', () => {
   const plain = baseState({ seat0: { characterInstanceId: 'c0', level: 2 as const, hand: ['w1'], partnerInstanceId: 'cp#1', partnerAttached: ['a1', 'a2'], actionsLeft: 2 } });
   expect(validateAction(plain, { type: 'attachToPartner', seat: 0, instanceId: 'w1' }).ok).toBe(false);
 });
+test('Chris L1 as main: may still attach weapons to partner (cap 2)', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c008', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'c0', partnerAttached: [], actionsLeft: 4 } });
+  expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'wp' }).ok).toBe(true);
+  const two = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['a1', 'a2'] } : s)) };
+  expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk' }).ok).toBe(false);
+  expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk', replaceIndex: 0 }).ok).toBe(true);
+});
+
+test('Chris L1 as partner: cannot receive attachments', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 2 as const, hand: ['wp'], partnerInstanceId: 'c008', partnerAttached: [], actionsLeft: 4 } });
+  expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'wp' }).ok).toBe(false);
+});
+
 test('Alliance Jill L1: +10 damage when her partner has 1 or fewer attached', () => {
   const withPartner = baseState({ seat0: { characterInstanceId: 'cjill', level: 1 as const, hand: ['w1'], turnAmmo: 100, partnerInstanceId: 'cp#1', partnerAttached: [] } });
   expect(exploreDamage(withPartner, 0, ['w1'])).toBe(20); // 10 base + 10

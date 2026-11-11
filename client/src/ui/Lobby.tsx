@@ -270,7 +270,7 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {selectableCharacters(room).filter(c => {
+                      {selectableCharacters(room).filter(c => c.id !== 'ch-008').filter(c => {
                         const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                         return !taken.has(c.id) || c.id === me?.partnerCharacterId;
                       }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}

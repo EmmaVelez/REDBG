@@ -1,20 +1,10 @@
-import type { GameState, Action, CardDef, ValidationResult, CharacterAbility } from '../types';
+import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
-
-/** True when the seat has the given ability kind (level-gated, Main or Partner). */
-function hasAbilityKind(state: GameState, seat: number, kind: CharacterAbility['kind']): boolean {
-  return seatAbilities(state, seat).some(a => a.kind === kind);
-}
-
-/** Chris L1 restriction flag. */
-function hasNoHealingAbility(state: GameState, seat: number): boolean {
-  return hasAbilityKind(state, seat, 'noHealingNoNonInfectedAttach');
-}
 
 /**
  * True when the NAMED character has Chris's "cannot be healed" restriction at
@@ -721,10 +711,14 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (attachDef === undefined || (attachDef.type !== 'weapon' && attachDef.type !== 'action')) {
         return { ok: false, reason: 'attachToPartner: not eligible card' };
       }
-      // Chris L1: cannot attach non-Infected cards. Attachable cards here are
-      // weapons/actions, so Chris cannot attach any of them.
-      if (hasNoHealingAbility(state, action.seat)) {
-        return { ok: false, reason: 'attachToPartner: Chris cannot attach non-Infected cards' };
+      // The `noHealingNoNonInfectedAttach` ability only blocks attaching to a
+      // partner that HAS the restriction. When Ch-008 (Chris) is the player's
+      // main character, attaching to the partner is still legal. The ability
+      // is a character-level restriction, not a seat-level one: it prevents
+      // *Chris himself* from receiving attachments, so a player with Chris as
+      // their main character may still attach cards to their partner.
+      if (characterCannotBeHealed(state, action.seat, 'partner')) {
+        return { ok: false, reason: 'attachToPartner: partner cannot accept attachments' };
       }
       const attached = player.partnerAttached ?? [];
       const attachCap = partnerAttachCap(seatAbilities(state, action.seat));

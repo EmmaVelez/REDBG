@@ -128,6 +128,59 @@ describe('MX-001 Mr. X data', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Custom ammunition cards
+// ---------------------------------------------------------------------------
+
+describe('custom ammunition cards', () => {
+  it('RED HAWK (ca-001) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ca-001');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ca-001',
+      name: 'RED HAWK',
+      type: 'ammunition',
+      set: 'custom',
+      text: 'Grants +40 Ammo and +40 Gold for the turn.',
+      copies: 15,
+      cost: 90,
+      bonuses: { ammo: 40, gold: 40 },
+    }));
+  });
+
+  it('Ammunition Box (ca-002) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ca-002');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ca-002',
+      name: 'Ammunition Box',
+      type: 'ammunition',
+      set: 'custom',
+      text: 'Grants +30 Ammo and +30 Gold for the turn.',
+      copies: 15,
+      cost: 40,
+      bonuses: { ammo: 30, gold: 30 },
+    }));
+  });
+
+  it('ammunition cards can be bought in a custom room', () => {
+    // Ammunition cards (am-001, am-002, am-003) are in the FIRST_TIMER_PILES
+    // market. Verify the custom ammunition cards (ca-001, ca-002) are also
+    // defined and reachable in the custom card pool.
+    const pool = customPool();
+    const ca001 = pool.find(c => c.id === 'ca-001');
+    const ca002 = pool.find(c => c.id === 'ca-002');
+    expect(ca001).toBeDefined();
+    expect(ca002).toBeDefined();
+    expect(ca001!.type).toBe('ammunition');
+    expect(ca002!.type).toBe('ammunition');
+    // Verify they wouldn't appear in standard (non-custom) scenarios.
+    const standard = cardsForScenario('firstTimer');
+    expect(standard.some(c => c.id === 'ca-001')).toBe(false);
+    expect(standard.some(c => c.id === 'ca-002')).toBe(false);
+  });
+});
+
 describe('MX-001 mansion membership', () => {
   it('setup shuffles both copies into the Mansion when the card is in the pool', () => {
     const s = customGame();

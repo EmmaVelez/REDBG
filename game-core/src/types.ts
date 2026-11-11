@@ -78,6 +78,11 @@ export interface CardDef {
   /** Cost to Buy from the Resource Area (Gold). Absent = not purchasable. */
   readonly cost?: number;
 
+  /** Marked as a Mansion card: placed in the Mansion deck when the card is
+   *  added to a game (custom cards are always included in the Mansion deck
+   *  if they have this flag set). */
+  readonly mansion?: boolean;
+
   /** Bonus icons (ammunition, some actions/weapons). */
   readonly bonuses?: CardBonuses;
 
@@ -270,7 +275,8 @@ export type ItemEffect =
   | { readonly kind: "attachAndPreventDamageByMovingToMansionBottom" } // MA-054o Kevlar Jacket
   | { readonly kind: "antivirusReduceInfectionOrRemove"; readonly threshold: number; readonly amount: number } // MA-055o Antivirus
   // --- Unofficial Expansion (EX-007 Blue Herb) ---
-  | { readonly kind: "returnToMarketAndRemoveCounters" }; // EX-007: return this card to its own market pile; remove all Poison counters from your Characters
+  | { readonly kind: "returnToMarketAndRemoveCounters" } // EX-007: return this card to its own market pile; remove all Poison counters from your Characters
+  | { readonly kind: "gainWeaponFromMarket"; readonly costLimit: number } // Antique Coin IT-000: gain one weapon from the Resource Area with cost <= Antique Coin's cost
 
 export type ActionEffect =
   | { readonly kind: "allWeaponsPlusDamageThisTurn"; readonly amount: number } // Deadly Aim: +10
