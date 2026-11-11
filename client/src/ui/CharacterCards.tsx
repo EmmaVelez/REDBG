@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import type { CardDef, GameState } from '@re/game-core';
 import { CardView } from './CardView';
 import { defForInstance } from './cards';
+import { useDamageEffect } from './useDamageEffect';
 
 /**
  * The character and partner cards for one seat, as a horizontal pair.
@@ -45,30 +46,6 @@ export interface CharacterCardsProps {
 }
 
 export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Element | null {
-  const prevRef = useRef<{ hp: number; counters: readonly string[] }>({ hp: 0, counters: [] });
-  const [poisonAnim, setPoisonAnim] = useState(false);
-
-  // Track whether this player was just poisoned (counter attached or HP dropped
-  // from poison damage at turn start).  Re-trigger the CSS animation each time
-  // we detect a new poison application.
-  useEffect(() => {
-    const p = state.seats[seat];
-    if (p === undefined) return;
-    const prev = prevRef.current;
-    const curCounters = p.counters ?? [];
-    const curHp = p.partnerHp ?? p.hp;
-    const hadCounters = prev.counters.length > 0;
-    const nowHasCounters = curCounters.length > 0;
-    const hpDropped = curHp < prev.hp - 1; // significant drop indicates poison damage
-    const recentlyPoisoned = (!hadCounters && nowHasCounters) || (hadCounters && nowHasCounters && hpDropped);
-    if (recentlyPoisoned) {
-      setPoisonAnim(true);
-      const tid = window.setTimeout(() => setPoisonAnim(false), 1250);
-      return () => window.clearTimeout(tid);
-    }
-    prevRef.current = { hp: curHp, counters: curCounters };
-  }, [state.version, seat]);
-
   const player = state.seats[seat];
   if (player === undefined) return null;
   const charDef = defForInstance(state, player.characterInstanceId);
@@ -80,18 +57,25 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
   const hasPoison = (player.counters ?? []).length > 0;
   const mainAttached = attachedTrophies(state, player.attached);
   const partnerAttached = attachedTrophies(state, player.partnerAttached ?? []);
+
+  // Damage flash for both character and partner cards.  The hook fires when HP
+  // drops below the previous render's value.  Poison-only detection (no HP
+  // drop) is handled separately via the hasPoison flag above.
+  const { flash: charFlash, animHp: charAnimHp } = useDamageEffect(hp, maxHp, `${seat}-char`);
+  const { flash: partnerFlash, animHp: partnerAnimHp } = useDamageEffect(hp, maxHp, `${seat}-partner`);
+
   return (
     <div className="player-character-row" data-character-row>
       {charDef !== null && (
         <div
-          className={`player-character-card${(hasPoison || poisonAnim) ? ' has-poison' : ''}`}
+          className={`player-character-card${(hasPoison || charFlash) ? ' has-damage' : ''}`}
           data-character-card
           data-anim-zone="attached"
           data-poison={hasPoison ? true : undefined}
           style={{ '--cc-overlap': attachedOverlap(mainAttached.length) } as CSSProperties}
         >
           <div className="cc-fan">
-            <CardView def={charDef} compact artOnly decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} />
+            <CardView def={charDef} compact artOnly decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} flash={charFlash || undefined} cardAnimHp={charAnimHp} />
             {mainAttached.length > 0 && (
               <div className="cc-attached-fan" data-attached-fan={mainAttached.length}>
                 {mainAttached.map(x => (
@@ -107,7 +91,7 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
       )}
       {partnerDef !== null && (
         <div
-          className="player-character-card player-partner-card"
+          className={`player-character-card player-partner-card${(hasPoison || partnerFlash) ? ' has-damage' : ''}`}
           data-partner-character-card
           data-anim-zone="attached"
           style={{ '--cc-overlap': attachedOverlap(partnerAttached.length) } as CSSProperties}
@@ -118,7 +102,7 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
                 Partner holds no Decorations of its own, so feed it the Main
                 character's count to render the correct level badge / skill
                 gating. */}
-            <CardView def={partnerDef} compact artOnly decorations={player.decorations} hp={hp} maxHp={maxHp} />
+            <CardView def={partnerDef} compact artOnly decorations={player.decorations} hp={hp} maxHp={maxHp} flash={partnerFlash || undefined} cardAnimHp={partnerAnimHp} />
             {partnerAttached.length > 0 && (
               <div className="cc-attached-fan" data-partner-attached-fan={partnerAttached.length}>
                 {partnerAttached.map(x => (

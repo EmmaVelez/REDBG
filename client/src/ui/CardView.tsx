@@ -48,12 +48,16 @@ export interface CardViewProps {
    * (there is nothing to show but the text).
    */
   readonly artOnly?: boolean;
+  /** When true the health ring scales up and pulses during damage flash. */
+  readonly flash?: boolean;
+  /** Alternative HP value to display while the damage animation plays. */
+  readonly cardAnimHp?: number;
 }
 
-export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false }: CardViewProps): JSX.Element {
+export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false, flash, cardAnimHp }: CardViewProps): JSX.Element {
   const art = cardArtUrl(def.id);
   if (def.type === 'character') {
-    return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} />;
+    return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} flash={flash} cardAnimHp={cardAnimHp} />;
   }
   const stats = statLine(def);
   const bonus = bonusLine(def);
@@ -94,9 +98,13 @@ interface CharacterCardProps {
   readonly hp?: number;
   readonly maxHp?: number;
   readonly art: string | undefined;
+  /** When true the health ring scales up during damage flash. */
+  readonly flash?: boolean;
+  /** Alternative HP value to display while the damage animation plays. */
+  readonly cardAnimHp?: number;
 }
 
-function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, art }: CharacterCardProps): JSX.Element {
+function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, art, flash, cardAnimHp }: CharacterCardProps): JSX.Element {
   const showRing = hp !== undefined && maxHp !== undefined;
   const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
@@ -121,7 +129,9 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
             ring is overlaid on the printed badge instead of sitting in a header
             row — see the --cc-badge-* custom properties in styles.css. */}
         {showRing && (
-          <span className="cc-hp-ring"><HealthRing hp={hp} maxHp={maxHp} size={compact ? 24 : 26} strokeWidth={compact ? 3 : 6} /></span>
+          <span className={`cc-hp-ring${flash ? ' cc-hp-ring-flash' : ''}`}>
+            <HealthRing hp={cardAnimHp ?? hp} maxHp={maxHp} size={compact ? 24 : 26} strokeWidth={compact ? 3 : 6} />
+          </span>
         )}
       </div>
       {/* The art-only face has no hover POPUP any more (character cards are not
