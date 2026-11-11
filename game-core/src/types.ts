@@ -537,6 +537,8 @@ export type CharacterAbility =
   // --- Fan characters (RC-001..) ---
   | { readonly kind: "turnStartDrawThenDiscardCard"; readonly level: 1 | 2 } // RC-001 Rebecca L1: at turn start, may get +1 card and discard a card
   | { readonly kind: "goldWhenDiscardingAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // RC-001 Rebecca L2: when discarding due to card effect during turn, gain +amount gold
+  | { readonly kind: "healIfDidNotExplore"; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L1: if didn't explore this turn, heal N at end of turn
+  | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L2: Machine Gun weapons get +N damage
   // --- Fan characters (JM-001..) ---
   | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
   | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats

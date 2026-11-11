@@ -145,6 +145,25 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    id: 'rc-002',
+    name: 'Rebecca Chambers',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: If Rebecca doesn\'t explore this turn, she heals 10 health at the end of the turn.\\nLevel 2: All your "Machine Gun" weapons get +5 damage.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 3,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'If Rebecca doesn\'t explore this turn, she heals 10 health at the end of the turn.' },
+      { level: 2, text: 'All your "Machine Gun" weapons get +5 damage.' },
+    ],
+    abilities: [
+      { kind: 'healIfDidNotExplore', amount: 10, level: 1 },
+      { kind: 'plusDamageForWeaponTag', tag: 'machineGun', amount: 5, level: 2 },
+    ],
+  },
+  {
     id: 'cr-001',
     name: 'Claire Redfield',
     type: 'character',

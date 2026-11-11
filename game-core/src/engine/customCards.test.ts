@@ -559,6 +559,25 @@ describe('custom attachment event cards', () => {
     }));
   });
 
+  it('Rebecca Chambers (rc-002) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'rc-002');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'rc-002',
+      name: 'Rebecca Chambers',
+      type: 'character',
+      set: 'custom',
+      copies: 1,
+      maxHp: 80,
+      level1At: 3,
+      level2At: 8,
+      abilities: [
+        { kind: 'healIfDidNotExplore', amount: 10, level: 1 },
+        { kind: 'plusDamageForWeaponTag', tag: 'machineGun', amount: 5, level: 2 },
+      ],
+    }));
+  });
+
   it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
     const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
     // Knife pile should include Combat Knife

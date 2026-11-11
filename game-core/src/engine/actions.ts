@@ -1460,6 +1460,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             }
           }
+          // RC-002 Rebecca Chambers L2: Machine Gun weapons get +N damage.
+          const rebeccaMachineGunBonus = abilities
+            .filter(a => a.kind === 'plusDamageForWeaponTag' && a.tag === 'machineGun')
+            .reduce((sum, a) => sum + (a.kind === 'plusDamageForWeaponTag' ? a.amount : 0), 0);
+          if (rebeccaMachineGunBonus > 0) {
+            const current = attachmentDamageByTag.get('machineGun') ?? 0;
+            attachmentDamageByTag.set('machineGun', current + rebeccaMachineGunBonus);
+          }
 
           const exploreWeapons = weaponDefs.map((w, i) => {
             const instId = weapons[i];
@@ -4655,6 +4663,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const ric = applyRicardoDamage(state, seat, player.hp, hordeBonus.damage);
             state = ric.state;
             hordeHp = ric.hp;
+          }
+
+          // RC-002 Rebecca Chambers L1: if didn't explore this turn, heal at end of turn.
+          const rebeccaHealAbility = seatAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
+          if (rebeccaHealAbility !== undefined && rebeccaHealAbility.kind === 'healIfDidNotExplore' &&
+              !player.exploredOrAttackedThisTurn && !player.downed && !player.dead) {
+            hordeHp = Math.min(player.maxHp, hordeHp + rebeccaHealAbility.amount);
           }
 
           const ctx = advanceTurn({
