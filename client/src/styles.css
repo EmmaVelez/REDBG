@@ -2185,12 +2185,11 @@ h1, h2 { margin: 0 0 8px; }
   padding-bottom: 4px;
   scrollbar-width: thin;
 }
-/* auto margins centre the fan while it fits and collapse to 0 (so it stays
-   reachable by scrolling) once it overflows */
+/* auto margins centre the fan while it fits but are reduced to 40px each side so it never sits lost in wide gaps */
 .action-hand-scroll .hand {
   flex: 0 0 auto;
   flex-wrap: nowrap;
-  margin-inline: auto;
+  margin-inline: 40px;
 }
 .action-hand-scroll .hand-card { margin-right: -18px; }
 .action-hand-scroll .hand-card .card { width: 80px; }
