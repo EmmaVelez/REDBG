@@ -218,8 +218,8 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number }): ExploreOutcome {
-  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp, infectedBattledThisTurn } = params;
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number; readonly ammoX10InDiscardCount?: number }): ExploreOutcome {
+  const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp, infectedBattledThisTurn, ammoX10InDiscardCount } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
 
@@ -258,6 +258,12 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
       }
       if (effect.kind === 'onRevealWeaponDamagePenalty') {
         effective -= effect.amount * weapons.length;
+      }
+      // CI-009 Rachael Foley (First Encounter): "takes 10 Damage less for each
+      // 10xAmmo in the Exploring Player's Discard Pile" — the discard count is
+      // computed by the caller (resolveExplore is pure).
+      if (effect.kind === 'onRevealDamageReductionPerAmmoX10InDiscard') {
+        effective -= effect.amount * (params.ammoX10InDiscardCount ?? 0);
       }
       if (effect.kind === 'onRevealBonusDamageIfCharacterDamaged') {
         if ((characterDamage ?? 0) >= effect.threshold) {
@@ -337,6 +343,7 @@ export function resolveMultiExplore(params: {
   readonly inventoryCount?: number;
   readonly actionsInPlayArea?: number;
   readonly damageReduction?: number;
+  readonly ammoX10InDiscardCount?: number;
 }): {
   readonly defeated: boolean;
   readonly combinedHp: number;
@@ -389,6 +396,10 @@ export function resolveMultiExplore(params: {
     if (ammoBonus) atk += ammoBonus.amount * Math.floor(ammo / 10);
     const weaponPenalty = target.infectedEffects?.find(e => e.kind === 'onRevealWeaponDamagePenalty') as { kind: 'onRevealWeaponDamagePenalty'; amount: number } | undefined;
     if (weaponPenalty) damage -= weaponPenalty.amount * weapons.length;
+    // CI-009 Rachael Foley (First Encounter): the discard-pile damage soak
+    // applies to the pooled batch just as it does to a single battle.
+    const ammoReduction = target.infectedEffects?.find(e => e.kind === 'onRevealDamageReductionPerAmmoX10InDiscard') as { kind: 'onRevealDamageReductionPerAmmoX10InDiscard'; amount: number } | undefined;
+    if (ammoReduction) damage -= ammoReduction.amount * (params.ammoX10InDiscardCount ?? 0);
     const charDamageBonus = target.infectedEffects?.find(e => e.kind === 'onRevealBonusDamageIfCharacterDamaged') as { kind: 'onRevealBonusDamageIfCharacterDamaged'; amount: number; threshold: number } | undefined;
     if (charDamageBonus && (params.characterDamage ?? 0) >= charDamageBonus.threshold) damage += charDamageBonus.amount;
     const cannotInv = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (params.inventoryCount ?? 0) <= e.count) ?? false;

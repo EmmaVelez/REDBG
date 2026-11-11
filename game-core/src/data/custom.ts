@@ -68,6 +68,69 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     decorations: 2,
     infectedEffects: [{ kind: 'onRevealRevealNextMansionCard' }],
   },
+  {
+    // Fan cards (printed codes CI-009 / MA-000). Rachael Foley's first
+    // encounter soaks damage from spent "Ammo x10" cards and spawns the Ooze
+    // (ma-000) into the Mansion when defeated; the Ooze itself returns to the
+    // Mansion whenever it is defeated with 80 or less damage.
+    id: 'ci-009',
+    name: 'Rachael Foley (First Encounter)',
+    type: 'infected',
+    set: 'custom',
+    text: 'When Revealed, this infected takes 10 Damage less for each 10xAmmo in the Exploring Player\'s Discard Pile.\nWhen defeated, shuffle a card named "RACHAEL FOLEY OOZE" into the Mansion.',
+    copies: 1,
+    hp: 60,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [
+      { kind: 'onRevealDamageReductionPerAmmoX10InDiscard', amount: 10 },
+      { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ma-000' },
+    ],
+  },
+  {
+    id: 'ma-000',
+    name: 'Rachael Foley (ooze)',
+    type: 'infected',
+    set: 'custom',
+    text: 'If this Infected is Defeated with 80 or less Damage, shuffle it back into the Mansion (it deals no damage this turn).',
+    copies: 1,
+    hp: 30,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [{ kind: 'onDefeatShuffleBackIfDamageAtMost', maxDamage: 80 }],
+  },
+  {
+    // Fan card (printed code CI-001). Oscar tramples the exploring Character
+    // when he survives, trashing the highest-Damage Weapon(s) they are using.
+    id: 'ci-001',
+    name: 'Oscar - Zombie Elephant',
+    type: 'infected',
+    set: 'custom',
+    text: 'If OSCAR is not defeated he tramples the exploring Character, trashing the highest Damage Weapon(s) they are using.',
+    copies: 1,
+    hp: 120,
+    attack: 10,
+    decorations: 7,
+    infectedEffects: [{ kind: 'onNotDefeatedTrashHighestDamageUsedWeapons' }],
+  },
+  {
+    // Fan card (printed code CI-003). The First Encounter hands every player a
+    // 10x Ammo on reveal and replaces itself with the official boss card
+    // ("Osmund Saddler", MA-054) when it is defeated.
+    id: 'ci-003',
+    name: 'Osmund Saddler (First Encounter)',
+    type: 'infected',
+    set: 'custom',
+    text: 'When Revealed each player gains a 10xAmmo.\nWhen this Infected is defeated, Shuffle a card named "OSMUND SADDLER" into the Mansion.',
+    copies: 1,
+    hp: 60,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [
+      { kind: 'onRevealEachPlayerGainsAmmoX10', count: 1 },
+      { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ma-054' },
+    ],
+  },
 
   {
     id: 'ev-001',
@@ -692,5 +755,19 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     damage: 40,
     weaponTags: ['magnum'],
     weaponEffects: [{ kind: 'trashAfterUse' }],
+  },
+  {
+    // Fan card. "Abandon All Hope..." — Story Mode action.
+    // During this turn, if the Boss (endInfectedCardId) is revealed while
+    // Exploring and not Defeated, player can shuffle it into top 10 of Mansion.
+    id: 'ah-001',
+    name: 'Abandon All Hope...',
+    type: 'action',
+    set: 'custom',
+    text: 'STORY MODE: During this turn, if the Boss is revealed while Exploring and it is not Defeated, you can shuffle it into the top 10 cards of the Mansion instead.',
+    copies: 1,
+    cost: 100,
+    bonuses: { ammo: 20, cards: 2, actions: 2 },
+    actionEffects: [{ kind: 'storyModeBossShuffleToTop10' }],
   },
 ];

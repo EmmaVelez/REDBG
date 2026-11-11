@@ -764,10 +764,16 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
       if (def === undefined) continue;
       for (const e of def.infectedEffects ?? []) {
         if (e.kind === 'onNotDefeatedAttachCounter') wanted.add(e.counterCardId);
+        // CI-009 shuffles a named card into the Mansion on defeat, so that
+        // card's def must exist even when the room did not tick it.
+        if (e.kind === 'onDefeatShuffleCardIntoMansion') wanted.add(e.cardId);
       }
     }
     for (const cardId of wanted) {
-      const def = CUSTOM_CARDS.find(c => c.id === cardId);
+      // A dependency may be another custom card (EX-006 -> EX-009) or an
+      // OFFICIAL one — CI-003 shuffles the real "Osmund Saddler" (MA-054) into
+      // the Mansion, so that def must exist even when the room did not tick it.
+      const def = CUSTOM_CARDS.find(c => c.id === cardId) ?? ALL_CARDS.find(c => c.id === cardId);
       if (def !== undefined && !known.has(def.id)) extras.push(def);
     }
   }

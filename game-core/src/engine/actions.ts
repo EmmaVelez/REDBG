@@ -68,6 +68,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
+import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
 
@@ -1760,6 +1761,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const zeroDamageIds: string[] = [];
         const negatedIds = new Set<string>();
         let redirectSeat: number | undefined;
+        // Custom card line: CI-003 Osmund Saddler (First Encounter) — each
+        // player gains a 10x Ammo. Applied after the explore's seat rebuild.
+        let saddlerAmmoGrant = 0;
         const targets: MultiExploreTarget[] = [];
         for (const { id, def } of infectedEntries) {
           // MA-037 Guardian of Insanity: each character takes 10 damage.
@@ -1805,6 +1809,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             revealPrompts.push(...r1.prompts);
             zeroDamageIds.push(...r1.zeroDamageWeaponIds);
             revealGains.push(...r1.gains);
+            saddlerAmmoGrant = Math.max(saddlerAmmoGrant, saddlerAmmoGrantPerPlayer(def));
             const r2 = applyNightmareRevealEffects(state, { seat, revealedInstanceId: id, revealedDef: def, weapons });
             state = r2.state;
             revealPrompts.push(...r2.prompts);
@@ -1873,6 +1878,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               sameNameAttachedCount,
               inventoryCount: player.inventory.length,
               actionsInPlayArea: player.playArea.filter(pid => cardDef(state, pid)?.type === 'action').length,
+              ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
             });
         const defeated = multi.defeated;
         const autoDefeatedIds = autoDefeatedEntries.map(e => e.id);
@@ -2230,6 +2236,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const rn = applyNightmareDefeatEffects(fxState, { seat, revealedInstanceId: id, revealedDef: def, weapons });
             fxState = rn.state;
             defeatFxPrompts.push(...rn.prompts);
+            // Custom card line: CI-009 shuffles a fresh copy of the named Ooze
+            // into the Mansion when it is defeated.
+            if (!negatedIds.has(id)) {
+              for (const e of def.infectedEffects ?? []) {
+                if (e.kind === 'onDefeatShuffleCardIntoMansion') {
+                  fxState = shuffleCopyIntoMansion(fxState, e.cardId);
+                }
+              }
+            }
           } else {
             const r = applyMercenariesNotDefeatedEffects(fxState, ctx);
             fxState = r.state;
@@ -2242,6 +2257,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             defeatFxPrompts.push(...rn.prompts);
           }
         }
+        // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
+        // shuffled back into the Mansion instead of attached (its Decoration is
+        // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
+        const oozeShuffleBackIds = defeated
+          ? infectedEntries
+              .filter(({ id, def }) => !negatedIds.has(id) && oozeShufflesBackOnDefeat(def, multi.effectiveDamage))
+              .map(({ id }) => id)
+          : [];
+        for (const id of oozeShuffleBackIds) {
+          fxState = shuffleIntoMansion(fxState, id);
+        }
+        // CI-001 Oscar: when the batch is not defeated he tramples the
+        // exploring Character, trashing the highest-Damage Weapon(s) they used.
+        const oscarTrample = !defeated && infectedEntries.some(({ id, def }) =>
+          !negatedIds.has(id) && (def.infectedEffects ?? []).some(e => e.kind === 'onNotDefeatedTrashHighestDamageUsedWeapons'));
         mDeck = fxState.mansionDeck;
 
         // The not-defeated effects ran on the PRE-explore seat. MA-078 moves the
@@ -2313,7 +2343,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           pendingSkillEffects: undefined,
           pendingBackstab: undefined,
           attached: defeated
-            ? [...attachedBase, ...defeatedIds, ...chainAttachedIds]
+            ? [...attachedBase, ...defeatedIds.filter(id => !oozeShuffleBackIds.includes(id)), ...chainAttachedIds]
             : [...attachedBase, ...autoDefeatedIds],
           // EX-006/EX-008 may have attached a Poison counter since `player` was
           // read — carry the live value forward.
@@ -2356,7 +2386,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ? { ...newPlayer, discard: [...newPlayer.discard, ...gainedDiscardIds] }
           : newPlayer;
         const zombieBPromptsOut = zombieBAffected.flatMap(seatIdx => zombieBPrompts(fxState, seatIdx, fxState.version));
-        return {
+        const result: GameState = {
           ...fxState,
           ...nextBase,
           seats: fxState.seats.map(s => (s.seat === seat ? finalPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
@@ -2366,6 +2396,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
+        // Custom card line: CI-003's 10x Ammo and CI-001's trample both land on
+        // the FINAL seat — the rebuilt one would drop them.
+        let out = result;
+        if (saddlerAmmoGrant > 0) {
+          for (const s of out.seats) {
+            if (!s.dead) out = gainAmmoX10(out, s.seat, saddlerAmmoGrant);
+          }
+        }
+        if (oscarTrample) out = trashHighestDamageUsedWeapons(out, weapons);
+        return out;
       }
 
 
@@ -2482,6 +2522,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Re-read the exploring seat: MA-045 can lower its Health.
       player = state.seats[seat] as PlayerState;
 
+      // Custom card line: CI-003 Osmund Saddler (First Encounter) — each player
+      // gains a 10x Ammo. Applied AFTER the explore's own seat updates, since
+      // the rebuilt seat would otherwise drop the gained card.
+      const saddlerAmmoGrant = revealedDef?.type === 'infected' && !infectedEffectNegated
+        ? saddlerAmmoGrantPerPlayer(revealedDef)
+        : 0;
+
       const zeroDamageIds = [...revealFx.zeroDamageWeaponIds, ...outbreakRevealFx.zeroDamageWeaponIds];
       if (zeroDamageIds.length > 0) {
         const zero = new Set(zeroDamageIds);
@@ -2591,6 +2638,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
+          ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
             cardId: d!.id, hp: (d!.hp ?? 0) + nemesisPursuitBuff(state).hp, attack: (d!.attack ?? 0) + nemesisPursuitBuff(state).attack, infectedEffects: d!.infectedEffects,
           })),
@@ -3050,6 +3098,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
               ammoCardsInPlayArea,
+              ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
               revealed: {
                 ...revealedDef,
                 hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0),
@@ -3258,6 +3307,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             lastHp = topDef.hp ?? 0;
           }
         }
+        // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
+        // shuffled back into the Mansion instead of attached (its Decoration is
+        // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
+        const oozeShuffleBack = !infectedEffectNegated && revealedDef?.type === 'infected' &&
+          oozeShufflesBackOnDefeat(revealedDef, outcome.damage);
         // The Decoration total is adjusted for the Combo Pile change so MA-077
         // Chicken — worth 0 while in a Combo Pile by itself — is handled.
         const newAttachedIds = [...player.attached, revealedInstanceId, ...chainAttachedIds];
@@ -3298,7 +3352,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   xp: (player.xp ?? 0) + 1 + maximizerXp + virusMutatesBonus(state).xpBonus,
                   pendingSkillEffects: undefined,
                   pendingBackstab: undefined,
-                  attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
+                  attached: (defeatedToBottom || oozeShuffleBack) ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
                   partnerAttached: reaperPartnerAttached,
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 });
@@ -3406,6 +3460,30 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const nightmareDefeatFx = applyNightmareDefeatEffects(defeatFxState, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
         defeatFxState = nightmareDefeatFx.state;
         defeatFxPrompts.push(...nightmareDefeatFx.prompts);
+        // Custom card line: CI-009 shuffles a fresh copy of the named Ooze into
+        // the Mansion when it is defeated; MA-000 (ooze) is shuffled straight
+        // back when the defeat damage was 80 or less. `defeatFxState` still
+        // carries the PRE-reveal deck here, so hand it the local post-reveal
+        // `mansionDeck` before the helpers read it.
+        defeatFxState = { ...defeatFxState, mansionDeck };
+        if (!infectedEffectNegated && revealedDef?.type === 'infected') {
+          for (const e of revealedDef.infectedEffects ?? []) {
+            if (e.kind === 'onDefeatShuffleCardIntoMansion') {
+              defeatFxState = shuffleCopyIntoMansion(defeatFxState, e.cardId);
+              mansionDeck = defeatFxState.mansionDeck;
+            }
+          }
+        }
+        if (oozeShuffleBack) {
+          defeatFxState = shuffleIntoMansion(defeatFxState, revealedInstanceId);
+          mansionDeck = defeatFxState.mansionDeck;
+        }
+        // Custom card line: CI-003's 10x Ammo lands after the seat rebuild.
+        if (saddlerAmmoGrant > 0) {
+          for (const s of defeatFxState.seats) {
+            if (!s.dead) defeatFxState = gainAmmoX10(defeatFxState, s.seat, saddlerAmmoGrant);
+          }
+        }
         // MA-092 reveal gains apply AFTER the explore's own seat updates.
         for (const g of revealGains) defeatFxState = gainCopy(defeatFxState, g.seat, g.cardId);
         return {
@@ -3633,6 +3711,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       mansionDeck = state.mansionDeck;
       if (notDefeatedFx.prompts.length > 0) {
         state = { ...state, prompts: [...state.prompts, ...notDefeatedFx.prompts] };
+      }
+
+      // Custom card line: CI-001 Oscar tramples the exploring Character when
+      // he is not defeated, trashing the highest-Damage Weapon(s) they used.
+      if (!infectedEffectNegated && revealedDef?.type === 'infected' &&
+          (revealedDef.infectedEffects ?? []).some(e => e.kind === 'onNotDefeatedTrashHighestDamageUsedWeapons')) {
+        state = trashHighestDamageUsedWeapons(state, weapons);
+      }
+      // Custom card line: CI-003's 10x Ammo lands after the seat rebuild.
+      if (saddlerAmmoGrant > 0) {
+        for (const s of state.seats) {
+          if (!s.dead) state = gainAmmoX10(state, s.seat, saddlerAmmoGrant);
+        }
       }
 
       // Nightmare: on-not-defeated infected effects (MA-054 Osmund Saddler).
