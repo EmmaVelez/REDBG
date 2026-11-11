@@ -66,7 +66,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -309,6 +309,16 @@ function applyDownedHooks(next: GameState): GameState {
           }
         : s)),
     };
+    // Final Action: when a character loses all health, remove this attachment.
+    const faBonus = finalActionBonus(state);
+    if (faBonus.attachmentIds.length > 0) {
+      const remainingAttachments = (state.mansionAttachments ?? []).filter(id => !faBonus.attachmentIds.includes(id));
+      state = {
+        ...state,
+        mansionAttachments: remainingAttachments,
+        removed: [...state.removed, ...faBonus.attachmentIds.filter(id => !state.removed.includes(id))],
+      };
+    }
   }
   return state;
 }

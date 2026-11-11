@@ -430,4 +430,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'plusExploreAndMustExploreOrDamage', explores: 1, damage: 20 }],
   },
+  {
+    id: 'ce-011',
+    name: 'Final Action',
+    type: 'event',
+    set: 'custom',
+    text: 'All players can only use 1 action on their turn. When a character loses all their health, remove this card from the game.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'actionsCapAndRemoveOnDowned', actions: 1 }],
+  },
 ];

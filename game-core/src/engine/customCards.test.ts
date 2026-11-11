@@ -336,6 +336,28 @@ describe('custom attachment event cards', () => {
     expect(ih!.type).toBe('event');
     expect(ih!.attachmentMode).toBe(1);
   });
+
+  it('Final Action (ce-011) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-011');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-011',
+      name: 'Final Action',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'actionsCapAndRemoveOnDowned', actions: 1 }],
+    }));
+  });
+
+  it('Final Action is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const fa = pool.find(c => c.id === 'ce-011');
+    expect(fa).toBeDefined();
+    expect(fa!.type).toBe('event');
+    expect(fa!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

@@ -80,6 +80,25 @@ export function infectedHordeBonus(state: GameState): { explores: number; damage
   return { explores, damage };
 }
 
+/** Get the Final Action cap: max actions per turn, and attachment IDs to remove on downed. */
+export function finalActionBonus(state: GameState): { actionsCap: number; attachmentIds: string[] } {
+  let actionsCap = 0;
+  const attachmentIds: string[] = [];
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'actionsCapAndRemoveOnDowned') {
+        actionsCap = Math.max(actionsCap, effect.actions);
+        attachmentIds.push(attId);
+      }
+    }
+  }
+  return { actionsCap, attachmentIds };
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.
@@ -1000,11 +1019,14 @@ function startTurnInternal(state: GameState): GameState {
     actionsLeft: (() => {
       const base = (player.skipNextTurn || player.noActionsNextTurn) ? 0 : 1 + (partnersAttachedAtTurnStart ? 1 : 0);
       // IN-001 Claw caps the Actions available next turn.
-      const capped = player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
+      let capped = player.actionsCapNextTurn !== undefined ? Math.min(base, player.actionsCapNextTurn) : base;
       // Ada Wong (Outbreak CH-027) L1: +1 Action at turn start when Health is
       // at or below the threshold.
       const adaBonus = seatAbils
         .filter(a => a.kind === 'turnStartActionIfHpAtMost' && player.hp <= a.threshold).length;
+      // Final Action: cap actions at N (overrides other caps if lower).
+      const faCap = finalActionBonus(state).actionsCap;
+      if (faCap > 0) capped = Math.min(capped, faCap);
       return capped + adaBonus;
     })(),
     // CR-001 Claire Redfield L1 (TACTICIAN): flat +amount Buy.

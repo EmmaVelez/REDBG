@@ -372,6 +372,7 @@ export type AttachmentEffect =
   | { readonly kind: "reduceAmmoBonus"; readonly amount: number } // Low on Ammo: ammunition cards grant N less ammo
   | { readonly kind: "trashDiscardOnInfectedDefeat" } // Ecliptic Express: when defeating an infected, may trash a discard card
   | { readonly kind: "plusExploreAndMustExploreOrDamage"; readonly explores: number; readonly damage: number } // Infected Horde: +N explore, must explore or take N damage
+  | { readonly kind: "actionsCapAndRemoveOnDowned"; readonly actions: number } // Final Action: cap actions at N, remove when character loses all health
 ;
 
 /**
