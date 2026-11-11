@@ -352,7 +352,9 @@ export type ActionEffect =
   | { readonly kind: "moveHandToInventoryBottomAndDraw" } // AC-049 Battle Hardened
   | { readonly kind: "removeXpForCard" } // AC-049 Battle Hardened (optional second half)
   | { readonly kind: "reactiveResuscitate" } // AC-050: on lethal damage, trash to set the Character's Health to 10
-  | { readonly kind: "discardInventoryUntilWeaponForDamage"; readonly amount: number }; // AC-051 Tear Gas
+  | { readonly kind: "discardInventoryUntilWeaponForDamage"; readonly amount: number } // AC-051 Tear Gas
+  // --- Custom actions ---
+  | { readonly kind: "storyModeBossShuffleToTop10" }; // AH-001 Abandon All Hope: during this turn, if Boss revealed & not defeated, can shuffle to top 10
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -809,6 +811,11 @@ export interface GameState {
     readonly hp: number;
     readonly attack: number;
   };
+
+  /** AH-001 Abandon All Hope: when true, if the Boss (endInfectedCardId) is
+   *  revealed while Exploring and not Defeated, player can shuffle it into
+   *  top 10 of Mansion instead of normal disposition. Cleared at turn end. */
+  readonly storyModeBossShuffleActive?: boolean;
 
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when
