@@ -16,6 +16,23 @@ rebuilds the seat from a pre-effect snapshot (the same reason MA-092's gains lan
 `engine/customOscarSaddler.test.ts` (10 tests, 3 verified red without the wiring). Art:
 `CARD-ART/CI-001.png` + `CI-003.png` (320x446, P-mode, ~120 KB).
 
+**PRE-EXISTING RED ON origin/master (not this change — do not attribute it to the
+custom-card work):** three tests fail on a CLEAN `origin/master` checkout, verified
+by stashing the WIP and re-running each file. (1) `server/src/rooms.test.ts`
+"toSnapshot matches the protocol RoomSnapshot shape" — commit e447adf added
+`mansionAttachmentMode` to the snapshot but the expected object at line 183 was
+never updated (the remote's 0bbfa71/57ed940 fixed the OTHER test files, not this
+one). (2) `game-core/src/engine/unofficialExpansion.test.ts:120` — expects
+`custom-ex-002`, but commit 4ceeaad deliberately merged custom weapons into the
+matching base pile by weapon tag, and EX-002 ("explosive") now lands in the `grn`
+pile; the assertion is stale. (3) `game-core/src/engine/customRachael.test.ts:170`
+— Rachael's L1 prompt and the RC-001 partner prompt still share an id at turn start
+(Rachael uses `rachael-explore-<seat>-v<version>`, RC-001 uses the generic
+`ability-<seat>-v<version>`, and a third prompt also uses the generic id). Left
+alone per the "do not fix another session's in-flight work unasked" rule; the
+custom-card commits add no new failures (full game-core run: 993 passed / these 2,
+client 206, server 104/105).
+
 **CI-009 / MA-000 RACHAEL FOLEY CUSTOM CARDS (2026-11-11):** Manny sent two fan-card
 scans — CI-009 "Rachael Foley (First Encounter)" (Infected, 60/50/5) and MA-000 "Rachael
 Foley (ooze)" (Infected, 30/50/5) — and asked for both in the Mansion deck. Three new
