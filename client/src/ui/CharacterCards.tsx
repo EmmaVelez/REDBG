@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { CSSProperties } from 'react';
 import type { CardDef, GameState } from '@re/game-core';
@@ -44,6 +45,30 @@ export interface CharacterCardsProps {
 }
 
 export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Element | null {
+  const prevRef = useRef<{ hp: number; counters: readonly string[] }>({ hp: 0, counters: [] });
+  const [poisonAnim, setPoisonAnim] = useState(false);
+
+  // Track whether this player was just poisoned (counter attached or HP dropped
+  // from poison damage at turn start).  Re-trigger the CSS animation each time
+  // we detect a new poison application.
+  useEffect(() => {
+    const p = state.seats[seat];
+    if (p === undefined) return;
+    const prev = prevRef.current;
+    const curCounters = p.counters ?? [];
+    const curHp = p.partnerHp ?? p.hp;
+    const hadCounters = prev.counters.length > 0;
+    const nowHasCounters = curCounters.length > 0;
+    const hpDropped = curHp < prev.hp - 1; // significant drop indicates poison damage
+    const recentlyPoisoned = (!hadCounters && nowHasCounters) || (hadCounters && nowHasCounters && hpDropped);
+    if (recentlyPoisoned) {
+      setPoisonAnim(true);
+      const tid = window.setTimeout(() => setPoisonAnim(false), 1250);
+      return () => window.clearTimeout(tid);
+    }
+    prevRef.current = { hp: curHp, counters: curCounters };
+  }, [state.version, seat]);
+
   const player = state.seats[seat];
   if (player === undefined) return null;
   const charDef = defForInstance(state, player.characterInstanceId);
@@ -52,15 +77,17 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
 
   const hp = player.partnerHp ?? player.hp;
   const maxHp = player.partnerMaxHp ?? player.maxHp;
+  const hasPoison = (player.counters ?? []).length > 0;
   const mainAttached = attachedTrophies(state, player.attached);
   const partnerAttached = attachedTrophies(state, player.partnerAttached ?? []);
   return (
     <div className="player-character-row" data-character-row>
       {charDef !== null && (
         <div
-          className="player-character-card"
+          className={`player-character-card${(hasPoison || poisonAnim) ? ' has-poison' : ''}`}
           data-character-card
           data-anim-zone="attached"
+          data-poison={hasPoison ? true : undefined}
           style={{ '--cc-overlap': attachedOverlap(mainAttached.length) } as CSSProperties}
         >
           <div className="cc-fan">
