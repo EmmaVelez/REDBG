@@ -75,12 +75,9 @@ function ScenarioDropdown(props: {
 
 /**
  * Expandable Custom Cards picker — the fan-made card line (MX-001.., EX-001..).
- * Selected cards join the game: Infected and Storage/Box tokens go to the
- * Mansion deck, Characters enter the deal pool, and cost-bearing cards get their
- * own Resource Area pile. EX-006..EX-009 are NOT listed individually — they are
- * enabled together by the single "Poison" check (the two Poison-spreading
- * Infected, the 5-card Blue Herb stack and the Poison counter supply).
- * A native <details> keeps it expandable with no local state.
+ * Organized into grouped submenus for easier selection.
+ * Selected cards join the game: Infected, Tokens → Mansion deck; Characters → Deal pool; 
+ * Weapons/Ammo/Items → Resource Area piles. Poison bundles Web Spinner + Yawn + Blue Herb stack.
  */
 function CustomCardsPicker(props: {
   readonly selected: readonly string[];
@@ -91,23 +88,94 @@ function CustomCardsPicker(props: {
   const toggle = (id: string, checked: boolean): void => {
     props.onChange(checked ? [...props.selected, id] : props.selected.filter(x => x !== id));
   };
+
+  // Group cards by type
+  const characters = CUSTOM_CARDS.filter(c => c.type === 'character');
+  const infectionTokens = CUSTOM_CARDS.filter(c => c.type === 'infected' || c.type === 'token');
+  const resourceAreaCards = CUSTOM_CARDS.filter(c => 
+    c.type === 'weapon' || c.type === 'ammunition' || c.type === 'item'
+  );
+  const otherCards = CUSTOM_CARDS.filter(c => 
+    c.type === 'event' || c.type === 'action' || c.type === 'counter'
+  );
+
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
-      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected and Storage/Box tokens are shuffled into the Mansion deck, Characters enter the deal pool, and cost-bearing cards get their own Resource Area pile. The Poison check enables the whole Poison sub-system (Web Spinner + Yawn in the Mansion, a 5-card Blue Herb stack, and the Poison counter).</p>
-      {CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => (
-        <label key={c.id} className="custom-card-row">
-          <input
-            type="checkbox"
-            checked={props.selected.includes(c.id)}
-            disabled={props.disabled === true}
-            onChange={e => toggle(c.id, e.target.checked)}
-            data-testid={`custom-card-${c.id}`}
-          />
-          <span>{c.id.toUpperCase()} {c.name} — {c.text}</span>
-        </label>
-      ))}
-      <label className="custom-card-row">
+      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected/Tokens go to Mansion deck, Characters enter deal pool, Weapons/Ammo/Items get Resource Area piles.</p>
+
+      {/* Character Cards Section */}
+      <details className="custom-card-section">
+        <summary className="custom-card-section-title"> Characters</summary>
+        {characters.map(c => (
+          <label key={c.id} className="custom-card-row">
+            <input
+              type="checkbox"
+              checked={props.selected.includes(c.id)}
+              disabled={props.disabled === true}
+              onChange={e => toggle(c.id, e.target.checked)}
+              data-testid={`custom-card-${c.id}`}
+            />
+            <span>{c.id.toUpperCase()} {c.name}</span>
+          </label>
+        ))}
+      </details>
+
+      {/* Mansion Deck Cards Section */}
+      <details className="custom-card-section">
+        <summary className="custom-card-section-title">🏠 Mansion Deck Cards</summary>
+        <p className="lobby-hint-small">Infected and tokens are shuffled into the Mansion deck.</p>
+        {infectionTokens.map(c => (
+          <label key={c.id} className="custom-card-row">
+            <input
+              type="checkbox"
+              checked={props.selected.includes(c.id)}
+              disabled={props.disabled === true}
+              onChange={e => toggle(c.id, e.target.checked)}
+              data-testid={`custom-card-${c.id}`}
+            />
+            <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
+          </label>
+        ))}
+      </details>
+
+      {/* Resource Area Cards Section */}
+      <details className="custom-card-section">
+        <summary className="custom-card-section-title">⚔️ Resource Area Cards</summary>
+        <p className="lobby-hint-small">Weapons, Ammo, and Items get their own Resource Area pile.</p>
+        {resourceAreaCards.map(c => (
+          <label key={c.id} className="custom-card-row">
+            <input
+              type="checkbox"
+              checked={props.selected.includes(c.id)}
+              disabled={props.disabled === true}
+              onChange={e => toggle(c.id, e.target.checked)}
+              data-testid={`custom-card-${c.id}`}
+            />
+            <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
+          </label>
+        ))}
+      </details>
+
+      {/* Other Cards Section */}
+      <details className="custom-card-section">
+        <summary className="custom-card-section-title">✨ Other Cards</summary>
+        {otherCards.map(c => (
+          <label key={c.id} className="custom-card-row">
+            <input
+              type="checkbox"
+              checked={props.selected.includes(c.id)}
+              disabled={props.disabled === true}
+              onChange={e => toggle(c.id, e.target.checked)}
+              data-testid={`custom-card-${c.id}`}
+            />
+            <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
+          </label>
+        ))}
+      </details>
+
+      {/* Poison Bundle */}
+      <label className="custom-card-row custom-card-row-bundle">
         <input
           type="checkbox"
           checked={props.selected.includes(POISON_OPTION_ID)}
@@ -115,7 +183,7 @@ function CustomCardsPicker(props: {
           onChange={e => toggle(POISON_OPTION_ID, e.target.checked)}
           data-testid={`custom-card-${POISON_OPTION_ID}`}
         />
-        <span>POISON — Poison counters: 2 Web Spinner and 2 Yawn shuffled into the Mansion, a stack of 5 Blue Herbs in the Resource Area, and the Poison counter supply.</span>
+        <span>🧪 POISON BUNDLE — Enables: 2×Web Spinner + 2×Yawn in Mansion, 5×Blue Herbs (stack), poison counters</span>
       </label>
     </details>
   );

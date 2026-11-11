@@ -1754,7 +1754,10 @@ h1, h2 { margin: 0 0 8px; }
 /* ---- Custom Cards picker ---- */
 .custom-cards { margin-top: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,0.03); }
 .custom-cards-summary { cursor: pointer; font-size: 0.9em; color: var(--muted-foreground); }
-.custom-card-row { display: flex; gap: 6px; align-items: flex-start; font-size: 0.85em; margin: 4px 0; }
+.custom-card-row { display: flex; gap: 6px; align-items: center; font-size: 0.85em; margin: 4px 0; cursor: pointer; }
+.custom-card-section { margin-left: 8px; margin-bottom: 6px; }
+.custom-card-section-title { cursor: pointer; font-size: 0.85em; font-weight: bold; color: var(--foreground); margin-bottom: 4px; }
+.custom-card-row-bundle { display: flex; gap: 6px; align-items: center; font-size: 0.85em; margin: 6px 0; padding: 6px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border-left: 3px solid #ef4444; }
 .custom-card-row span { line-height: 1.3; }
 
 /* ==========================================================================
