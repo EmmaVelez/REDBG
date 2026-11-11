@@ -10,7 +10,7 @@
  * keeps the placeholder frame.
  */
 
-const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.png', {
+const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.{png,jpg,jpeg}', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -18,7 +18,7 @@ const modules = import.meta.glob('../../../game-core/src/data/CARD-ART/*.png', {
 
 const BY_ID: Record<string, string> = {};
 for (const [path, url] of Object.entries(modules)) {
-  const file = path.slice(path.lastIndexOf('/') + 1).replace(/\.png$/i, '');
+  const file = path.slice(path.lastIndexOf('/') + 1).replace(/\.(png|jpg|jpeg)$/i, '');
   BY_ID[file.toUpperCase()] = url;
 }
 
