@@ -1,7 +1,7 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
-import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes } from './weaponReuse';
+import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -287,7 +287,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               // rule — see engine/weaponReuse.ts. Alliance Partner
               // Modification: a weapon attached to the Partner may also be
               // used (it stays attached; it is not moved or trashed).
-              if (!player.hand.includes(weaponId) && !canReuseWeapon(state, action.seat, weaponId) && !isPartnerWeapon(state, action.seat, weaponId)) {
+              // CW-006 Kukri (playFromDiscardOnExplore): may be played from discard.
+              if (!player.hand.includes(weaponId) && !canReuseWeapon(state, action.seat, weaponId) && !isPartnerWeapon(state, action.seat, weaponId) && !canPlayFromDiscard(state, action.seat, weaponId)) {
                 return { ok: false, reason: `explore: weapon not in hand: ${weaponId}` };
               }
               // A Partner's attached weapon stays attached, so the normal
