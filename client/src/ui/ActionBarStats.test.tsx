@@ -43,6 +43,25 @@ describe('ActionBarStats', () => {
     expect(html).not.toContain('data-stat="status"');
     expect(html).not.toContain('app-status-');
     expect(html).not.toContain('app-room');
+    // XP chip omitted when skillSystem is off
+    expect(html).not.toContain('data-stat="xp"');
+  });
+
+  it('shows XP when skillSystem is enabled', () => {
+    const html = renderToStaticMarkup(<ActionBarStats hp={90} maxHp={120} gold={0} ammo={0} actions={1} buys={1} skillSystem xp={7} />);
+    expect(html).toContain('data-stat="xp"');
+    expect(html).toMatch(/XP <strong>7<\/strong>/);
+  });
+
+  it('renders XP as zero when skillSystem on but no xp prop', () => {
+    const html = renderToStaticMarkup(<ActionBarStats hp={90} maxHp={120} gold={0} ammo={0} actions={1} buys={1} skillSystem />);
+    expect(html).toContain('data-stat="xp"');
+    expect(html).toMatch(/XP <strong>0<\/strong>/);
+  });
+
+  it('omits XP when skillSystem is false', () => {
+    const html = renderToStaticMarkup(<ActionBarStats hp={90} maxHp={120} gold={0} ammo={0} actions={1} buys={1} skillSystem={false} xp={5} />);
+    expect(html).not.toContain('data-stat="xp"');
   });
 
   it('shows hp as current/max', () => {

@@ -1424,6 +1424,7 @@ h1, h2 { margin: 0 0 8px; }
 .action-stat-ammo strong { color: #9ecbff; }
 .action-stat-actions strong { color: #f0abfc; }
 .action-stat-buys strong { color: #fdba74; }
+.action-stat-xp strong { color: #818cf8; }
 /* the room code and connection status are stat chips too now — they moved out
    of the dock's lower-right corner and into the stats bar. They take their
    size from .action-stat / .app-board .action-stat like every other chip. */

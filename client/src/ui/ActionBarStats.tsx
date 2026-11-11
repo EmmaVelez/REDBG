@@ -14,6 +14,10 @@ export interface ActionBarStatsProps {
   readonly actions: number;
   /** Buys remaining this turn. */
   readonly buys: number;
+  /** Skill System active on. */
+  readonly skillSystem?: boolean;
+  /** Player's unassigned XP (skill pips). */
+  readonly xp?: number;
   /** Game-wide turn counter. */
   readonly turn?: number;
   /** Decorations held by EVERY player, summed — the game's shared progress. */
@@ -29,7 +33,7 @@ export interface ActionBarStatsProps {
  * game-level counters (turn, total decorations) and finally the room code and
  * connection status, which used to sit in the dock's lower-right corner.
  */
-export function ActionBarStats({ hp, maxHp, gold, ammo, actions, buys, turn, decorations, roomCode = null, status }: ActionBarStatsProps): JSX.Element {
+export function ActionBarStats({ hp, maxHp, gold, ammo, actions, buys, skillSystem = false, xp = 0, turn, decorations, roomCode = null, status }: ActionBarStatsProps): JSX.Element {
   return (
     <div className="action-stats" data-action-stats>
       <span className="action-stat action-stat-hp" data-stat="hp">HP <strong>{hp}/{maxHp}</strong></span>
@@ -37,6 +41,7 @@ export function ActionBarStats({ hp, maxHp, gold, ammo, actions, buys, turn, dec
       <span className="action-stat action-stat-ammo" data-stat="ammo">Ammo <strong>{ammo}</strong></span>
       <span className="action-stat action-stat-actions" data-stat="actions">Actions <strong>{actions}</strong></span>
       <span className="action-stat action-stat-buys" data-stat="buys">Buys <strong>{buys}</strong></span>
+      {skillSystem && (<span className="action-stat action-stat-xp" data-stat="xp">XP <strong>{xp}</strong></span>)}
       {turn !== undefined && (
         <span className="action-stat action-stat-turn" data-stat="turn">Turn <strong>{turn}</strong></span>
       )}

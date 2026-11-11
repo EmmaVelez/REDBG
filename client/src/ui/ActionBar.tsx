@@ -211,6 +211,8 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             ammo={player.turnAmmo}
             actions={player.actionsLeft}
             buys={player.buysLeft}
+            skillSystem={state.skillSystem}
+            xp={player.xp ?? 0}
             turn={state.turnNumber}
             decorations={state.seats.reduce((sum, s) => sum + s.decorations, 0)}
             roomCode={roomCode}
