@@ -99,6 +99,38 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     decorations: 5,
     infectedEffects: [{ kind: 'onDefeatShuffleBackIfDamageAtMost', maxDamage: 80 }],
   },
+  {
+    // Fan card (printed code CI-001). Oscar tramples the exploring Character
+    // when he survives, trashing the highest-Damage Weapon(s) they are using.
+    id: 'ci-001',
+    name: 'Oscar - Zombie Elephant',
+    type: 'infected',
+    set: 'custom',
+    text: 'If OSCAR is not defeated he tramples the exploring Character, trashing the highest Damage Weapon(s) they are using.',
+    copies: 1,
+    hp: 120,
+    attack: 10,
+    decorations: 7,
+    infectedEffects: [{ kind: 'onNotDefeatedTrashHighestDamageUsedWeapons' }],
+  },
+  {
+    // Fan card (printed code CI-003). The First Encounter hands every player a
+    // 10x Ammo on reveal and replaces itself with the official boss card
+    // ("Osmund Saddler", MA-054) when it is defeated.
+    id: 'ci-003',
+    name: 'Osmund Saddler (First Encounter)',
+    type: 'infected',
+    set: 'custom',
+    text: 'When Revealed each player gains a 10xAmmo.\nWhen this Infected is defeated, Shuffle a card named "OSMUND SADDLER" into the Mansion.',
+    copies: 1,
+    hp: 60,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [
+      { kind: 'onRevealEachPlayerGainsAmmoX10', count: 1 },
+      { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ma-054' },
+    ],
+  },
 
   {
     id: 'ev-001',

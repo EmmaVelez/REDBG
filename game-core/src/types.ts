@@ -275,6 +275,9 @@ export type InfectedEffect =
   | { readonly kind: "onRevealDamageReductionPerAmmoX10InDiscard"; readonly amount: number } // CI-009: takes `amount` less damage per "Ammo x10" in the exploring player's discard pile
   | { readonly kind: "onDefeatShuffleCardIntoMansion"; readonly cardId: string } // CI-009: on defeat, shuffle a fresh copy of `cardId` into the Mansion
   | { readonly kind: "onDefeatShuffleBackIfDamageAtMost"; readonly maxDamage: number } // MA-000 (ooze): defeated with <= maxDamage -> shuffled back into the Mansion instead of attached
+  // --- Custom card line: CI-001 / CI-003 (Oscar, Saddler) ---
+  | { readonly kind: "onNotDefeatedTrashHighestDamageUsedWeapons" } // CI-001 Oscar: on not-defeated, trash the highest-Damage Weapon(s) the exploring Character is using
+  | { readonly kind: "onRevealEachPlayerGainsAmmoX10"; readonly count: number } // CI-003 Saddler (First Encounter): on reveal, every player gains `count` "Ammo x10"
   // --- Unofficial Expansion (EX-006/EX-008) ---
   | { readonly kind: "onNotDefeatedAttachCounter"; readonly counterCardId: string } // EX-006 Web Spinner / EX-008 Yawn: attach a Poison counter to the exploring Character
 

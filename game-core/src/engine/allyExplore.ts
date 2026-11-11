@@ -5,7 +5,8 @@ import { characterAbilities, passiveDamageBonus, infectedDamageReduction, applyR
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
-import { ammoX10CountInDiscard } from './rachaelFoley';
+import { ammoX10CountInDiscard, saddlerAmmoGrantPerPlayer, trashHighestDamageUsedWeapons } from './customInfected';
+import { gainAmmoX10 } from './mercenaries';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -235,6 +236,17 @@ export function resolveAllyExplore(
   } else {
     const bottomed = sendToBottom({ deck: next.mansionDeck }, revealedId);
     next = { ...next, mansionDeck: bottomed.deck };
+  }
+
+  // Custom card line: CI-003's 10x Ammo for every player, and CI-001's
+  // trample when the forced explore does not defeat him.
+  const saddlerGrant = saddlerAmmoGrantPerPlayer(revealedDef);
+  if (saddlerGrant > 0) {
+    for (const s of next.seats) if (!s.dead) next = gainAmmoX10(next, s.seat, saddlerGrant);
+  }
+  if (outcome.kind !== 'defeated' &&
+      (revealedDef?.infectedEffects ?? []).some(e => e.kind === 'onNotDefeatedTrashHighestDamageUsedWeapons')) {
+    next = trashHighestDamageUsedWeapons(next, usedWeaponIds);
   }
 
   // The exploring player draws a new hand.
