@@ -101,7 +101,6 @@ describe('WE-019 Telescopic Sight Rifle — "reveal cards from BOTTOM of Mansion
     const after = applyAction(tuned, { type: 'explore', seat: 0, weapons: ['we-019#1'], exploreCount: 1 });
     const everywhere = [
       ...after.mansionDeck,
-      ...after.mansionBottom,
       ...(after.seats[0]?.attached ?? []),
     ];
     expect(everywhere.filter(id => id === 'ma-006#1').length).toBe(1);
@@ -240,13 +239,12 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
     const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
     expect(after.seats[0]?.hp).toBe(hpBefore);
     expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
-    expect(after.mansionBottom).toContain('ma-054o#1');
   });
 
   // Regression: applyDamageWithKevlar removes the jacket from `attached` and
-  // puts it on the Mansion bottom, but the explore paths rebuild the seat from
-  // the pre-kevlar `player` object, which used to restore the jacket into
-  // `attached` while it was also in `mansionBottom` (two zones, one card).
+  // puts it at the bottom of the deck, but the explore paths rebuild the seat
+  // from the pre-kevlar `player` object, which used to restore the jacket into
+  // `attached` while it was also in the deck (two zones, one card).
   test('the jacket is not duplicated when it absorbs infected combat damage', () => {
     const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-001#1'), ['we-009#1', 'ma-054o#1']);
     const tuned: GameState = {
@@ -261,7 +259,7 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
     const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
     expect(after.seats[0]?.hp).toBe(hpBefore);
     expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
-    expect(after.mansionBottom).toContain('ma-054o#1');
+    expect(after.mansionDeck).toContain('ma-054o#1');
   });
 
   test('the jacket is not duplicated when it absorbs a trap', () => {
@@ -274,7 +272,7 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
     const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
     expect(after.seats[0]?.hp).toBe(hpBefore);
     expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
-    expect(after.mansionBottom).toContain('ma-054o#1');
+    expect(after.mansionDeck).toContain('ma-054o#1');
   });
 });
 

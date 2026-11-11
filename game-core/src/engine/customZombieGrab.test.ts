@@ -86,7 +86,7 @@ describe('EV-001 Zombie Grab resolution', () => {
     expect(prompt.options).toContain(spare);
     expect(prompt.options).toContain('Take 20 damage');
     expect(prompt.options).not.toContain(used); // already moved to the play area
-    expect([...revealed.mansionDeck, ...revealed.mansionBottom]).not.toContain(ids[0]);
+    expect([...revealed.mansionDeck]).not.toContain(ids[0]);
   });
 
   it('trashing a weapon costs no Health and shuffles the card back', () => {
@@ -100,7 +100,7 @@ describe('EV-001 Zombie Grab resolution', () => {
     const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: prompt.options.indexOf(spare) });
     expect(after.removed).toContain(spare);
     expect(after.seats[0]?.hp).toBe(80);
-    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
+    expect([...after.mansionDeck]).toContain(ids[0]);
     expect(after.removed).not.toContain(ids[0]);
   });
 
@@ -115,7 +115,7 @@ describe('EV-001 Zombie Grab resolution', () => {
     const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: prompt.options.indexOf('Take 20 damage') });
     expect(after.seats[0]?.hp).toBe(60);
     expect(after.removed).not.toContain(spare);
-    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
+    expect([...after.mansionDeck]).toContain(ids[0]);
   });
 
   it('offers only the damage fallback when there is no weapon to trash', () => {
@@ -133,7 +133,7 @@ describe('EV-001 Zombie Grab resolution', () => {
     expect(prompt.options).toEqual(['Take 20 damage']);
     const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
     expect(after.seats[0]?.hp).toBe(60);
-    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
+    expect([...after.mansionDeck]).toContain(ids[0]);
   });
 });
 
@@ -155,7 +155,7 @@ describe('EV-001 Zombie Grab across every reveal path', () => {
     expect(nonInfected).toBeDefined();
     const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: grab.id, option: grab.options.indexOf('Take 20 damage') });
     expect(after.seats[0]?.hp).toBe(60);
-    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[0]);
+    expect([...after.mansionDeck]).toContain(ids[0]);
     expect(after.removed).not.toContain(ids[0]);
   });
 
@@ -173,6 +173,6 @@ describe('EV-001 Zombie Grab across every reveal path', () => {
     expect(grab.options).toContain(spare);
     const after = applyAction(revealed, { type: 'chooseOption', seat: 0, promptId: grab.id, option: grab.options.indexOf(spare) });
     expect(after.removed).toContain(spare);
-    expect([...after.mansionDeck, ...after.mansionBottom]).toContain(ids[1]);
+    expect([...after.mansionDeck]).toContain(ids[1]);
   });
 });

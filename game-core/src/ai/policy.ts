@@ -36,7 +36,6 @@ function sameCoreState(a: GameState, b: GameState): boolean {
     JSON.stringify(a.seats) === JSON.stringify(b.seats) &&
     JSON.stringify(a.marketPiles) === JSON.stringify(b.marketPiles) &&
     JSON.stringify(a.mansionDeck) === JSON.stringify(b.mansionDeck) &&
-    JSON.stringify(a.mansionBottom) === JSON.stringify(b.mansionBottom) &&
     JSON.stringify(a.prompts) === JSON.stringify(b.prompts) &&
     JSON.stringify(a.removed) === JSON.stringify(b.removed)
   );

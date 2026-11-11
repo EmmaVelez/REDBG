@@ -59,7 +59,6 @@ export function assertReplayDeterministic(reference: GameState): boolean {
   const coreSlice = {
     seats: rebuilt.seats,
     mansionDeck: rebuilt.mansionDeck,
-    mansionBottom: rebuilt.mansionBottom,
     marketPiles: rebuilt.marketPiles,
     prompts: rebuilt.prompts,
     phase: rebuilt.phase,
@@ -74,7 +73,6 @@ export function assertReplayDeterministic(reference: GameState): boolean {
   return JSON.stringify(coreSlice) === JSON.stringify({
     seats: reference.seats,
     mansionDeck: reference.mansionDeck,
-    mansionBottom: reference.mansionBottom,
     marketPiles: reference.marketPiles,
     prompts: reference.prompts,
     phase: reference.phase,

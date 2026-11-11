@@ -556,7 +556,6 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     seats: drawnHands,
     marketPiles,
     mansionDeck,
-    mansionBottom: [],
     removed: [],
     cards: instances,
     cardDefs,
@@ -630,6 +629,12 @@ export function startTurn(state: GameState): GameState {
 function startTurnInternal(state: GameState): GameState {
   if (state.phase !== 'main') {
     return state;
+  }
+
+  // EV-002 Nemesis Pursuit's infected buff lasts "this turn" only — a new turn
+  // clears it.
+  if (state.infectedBuffThisTurn !== undefined) {
+    state = { ...state, infectedBuffThisTurn: undefined };
   }
 
   // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of

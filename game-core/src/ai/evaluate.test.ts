@@ -37,7 +37,7 @@ function baseState(over: Partial<GameState> = {}): GameState {
       hg: { pileId: 'hg', cards: ['we-1#1'] },
       kn: { pileId: 'kn', cards: ['we-2#1'] },
     },
-    mansionDeck: ['ma-1#1', 'ma-1#2'], mansionBottom: [], removed: [],
+    mansionDeck: ['ma-1#1', 'ma-1#2'], removed: [],
     cards: Object.fromEntries(['ch-1#0', 'ch-1#1', 'am-1#1', 'we-1#1', 'we-2#1', 'ac-1#1', 'it-1#1', 'ma-1#1', 'ma-1#2'].map(id => [id, { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } }])),
     cardDefs: DEFS,
     prompts: [], winners: [], endReason: undefined, log: [],

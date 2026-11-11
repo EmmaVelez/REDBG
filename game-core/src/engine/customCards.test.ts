@@ -88,7 +88,7 @@ function mansionTop(s: GameState, cardId: string): GameState {
 
 /** The instance ids of every copy of `cardId` currently in the Mansion. */
 function mansionCopies(s: GameState, cardId: string): readonly string[] {
-  return [...s.mansionDeck, ...s.mansionBottom].filter(id => s.cards[id]?.cardId === cardId);
+  return [...s.mansionDeck].filter(id => s.cards[id]?.cardId === cardId);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,6 @@ describe('MX-001 not-defeated placement', () => {
     expect(after.seats[0]?.hp).toBe(100 - 30);
     expect(after.mansionDeck).toContain(xId!);
     expect(after.mansionDeck.indexOf(xId!)).toBe(4);
-    expect(after.mansionBottom).not.toContain(xId!);
   });
 
   it('single explore: defeated -> attached, never inserted', () => {
@@ -239,7 +238,6 @@ describe('MX-001 not-defeated placement', () => {
 
     expect(after.seats[0]?.attached).toContain(xId!);
     expect(after.mansionDeck).not.toContain(xId!);
-    expect(after.mansionBottom).not.toContain(xId!);
   });
 
   it('clamps to the end when the deck is shorter than the requested position', () => {
@@ -264,15 +262,14 @@ describe('insertAt', () => {
     expect(insertAt(m, 'x', 4).deck).toEqual(['a', 'b', 'c', 'x']);
   });
 
-  it('clamps past the end and never touches the bottom pile', () => {
-    const m = { deck: ['a'], bottom: ['z'] };
+  it('clamps past the end of the deck', () => {
+    const m = { deck: ['a'] };
     const out = insertAt(m, 'x', 99);
     expect(out.deck).toEqual(['a', 'x']);
-    expect(out.bottom).toEqual(['z']);
   });
 
   it('handles an empty deck', () => {
-    expect(insertAt({ deck: [], bottom: [] }, 'x', 5).deck).toEqual(['x']);
+    expect(insertAt({ deck: [] }, 'x', 5).deck).toEqual(['x']);
   });
 });
 
@@ -319,7 +316,6 @@ describe('MX-001 in a multi-explore', () => {
       seats: [synthSeat(0, { hand: ['w1'], exploresLeft: 2, turnAmmo: 0 }), synthSeat(1)],
       marketPiles: {},
       mansionDeck: ids,
-      mansionBottom: [],
       removed: [],
       cards,
       cardDefs: SYNTH_DEFS,
@@ -330,7 +326,6 @@ describe('MX-001 in a multi-explore', () => {
 
     // 5 damage vs 60 + 15 combined Health -> not defeated.
     expect(after.seats[0]?.hp).toBe(100 - 40);
-    expect(after.mansionDeck).toEqual(['x1', 'x2', 'x3', 'x4', 'mx1', 'x5']);
-    expect(after.mansionBottom).toEqual(['ma1']);
+    expect(after.mansionDeck).toEqual(['x1', 'x2', 'x3', 'x4', 'mx1', 'x5', 'ma1']);
   });
 });

@@ -78,6 +78,18 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     copies: 1,
   },
   {
+    // Fan card (Bandai print, no card number on the card). Manny's ruling
+    // (2026-11-10): "the exploring character must explore again" = +1 Explore
+    // and a must-explore obligation, and "this turn, all infected gain" is a
+    // turn-long buff (it also covers the forced second explore).
+    id: 'ev-002',
+    name: 'Nemesis Pursuit',
+    type: 'event',
+    set: 'custom',
+    text: 'When this event is revealed, the exploring character must explore again. This turn, all infected gain +10 health and +20 damage. Remove this event from the game afterwards.',
+    copies: 1,
+  },
+  {
     id: 'fch-008',
     name: 'Sherry Birkin',
     type: 'character',

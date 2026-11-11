@@ -1166,7 +1166,7 @@ describe('ActionBar (T07)', () => {
     // is the Mansion size, not the pool.
     const options = exploreCountOptions(armed, 0);
     expect(options[0]).toBe(1);
-    expect(options.length).toBe(Math.min(5, armed.mansionDeck.length + armed.mansionBottom.length));
+    expect(options.length).toBe(Math.min(5, armed.mansionDeck.length));
     expect(options.length).toBeGreaterThan(1);
   });
 

@@ -307,7 +307,7 @@ describe('Mercenaries actions', () => {
     const resolved = choose(next, 1, promptId, 0); // trash it
     // The explore is cancelled: no damage, the Infected goes to the bottom.
     expect(resolved.seats[0]?.hp).toBe(50);
-    expect(resolved.mansionBottom.some(id => resolved.cards[id]?.cardId === 'ma-078')).toBe(true);
+    expect(resolved.mansionDeck.some(id => resolved.cards[id]?.cardId === 'ma-078')).toBe(true);
     expect(resolved.removed.some(id => resolved.cards[id]?.cardId === 'ac-042')).toBe(true);
   });
 
@@ -563,7 +563,7 @@ describe('Mercenaries infected', () => {
     const weapon = findHand(withInfected, 'we-050');
     const next = explore(withInfected, 0, weapon);
     expect(next.seats[0]?.attached).not.toContain(trophyId);
-    expect(next.mansionBottom).toContain(trophyId);
+    expect(next.mansionDeck).toContain(trophyId);
     expect(next.seats[0]?.decorations).toBe(10 - 1); // the moved Infected's reward is lost
     expect(next.mansionDeck.some(id => next.cards[id]?.cardId === 'ma-078')).toBe(true);
   });

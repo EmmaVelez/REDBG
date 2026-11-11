@@ -180,7 +180,7 @@ export function applyDamageWithKevlar(
     state: {
       ...state,
       seats: state.seats.map(s => (s.seat === seat ? { ...s, attached: s.attached.filter(id => id !== jacketId) } : s)),
-      mansionBottom: [...state.mansionBottom, jacketId],
+      mansionDeck: [...state.mansionDeck, jacketId],
     },
     damage: 0,
     movedIds: [jacketId],

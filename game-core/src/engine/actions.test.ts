@@ -76,7 +76,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
     activeSeat: 0, turnNumber: 1,
     seats: [seat(0, over.seat0), seat(1, over.seat1)],
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: ['mkr1'] } },
-    mansionDeck: over.mansionDeck ?? ['inf1'], mansionBottom: over.mansionBottom ?? [], removed: over.removed ?? [],
+    mansionDeck: over.mansionDeck ?? ['inf1'], removed: over.removed ?? [],
     cards: {
       'a1': inst('a1', 'ac-1'), 'a2': inst('a2', 'ac-2'), 'a3': inst('a3', 'ac-3'), 'a4': inst('a4', 'ac-4'), 'a5': inst('a5', 'ac-5'), 'a6': inst('a6', 'ac-6'), 'a7': inst('a7', 'ac-7'),
       'i1': inst('i1', 'it-1'), 'i2': inst('i2', 'it-1'), 'i3': inst('i3', 'it-2'),
@@ -209,7 +209,6 @@ test('explore defeated', () => {
   expect(p0(s).decorations).toBe(1);
   expect(p0(s).attached).toEqual(['inf1']);
   expect(s.mansionDeck).toEqual([]);
-  expect(s.mansionBottom).toEqual([]);
   expect(p0(s).exploresLeft).toBe(0);
   expect(p0(s).dead).toBe(false);
   expect(p0(s).hp).toBe(100);
@@ -248,7 +247,7 @@ test('explore level-up', () => {
 test('explore not defeated', () => {
   const s = applyAction(baseState({ seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).hp).toBe(80);
-  expect(s.mansionBottom).toEqual(['inf1']);
+  expect(s.mansionDeck).toEqual(['inf1']);
   expect(p0(s).attached).toEqual([]);
   expect(p0(s).decorations).toBe(0);
 });
@@ -602,7 +601,6 @@ test('explore Uroboros shuffle-back', () => {
   const s = applyAction(baseState({ mansionDeck: ['uro1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   expect(p0(s).hp).toBe(30);
   expect(s.mansionDeck).toContain('uro1');
-  expect(s.mansionBottom).toEqual([]);
 });
 
 test('explore non-infected take', () => {
@@ -619,7 +617,7 @@ test('explore non-infected take', () => {
 test('explore non-infected bottom', () => {
   const s = applyAction(baseState({ mansionDeck: ['gh1'], seat0: { hand: ['w5'] } }), { type: 'explore', seat: 0, weapons: ['w5'], exploreCount: 1 });
   const s2 = applyAction(s, { type: 'chooseOption', seat: 0, promptId: pr(s).id, option: 1 });
-  expect(s2.mansionBottom).toEqual(['gh1']);
+  expect(s2.mansionDeck).toEqual(['gh1']);
   expect(p0(s2).discard).toEqual([]);
 });
 

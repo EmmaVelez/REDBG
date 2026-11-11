@@ -77,7 +77,7 @@ describe('CI-002 Infected Crow data', () => {
       FIRST_TIMER_PILES,
       STANDARD_MANSION_DECK,
     );
-    const crows = [...s.mansionDeck, ...s.mansionBottom]
+    const crows = [...s.mansionDeck]
       .filter(id => s.cards[id]?.cardId === 'ci-002');
     expect(crows).toHaveLength(5);
   });
@@ -104,7 +104,7 @@ describe('CI-002 reveal chain', () => {
     expect(next.seats[0]?.decorations).toBe(2);
     expect(next.seats[0]?.attached).toContain(ids[0]);
     // The action card went back into the Mansion, not removed or attached.
-    const mansion = [...next.mansionDeck, ...next.mansionBottom];
+    const mansion = [...next.mansionDeck];
     expect(mansion).toContain(ids[1]);
     expect(next.removed).not.toContain(ids[1]);
   });
@@ -131,7 +131,7 @@ describe('CI-002 reveal chain', () => {
   it('does nothing when the Mansion is exhausted behind the Crow', () => {
     const { state, ids } = setMansionTop(crowGame({ level: 1, hp: 80, turnAmmo: 70 }), ['ci-002']);
     // Drain the rest of the Mansion so the Crow has nothing to reveal.
-    const drained = { ...state, mansionDeck: ids, mansionBottom: [] };
+    const drained = { ...state, mansionDeck: ids };
     const { state: armed, id } = addWeapon(drained, 0, 'we-012');
     const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
     expect(next.seats[0]?.hp).toBe(80);

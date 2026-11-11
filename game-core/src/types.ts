@@ -754,13 +754,20 @@ export interface GameState {
   /** Resource Area: fixed piles keyed by pileId (18 in First Timer). */
   readonly marketPiles: Readonly<Record<string, MarketPile>>;
 
-  /** Mansion deck, top = index 0 (Infected + tokens + Yellow Herbs). */
+  /** Mansion deck, top = index 0 (Infected + tokens + Yellow Herbs). Cards
+   *  sent to the bottom are appended to the END of this same list. */
   readonly mansionDeck: readonly string[];
-  /** Cards sent to the BOTTOM of the Mansion (undefeated Infected, declined cards). */
-  readonly mansionBottom: readonly string[];
 
   /** Removed-from-game cards. */
   readonly removed: readonly string[];
+
+  /** EV-002 Nemesis Pursuit: while set, every Infected battled this turn gets
+   *  +hp Health and +attack Damage. Set when the event is revealed, cleared at
+   *  the start of the next turn. */
+  readonly infectedBuffThisTurn?: {
+    readonly hp: number;
+    readonly attack: number;
+  };
 
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when
@@ -813,7 +820,6 @@ export interface GameState {
     readonly damageTaken: number;
     readonly newPlayer: PlayerState;
     readonly mansionDeck: readonly string[];
-    readonly mansionBottom: readonly string[];
     readonly rngState: number;
     /** AC-042 Fight or Flight: the exploring player's pre-explore state, used to
      *  cancel the explore when the revealed Infected is stronger. */

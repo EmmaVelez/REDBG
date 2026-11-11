@@ -4,6 +4,7 @@ import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore, grantedExploresFor } from './explore';
 import type { MultiExploreTarget } from './explore';
+import { isNemesisPursuit, withNemesisPursuitBuff, applyNemesisPursuit, nemesisPursuitBuff, NEMESIS_PURSUIT_ID } from './nemesisPursuit';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
 import {
@@ -344,16 +345,13 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
   if (action.type === 'explore') {
     mark(action.seat);
     // Detect which mansion deck card was revealed by comparing decks before/after.
-    // A revealed card disappears from mansionDeck and/or mansionBottom and appears
-    // in a player's inventory/discard/playArea — track what left the mansion pool.
+    // A revealed card disappears from mansionDeck and appears in a player's
+    // inventory/discard/playArea — track what left the deck.
     const prevDeck = new Set(prev.mansionDeck);
-    const prevBottom = new Set(prev.mansionBottom);
     const nextDeck = new Set(state.mansionDeck ?? []);
-    const nextBottom = new Set(state.mansionBottom ?? []);
-    // Cards that were in the mansion pool but aren't anymore (revealed/removed cards).
+    // Cards that were in the deck but aren't anymore (revealed/removed cards).
     const revealedInstances: string[] = [];
     for (const id of prevDeck) { if (!nextDeck.has(id)) revealedInstances.push(id); }
-    for (const id of prevBottom) { if (!nextBottom.has(id)) revealedInstances.push(id); }
     // Filter to instances that are now in a player's non-mansion zone.
     const validCards = revealedInstances.filter(id => {
       const loc = state.cards[id]?.location;
@@ -1435,8 +1433,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const revealFromBottom = weapons.some(id => cardDef(state, id)?.weaponEffects?.some(
         e => e.kind === 'revealFromMansionBottom') === true);
       const rev = revealFromBottom
-        ? revealBottom({ deck: state.mansionDeck, bottom: state.mansionBottom })
-        : revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
+        ? revealBottom({ deck: state.mansionDeck })
+        : revealTop({ deck: state.mansionDeck });
       const revealedInstanceId = rev.revealedInstanceId;
       const revealedDef = cardDef(state, revealedInstanceId);
       // CI-002 Infected Crow: a single explore that reveals it becomes a
@@ -1458,15 +1456,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (exploreCount > 1 || crowChainPending) {
         const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
         let mDeck = rev.mansion.deck;
-        let mBottom = rev.mansion.bottom;
         const revealedIds: string[] = [revealedInstanceId];
         for (let i = 1; i < exploreCount; i++) {
           const r = revealFromBottom
-            ? revealBottom({ deck: mDeck, bottom: mBottom })
-            : revealTop({ deck: mDeck, bottom: mBottom });
+            ? revealBottom({ deck: mDeck })
+            : revealTop({ deck: mDeck });
           revealedIds.push(r.revealedInstanceId);
           mDeck = r.mansion.deck;
-          mBottom = r.mansion.bottom;
         }
 
         // Events that reveal MORE Mansion cards (MA-039 x2, MA-072 x1): the
@@ -1478,6 +1474,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let laserTargeting = false;
         const barrelIds: string[] = [];
         const trapIds: string[] = [];
+        // EV-002 Nemesis Pursuit revealed anywhere in this batch.
+        let nemesisPursuit = false;
         let expanding = true;
         // CI-002 Infected Crow chains: each Crow reveals one more Mansion
         // card. Mark them so the re-scan does not expand the same Crow twice.
@@ -1491,12 +1489,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (crowExpanded.has(id)) continue;
               if (!(d.infectedEffects ?? []).some(e => e.kind === 'onRevealRevealNextMansionCard')) continue;
               crowExpanded.add(id);
-              if (deckCount({ deck: mDeck, bottom: mBottom }) > 0) {
-                const r = revealTop({ deck: mDeck, bottom: mBottom });
+              if (deckCount({ deck: mDeck }) > 0) {
+                const r = revealTop({ deck: mDeck });
                 revealedIds.push(r.revealedInstanceId);
                 expansionIds.push(r.revealedInstanceId);
                 mDeck = r.mansion.deck;
-                mBottom = r.mansion.bottom;
               }
               expanding = true;
               continue;
@@ -1504,22 +1501,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (d.type !== 'event' || eventIdsToRemove.includes(id)) continue;
             if (d.id === 'ma-039') {
               eventIdsToRemove.push(id);
-              for (let k = 0; k < 2 && deckCount({ deck: mDeck, bottom: mBottom }) > 0; k++) {
-                const r = revealTop({ deck: mDeck, bottom: mBottom });
+              for (let k = 0; k < 2 && deckCount({ deck: mDeck }) > 0; k++) {
+                const r = revealTop({ deck: mDeck });
                 revealedIds.push(r.revealedInstanceId);
                 expansionIds.push(r.revealedInstanceId);
                 mDeck = r.mansion.deck;
-                mBottom = r.mansion.bottom;
               }
               expanding = true;
             } else if (d.id === 'ma-072') {
               eventIdsToRemove.push(id);
-              if (deckCount({ deck: mDeck, bottom: mBottom }) > 0) {
-                const r = revealTop({ deck: mDeck, bottom: mBottom });
+              if (deckCount({ deck: mDeck }) > 0) {
+                const r = revealTop({ deck: mDeck });
                 revealedIds.push(r.revealedInstanceId);
                 expansionIds.push(r.revealedInstanceId);
                 mDeck = r.mansion.deck;
-                mBottom = r.mansion.bottom;
               }
               expanding = true;
             } else if (d.id === 'ma-038' || d.id === 'ma-056o' || d.id === 'ma-057o' || d.id === 'ma-040') {
@@ -1527,9 +1522,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (d.id === 'ma-038') barrelIds.push(id);
               else if (d.id === 'ma-040') laserTargeting = true;
               else trapIds.push(id);
+            } else if (isNemesisPursuit(d)) {
+              // EV-002: removed from the game; the buff is applied below and
+              // the explore-again obligation on the exploring seat.
+              eventIdsToRemove.push(id);
+              nemesisPursuit = true;
             }
           }
         }
+
+        // EV-002 Nemesis Pursuit: "this turn, all infected gain +10 health and
+        // +20 damage" — the Infected revealed in THIS battle are included.
+        if (nemesisPursuit) state = withNemesisPursuitBuff(state);
 
         const infectedEntries: Array<{ id: string; def: CardDef }> = [];
         const nonInfectedIds: string[] = [];
@@ -1625,10 +1629,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             hpBonus = r3.revealedHpBonus;
             atkBonus = r3.revealedAttackBonus;
             for (const bid of r3.movedToBottom) {
-              if (!mBottom.includes(bid)) mBottom = [...mBottom, bid];
+              if (!mDeck.includes(bid)) mDeck = [...mDeck, bid];
             }
           }
-          targets.push({ cardId: def.id, hp: (def.hp ?? 0) + hpBonus, attack: (def.attack ?? 0) + atkBonus, infectedEffects: def.infectedEffects });
+          const buff = nemesisPursuitBuff(state);
+          targets.push({ cardId: def.id, hp: (def.hp ?? 0) + hpBonus + buff.hp, attack: (def.attack ?? 0) + atkBonus + buff.attack, infectedEffects: def.infectedEffects });
         }
 
         // MA-081/MA-049: weapons whose damage is zeroed for this explore.
@@ -1886,7 +1891,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // The jacket joined the Mansion bottom; fold it into the local pile
           // or the return below (which spreads this local) drops it into no zone.
           for (const id of kevlar.movedIds) {
-            if (!mBottom.includes(id)) mBottom = [...mBottom, id];
+            if (!mDeck.includes(id)) mDeck = [...mDeck, id];
           }
 
           if (damageOnAda) {
@@ -1932,7 +1937,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const kevlarTrap = applyDamageWithKevlar(state, seat, trapDamage);
             state = kevlarTrap.state;
             for (const bid of kevlarTrap.movedIds) {
-              if (!mBottom.includes(bid)) mBottom = [...mBottom, bid];
+              if (!mDeck.includes(bid)) mDeck = [...mDeck, bid];
             }
             const ric = applyRicardoDamage(state, seat, player.hp, kevlarTrap.damage);
             state = ric.state;
@@ -1973,23 +1978,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const shuffles = (def?.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle')) ?? false;
           const insertEffect = def?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
           if (insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt') {
-            const inserted = insertAt({ deck: mDeck, bottom: mBottom }, id, insertEffect.position);
+            const inserted = insertAt({ deck: mDeck }, id, insertEffect.position);
             mDeck = inserted.deck;
-            mBottom = inserted.bottom;
           } else if (shuffles) {
-            const shuffled = shuffleBack({ deck: mDeck, bottom: mBottom }, id, rngShuffle);
+            const shuffled = shuffleBack({ deck: mDeck }, id, rngShuffle);
             mDeck = shuffled.deck;
-            mBottom = shuffled.bottom;
           } else {
-            const bottomed = sendToBottom({ deck: mDeck, bottom: mBottom }, id);
+            const bottomed = sendToBottom({ deck: mDeck }, id);
             mDeck = bottomed.deck;
-            mBottom = bottomed.bottom;
           }
         }
         for (const id of shuffleBackIds) {
-          const shuffled = shuffleBack({ deck: mDeck, bottom: mBottom }, id, rngShuffle);
+          const shuffled = shuffleBack({ deck: mDeck }, id, rngShuffle);
           mDeck = shuffled.deck;
-          mBottom = shuffled.bottom;
         }
         // ---- Defeat / not-defeated effect hooks (per card) ----
         let fxState: GameState = {
@@ -2006,7 +2007,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ...(partnerDied ? partnerAttached.filter(id => !removedIds.includes(id)) : []),
           ],
           mansionDeck: mDeck,
-          mansionBottom: mBottom,
         };
         const defeatFxPrompts: Prompt[] = [];
         for (const { id, def } of infectedEntries) {
@@ -2023,8 +2023,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             fxState = r.state;
             defeatFxPrompts.push(...r.prompts);
             if (r.infectedShuffledBack) {
-              const shuffled = shuffleBack({ deck: fxState.mansionDeck, bottom: fxState.mansionBottom }, id, rngShuffle);
-              fxState = { ...fxState, mansionDeck: shuffled.deck, mansionBottom: shuffled.bottom };
+              const shuffled = shuffleBack({ deck: fxState.mansionDeck }, id, rngShuffle);
+              fxState = { ...fxState, mansionDeck: shuffled.deck };
             }
             const rn = applyNightmareNotDefeatedEffects(fxState, { seat, revealedInstanceId: id, revealedDef: def, weapons });
             fxState = rn.state;
@@ -2032,7 +2032,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
         }
         mDeck = fxState.mansionDeck;
-        mBottom = fxState.mansionBottom;
 
         // Downed handling for a surviving leader.
         let handOut: readonly string[] = handAfter;
@@ -2082,10 +2081,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           playArea: playAreaAfter,
           discard: discardOut,
           inventory: inventoryOut,
-          exploresLeft: exploresLeftAfter,
+          exploresLeft: exploresLeftAfter + (nemesisPursuit ? 1 : 0),
           turnAmmo: turnAmmoAfter,
           turnGold: turnGoldAfter,
-          mustExplore: false,
+          mustExplore: nemesisPursuit ? true : false,
           decorations,
           level,
           xp,
@@ -2133,7 +2132,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           seats: fxState.seats.map(s => (s.seat === seat ? finalPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
           mansionDeck: mDeck,
-          mansionBottom: mBottom,
           rngState: fxState.rngState,
           prompts: [...fxState.prompts, ...outcomePrompts, ...defeatFxPrompts, ...nonInfectedPrompts, ...zombieGrabPrompts, ...resuscitatePrompts, ...zombieBPromptsOut],
           ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
@@ -2268,11 +2266,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
 
       let mansionDeck = rev.mansion.deck;
-      let mansionBottom = rev.mansion.bottom;
       // MA-054o Kevlar Jacket: the reveal handlers may have moved an attached
-      // jacket to the bottom of the Mansion; fold those into the local pile.
+      // jacket to the bottom of the deck; fold those into the local pile.
       for (const id of outbreakRevealFx.movedToBottom) {
-        if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+        if (!mansionDeck.includes(id)) mansionDeck = [...mansionDeck, id];
       }
 
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-040') {
@@ -2284,18 +2281,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
           removed: [...removedAfter, revealedInstanceId],
           mansionDeck,
-          mansionBottom,
           rngState: currentRng,
           prompts: state.prompts,
         };
       }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-039') {
         // Collapsing Floor Traps: reveal next 2 mansion cards; battle any infected among them; shuffle non-infected back.
-        const rev2 = revealTop({ deck: mansionDeck, bottom: mansionBottom });
+        const rev2 = revealTop({ deck: mansionDeck });
         const secondId = rev2.revealedInstanceId;
         const secondDef = cardDef(state, secondId);
         mansionDeck = rev2.mansion.deck;
-        mansionBottom = rev2.mansion.bottom;
         // collect infected targets
         const targets = [];
         if (revealedDef && false) {}
@@ -2306,7 +2301,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
-            cardId: d!.id, hp: d!.hp ?? 0, attack: d!.attack ?? 0, infectedEffects: d!.infectedEffects,
+            cardId: d!.id, hp: (d!.hp ?? 0) + nemesisPursuitBuff(state).hp, attack: (d!.attack ?? 0) + nemesisPursuitBuff(state).attack, infectedEffects: d!.infectedEffects,
           })),
         });
         const defeatedDecorations = multiResult.defeated ? infectedTargets.reduce((s, d) => s + (d?.decorations ?? 0), 0) : 0;
@@ -2339,6 +2334,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }]
           : [];
         const grabSecond = secondDef?.id === 'ev-001';
+        // EV-002 Nemesis Pursuit is removed from the game, never shuffled back.
+        const nemesisSecond = isNemesisPursuit(secondDef);
         const removedIds = [revealedInstanceId, secondId].filter(id => {
           const d = cardDef(state, id);
           return (d?.type === 'infected' || d?.type === 'event') && d?.id !== 'ev-001';
@@ -2347,10 +2344,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // its choice is answered, then the resolver shuffles it back)
         const toShuffleBack = [revealedInstanceId, secondId].filter(id => {
           const d = cardDef(state, id);
-          return d?.type !== 'infected' && d?.id !== 'ev-001';
+          return d?.type !== 'infected' && d?.id !== 'ev-001' && d?.id !== NEMESIS_PURSUIT_ID;
         });
         if (toShuffleBack.length > 0) {
-          mansionBottom = [...mansionBottom, ...toShuffleBack];
+          mansionDeck = [...mansionDeck, ...toShuffleBack];
         }
         const grabPromptsMa039: Prompt[] = grabSecond
           ? [{
@@ -2364,7 +2361,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
             }]
           : [];
-        return {
+        const ma039Result: GameState = {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
@@ -2372,10 +2369,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const d = cardDef(state, id); return d?.type === 'infected' || d?.type === 'event';
           })],
           mansionDeck,
-          mansionBottom,
           rngState: currentRng,
           prompts: [...state.prompts, ...stunPrompts, ...grabPromptsMa039],
         };
+        return nemesisSecond ? applyNemesisPursuit(ma039Result, seat) : ma039Result;
       }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
@@ -2395,7 +2392,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
           removed: [...removedAfter, revealedInstanceId],
           mansionDeck,
-          mansionBottom,
           rngState: currentRng,
           prompts: state.prompts,
         };
@@ -2406,11 +2402,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // player with the fewest Decorations automatically defeats it; either
         // way the P.R.L. 412 is removed. A non-Infected reveal is shuffled back
         // into the Mansion together with the P.R.L. 412.
-        const rev2 = revealTop({ deck: mansionDeck, bottom: mansionBottom });
+        const rev2 = revealTop({ deck: mansionDeck });
         const secondId = rev2.revealedInstanceId;
         const secondDef = cardDef(state, secondId);
         mansionDeck = rev2.mansion.deck;
-        mansionBottom = rev2.mansion.bottom;
         if (secondDef?.type === 'infected') {
           // One Infected can only be Defeated by one Player, so a tie for the
           // fewest Decorations is broken the same way the game's victory
@@ -2428,17 +2423,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : x)),
             removed: [...removedAfter, revealedInstanceId],
             mansionDeck,
-            mansionBottom,
             rngState: currentRng,
             prompts: state.prompts,
           };
         }
         const grabSecondMa072 = secondDef?.id === 'ev-001';
+        // EV-002 Nemesis Pursuit is removed from the game, never shuffled back.
+        const nemesisSecondMa072 = isNemesisPursuit(secondDef);
         // EV-001 parks in limbo until its choice is answered; only the
         // P.R.L. 412 itself is shuffled back here.
-        const shuffled = grabSecondMa072
-          ? { deck: mansionDeck, bottom: mansionBottom }
-          : shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, secondId, rngShuffle);
+        const shuffled = (grabSecondMa072 || nemesisSecondMa072)
+          ? { deck: mansionDeck }
+          : shuffleBack({ deck: mansionDeck }, secondId, rngShuffle);
         const shuffled2 = shuffleBack(shuffled, revealedInstanceId, rngShuffle);
         const grabPromptsMa072: Prompt[] = grabSecondMa072
           ? [{
@@ -2452,15 +2448,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
             }]
           : [];
-        return {
+        const ma072Result: GameState = {
           ...state,
           ...nextBase,
-          removed: removedAfter,
+          removed: nemesisSecondMa072 ? [...removedAfter, secondId] : removedAfter,
           mansionDeck: shuffled2.deck,
-          mansionBottom: shuffled2.bottom,
           rngState: currentRng,
           prompts: [...state.prompts, ...grabPromptsMa072],
         };
+        return nemesisSecondMa072 ? applyNemesisPursuit(ma072Result, seat) : ma072Result;
       }
 
       // Outbreak traps: MA-056o Laser Trap / MA-057o Rock Trap. Both damage the
@@ -2483,7 +2479,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const kevlarTrap = applyDamageWithKevlar(state, seat, trapDamage);
           state = kevlarTrap.state;
           for (const id of kevlarTrap.movedIds) {
-            if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+            if (!mansionDeck.includes(id)) mansionDeck = [...mansionDeck, id];
           }
           const ricTrap = applyRicardoDamage(state, seat, trapPlayer.hp, kevlarTrap.damage);
           state = ricTrap.state;
@@ -2500,7 +2496,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? trapPlayer : s)),
           removed: [...removedAfter, revealedInstanceId],
           mansionDeck,
-          mansionBottom,
           rngState: currentRng,
           prompts: state.prompts,
         };
@@ -2614,7 +2609,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
           removed: removedAfter,
           mansionDeck,
-          mansionBottom,
           prompts: [...reactivePrompts, {
             id: 'p' + (reactivePrompts.length + 1),
             seat,
@@ -2622,6 +2616,32 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             options: [...grabWeapons, 'Take 20 damage'],
             payload: { kind: 'zombieGrab', amount: '20', instanceId: revealedInstanceId },
           }],
+        };
+      }
+
+      if (isNemesisPursuit(revealedDef)) {
+        // EV-002 Nemesis Pursuit: removed from the game; the exploring
+        // character must explore again; every Infected gets +10 Health and
+        // +20 Damage for the rest of this turn.
+        const buffedState = withNemesisPursuitBuff(state);
+        const nemesisPlayer: PlayerState = applyNightmareGains({
+          ...player,
+          hand: handAfter,
+          playArea: playAreaAfter,
+          discard: discardAfterExplosives,
+          exploresLeft: exploresLeft + grantedExplores + 1,
+          turnAmmo: turnAmmoAfter,
+          turnGold: turnGoldAfter,
+          mustExplore: true,
+        });
+        return {
+          ...buffedState,
+          ...nextBase,
+          seats: buffedState.seats.map(s => (s.seat === seat ? nemesisPlayer : s)),
+          removed: [...removedAfter, revealedInstanceId],
+          mansionDeck,
+          rngState: currentRng,
+          prompts: [...reactivePrompts],
         };
       }
 
@@ -2654,7 +2674,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
             removed: removedAfter,
             mansionDeck,
-            mansionBottom,
             prompts: [...reactivePrompts, ...antivirusPrompts],
           };
         }
@@ -2674,7 +2693,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
           removed: removedAfter,
           mansionDeck,
-          mansionBottom,
           prompts,
         };
       }
@@ -2699,8 +2717,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ammoCardsInPlayArea,
               revealed: {
                 ...revealedDef,
-                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus,
-                attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus,
+                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp,
+                attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
               },
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
@@ -2775,7 +2793,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? { ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false } : s)),
           removed: removedAfter,
           mansionDeck,
-          mansionBottom,
           rngState: currentRng,
           reactiveTrashWindow: { kind: lasPlagasDefer ? 'jillFlashGrenade' : 'fightOrFlight', triggeringSeat: seat, revealedInstanceId },
           pendingExplore: {
@@ -2788,7 +2805,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             damageTaken: pendingDamageTaken,
             newPlayer: pendingPlayer,
             mansionDeck,
-            mansionBottom,
             rngState: currentRng,
             prePlayer: player,
             revealHpThreshold: ac042Eligible.length > 0 ? player.hp : undefined,
@@ -2967,9 +2983,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }]
           : state.prompts;
         if (defeatedToBottom) {
-          const bottomed = sendToBottom({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId);
+          const bottomed = sendToBottom({ deck: mansionDeck }, revealedInstanceId);
           mansionDeck = bottomed.deck;
-          mansionBottom = bottomed.bottom;
         }
         // Luis Sera (Nightmare) L2: on defeating an Infected, may move any
         // number of cards from the discard pile to the bottom of the Inventory.
@@ -3067,7 +3082,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] }
           )),
           mansionDeck,
-          mansionBottom,
           rngState: defeatFxState.rngState,
           prompts: [...cephaloPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
@@ -3113,13 +3127,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // the bottom of the Mansion.
       const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
       state = kevlar.state;
-      // The jacket joined the Mansion bottom; keep the local pile in sync
+      // The jacket joined the bottom of the deck; keep the local deck in sync
       // or the return below (which spreads this local) drops it into no zone.
-      // Append ONLY the moved jacket: `state.mansionBottom` is still the
-      // pre-reveal pile (the reveal lives in this local), so reading it
+      // Append ONLY the moved jacket: `state.mansionDeck` is still the
+      // pre-reveal deck (the reveal lives in this local), so reading it
       // back would restore the revealed card and duplicate it below.
       for (const id of kevlar.movedIds) {
-        if (!mansionBottom.includes(id)) mansionBottom = [...mansionBottom, id];
+        if (!mansionDeck.includes(id)) mansionDeck = [...mansionDeck, id];
       }
 
       let newLeadingHp: number;
@@ -3206,9 +3220,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             drawInfectionsFor(infectedEffectSeat(), e.amount + e.perLevel * player.level);
             zombieBAffected.push(infectedEffectSeat());
           } else if (e.kind === 'onNotDefeatedShuffleBack') {
-            const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
+            const shuffled = shuffleBack({ deck: mansionDeck }, revealedInstanceId, rngShuffle);
             mansionDeck = shuffled.deck;
-            mansionBottom = shuffled.bottom;
             outbreakShuffledBack = true;
           } else if (e.kind === 'onNotDefeatedAttachCounter') {
             // Unofficial Expansion: EX-006 Web Spinner / EX-008 Yawn attach a
@@ -3276,7 +3289,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ...afterPartnerDeath,
         removed: removedWithReaper,
         mansionDeck,
-        mansionBottom,
         seats: afterPartnerDeath.seats.map(s => (s.seat === seat ? newPlayer : s)),
       };
       const notDefeatedFx = infectedEffectNegated
@@ -3284,7 +3296,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : applyMercenariesNotDefeatedEffects(state, mercCtx);
       state = notDefeatedFx.state;
       mansionDeck = state.mansionDeck;
-      mansionBottom = state.mansionBottom;
       if (notDefeatedFx.prompts.length > 0) {
         state = { ...state, prompts: [...state.prompts, ...notDefeatedFx.prompts] };
       }
@@ -3300,17 +3311,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? insertEffect.position
         : undefined;
       if (insertPosition !== undefined) {
-        const inserted = insertAt({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, insertPosition);
+        const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, insertPosition);
         mansionDeck = inserted.deck;
-        mansionBottom = inserted.bottom;
       } else if (outcome.shuffleBack) {
-        const shuffled = shuffleBack({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId, rngShuffle);
+        const shuffled = shuffleBack({ deck: mansionDeck }, revealedInstanceId, rngShuffle);
         mansionDeck = shuffled.deck;
-        mansionBottom = shuffled.bottom;
       } else if (!outbreakShuffledBack && !notDefeatedFx.infectedShuffledBack) {
-        const bottomed = sendToBottom({ deck: mansionDeck, bottom: mansionBottom }, revealedInstanceId);
+        const bottomed = sendToBottom({ deck: mansionDeck }, revealedInstanceId);
         mansionDeck = bottomed.deck;
-        mansionBottom = bottomed.bottom;
       }
 
       // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
@@ -3325,7 +3333,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] }
         )),
         mansionDeck,
-        mansionBottom,
         rngState: state.rngState,
         prompts: [...state.prompts, ...resuscitatePrompts, ...zombieBNotDefeatedPrompts],
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
@@ -4643,13 +4650,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const deckWithout = s.mansionDeck.filter(id => id !== pe.revealedInstanceId);
             const insertFx = revealedDef?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
             const placed = insertFx !== undefined && insertFx.kind === 'onNotDefeatedInsertIntoMansionAt'
-              ? insertAt({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId, insertFx.position)
-              : { deck: deckWithout, bottom: [...s.mansionBottom, pe.revealedInstanceId] };
+              ? insertAt({ deck: deckWithout }, pe.revealedInstanceId, insertFx.position)
+              : { deck: [...deckWithout, pe.revealedInstanceId] };
             return {
               ...s,
               seats: s.seats.map(x => (x.seat === pe.seat ? restored : x)),
               mansionDeck: placed.deck,
-              mansionBottom: placed.bottom,
               pendingExplore: undefined,
               prompts: newPrompts,
             };
@@ -4677,16 +4683,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? undefined
             : cardDef(s, pe.revealedInstanceId)?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
           const bottomed = defeated
-            ? { deck: s.mansionDeck, bottom: s.mansionBottom }
+            ? { deck: s.mansionDeck }
             : insertFx !== undefined && insertFx.kind === 'onNotDefeatedInsertIntoMansionAt'
-              ? insertAt({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId, insertFx.position)
-              : sendToBottom({ deck: deckWithout, bottom: s.mansionBottom }, pe.revealedInstanceId);
+              ? insertAt({ deck: deckWithout }, pe.revealedInstanceId, insertFx.position)
+              : sendToBottom({ deck: deckWithout }, pe.revealedInstanceId);
           return {
             ...s,
             seats: s.seats.map(x => (x.seat === pe.seat ? newPlayer : x)),
             removed: defeated ? [...s.removed, pe.revealedInstanceId] : s.removed,
             mansionDeck: bottomed.deck,
-            mansionBottom: bottomed.bottom,
             pendingExplore: undefined,
             prompts: newPrompts,
           };
@@ -4737,15 +4742,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // The Infected's own fate likewise applies to the CURRENT deck (it
           // may have changed while the prompt was open).
           const bottomed = defeated
-            ? { deck: baseState.mansionDeck, bottom: baseState.mansionBottom }
-            : sendToBottom({ deck: baseState.mansionDeck, bottom: baseState.mansionBottom }, pe.revealedInstanceId);
+            ? { deck: baseState.mansionDeck }
+            : sendToBottom({ deck: baseState.mansionDeck }, pe.revealedInstanceId);
           return {
             ...baseState,
             ...nextBase,
             seats: baseState.seats.map(s => (s.seat === pe.seat ? newPlayer : s)),
             removed: defeated ? [...baseState.removed, pe.revealedInstanceId] : baseState.removed,
             mansionDeck: bottomed.deck,
-            mansionBottom: bottomed.bottom,
             pendingExplore: undefined,
             flashGrenadeDefeatedInstanceId: undefined,
             prompts: newPrompts,
@@ -5409,13 +5413,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           rngBox.current = r.rng.s;
           return r.value;
         };
-        const shuffled = shuffleBack({ deck: next.mansionDeck, bottom: next.mansionBottom }, grabInstanceId, rngShuffle);
+        const shuffled = shuffleBack({ deck: next.mansionDeck }, grabInstanceId, rngShuffle);
         return {
           ...next,
           ...nextBase,
           rngState: rngBox.current,
           mansionDeck: shuffled.deck,
-          mansionBottom: shuffled.bottom,
           prompts: newPrompts,
         };
       }
@@ -5534,7 +5537,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           seats: state.seats.map(s => ({ ...s, attached: s.attached.filter(id => id !== chosen) })),
           mansionDeck: [chosen, ...state.mansionDeck.filter(id => id !== chosen)],
-          mansionBottom: state.mansionBottom.filter(id => id !== chosen),
           removed: state.removed.filter(id => id !== chosen),
           prompts: newPrompts,
         };
@@ -6045,7 +6047,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 return {
                   ...state,
                   ...nextBase,
-                  mansionBottom: [...state.mansionBottom, instanceId],
+                  mansionDeck: [...state.mansionDeck, instanceId],
                   prompts: newPrompts,
                 };
               }
@@ -6077,7 +6079,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (kind === 'antivirusFate') {
               const instanceId = prompt.payload?.instanceId as string | undefined;
               if (option === 0 && instanceId !== undefined) {
-                return { ...state, ...nextBase, mansionBottom: [...state.mansionBottom, instanceId], prompts: newPrompts };
+                return { ...state, ...nextBase, mansionDeck: [...state.mansionDeck, instanceId], prompts: newPrompts };
               }
               if (option === 1 && instanceId !== undefined) {
                 return { ...state, ...nextBase, removed: [...state.removed, instanceId], prompts: newPrompts };
@@ -7359,7 +7361,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, instanceId],
         };
         if (topId === undefined) {
-          return { ...afterTrash, mansionDeck: state.mansionDeck, mansionBottom: state.mansionBottom, prompts: newPrompts };
+          return { ...afterTrash, mansionDeck: state.mansionDeck, prompts: newPrompts };
         }
         return {
           ...afterTrash,
@@ -7373,7 +7375,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
       // CV-001 Cover-up peek: optionally move the peeked top card to the
-            // bottom of the Mansion. sendToBottom only APPENDS to the bottom — the
+            // bottom of the deck. sendToBottom only APPENDS to the deck — the
             // caller must remove the card from the deck itself (the explore paths
             // rely on revealTop having popped it; here we filter explicitly).
             if (kind === 'coverUpPeek') {
@@ -7381,12 +7383,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 const topId = String(prompt.payload?.topId ?? '');
                 if (topId !== '' && state.mansionDeck[0] === topId) {
                   const deckWithout = state.mansionDeck.filter(id => id !== topId);
-                  const bottomed = sendToBottom({ deck: deckWithout, bottom: state.mansionBottom }, topId);
+                  const bottomed = sendToBottom({ deck: deckWithout }, topId);
                   return {
                     ...state,
                     ...nextBase,
                     mansionDeck: bottomed.deck,
-                    mansionBottom: bottomed.bottom,
                     prompts: newPrompts,
                   };
                 }

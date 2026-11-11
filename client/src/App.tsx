@@ -221,9 +221,7 @@ export function App(): JSX.Element {
             ? `${def.name} was removed from the Mansion.`
             : r.outcomeZone === 'mansion'
               ? `${def.name} was returned to the Mansion deck.`
-              : r.outcomeZone === 'pending'
-                ? `${def.name} is revealed — answer the choice below to continue.`
-                : `${def.name} escaped to the bottom of the Mansion.`;
+              : `${def.name} is revealed — answer the choice below to continue.`;
       // Resolve the explore's weapon instances to defs for the reveal panel.
       const weaponDefs = r.weapons
         .map(id => defForInstance(state, id))

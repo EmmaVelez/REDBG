@@ -126,7 +126,7 @@ describe('Unofficial Expansion data', () => {
 
   it('shuffles the custom mansion cards in and seeds the shared counter supply', () => {
     const s = game();
-    const mansion = [...s.mansionDeck, ...s.mansionBottom];
+    const mansion = [...s.mansionDeck];
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-001')).toHaveLength(1);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-003')).toHaveLength(1);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-004')).toHaveLength(1);
@@ -150,7 +150,7 @@ describe('Unofficial Expansion data', () => {
       pilesForScenario('firstTimer', { customCards: ['poison'] }),
       STANDARD_MANSION_DECK,
     );
-    const mansion = [...s.mansionDeck, ...s.mansionBottom];
+    const mansion = [...s.mansionDeck];
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-006')).toHaveLength(2);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-008')).toHaveLength(2);
     expect(s.marketPiles['custom-ex-007']?.cards).toHaveLength(5);
@@ -376,7 +376,7 @@ describe('Unofficial Expansion in a full bot game', () => {
       ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached, ...(seat.counters ?? []), ...(seat.infectionCards ?? []), ...(seat.partnerAttached ?? []));
     }
     for (const pile of Object.values(state.marketPiles)) ids.push(...pile.cards);
-    ids.push(...state.mansionDeck, ...state.mansionBottom);
+    ids.push(...state.mansionDeck);
     ids.push(...(state.infectionDeck ?? []));
     ids.push(...(state.supply ?? []));
     return ids;

@@ -32,7 +32,7 @@ function mkState(over: Partial<GameState> & { seat0?: Partial<PlayerState> } = {
     activeSeat: 0, turnNumber: 1,
     seats: [seat(over.seat0)],
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: ['mkr1'] } },
-    mansionDeck: over.mansionDeck ?? [], mansionBottom: [], removed: [],
+    mansionDeck: over.mansionDeck ?? [], removed: [],
     cards: over.cards ?? {
       'c0': inst('c0', 'ch-plain'),
       'h1': inst('h1', 'we-1'),

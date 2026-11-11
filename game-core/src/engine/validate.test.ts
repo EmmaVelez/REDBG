@@ -34,7 +34,7 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState> } =
     activeSeat: 0, turnNumber: 1,
     seats: [seat(0, over.seat0), seat(1)],
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: ['mkr-1'] } },
-    mansionDeck: ['ma-1i'], mansionBottom: [], removed: [],
+    mansionDeck: ['ma-1i'], removed: [],
     cards: { 'a-1': inst('a-1', 'ac-1'), 'i-1': inst('i-1', 'it-1'), 'm-1': inst('m-1', 'am-1'), 'm-2': inst('m-2', 'am-1'), 'w-1': inst('w-1', 'we-1'), 'w-2': inst('w-2', 'we-2'), 'mkr-1': inst('mkr-1', 'we-1'), 'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'), 'ma-1i': inst('ma-1i', 'ma-1') },
     cardDefs: DEFS, prompts: over.prompts ?? [], winners: [], log: [],
   };

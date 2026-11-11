@@ -38,7 +38,7 @@ test('exploreDamage reads weapon damages + turn bonus from a full state', () => 
       actionsLeft: 1, buysLeft: 1, exploresLeft: 1, weaponDamageBonusThisTurn: 5,
       attached: [], inventory: [], hand: [], discard: [], playArea: [], downed: false, dead: false,
     }],
-    marketPiles: {}, mansionDeck: [], mansionBottom: [], removed: [],
+    marketPiles: {}, mansionDeck: [], removed: [],
     cards: {
       'w1': { instanceId: 'w1', cardId: 'we-full', location: { zone: 'hand', index: 0 } },
       'w2': { instanceId: 'w2', cardId: 'we-plain', location: { zone: 'hand', index: 0 } },

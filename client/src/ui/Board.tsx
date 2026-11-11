@@ -81,8 +81,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
                     </div>
                     <span className="zone-pile-count">{state.mansionDeck.length}</span>
                   </div>
-          <div className="mansion-counts" data-anim-zone="mansionBottom">
-            <span>Bottom: {state.mansionBottom.length}</span>
+          <div className="mansion-counts">
             <span>Removed: {state.removed.length}</span>
           </div>
           {counterAttached && (

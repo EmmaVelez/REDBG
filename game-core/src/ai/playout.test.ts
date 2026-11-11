@@ -43,7 +43,7 @@ function baseState(over: Partial<GameState> = {}): GameState {
     version: 1, seed: 1, rngState: 1, phase: 'main', activeSeat: 0, turnNumber: 1,
     seats: [player(0), player(1)],
     marketPiles: {},
-    mansionDeck: ['ma-1#1'], mansionBottom: [], removed: [],
+    mansionDeck: ['ma-1#1'], removed: [],
     cards: Object.fromEntries(
       ['ch-1#0', 'ch-1#1', 'am-1#1', 'we-weak#1', 'we-strong#1', 'ma-1#1', 'ma-bruiser#1'].map(id => [
         id, { instanceId: id, cardId: id.replace(/#.*$/, ''), location: { zone: 'hand' as const, index: 0 } },

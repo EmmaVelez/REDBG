@@ -507,7 +507,6 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
   let s = state;
   let prompts: Prompt[] = [];
   let mansionDeck = s.mansionDeck;
-  let mansionBottom = s.mansionBottom;
   let infectedShuffledBack = false;
 
   for (const e of def.infectedEffects ?? []) {
@@ -541,9 +540,8 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
           }
         }
         if (bestId !== undefined) {
-          const bottomed = sendToBottom({ deck: mansionDeck, bottom: mansionBottom }, bestId);
+          const bottomed = sendToBottom({ deck: mansionDeck }, bestId);
           mansionDeck = bottomed.deck;
-          mansionBottom = bottomed.bottom;
           // The moved Infected leaves the Combo Pile, so its Decoration Reward
           // is lost (and a lone MA-077 becomes worth 0).
           const prevAttached = player.attached;
@@ -558,7 +556,7 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
         }
         // Then shuffle this Infected into the Mansion.
         const shuffled = shuffleBack(
-          { deck: mansionDeck, bottom: mansionBottom },
+          { deck: mansionDeck },
           ctx.revealedInstanceId,
           items => {
             const r = shuffle(makeRng(s.rngState), items);
@@ -567,7 +565,6 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
           },
         );
         mansionDeck = shuffled.deck;
-        mansionBottom = shuffled.bottom;
         infectedShuffledBack = true;
         break;
       }
@@ -608,7 +605,7 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
     }
   }
 
-  return { state: { ...s, mansionDeck, mansionBottom }, prompts, infectedShuffledBack };
+  return { state: { ...s, mansionDeck }, prompts, infectedShuffledBack };
 }
 
 // ---------------------------------------------------------------------------

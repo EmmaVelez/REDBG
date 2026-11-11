@@ -18,7 +18,6 @@ function makeState(over: {
   }>;
   marketPiles?: Readonly<Record<string, { readonly pileId: string; readonly cards: readonly string[] }>>;
   mansionDeck?: readonly string[];
-  mansionBottom?: readonly string[];
   removed?: readonly string[];
   version?: number;
   log?: ReadonlyArray<{ seq: number; action: Record<string, unknown> }>;
@@ -56,7 +55,6 @@ function makeState(over: {
     })),
     marketPiles: over.marketPiles ?? {},
     mansionDeck: over.mansionDeck ?? [],
-    mansionBottom: over.mansionBottom ?? [],
     removed: over.removed ?? [],
     cards: {},
     cardDefs: {},
@@ -146,16 +144,15 @@ describe('detectReveal', () => {
     expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#7', outcomeZone: 'attached', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
-  it('detects an escaped Infected: mansion -> mansionBottom', () => {
-    const prev = makeState({ mansionDeck: ['ma-002#7'], seats: [{ seat: 0 }] });
+  it('detects an escaped Infected: mansion -> the bottom of the deck', () => {
+    const prev = makeState({ mansionDeck: ['ma-002#7', 'x1', 'x2'], seats: [{ seat: 0 }] });
     const next = makeState({
       version: 2,
-      mansionDeck: [],
-      mansionBottom: ['ma-002#7'],
+      mansionDeck: ['x1', 'x2', 'ma-002#7'],
       seats: [{ seat: 0 }],
       log: exploreLog,
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansionBottom', explorerSeat: 0, damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-002#7', outcomeZone: 'mansion', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('captures the weapon ids used for the explore', () => {
@@ -185,8 +182,7 @@ describe('detectReveal', () => {
     const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }] });
     const next = makeState({
       version: 2,
-      mansionDeck: [],
-      mansionBottom: ['ma-001#7'],
+      mansionDeck: ['ma-001#7'],
       seats: [{ seat: 0 }],
       log: [{ seq: 1, action: { type: 'buy' as const, seat: 0, pileId: 'we-001' as const } }],
     });
@@ -284,12 +280,11 @@ describe('detectReveal', () => {
     const prev = makeState({ mansionDeck: ['ma-001#1', 'ma-002#1'], seats: [{ seat: 0 }] });
     const next = makeState({
       version: 2,
-      mansionDeck: ['ma-002#1'],
-      mansionBottom: ['ma-001#1'],
+      mansionDeck: ['ma-002#1', 'ma-001#1'],
       seats: [{ seat: 0 }],
       log: [{ seq: 1, action: { type: 'explore' as const, seat: 0, weapons: [] as readonly string[], exploreCount: 1 } }],
     });
-    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#1', outcomeZone: 'mansionBottom', explorerSeat: 0, damage: 0, weapons: [] });
+    expect(detectReveal(prev, next, 0)).toEqual({ instanceId: 'ma-001#1', outcomeZone: 'mansion', explorerSeat: 0, damage: 0, weapons: [] });
   });
 
   it('returns null when the newest action is not an explore', () => {

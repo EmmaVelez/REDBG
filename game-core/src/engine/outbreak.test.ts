@@ -215,7 +215,7 @@ describe('Outbreak mode', () => {
     const explored = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-029#1'], exploreCount: 1 });
     expect(explored.seats[0]!.infectionCards).toHaveLength(1);
     expect(explored.seats[0]!.attached).not.toContain('ma-053#1');
-    expect(explored.mansionBottom).toContain('ma-053#1');
+    expect(explored.mansionDeck).toContain('ma-053#1');
   });
   // --- action cards ---
   test('AC-028 Higher Priorities: choose +3 cards or +2 actions', () => {

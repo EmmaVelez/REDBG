@@ -150,7 +150,7 @@ export function exploreCountOptions(
 ): readonly number[] {
   const player = state.seats[seat];
   if (player === undefined) return [1];
-  const mansionSize = state.mansionDeck.length + state.mansionBottom.length;
+  const mansionSize = state.mansionDeck.length;
   const granted = grantedExploresFor(weaponIds.map(id => defForInstance(state, id) ?? undefined));
   const max = Math.max(1, Math.min(player.exploresLeft + granted, mansionSize));
   const out: number[] = [];

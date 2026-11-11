@@ -4,6 +4,7 @@ import { drawWithReshuffle } from './deck';
 import { characterAbilities, passiveDamageBonus, infectedDamageReduction, applyRicardoDamage } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
+import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -81,11 +82,10 @@ export function resolveAllyExplore(
   // old `if (weaponIds.length === 0) return state` made the ability silently do
   // nothing whenever neither hand held a weapon.
 
-  const rev = revealTop({ deck: state.mansionDeck, bottom: state.mansionBottom });
+  const rev = revealTop({ deck: state.mansionDeck });
   const revealedId = rev.revealedInstanceId;
   const revealedDef = cardDef(state, revealedId);
   let mansionDeck = rev.mansion.deck;
-  let mansionBottom = rev.mansion.bottom;
 
   const targetAbilities = characterAbilities(state, targetSeat);
   // Both the exploring player's and Sherry's Ammo may pay for the explore.
@@ -107,7 +107,11 @@ export function resolveAllyExplore(
     weapons,
     ammo: combinedAmmo,
     bonusDamage,
-    revealed: revealedDef ?? ({} as CardDef),
+    revealed: {
+      ...(revealedDef ?? ({} as CardDef)),
+      hp: (revealedDef?.hp ?? 0) + nemesisPursuitBuff(state).hp,
+      attack: (revealedDef?.attack ?? 0) + nemesisPursuitBuff(state).attack,
+    },
     damageReduction: infectedDamageReduction(targetAbilities),
     attachedInfectedCount: target.attached.length,
     inventoryCount: target.inventory.length,
@@ -146,7 +150,16 @@ export function resolveAllyExplore(
   };
 
   if (outcome.kind === 'nonInfected') {
-    // EV-001 Zombie Grab: its own reveal branch (same contract as a normal
+    if (isNemesisPursuit(revealedDef)) {
+      // EV-002 Nemesis Pursuit: removed from the game; the exploring
+      // character (Sherry's target) must explore again and every Infected
+      // gets +10 Health / +20 Damage for the rest of the turn.
+      return applyNemesisPursuit({
+        ...next,
+        removed: [...next.removed, revealedId],
+      }, targetSeat);
+    }
+    // EV-001 Zombie Grab: its OWN reveal branch (same contract as a normal
     // explore) — trash a weapon from the target's POST-explore hand or
     // discard, or take 20 damage, then shuffle the card back into the Mansion.
     // The weapon options must not read the pre-strip hand: the explore has
@@ -159,7 +172,6 @@ export function resolveAllyExplore(
       return {
         ...next,
         mansionDeck,
-        mansionBottom,
         prompts: [...next.prompts, {
           id: `ally-zombie-grab-${sherrySeat}-${targetSeat}-${next.version}`,
           seat: targetSeat,
@@ -173,7 +185,6 @@ export function resolveAllyExplore(
     return {
       ...next,
       mansionDeck,
-      mansionBottom,
       prompts: [...next.prompts, {
         id: `ally-${sherrySeat}-${targetSeat}-${next.version}`,
         seat: targetSeat,
@@ -220,8 +231,8 @@ export function resolveAllyExplore(
       removed: [...next.removed, revealedId],
     };
   } else {
-    const bottomed = sendToBottom({ deck: next.mansionDeck, bottom: next.mansionBottom }, revealedId);
-    next = { ...next, mansionDeck: bottomed.deck, mansionBottom: bottomed.bottom };
+    const bottomed = sendToBottom({ deck: next.mansionDeck }, revealedId);
+    next = { ...next, mansionDeck: bottomed.deck };
   }
 
   // The exploring player draws a new hand.

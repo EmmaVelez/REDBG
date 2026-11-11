@@ -112,7 +112,6 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
     seats: [seat(0, over.seat0), seat(1, over.seat1)],
     marketPiles: over.marketPiles ?? { hg: { pileId: 'hg', cards: [] } },
     mansionDeck: over.mansionDeck ?? ['inf1'],
-    mansionBottom: over.mansionBottom ?? [],
     removed: over.removed ?? [],
     cards: over.cards ?? {
       'c0': inst('c0', 'ch-main'), 'c1': inst('c1', 'ch-main'),

@@ -57,7 +57,6 @@ function baseState(over: Partial<GameState> & { seat0?: Partial<PlayerState>; se
     seats: [seat(0, over.seat0), seat(1, over.seat1)],
     marketPiles: { hg: { pileId: 'hg', cards: [] } },
     mansionDeck: over.mansionDeck ?? ['inf1', 'inf2', 'inf3'],
-    mansionBottom: over.mansionBottom ?? [],
     removed: over.removed ?? [],
     cards: over.cards ?? {
       'c0': inst('c0', 'ch-1'), 'c1': inst('c1', 'ch-1'),
@@ -96,8 +95,7 @@ test('multi-explore failure deals the combined damage and bottoms every infected
   expect(after.seats[0]?.attached).toEqual([]);
   expect(after.seats[0]?.hp).toBe(70);
   expect(after.seats[0]?.exploresLeft).toBe(0);
-  expect(after.mansionDeck).toEqual(['inf3']);
-  expect(after.mansionBottom).toEqual(['inf1', 'inf2']);
+  expect(after.mansionDeck).toEqual(['inf3', 'inf1', 'inf2']);
 });
 
 test('multi-explore spends exactly the chosen number of explores', () => {
@@ -299,7 +297,6 @@ test('a multi-explore reveal gain (MA-092) lands in the discard, not in limbo', 
   }
   for (const pile of Object.values(after.marketPiles)) addAll(pile.cards);
   addAll(after.mansionDeck);
-  addAll(after.mansionBottom);
   addAll(after.removed);
   // Character cards are registered outside every zone by design (setup does
   // not place them), so they are accounted for separately.

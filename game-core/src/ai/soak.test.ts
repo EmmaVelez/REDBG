@@ -40,7 +40,7 @@ function zoneInstanceIds(state: GameState): string[] {
     ids.push(...seat.hand, ...seat.inventory, ...seat.discard, ...seat.playArea, ...seat.attached, ...(seat.counters ?? []), ...(seat.infectionCards ?? []), ...(seat.partnerAttached ?? []));
   }
   for (const pile of Object.values(state.marketPiles)) ids.push(...pile.cards);
-  ids.push(...state.mansionDeck, ...state.mansionBottom);
+  ids.push(...state.mansionDeck);
   ids.push(...(state.infectionDeck ?? []));
   ids.push(...(state.supply ?? []));
   return ids;

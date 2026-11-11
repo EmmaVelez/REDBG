@@ -143,8 +143,7 @@ describe('CV-001 Cover-up turn-start trash', () => {
     if (peek === undefined) return;
     const next = applyAction(afterTrash, { type: 'chooseOption', seat: 0, promptId: peek.id, option: peek.options.indexOf('Move to bottom') });
     expect(next.mansionDeck[0]).toBe(s1.mansionDeck[1]);
-    expect(next.mansionBottom).toContain(topId);
-    expect(next.mansionDeck).not.toContain(topId);
+    expect(next.mansionDeck[next.mansionDeck.length - 1]).toBe(topId);
   });
 
   it('Leave it keeps the peeked card on top', () => {
@@ -159,7 +158,6 @@ describe('CV-001 Cover-up turn-start trash', () => {
     if (peek === undefined) return;
     const next = applyAction(afterTrash, { type: 'chooseOption', seat: 0, promptId: peek.id, option: peek.options.indexOf('Leave it') });
     expect(next.mansionDeck[0]).toBe(topId);
-    expect(next.mansionBottom).not.toContain(topId);
   });
 
   it('does not duplicate the prompt for the same copy on a second turn start', () => {

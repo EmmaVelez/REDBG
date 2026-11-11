@@ -780,7 +780,7 @@ describe('Yellow Herb (it-002): attach + max HP + owed heal', () => {
     const declined = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 1 });
     expect(declined.seats[0]?.maxHp).toBe(120);
     expect(declined.seats[0]?.attached).not.toContain('it-002#1');
-    expect(declined.mansionBottom).toContain('it-002#1');
+    expect(declined.mansionDeck[declined.mansionDeck.length - 1]).toBe('it-002#1');
   });
 
   it('two herbs stack: +20 max HP, +20 owed heal', () => {

@@ -18,7 +18,6 @@ export type AnimZone =
   | 'play' // playArea
   | 'market'
   | 'mansion'
-  | 'mansionBottom'
   | 'attached'
   | 'removed';
 
@@ -71,7 +70,6 @@ function zoneIndex(state: GameState): Map<string, ZoneLoc> {
     }
   }
   for (const id of state.mansionDeck) map.set(id, { zone: 'mansion' });
-  for (const id of state.mansionBottom) map.set(id, { zone: 'mansionBottom' });
   for (const id of state.removed) map.set(id, { zone: 'removed' });
   return map;
 }
@@ -82,7 +80,6 @@ function travelsFaceDown(from: AnimZone, to: AnimZone): boolean {
     'deck',
     'discard',
     'mansion',
-    'mansionBottom',
     'removed',
   ]);
   return hidden.has(from) || hidden.has(to);
@@ -100,7 +97,7 @@ export interface Reveal {
    *  means it was RE-INSERTED into the deck (MX-001 Mr. X). `pending` means a
    *  NON-Infected reveal is parked in limbo while its Take / Send-to-bottom
    *  prompt is open — it is in no zone at all until the prompt is answered. */
-  readonly outcomeZone: 'attached' | 'mansionBottom' | 'removed' | 'mansion' | 'pending';
+  readonly outcomeZone: 'attached' | 'removed' | 'mansion' | 'pending';
   /** Seat that actually explored (the forced-explore target, if any). */
   readonly explorerSeat: number;
   /** Total damage the player's explore dealt (weapons + effects + turn bonus). */
@@ -145,10 +142,9 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
 
   // Revealed cards come out of the deck top-first, so the pre-explore deck
   // order IS the reveal order. A bottom reveal (WE-019) comes after every top
-  // card — its instance sits in `mansionBottom`, which is scanned second.
+  // card — its instance is the LAST one in the pre-explore deck.
   const revealOrder = new Map<string, number>();
   prev.mansionDeck.forEach((id, i) => revealOrder.set(id, i));
-  prev.mansionBottom.forEach((id, i) => revealOrder.set(id, prev.mansionDeck.length + i));
 
   const outcomes = new Map<string, Reveal['outcomeZone']>();
   for (const [instanceId, nextLoc] of nextZones) {
@@ -157,7 +153,7 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
     if (prevLoc === undefined) continue;
     if (prevLoc.zone !== 'mansion') continue;
     if (sameLoc(prevLoc, nextLoc)) continue;
-    if (nextLoc.zone === 'attached' || nextLoc.zone === 'mansionBottom' || nextLoc.zone === 'removed') {
+    if (nextLoc.zone === 'attached' || nextLoc.zone === 'removed') {
       outcomes.set(instanceId, nextLoc.zone);
     }
   }

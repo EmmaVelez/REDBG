@@ -33,7 +33,7 @@ function canExploreLegally(state: GameState, seat: number): boolean {
   if (player === undefined) return false;
   if (player.downed || player.dead) return false;
   if (player.exploresLeft < 1) return false;
-  if (deckCount({ deck: state.mansionDeck, bottom: state.mansionBottom }) < 1) return false;
+  if (deckCount({ deck: state.mansionDeck }) < 1) return false;
   const leaders: readonly ('main' | 'partner')[] =
     player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
   return leaders.some(
@@ -246,7 +246,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.exploreCount > player.exploresLeft + grantedExplores) {
         return { ok: false, reason: 'explore: not enough explores' };
       }
-      if (action.exploreCount > deckCount({ deck: state.mansionDeck, bottom: state.mansionBottom })) {
+      if (action.exploreCount > deckCount({ deck: state.mansionDeck })) {
         return { ok: false, reason: 'explore: mansion too small' };
       }
       if (action.leader === 'partner' && player.partnerInstanceId === undefined) {
