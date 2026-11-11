@@ -60,7 +60,7 @@ import { advanceTurn } from './turn';
 import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
 import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
-import { makeRng, shuffle } from '../util/rng';
+import { makeRng, shuffle, nextInt } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
@@ -68,7 +68,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1255,6 +1255,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
     case 'explore': {
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
           let player = state.seats[seat] as PlayerState;
+
+          // Survival Horror: before exploring, roll a d6 and apply the result.
+          // The die roll is handled via a prompt so the player sees the result.
+          if (hasSurvivalHorror(state) && !state.prompts.some(p => p.payload?.kind === 'survivalHorrorRoll')) {
+            const roll = nextInt(makeRng(state.rngState), 6).value + 1;
+            const newRng = nextInt(makeRng(state.rngState), 6).rng.s;
+            return {
+              ...state,
+              rngState: newRng,
+              prompts: [...state.prompts, {
+                id: `survival-horror-${seat}-${state.version}`,
+                seat,
+                text: `Survival Horror: rolled a ${roll}. Apply the effect.`,
+                options: ['Continue'],
+                payload: { kind: 'survivalHorrorRoll', roll: String(roll), seat: String(seat) },
+              }],
+            };
+          }
+
           // Alliance Partner Modification: the leader is chosen before the
           // reveal (action.leader); the persisted partnerLeading flag is the
           // fallback for older clients that set it via chooseExploreLeader.
@@ -5702,6 +5721,57 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? { ...s, discard: s.discard.filter(id => id !== chosen) }
             : s)),
           removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'survivalHorrorRoll') {
+        // Survival Horror: apply the die roll effect.
+        const roll = Number(prompt.payload?.roll ?? '1');
+        const shSeat = Number(prompt.payload?.seat ?? String(seat));
+        const shPlayer = state.seats[shSeat];
+        if (shPlayer === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+
+        let newState: GameState = state;
+        let newPlayer = { ...shPlayer };
+
+        switch (roll) {
+          case 1: // Weapons deal -5 damage this turn
+            newPlayer.weaponDamageBonusThisTurn = (newPlayer.weaponDamageBonusThisTurn ?? 0) - 5;
+            break;
+          case 2: // Take 10 damage
+            newPlayer.hp = Math.max(0, newPlayer.hp - 10);
+            break;
+          case 3: // Trash the top card of inventory
+            if (newPlayer.inventory.length > 0) {
+              const [topCard, ...rest] = newPlayer.inventory;
+              newPlayer.inventory = rest;
+              newState = { ...newState, removed: [...newState.removed, topCard] };
+            }
+            break;
+          case 4: // +2 cards
+            if (newPlayer.inventory.length >= 2) {
+              const drawn = newPlayer.inventory.slice(0, 2);
+              newPlayer.inventory = newPlayer.inventory.slice(2);
+              newPlayer.hand = [...newPlayer.hand, ...drawn];
+            } else {
+              const drawn = [...newPlayer.inventory];
+              newPlayer.inventory = [];
+              newPlayer.hand = [...newPlayer.hand, ...drawn];
+            }
+            break;
+          case 5: // Heal +10 health
+            newPlayer.hp = Math.min(newPlayer.maxHp, newPlayer.hp + 10);
+            break;
+          case 6: // Weapons deal +5 damage this turn
+            newPlayer.weaponDamageBonusThisTurn = (newPlayer.weaponDamageBonusThisTurn ?? 0) + 5;
+            break;
+        }
+
+        return {
+          ...newState,
+          ...nextBase,
+          seats: newState.seats.map(s => (s.seat === shSeat ? newPlayer : s)),
           prompts: newPrompts,
         };
       }

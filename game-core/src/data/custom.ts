@@ -503,4 +503,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'damagePenaltyForMultipleActions', actions: 1, penalty: 10 },
     ],
   },
+  {
+    id: 'ce-004',
+    name: 'Survival Horror',
+    type: 'event',
+    set: 'custom',
+    text: 'Before exploring, roll a six sided die and apply the result. 1: Weapons deal -5 damage this turn. 2: Take 10 damage. 3: Trash the top card of your inventory. 4: +2 cards. 5: Heal +10 health. 6: Weapons deal +5 damage this turn.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'survivalHorrorDieRoll' }],
+  },
 ];

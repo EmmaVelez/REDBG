@@ -142,6 +142,11 @@ export function mazeDamagePenalty(state: GameState, actionCountInPlayArea: numbe
   return 0;
 }
 
+/** Check if any active mansion attachment has Survival Horror die roll effect. */
+export function hasSurvivalHorror(state: GameState): boolean {
+  return hasMansionAttachmentEffect(state, 'survivalHorrorDieRoll');
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.
