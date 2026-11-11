@@ -209,6 +209,7 @@ export type WeaponEffect =
   // --- Custom weapons (CW-005..) ---
   | { readonly kind: "plusDamageIfRevealedInfectedHpAtLeast"; readonly threshold: number; readonly amount: number } // CW-005 Combat Knife: +N damage when infected with >= threshold HP is revealed
   | { readonly kind: "optionalSelfDamageForDamageAndType"; readonly damage: number; readonly amount: number; readonly type: WeaponTag } // CW-013 Pump-Action: take N damage to gain +amount damage and the type
+  | { readonly kind: "playFromDiscardOnExplore" } // CW-006 Kukri: may play from discard when exploring
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn

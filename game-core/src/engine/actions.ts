@@ -7,6 +7,7 @@ import type { MultiExploreTarget } from './explore';
 import { isNemesisPursuit, withNemesisPursuitBuff, applyNemesisPursuit, nemesisPursuitBuff, NEMESIS_PURSUIT_ID } from './nemesisPursuit';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
+import { canPlayFromDiscard } from './weaponReuse';
 import {
   characterAbilities,
   cardsOnDamageTakenDuringTurn,
@@ -1344,6 +1345,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           const handAfter = player.hand.filter(id => !weapons.includes(id) && !discardedPistols.includes(id));
           const discardAfterPistols: string[] = [...player.discard, ...discardedPistols];
+          // CW-006 Kukri: weapons with playFromDiscardOnExplore can be played from discard.
+          // Remove them from discard and treat as fresh weapons (they go to play area).
+          const discardWeaponIds = weapons.filter(id =>
+            player.discard.includes(id) && canPlayFromDiscard(state, seat, id)
+          );
+          const discardAfterKukri = discardAfterPistols.filter(id => !discardWeaponIds.includes(id));
           // Alliance Partner Modification: weapons attached to the Partner take
           // part in the explore but stay attached — they are never moved to the
           // play area, trashed, or removed by use.
@@ -1391,8 +1398,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? [...state.removed, ...trashedAmmo]
             : [...state.removed, ...explosiveIds, ...toTrashAfterUse, ...trashedAmmo];
           const discardAfterExplosives = toDiscardExplosives
-            ? [...discardAfterPistols, ...explosiveIds]
-            : discardAfterPistols;
+            ? [...discardAfterKukri, ...explosiveIds]
+            : discardAfterKukri;
           const exploresLeft = player.exploresLeft - exploreCount;
           // grantExplores weapon effect: +explores when this weapon is used.
           // The player may spend those explores in THIS action (see validate)

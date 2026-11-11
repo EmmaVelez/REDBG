@@ -93,6 +93,20 @@ export function canReuseWeapon(state: GameState, seat: number, weaponId: string)
 }
 
 /**
+ * True when this weapon may be played from the discard pile on explore
+ * (CW-006 Kukri: playFromDiscardOnExplore). The weapon must be in the discard,
+ * not already used this turn, and the seat must have the ability.
+ */
+export function canPlayFromDiscard(state: GameState, seat: number, weaponId: string): boolean {
+  const player = state.seats[seat];
+  if (player === undefined) return false;
+  if (!player.discard.includes(weaponId)) return false;
+  const def = weaponDef(state, weaponId);
+  if (def === undefined) return false;
+  return (def.weaponEffects ?? []).some(e => e.kind === 'playFromDiscardOnExplore');
+}
+
+/**
  * True when this weapon instance is attached to the seat's Partner (Alliance
  * Partner Modification). Attached weapons join the explore attack but are NOT
  * moved to the play area, trashed, or removed by use — they stay attached.
@@ -106,6 +120,7 @@ export function isPartnerWeapon(state: GameState, seat: number, weaponId: string
 /**
  * Weapons the seat can use in an explore right now: hand weapons first, then
  * any play-area weapon an ability lets them use again (Leon L2 pistols), then
+ * discard weapons with playFromDiscardOnExplore (CW-006 Kukri), then
  * the Partner's attached weapons (Alliance). Deduped and order-stable so the
  * action bar can render it directly.
  */
@@ -118,8 +133,12 @@ export function explorableWeapons(state: GameState, seat: number): readonly stri
     id => !seen.has(id) && weaponDef(state, id)?.type === 'weapon' && canReuseWeapon(state, seat, id),
   );
   for (const id of fromPlayArea) seen.add(id);
+  const fromDiscard = player.discard.filter(
+    id => !seen.has(id) && weaponDef(state, id)?.type === 'weapon' && canPlayFromDiscard(state, seat, id),
+  );
+  for (const id of fromDiscard) seen.add(id);
   const fromPartner = (player.partnerAttached ?? []).filter(
     id => !seen.has(id) && weaponDef(state, id)?.type === 'weapon',
   );
-  return [...fromHand, ...fromPlayArea, ...fromPartner];
+  return [...fromHand, ...fromPlayArea, ...fromDiscard, ...fromPartner];
 }

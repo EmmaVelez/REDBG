@@ -523,6 +523,23 @@ describe('custom attachment event cards', () => {
     }));
   });
 
+  it('Kukri (cw-006) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'cw-006');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'cw-006',
+      name: 'Kukri',
+      type: 'weapon',
+      set: 'custom',
+      copies: 1,
+      cost: 70,
+      ammoReq: 0,
+      damage: 15,
+      weaponTags: ['melee', 'knife'],
+      weaponEffects: [{ kind: 'playFromDiscardOnExplore' }],
+    }));
+  });
+
   it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
     const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
     // Knife pile should include Combat Knife

@@ -577,4 +577,17 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'plusDamagePerActionPlayedThisTurn', amount: 5 },
     ],
   },
+  {
+    id: 'cw-006',
+    name: 'Kukri',
+    type: 'weapon',
+    set: 'custom',
+    text: 'When you Explore you may play this Weapon from your Discard Pile.',
+    copies: 1,
+    cost: 70,
+    ammoReq: 0,
+    damage: 15,
+    weaponTags: ['melee', 'knife'],
+    weaponEffects: [{ kind: 'playFromDiscardOnExplore' }],
+  },
 ];
