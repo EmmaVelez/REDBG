@@ -292,6 +292,28 @@ describe('custom attachment event cards', () => {
     expect(loa!.type).toBe('event');
     expect(loa!.attachmentMode).toBe(1);
   });
+
+  it('Ecliptic Express (ce-009) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-009');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-009',
+      name: 'Ecliptic Express',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'trashDiscardOnInfectedDefeat' }],
+    }));
+  });
+
+  it('Ecliptic Express is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const ee = pool.find(c => c.id === 'ce-009');
+    expect(ee).toBeDefined();
+    expect(ee!.type).toBe('event');
+    expect(ee!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

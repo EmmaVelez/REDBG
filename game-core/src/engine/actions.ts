@@ -66,7 +66,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1836,6 +1836,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }
               }
             }
+          }
+          // Ecliptic Express: when defeating an infected, may trash a discard card
+          if (hasMansionAttachmentEffect(state, 'trashDiscardOnInfectedDefeat') && player.discard.length > 0) {
+            outcomePrompts.push({
+              id: `ecliptic-trash-${seat}-${state.version}`,
+              seat,
+              text: 'Ecliptic Express: trash a card from your discard pile?',
+              options: [...player.discard, 'Decline'],
+              payload: { kind: 'eclipticTrash' },
+            });
           }
           // Decorations for every defeated Infected (Combo Pile aware), including
           // any Barry-chain attachments revealed by the batch.
@@ -5577,6 +5587,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           rngState: rngBox.current,
           mansionDeck: shuffled.deck,
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'eclipticTrash') {
+        // Ecliptic Express: trash a card from discard pile, or decline.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, discard: s.discard.filter(id => id !== chosen) }
+            : s)),
+          removed: [...state.removed, chosen],
           prompts: newPrompts,
         };
       }

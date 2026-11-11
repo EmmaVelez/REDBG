@@ -410,4 +410,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'reduceAmmoBonus', amount: 10 },
     ],
   },
+  {
+    id: 'ce-009',
+    name: 'Ecliptic Express',
+    type: 'event',
+    set: 'custom',
+    text: 'When a player defeats an infected, they can trash a card in their discard pile.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'trashDiscardOnInfectedDefeat' }],
+  },
 ];

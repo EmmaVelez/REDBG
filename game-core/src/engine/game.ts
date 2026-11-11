@@ -10,7 +10,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 
 /** Check if any active mansion attachment has the given effect kind. */
-function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
+export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
   for (const attId of state.mansionAttachments ?? []) {
     const inst = state.cards[attId];
     if (!inst) continue;

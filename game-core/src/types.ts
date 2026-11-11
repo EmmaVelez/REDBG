@@ -370,6 +370,7 @@ export type AttachmentEffect =
   | { readonly kind: "healAndAmmoAtTurnStart"; readonly heal: number; readonly ammo: number } // Save Room: heal 10, +10 ammo at turn start
   | { readonly kind: "freePistolTrashAtEnd" } // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
   | { readonly kind: "reduceAmmoBonus"; readonly amount: number } // Low on Ammo: ammunition cards grant N less ammo
+  | { readonly kind: "trashDiscardOnInfectedDefeat" } // Ecliptic Express: when defeating an infected, may trash a discard card
 ;
 
 /**
