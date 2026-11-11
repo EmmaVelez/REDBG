@@ -82,23 +82,29 @@ export function MansionReveal({
         <div className="mansion-door-battle">
           {party !== undefined && party.length > 0 && (
             <div className="mansion-door-party" data-reveal-party>
-              {party.map((m, i) => (
-                <div
-                  className={`mansion-door-party-member${m.leader ? ' is-leader' : ''}`}
-                  key={`${m.def.id}-${i}`}
-                  data-leader={m.leader || undefined}
-                >
-                  <CardView
-                    def={m.def}
-                    compact
-                    artOnly
-                    hp={m.hp}
-                    maxHp={m.maxHp}
-                    decorations={m.decorations}
-                  />
-                  {m.leader && <span className="mansion-door-leader-tag">LED</span>}
-                </div>
-              ))}
+              {party.map((m, i) => {
+                // Only show damage flash when combat occurred and this character's HP dropped
+                const wasHit = damage > 0 && m.hp !== undefined && m.maxHp !== undefined && m.hp < m.maxHp;
+                return (
+                  <div
+                    className={`mansion-door-party-member${m.leader ? ' is-leader' : ''}${wasHit ? ' has-damage' : ''}`}
+                    key={`${m.def.id}-${i}`}
+                    data-leader={m.leader || undefined}
+                    data-damaged={wasHit || undefined}
+                  >
+                    <CardView
+                      def={m.def}
+                      compact
+                      artOnly
+                      hp={m.hp}
+                      maxHp={m.maxHp}
+                      decorations={m.decorations}
+                      flash={wasHit}
+                    />
+                    {m.leader && <span className="mansion-door-leader-tag">LED</span>}
+                  </div>
+                );
+              })}
             </div>
           )}
           {weapons !== undefined && weapons.length > 0 && (

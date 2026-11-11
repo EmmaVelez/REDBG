@@ -206,6 +206,10 @@ h1, h2 { margin: 0 0 8px; }
   position: relative;
   z-index: 1;
 }
+/* When a child carries the flash class, let it bloom outside this container */
+.card-has-art:has(> .cc-hp-ring-flash) {
+  overflow: visible !important;
+}
 .card-has-art .card-top {
   padding: 2px 4px 4px;
   background: linear-gradient(180deg, rgba(8, 9, 12, 0.72), rgba(8, 9, 12, 0));
@@ -253,6 +257,10 @@ h1, h2 { margin: 0 0 8px; }
   background: transparent;
   box-shadow: none;
   overflow: hidden;
+}
+/* Character-card art-only allows flash ring to bleed out */
+.card.card-character.card-art-only:has(> .cc-hp-ring-flash) {
+  overflow: visible !important;
 }
 /* Promo art (PR-*) is still the shorter 320x292 window. Rather than stretch it
    (distortion) or crop it (the printed Health badge sits near the right edge
@@ -757,17 +765,21 @@ h1, h2 { margin: 0 0 8px; }
 }
 .health-segment { transition: stroke 0.25s; }
 
-/* Health ring pulse-on-damage — scales to ~2× then shrinks back. */
+/* Health ring pulse-on-damage — scales to ~4× then shrinks back. */
 .cc-hp-ring-flash {
   animation: hp-pulse 5s ease-out;
 }
 @keyframes hp-pulse {
   0%   { transform: scale(1); }
-  8%   { transform: scale(2.1); }
-  25%  { transform: scale(1.3); }
-  45%  { transform: scale(1.6); }
-  70%  { transform: scale(1.1); }
+  8%   { transform: scale(4); }
+  25%  { transform: scale(2.5); }
+  45%  { transform: scale(3); }
+  70%  { transform: scale(1.5); }
   100% { transform: scale(1); }
+}
+.cc-hp-ring-flash > * {
+  /* Scale from the ring's exact center so it blooms uniformly in every direction */
+  transform-origin: 50% 50%;
 }
 
 .player-character-row {
@@ -2454,6 +2466,10 @@ h1, h2 { margin: 0 0 8px; }
 }
 .player-character-card.has-damage > .card,
 .player-character-card.has-damage > * > .card {
+  animation: card-shake 5s ease-out;
+}
+/* Mansion reveal screen — same shake on damaged party member cards */
+.mansion-door-party-member.has-damage > .card {
   animation: card-shake 5s ease-out;
 }
 
