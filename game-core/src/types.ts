@@ -371,6 +371,7 @@ export type AttachmentEffect =
   | { readonly kind: "freePistolTrashAtEnd" } // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
   | { readonly kind: "reduceAmmoBonus"; readonly amount: number } // Low on Ammo: ammunition cards grant N less ammo
   | { readonly kind: "trashDiscardOnInfectedDefeat" } // Ecliptic Express: when defeating an infected, may trash a discard card
+  | { readonly kind: "plusExploreAndMustExploreOrDamage"; readonly explores: number; readonly damage: number } // Infected Horde: +N explore, must explore or take N damage
 ;
 
 /**

@@ -314,6 +314,28 @@ describe('custom attachment event cards', () => {
     expect(ee!.type).toBe('event');
     expect(ee!.attachmentMode).toBe(1);
   });
+
+  it('Infected Horde (ce-010) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-010');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-010',
+      name: 'Infected Horde',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'plusExploreAndMustExploreOrDamage', explores: 1, damage: 20 }],
+    }));
+  });
+
+  it('Infected Horde is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const ih = pool.find(c => c.id === 'ce-010');
+    expect(ih).toBeDefined();
+    expect(ih!.type).toBe('event');
+    expect(ih!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

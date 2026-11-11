@@ -66,7 +66,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -4452,6 +4452,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
           }
 
+          // Infected Horde: if player didn't explore this turn, take damage instead.
+          const hordeBonus = infectedHordeBonus(state);
+          let hordeHp = player.hp;
+          if (hordeBonus.damage > 0 && !player.exploredOrAttackedThisTurn && !player.downed && !player.dead) {
+            const ric = applyRicardoDamage(state, seat, player.hp, hordeBonus.damage);
+            state = ric.state;
+            hordeHp = ric.hp;
+          }
+
           const ctx = advanceTurn({
             seatCount: state.seats.length,
             activeSeat: seat,
@@ -4466,6 +4475,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (player.downed) {
             const downedPlayer: PlayerState = {
               ...player,
+              hp: hordeHp,
               hand: [],
               discard: discardAfterTrash,
               playArea: [],
@@ -4492,6 +4502,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           const newPlayer: PlayerState = {
             ...player,
+            hp: hordeHp,
             hand: d.hand,
             inventory: d.deck,
             discard: d.discard,

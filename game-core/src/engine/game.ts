@@ -61,6 +61,25 @@ export function mansionAmmoBonusReduction(state: GameState): number {
   return reduction;
 }
 
+/** Get the Infected Horde bonus: +N explores and must-explore-or-damage penalty. */
+export function infectedHordeBonus(state: GameState): { explores: number; damage: number } {
+  let explores = 0;
+  let damage = 0;
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'plusExploreAndMustExploreOrDamage') {
+        explores += effect.explores;
+        damage += effect.damage;
+      }
+    }
+  }
+  return { explores, damage };
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.
@@ -993,13 +1012,15 @@ function startTurnInternal(state: GameState): GameState {
     // Wesker L2: the targeted player gets +1 Explore and must Explore this turn
     // (validate blocks endTurn until then; exploring clears the obligation).
     // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).
+    // Infected Horde: +N explores at turn start.
     exploresLeft:
       player.skipNextTurn ? 0 :
       (player.mustExplore === true ? 2 : 1) +
-      (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores,
+      (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores + infectedHordeBonus(state).explores,
     // Mansion attachment: mustExploreIfAble (Close Combat) — all players must
     // Explore if able. Set the flag so validate blocks endTurn until explored.
-    mustExplore: player.mustExplore === true || hasMansionAttachmentEffect(state, 'mustExploreIfAble'),
+    // Infected Horde: must explore or take damage.
+    mustExplore: player.mustExplore === true || hasMansionAttachmentEffect(state, 'mustExploreIfAble') || infectedHordeBonus(state).damage > 0,
     weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true

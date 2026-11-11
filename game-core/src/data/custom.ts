@@ -420,4 +420,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'trashDiscardOnInfectedDefeat' }],
   },
+  {
+    id: 'ce-010',
+    name: 'Infected Horde',
+    type: 'event',
+    set: 'custom',
+    text: 'All players get +1 explore and must explore at least once on their turn or take 20 damage instead.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'plusExploreAndMustExploreOrDamage', explores: 1, damage: 20 }],
+  },
 ];
