@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
-import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes } from './weaponReuse';
 import { isSkillActive } from './skill';
@@ -760,8 +760,15 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'endTurn: not your turn' };
       }
-      if (player.mustExplore === true && canExploreLegally(state, action.seat)) {
-        return { ok: false, reason: 'endTurn: must Explore first (Wesker ability)' };
+      if (mustExploreNow(state, action.seat) && canExploreLegally(state, action.seat)) {
+        const debt = player.exploresRequiredThisTurn ?? 0;
+        const owed = Math.max(player.mustExplore === true ? 1 : 0, debt);
+        return {
+          ok: false,
+          reason: player.mustExplore === true && debt === 0
+            ? 'endTurn: must Explore first (Wesker ability)'
+            : `endTurn: must Explore ${owed} more time(s) first`,
+        };
       }
       return { ok: true };
 

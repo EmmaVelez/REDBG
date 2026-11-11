@@ -38,6 +38,8 @@ import {
   infectedDamageReduction,
   exploreBigHandBonus,
   exploreActionsBonus,
+  exploreDamageIfNoPartnerLowHp,
+  payExploreDebt,
   knifeWeaponsUsedThisTurn,
   exploreOnInfectedDefeat,
   trashCardFromDiscardOnInfectedDefeat,
@@ -99,12 +101,17 @@ function uniqueWeapons(ids: readonly string[]): string[] {
 }
 
 /** Every weapon instance currently in a Resource Area pile (EX-003 Weapon Case,
- *  which lets the taker choose any weapon from the Resource Area). */
-function marketWeaponIds(state: GameState): string[] {
+ *  which lets the taker choose any weapon from the Resource Area). Pass
+ *  `maxCost` to keep only weapons costing no more than that (IT-000 Antique
+ *  Coin, whose gain is limited to its own cost). */
+function marketWeaponIds(state: GameState, maxCost?: number): string[] {
   const out: string[] = [];
   for (const pile of Object.values(state.marketPiles)) {
     for (const id of pile.cards) {
-      if (cardDef(state, id)?.type === 'weapon') out.push(id);
+      const def = cardDef(state, id);
+      if (def?.type !== 'weapon') continue;
+      if (maxCost !== undefined && (def.cost ?? Infinity) > maxCost) continue;
+      out.push(id);
     }
   }
   return out;
@@ -364,6 +371,10 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
   };
   if (action.type === 'explore') {
     mark(action.seat);
+    // CH-000 Rachael Foley L1: every Explore works down the turn's Explore
+    // debt, whatever explore path was taken (single, multi, weapon-granted).
+    // A multi-explore with exploreCount 2 IS two Explores, so it pays 2.
+    state = payExploreDebt(state, action.seat, action.exploreCount ?? 1);
     // Detect which mansion deck card was revealed by comparing decks before/after.
     // A revealed card disappears from mansionDeck and appears in a player's
     // inventory/discard/playArea — track what left the deck.
@@ -1118,6 +1129,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   ];
                 }
 
+                // Antique Coin (IT-000): trashing it gains one weapon from the
+                // Resource Area costing no more than the coin's own cost. The
+                // coin itself is already in `removed` at this point; the choice
+                // of weapon follows. With no eligible weapon the coin is simply
+                // trashed and no prompt is raised.
+                const coinEffect = (def.itemEffects ?? []).find(e => e.kind === 'gainWeaponFromMarket');
+                if (coinEffect !== undefined && coinEffect.kind === 'gainWeaponFromMarket') {
+                  const weaponIds = marketWeaponIds(state, coinEffect.costLimit);
+                  if (weaponIds.length > 0) {
+                    prompts = [
+                      ...prompts,
+                      {
+                        id: `antiqueCoin-${seat}-v${state.version}`,
+                        seat,
+                        text: def.text,
+                        options: weaponIds,
+                        payload: { kind: 'antiqueCoinChooseWeapon' },
+                      },
+                    ];
+                  }
+                }
+
       const newPlayer: PlayerState = {
         ...played.player,
         hp,
@@ -1428,6 +1461,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
             dualWieldBonus(state, seat, abilities, weapons) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
+            exploreDamageIfNoPartnerLowHp(abilities, player.partnerInstanceId, player.hp) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
@@ -2064,9 +2098,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }));
         for (const id of undefeatedEntries.map(e => e.id)) {
           const def = cardDef(state, id);
-          const shuffles = (def?.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle')) ?? false;
-          const insertEffect = def?.infectedEffects?.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
-          if (insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt') {
+          const effects = def?.infectedEffects ?? [];
+          // MA-078 shuffles ITSELF back inside applyMercenariesNotDefeatedEffects
+          // (it sets infectedShuffledBack), so the disposition pass must leave it
+          // alone — otherwise the same instance is added to the deck twice.
+          const selfShuffles = effects.some(
+            e => e.kind === 'onNotDefeatedMoveHighestDecorationAttachedToBottomThenShuffle',
+          );
+          const shuffles = effects.some(
+            e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle',
+          );
+          const insertEffect = effects.find(e => e.kind === 'onNotDefeatedInsertIntoMansionAt');
+          if (selfShuffles) {
+            // handled by the not-defeated effect hook below
+          } else if (insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt') {
             const inserted = insertAt({ deck: mDeck }, id, insertEffect.position);
             mDeck = inserted.deck;
           } else if (shuffles) {
@@ -2111,16 +2156,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const r = applyMercenariesNotDefeatedEffects(fxState, ctx);
             fxState = r.state;
             defeatFxPrompts.push(...r.prompts);
-            if (r.infectedShuffledBack) {
-              const shuffled = shuffleBack({ deck: fxState.mansionDeck }, id, rngShuffle);
-              fxState = { ...fxState, mansionDeck: shuffled.deck };
-            }
+            // MA-078 (Red Executioner) already shuffled ITSELF back into the
+            // Mansion inside the effect and returned the updated deck; doing it
+            // again here appended a second copy of the same instance.
             const rn = applyNightmareNotDefeatedEffects(fxState, { seat, revealedInstanceId: id, revealedDef: def, weapons });
             fxState = rn.state;
             defeatFxPrompts.push(...rn.prompts);
           }
         }
         mDeck = fxState.mansionDeck;
+
+        // The not-defeated effects ran on the PRE-explore seat. MA-078 moves the
+        // highest-Decoration trophy to the Mansion bottom, which drops it from
+        // the Combo Pile AND loses its Decoration Reward. newPlayer is built from
+        // the pre-explore seat below, so carry the live attached list forward —
+        // otherwise the trophy is both in the Mansion and still attached.
+        const liveSeat = fxState.seats[seat] as PlayerState | undefined;
+        const preExploreAttached = (state.seats[seat] as PlayerState).attached;
+        const attachedBase = liveSeat?.attached ?? preExploreAttached;
+        // decorationDelta(A, A) is 0, so this is a no-op when nothing moved.
+        decorations += decorationDelta(state, preExploreAttached, attachedBase);
 
         // Downed handling for a surviving leader.
         let handOut: readonly string[] = handAfter;
@@ -2180,8 +2235,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           pendingSkillEffects: undefined,
           pendingBackstab: undefined,
           attached: defeated
-            ? [...(state.seats[seat] as PlayerState).attached, ...defeatedIds, ...chainAttachedIds]
-            : [...(state.seats[seat] as PlayerState).attached, ...autoDefeatedIds],
+            ? [...attachedBase, ...defeatedIds, ...chainAttachedIds]
+            : [...attachedBase, ...autoDefeatedIds],
           // EX-006/EX-008 may have attached a Poison counter since `player` was
           // read — carry the live value forward.
           counters: (state.seats[seat] as PlayerState).counters,
@@ -5217,6 +5272,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
+      if (kind === 'turnStartPlusExploreRequiresTwoExplores') {
+        // CH-000 Rachael Foley L1: take +1 Explore, and she then owes two
+        // Explores this turn (endTurn is blocked until they are spent, as long
+        // as she can still explore legally).
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, exploresLeft: s.exploresLeft + 1, exploresRequiredThisTurn: 2 }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
       if (kind === 'zombieBInfectionIncrease') {
         // CH-032 Zombie B: trash an infection card from hand; the affected
         // character's Infection Level rises by 1 more.
@@ -5662,12 +5734,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         });
       }
 
+      if (kind === 'antiqueCoinChooseWeapon') {
+        // Antique Coin (IT-000): the chosen weapon moves from its Resource
+        // Area pile into the player's discard. The coin itself was already
+        // trashed when the choice was offered.
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const weaponDef = cardDef(state, chosen);
+        if (weaponDef === undefined || weaponDef.type !== 'weapon') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let removedFromPile = false;
+        const marketPiles = { ...state.marketPiles };
+        for (const pile of Object.values(marketPiles)) {
+          if (pile.cards.includes(chosen)) {
+            marketPiles[pile.pileId] = { ...pile, cards: pile.cards.filter(id => id !== chosen) };
+            removedFromPile = true;
+            break;
+          }
+        }
+        if (!removedFromPile) return { ...state, ...nextBase, prompts: newPrompts };
+        const stripped: GameState = { ...state, ...nextBase, marketPiles, prompts: newPrompts };
+        return gainCard(stripped, {
+          seat,
+          cardId: weaponDef.id,
+          instanceId: chosen,
+          destination: 'discard',
+          reason: 'other',
+        });
+      }
+
       if (kind === 'sherryForceExplore') {
         // FCH-008 Sherry Birkin: the chosen player immediately Explores
         // with Sherry's support (see engine/allyExplore.ts).
         const targetSeat = Number(prompt.options[option]);
         if (Number.isNaN(targetSeat)) return { ...state, ...nextBase, prompts: newPrompts };
         const resolved = resolveAllyExplore(state, seat, targetSeat);
+        // CH-000 Rachael Foley L1: a forced ally Explore is still an Explore,
+        // so it pays down the target's Explore debt too.
+        const afterDebt = payExploreDebt(resolved, targetSeat, 1);
         // Record the forced explore in the log. It is not a player-submitted
         // explore action, so without this entry the client's reveal overlay
         // never fires for it and the turn history omits what the target did.
@@ -5681,10 +5786,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           forcedBy: seat,
         };
         return {
-          ...resolved,
+          ...afterDebt,
           ...nextBase,
           log: [...nextBase.log, { seq: nextBase.log.length + 1, action: forcedExplore }],
-          prompts: [...newPrompts, ...resolved.prompts.filter(p => p.id !== prompt.id)],
+          prompts: [...newPrompts, ...afterDebt.prompts.filter(p => p.id !== prompt.id)],
         };
       }
 

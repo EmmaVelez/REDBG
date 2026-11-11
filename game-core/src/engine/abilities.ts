@@ -86,6 +86,32 @@ export function seatAbilities(state: GameState, seat: number): readonly Characte
   return [...main, ...partner];
 }
 
+/**
+ * True when the seat is obliged to Explore this turn: Wesker L2's `mustExplore`
+ * or Rachael Foley (CH-000) L1's `exploresRequiredThisTurn`. Shared by the
+ * endTurn validator and the bot's "never volunteer an unarmed explore" filter.
+ */
+export function mustExploreNow(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined) return false;
+  return player.mustExplore === true || (player.exploresRequiredThisTurn ?? 0) > 0;
+}
+
+/**
+ * Rachael Foley (CH-000) L1: pay down a seat's Explore debt by `spent`
+ * (floored at 0). A no-op when the seat owes nothing.
+ */
+export function payExploreDebt(state: GameState, seat: number, spent: number): GameState {
+  const player = state.seats[seat];
+  if (player === undefined || (player.exploresRequiredThisTurn ?? 0) <= 0) return state;
+  return {
+    ...state,
+    seats: state.seats.map(x => (x.seat === seat
+      ? { ...x, exploresRequiredThisTurn: Math.max((x.exploresRequiredThisTurn ?? 0) - spent, 0) }
+      : x)),
+  };
+}
+
 /** The Main or Partner's own card def plus the level it has resolved to. */
 export interface CharacterAbilitySource {
   readonly def: CardDef;
@@ -632,6 +658,22 @@ export function exploreBonusIfAmmoAbove(
   let bonus = 0;
   for (const a of abilities) {
     if (a.kind === 'exploreBonusIfAmmoAbove' && ammo > a.threshold) bonus += a.amount;
+  }
+  return bonus;
+}
+
+/** CH-000 Rachael Foley L2: on Explore, +amount damage this turn when she has
+ *  no Partner and her Health is at or below hpThreshold. ("No Partner" implies
+ *  she is the Main character, so the seat's own hp is hers.) */
+export function exploreDamageIfNoPartnerLowHp(
+  abilities: readonly CharacterAbility[],
+  partnerInstanceId: string | undefined,
+  hp: number,
+): number {
+  if (partnerInstanceId !== undefined) return 0;
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'exploreDamageIfNoPartnerLowHp' && hp <= a.hpThreshold) bonus += a.amount;
   }
   return bonus;
 }

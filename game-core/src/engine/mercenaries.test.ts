@@ -568,6 +568,38 @@ describe('Mercenaries infected', () => {
     expect(next.mansionDeck.some(id => next.cards[id]?.cardId === 'ma-078')).toBe(true);
   });
 
+  it('MA-078 Red Executioner: a MULTI-explore shuffles it back once and still drops the trophy', () => {
+    // Regression (soak alliance/2): the multi-explore caller used to shuffle
+    // MA-078 back a SECOND time — the effect already did it — leaving two copies
+    // of the same instance in the deck; and newPlayer was built from the
+    // pre-explore seat, so the bottomed trophy was still attached as well as in
+    // the Mansion.
+    const s = mercGame('ch-044');
+    const trophyId = nextId('ma-073');
+    const withTrophy: GameState = {
+      ...s,
+      cards: { ...s.cards, [trophyId]: { instanceId: trophyId, cardId: 'ma-073', location: { zone: 'attached', index: 0, seat: 0 } } },
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, attached: [trophyId] } : p)),
+    };
+    // MA-078 on top with another infected under it, so exploreCount 2 reveals
+    // both. Neither is defeated (combined 120 HP vs we-050's damage), so MA-078's
+    // not-defeated effect fires.
+    const withInfected = mansionTop(mansionTop(withTrophy, 'ma-079'), 'ma-078');
+    const before = withInfected.mansionDeck.filter(id => withInfected.cards[id]?.cardId === 'ma-078').length;
+    const weapon = findHand(withInfected, 'we-050');
+    const next = applyAction(tune(withInfected, { turnAmmo: 200, exploresLeft: 2 }), {
+      type: 'explore', seat: 0, weapons: [weapon], exploreCount: 2,
+    });
+    // MA-078 was revealed once and shuffled back ONCE, so the deck holds exactly
+    // as many copies as before the explore. The bug added a second copy (the
+    // disposition pass bottomed it AND the effect shuffled it back).
+    expect(next.mansionDeck.filter(id => next.cards[id]?.cardId === 'ma-078')).toHaveLength(before);
+    // The trophy left the Combo Pile (and its Decoration Reward with it).
+    expect(next.mansionDeck).toContain(trophyId);
+    expect(next.seats[0]?.attached).not.toContain(trophyId);
+    expect(next.seats[0]?.decorations).toBe(10 - 1);
+  });
+
   it('MA-079 Big Man Majini: not defeated, the exploring player gains 2 Ammo x10', () => {
     const s = mercGame('ch-044');
     const withInfected = mansionTop(s, 'ma-079'); // hp 40

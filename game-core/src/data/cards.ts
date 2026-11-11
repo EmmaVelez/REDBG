@@ -598,12 +598,15 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
   // Unofficial Expansion: custom cards that print a cost are REAL market cards
   // (EX-002/005/007) and need their own Resource Area pile. Infected/token/event
   // customs go to the Mansion (see setup), counters (EX-009) go to the shared
-  // board supply, and characters/skills are never piled.
+  // board supply, and characters/skills are never piled. A custom card flagged
+  // `mansion` (IT-000 Antique Coin) is a Mansion card even though it prints a
+  // cost, so it never gets a market pile.
   const known = new Set(base.flatMap(p => p.cardIds));
   const extra: { pileId: string; cardIds: readonly string[] }[] = [];
   for (const cardId of expandCustomCards(opts.customCards)) {
     const def = CUSTOM_CARDS.find(c => c.id === cardId);
     if (def === undefined) continue;
+    if (def.mansion === true) continue;
     if (def.type === 'counter' || def.type === 'infected' || def.type === 'token' || def.type === 'event') continue;
     if (def.type === 'character' || def.type === 'skill') continue;
     if (def.cost === undefined) continue;

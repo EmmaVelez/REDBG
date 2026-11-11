@@ -4,6 +4,7 @@ import { enumerateLegalActions } from './enumerate';
 import { evaluateState } from './evaluate';
 import { applyAction } from '../engine/actions';
 import { checkWin } from '../engine/game';
+import { mustExploreNow } from '../engine/abilities';
 
 /**
  * Flat score bonus applied to explore candidates (all difficulties).
@@ -98,7 +99,7 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     }
     // An unarmed explore is only worth playing when a forced-Explore
     // obligation leaves no alternative; voluntarily it just takes a hit.
-    if (action.type === 'explore' && action.weapons.length === 0 && state.seats[seat]?.mustExplore !== true) {
+    if (action.type === 'explore' && action.weapons.length === 0 && !mustExploreNow(state, seat)) {
       continue;
     }
 
@@ -308,7 +309,7 @@ export function choosePlayoutAction(state: GameState, seat: number): Action {
     }
     if (sameCoreState(state, next)) continue;
     // See chooseGreedyAction: never volunteer an unarmed explore.
-    if (action.type === 'explore' && action.weapons.length === 0 && state.seats[seat]?.mustExplore !== true) continue;
+    if (action.type === 'explore' && action.weapons.length === 0 && !mustExploreNow(state, seat)) continue;
 
     const endsTurn = action.type === 'endTurn' || isSkipTurnOption(state, action);
     const raw = evaluateState(

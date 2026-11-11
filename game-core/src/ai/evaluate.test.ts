@@ -99,8 +99,9 @@ describe('evaluateState', () => {
     test('gold and ammo pools add value', () => {
       const s = baseState({ seats: [player(0, { turnGold: 50, turnAmmo: 10 }), player(1)] });
       // Derivation: baseline 130 + 50*1 (gold) + 10*3 (ammo, under the 40 cap)
-      // + 20 (both piles affordable) = 230.
-      expect(evaluateState(s, 0)).toBe(230);
+      // + 29 (both piles affordable: 8 + floor(ownedVal * 0.6) each —
+      // we-1 damage 10 -> owned 12 -> 15; we-2 damage 8 -> owned 11 -> 14) = 239.
+      expect(evaluateState(s, 0)).toBe(239);
     });
 
     // 8. 'hand cards count by type'
@@ -289,9 +290,9 @@ describe('evaluateState', () => {
                   'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
                 },
               });
-              // ac-4: +1 card (12) + 2 actions (80) = 92 text value. Owned in discard:
-              // baseline 130 + 92 = 222.
-              expect(evaluateState(s, 0)).toBe(222);
+              // ac-4: +1 card (20) + 2 actions (80) = 100 text value. Owned in
+              // discard: baseline 130 + 100 = 230.
+              expect(evaluateState(s, 0)).toBe(230);
             });
 
             // 23. 'action cards are held at half text value (one action per turn)'
@@ -304,8 +305,8 @@ describe('evaluateState', () => {
                   'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
                 },
               });
-              // Held: 92 * 0.5 = 46 -> baseline 130 + 46 = 176.
-              expect(evaluateState(s, 0)).toBe(176);
+              // Held: 100 * 0.5 = 50 -> baseline 130 + 50 = 180.
+              expect(evaluateState(s, 0)).toBe(180);
             });
 
             // 24. 'ammo cards are worth their yield when owned (fallback buy incentive)'
@@ -366,9 +367,9 @@ describe('evaluateState', () => {
                   'ac-4': def('ac-4', { type: 'action', cost: 70, bonuses: { cards: 1, actions: 2 } }),
                 },
               });
-              // ac-4 text value 92 + Ada actionBonus 40 = 132 owned; +200 level bonus:
-              // baseline 130 + 200 + 132 = 462.
-              expect(evaluateState(s, 0)).toBe(462);
+              // ac-4 text value 100 + Ada actionBonus 40 = 140 owned; +200 level
+              // bonus: baseline 130 + 200 + 140 = 470.
+              expect(evaluateState(s, 0)).toBe(470);
             });
 
             // 27. 'character ability: Rebecca trash affinity boosts trash actions'

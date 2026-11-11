@@ -1,5 +1,88 @@
 # HANDOFF — resume here
 
+**Fixed the 3 pre-existing failures the pull left behind (2026-11-11):**
+All three reproduced on the clean pulled tree with this work stashed, and all three are now green.
+1. **Soak conservation (`ai/soak.test.ts`, `alliance/2`)** — THREE duplicate-instance bugs in the
+   multi-explore path, all around MA-078 Red Executioner (the single-explore path was always correct,
+   which is why only multi-explore games failed):
+   - `applyMercenariesNotDefeatedEffects` already shuffles MA-078 back into the Mansion AND sets
+     `infectedShuffledBack`, but the multi-explore caller shuffled it back a SECOND time
+     (`actions.ts`, the old `if (r.infectedShuffledBack) { shuffleBack(...) }` block) → the same
+     instance appeared 3× in `mansionDeck`. Removed: the flag means "already handled".
+   - The multi-explore DISPOSITION pass (`for (const id of undefeatedEntries ...)`) sent MA-078 to the
+     deck bottom because its effect kind is not in the `shuffles` list — and then the effect shuffled it
+     back too, adding it a second time. The pass now skips any infected whose effect shuffles it back
+     itself (`onNotDefeatedMoveHighestDecorationAttachedToBottomThenShuffle`).
+   - `newPlayer.attached` was built from `state.seats[seat].attached` (the PRE-explore seat), so
+     MA-078's removal of the highest-Decoration trophy was dropped and that trophy sat in BOTH the
+     Mansion and the Combo Pile. It is now built from the live post-effect seat (`fxState`), and the
+     Decoration delta is carried into `decorations` (`decorationDelta(A, A)` is 0, so it is a no-op
+     when nothing moved).
+   Regression test: `mercenaries.test.ts` "MA-078 Red Executioner: a MULTI-explore shuffles it back once
+   and still drops the trophy" — fails (3 copies) with the disposition fix disabled.
+2. **`ai/evaluate.test.ts` ×4** — stale exact-score assertions. Commit 43eb09c deliberately changed
+   `CARD_DRAW_VALUE` 12→20 and `affordablePiles` to `8 + floor(ownedVal*0.6) + marketPull`. Updated the
+   four expectations and their derivations: 230→239 (piles now 15 + 14 = 29), 222→230, 176→180,
+   462→470.
+3. **`ai/sim.test.ts` explore-rate heuristic** — measured both sides of 43eb09c on the same 8 seeds:
+   perTurn 0.106 → 0.064, but total explores 395 → 426 and Decorations 381 → 408 with 7/8 games still
+   ending naturally. The bots fight MORE in absolute terms and just take longer, so the floor moved
+   0.08 → 0.06 and an absolute `totalExplores > 300` guard was added; `gameOverCount` remains the real
+   anti-freeze guard.
+
+**CH-000 Rachael Foley — custom character (turn-start Explore debt + solo low-HP damage) (2026-11-11):**
+Manny sent the card scan and asked to "implement this custom character". Card: `[CHARACTER]` RACHAEL FOLEY,
+printed code CH-000, **80 Health**, gates **1 / 5**. Text verbatim — L1: "At the beginning of your turn, you can
+get +1 Explore. If so, Rachael must Explore at least twice this turn." L2: "Whenever Rachael Explores, if she has
+no Partner and she has 50 or less Health, she gets +20 damage this turn."
+1. **Data** (`data/custom.ts`): id `ch-000`, `maxHp: 80`, `level1At: 1`, `level2At: 5`, abilities
+   `turnStartPlusExploreRequiresTwoExplores` (L1) and `exploreDamageIfNoPartnerLowHp { amount: 20,
+   hpThreshold: 50 }` (L2). Wrote `SPEC_RACHAEL.md` first (prompt kind + resolution semantics).
+2. **L1** needed a count-based obligation the engine did not have (`mustExplore` is a boolean = "at least
+   one"). New `PlayerState.exploresRequiredThisTurn?: number`: the turn-start prompt
+   (`turnStartPlusExploreRequiresTwoExplores`, options `Gain +1 Explore` / `Decline`) sets it to **2** and
+   adds +1 Explore; `applyOutbreakHooks` pays it down by `exploreCount` (a multi-explore of 2 IS two
+   Explores); `startTurn` clears it; `validate`'s endTurn gate blocks while it is > 0 AND
+   `canExploreLegally` (so a seat that cannot explore is never deadlocked). Shared helper
+   `mustExploreNow` (Wesker's `mustExplore` OR the debt) drives the validator and the bot's
+   "never volunteer an unarmed explore" filter.
+3. **L2** is a per-explore bonus added to the shared `abilityDamage` term (so single- and multi-explore
+   both get it), mirroring `exploreBonusIfAmmoAbove`: +20 when `partnerInstanceId === undefined` and
+   `hp <= 50`.
+4. **Art**: `CARD-ART/CH-000.png` (320x446, 107 KB, P-mode) from the scan.
+**Verified**: new `engine/customRachael.test.ts` (16) — data shape, absent from ALL_CARDS, the turn-start
+offer (and its absence below L1), accept/decline, the debt blocking endTurn and paying down one explore at
+a time, a multi-explore paying 2 at once, the deadlock guard, the next-turn reset, the four L2 cases
+(solo@50 gets it; 51 HP / L1 / has-partner do not), and a distinct prompt id so it cannot collide with a
+partner's turn-start prompt. Regression-checked: disabling the prompt resolver and the L2 term turns 6 of
+them red; reverting the prompt id turns the collision test red. Gates: typecheck clean, client 206,
+server 105; game-core full suite 6 failed | 933 passed (939) — the SAME 6 failures as the pre-pull
+baseline (4 stale ai/evaluate, 1 ai/sim explore-rate heuristic, 1 Red Executioner double-shuffle
+conservation bug), all reproduced on the clean pulled tree with this work stashed.
+
+**IT-000 Antique Coin — custom MANSION item, trash-for-a-weapon (2026-11-11):**
+Manny sent the card scan and asked to "implement this mansion item card ... when enabled via the custom card
+selector it should add two of these cards to the mansion deck".
+1. **Card**: `[ITEM]` ANTIQUE COIN, printed code IT-000, cost 60, 2 copies. Text verbatim: "You can Trash this Item
+   to Gain one Weapon from the Resource Area with cost equal to, or less than, Antique Coin's cost." (The scan
+   reads IT-000, not IT-008.)
+2. **Data** (`data/custom.ts`): id `it-000`, `type: 'item'`, `copies: 2`, `cost: 60`, **`mansion: true`**,
+   `itemEffects: [{ kind: 'gainWeaponFromMarket', costLimit: 60 }]`. The `mansion` flag and the effect kind were
+   already stubbed in `types.ts` (commit 72ca72d) but nothing consumed them.
+3. **Routing**: `setup`'s `isCustomMansionCard` now honours `c.mansion === true`, so the two copies are shuffled
+   into the Mansion deck; `pilesForScenario` skips `mansion` cards so the coin never gets a Resource Area pile
+   despite printing a cost. The lobby picker groups it under "Mansion Deck Cards".
+4. **Effect**: `playItem` (trashing the item) raises an `antiqueCoinChooseWeapon` prompt listing Resource Area
+   weapons with `cost <= 60` (`marketWeaponIds` gained an optional `maxCost`); the `chooseOption` handler moves
+   the chosen instance from its pile to the player's discard via `gainCard`. No eligible weapon → no prompt.
+5. **Art**: `CARD-ART/IT-000.png` (320x446, 110 KB, P-mode) from the scan; `cardArt.ts` globs the directory so no
+   map entry was needed.
+**Verified**: new `engine/customAntiqueCoin.test.ts` (8) — data shape, not in ALL_CARDS, 2 copies in the Mansion
+and no `custom-it-000` pile, the <=60 offer list (we-010 at exactly 60 included; we-006/012/014/016 excluded),
+the chosen weapon leaves its pile for the discard, no prompt when nothing is cheap enough, and the full
+explore → Take → play path. Regression-checked: disabling the `playItem` wiring turns 3 of them red.
+Gates: typecheck clean (3 workspaces), client 206, server 105, game-core full suite green.
+
 **Turn 1 never went through startTurn, so every turn-start effect was dead on the opening turn (2026-11-10):**
 Manny: "CR-001 dosent give the player it's automatic +1 buy each turn from it'S LEvel 1 ability".
 1. **Root cause**: `startTurn` is the only place the turn-start pools are applied (`buysLeft: 1 + plusBuyBonus(seatAbils)`,
@@ -1312,3 +1395,6 @@ engine are unused union members in `types.ts`
 5. GRANTED EXPLORES (commit 41757a2): a weapon that grants Explores (Pump-Action/Automatic/Riot/Triple Barreled Shotguns, Stun Rod, Flashbang) can now spend them in the SAME explore — `exploreCount` is bounded by `exploresLeft + grantedExploresFor(weapons)` (validate.ts) and the reducer adds the grant back after spending. The ActionBar's "Explores to use" selector lists 1..pool and a hint names the granting weapon; `exploreCountOptions`/`grantedExploresForSelection` in `client/src/ui/explorePicker.ts` mirror the engine helper. `enumerate.ts` offers 1 and the full pool so bots use it too. Fixed a latent multi-explore conservation bug this exposed: MA-092's "Gain 1 copy" was applied to a pre-gain seat snapshot and dropped from the discard (`gainCopyTracked` in mercenaries.ts now reports the created ids; regression test in multiExplore.test.ts).
 7. SKILL AREA POSITION (uncommitted): the Mercenaries Skill Area moved out of the footer dock into the action identity row, immediately right of the character/partner cards — the row is now `CharacterCards -> Skill Area -> deck -> hand -> discard`. App.tsx no longer renders SkillPanel; ActionBar.tsx renders it in a new `.action-col.action-col-skills`. `.skill-panel` is a vertical column and `.skill-panel .skill-row` stacks label -> pips -> button (scoped, because `.skill-row` is shared with CardView's character-card skill list). Collapses to zero width when the Skill System is off.
 6. LEON L2 DOUBLE USE (this change): `weapons: [pistolId, pistolId]` in ONE explore = the official FAQ play (pay the ammo twice, effect and damage twice). `weaponReuse.ts` gained `canUseWeaponTimes` and `weaponUsesThisTurn` counts occurrences; `validate.ts` rejects only beyond the per-turn cap; `actions.ts` de-dupes the play-area/trash lists via `uniqueWeapons`; `enumerate.ts` offers the doubled combo; the ActionBar has a "×2" button. If a future ability grants MORE than 2 uses (or duplicates only the effect, like SK-021), extend `maxWeaponUses` and the `toggleWeaponDouble` cap — the rest of the pipeline already treats each array entry as one use.
+8. IT-000 ANTIQUE COIN (this change): a custom MANSION item — `mansion: true` routes it to the Mansion deck (2 copies) instead of a Resource Area pile, and its `gainWeaponFromMarket { costLimit: 60 }` effect fires on `playItem` as an `antiqueCoinChooseWeapon` prompt. The `mansion` flag is the general switch for "custom card that prints a cost but lives in the Mansion"; any future card with it must also be excluded from `pilesForScenario` and grouped into the picker's Mansion section. `marketWeaponIds(state, maxCost?)` is shared with EX-003 (which passes no limit).
+9. CH-000 RACHAEL FOLEY (this change): a custom character whose L1 is a COUNT-based Explore obligation. `PlayerState.exploresRequiredThisTurn` (2 when she takes the turn-start +1 Explore) is paid down by `payExploreDebt` in `applyOutbreakHooks` (by `exploreCount`, so a multi-explore of 2 counts twice) and by the Sherry forced-explore path; `startTurn` clears it; `validate` blocks endTurn while it is > 0 AND `canExploreLegally`. `mustExploreNow(state, seat)` is the shared "is this seat obliged to explore" predicate (Wesker `mustExplore` OR the debt) — use it for any new obligation instead of reading `mustExplore` directly. Her L2 is a per-explore bonus on the shared `abilityDamage` term.
+10. PULL FALLOUT FIXES (this change): the three failures commit 43eb09c left behind are fixed (details in the top paragraph). The MA-078 lesson is the one to remember — in the MULTI-explore path, `applyMercenariesNotDefeatedEffects` already shuffles an `infectedShuffledBack` infected into the deck, so the caller must NOT shuffle it again; and `newPlayer` is built from the PRE-explore seat, so any seat mutation a not-defeated effect makes (MA-078 drops the highest-Decoration trophy from `attached` and adjusts `decorations`) must be carried over from `fxState` or it is silently lost and the card lands in two zones at once.

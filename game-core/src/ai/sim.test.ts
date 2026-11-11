@@ -171,7 +171,16 @@ describe('Bot Game Simulation (M2-T05)', () => {
       if (r.ended === 'gameOver') gameOverCount++;
     }
     const perTurn = totalExplores / Math.max(totalTurns, 1);
-    expect(perTurn).toBeGreaterThan(0.08);       // 0.05 was the freeze; the playout is selective
+    // Floor history: 0.05 was the freeze (500+ turn games, ~14 Decorations).
+    // The pulled AI reweight (43eb09c — CARD_DRAW_VALUE 12→20 and affordable
+    // piles weighted by owned value) deliberately changed bot behaviour.
+    // Measured over these 8 seeds: perTurn 0.106 → 0.064, but total explores
+    // 395 → 426 and Decorations 381 → 408, with 7/8 games still ending naturally.
+    // The bots fight MORE in absolute terms and simply take longer to do it, so
+    // the floor tracks the new normal; gameOverCount stays the real anti-freeze
+    // guard (a freeze would collapse totalExplores too).
+    expect(perTurn).toBeGreaterThan(0.06);
+    expect(totalExplores).toBeGreaterThan(300);    // absolute fighting floor
     expect(totalDecorations).toBeGreaterThan(150); // ~30/game vs ~14 for the 1-ply bot
     expect(gameOverCount).toBeGreaterThanOrEqual(5); // most games finish, not cap out
   });

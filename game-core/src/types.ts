@@ -532,6 +532,9 @@ export type CharacterAbility =
   // --- Fan characters (JM-001..) ---
   | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
   | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats
+  // --- Fan characters (CH-000..) ---
+  | { readonly kind: "turnStartPlusExploreRequiresTwoExplores"; readonly level: 1 | 2 } // CH-000 Rachael Foley L1: turn-start choice of +1 Explore, owing 2 Explores this turn
+  | { readonly kind: "exploreDamageIfNoPartnerLowHp"; readonly amount: number; readonly hpThreshold: number; readonly level: 1 | 2 } // CH-000 Rachael Foley L2: on Explore, +amount damage this turn when she has no Partner and Health <= hpThreshold
 
 
 // ---------------------------------------------------------------------------
@@ -605,6 +608,10 @@ export interface PlayerState {
   /** Wesker L2: this player must Explore on their current turn (grants +1
    *  Explore at turn start; blocks endTurn until at least one explore). */
   readonly mustExplore?: boolean;
+  /** Rachael Foley (CH-000) L1: Explores still owed THIS turn. Set to 2 when
+   *  she takes the turn-start +1 Explore; each explore decrements it; endTurn
+   *  is blocked while it is > 0 and the seat can still explore. */
+  readonly exploresRequiredThisTurn?: number;
   /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
    *  NEXT real turn (fallen from a herb attached via Explore gain). */
   readonly pendingHerbHeal?: number;

@@ -93,10 +93,12 @@ function CustomCardsPicker(props: {
   // the single bundle check below, so they are left out of the groups.
   const characters = CUSTOM_CARDS.filter(c => c.type === 'character' && !bundled.has(c.id));
   const infectionTokens = CUSTOM_CARDS.filter(c =>
-    (c.type === 'infected' || c.type === 'token') && !bundled.has(c.id)
+    (c.type === 'infected' || c.type === 'token' || c.mansion === true) && !bundled.has(c.id)
   );
   const resourceAreaCards = CUSTOM_CARDS.filter(c =>
-    (c.type === 'weapon' || c.type === 'ammunition' || c.type === 'item') && !bundled.has(c.id)
+    (c.type === 'weapon' || c.type === 'ammunition' || c.type === 'item') &&
+    c.mansion !== true &&
+    !bundled.has(c.id)
   );
   const otherCards = CUSTOM_CARDS.filter(c =>
     (c.type === 'event' || c.type === 'action' || c.type === 'counter') && !bundled.has(c.id)
@@ -105,7 +107,7 @@ function CustomCardsPicker(props: {
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
-      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected/Tokens go to Mansion deck, Characters enter deal pool, Weapons/Ammo/Items get Resource Area piles.</p>
+      <p className="lobby-hint">Fan-made cards. Selected cards join the game — Infected/Tokens and other Mansion cards go to the Mansion deck, Characters enter the deal pool, Weapons/Ammo/Items get Resource Area piles.</p>
 
       {/* Character Cards Section */}
       <details className="custom-card-section">
@@ -127,7 +129,7 @@ function CustomCardsPicker(props: {
       {/* Mansion Deck Cards Section */}
       <details className="custom-card-section">
         <summary className="custom-card-section-title">🏠 Mansion Deck Cards</summary>
-        <p className="lobby-hint-small">Infected and tokens are shuffled into the Mansion deck.</p>
+        <p className="lobby-hint-small">Infected, tokens, and other Mansion-flagged cards are shuffled into the Mansion deck.</p>
         {infectionTokens.map(c => (
           <label key={c.id} className="custom-card-row">
             <input

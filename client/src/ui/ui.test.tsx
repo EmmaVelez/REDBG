@@ -1373,6 +1373,14 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('data-testid="custom-card-mx-001"');
     expect(html).toContain('Mr. X');
     expect(html).toContain('Custom Cards (0 selected)');
+    // IT-000 Antique Coin prints a cost but is a MANSION card, so it must be
+    // grouped with the Mansion cards (rendered before the Resource Area
+    // section), never with the Resource Area piles.
+    const coinAt = html.indexOf('data-testid="custom-card-it-000"');
+    const resourceAt = html.indexOf('data-testid="custom-card-ex-002"');
+    expect(coinAt).toBeGreaterThan(-1);
+    expect(resourceAt).toBeGreaterThan(-1);
+    expect(coinAt).toBeLessThan(resourceAt);
   });
 
   it('offers one Poison check instead of the four EX-006..EX-009 cards', () => {

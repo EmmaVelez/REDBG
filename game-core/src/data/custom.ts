@@ -233,6 +233,27 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'plusDecorationOnDefeatHighHp', threshold: 40, amount: 1, level: 2 },
     ],
   },
+  {
+    // Fan card (Bandai print, code CH-000). Rachael Foley — the L1 gate is 1
+    // Decoration, the L2 gate is 5.
+    id: 'ch-000',
+    name: 'Rachael Foley',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: At the beginning of your turn, you can get +1 Explore. If so, Rachael must Explore at least twice this turn.\nLevel 2: Whenever Rachael Explores, if she has no Partner and she has 50 or less Health, she gets +20 damage this turn.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 1,
+    level2At: 5,
+    levels: [
+      { level: 1, text: 'At the beginning of your turn, you can get +1 Explore. If so, Rachael must Explore at least twice this turn.' },
+      { level: 2, text: 'Whenever Rachael Explores, if she has no Partner and she has 50 or less Health, she gets +20 damage this turn.' },
+    ],
+    abilities: [
+      { kind: 'turnStartPlusExploreRequiresTwoExplores', level: 1 },
+      { kind: 'exploreDamageIfNoPartnerLowHp', amount: 20, hpThreshold: 50, level: 2 },
+    ],
+  },
 
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
@@ -318,6 +339,22 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     copies: 5,
     cost: 20,
     itemEffects: [{ kind: 'returnToMarketAndRemoveCounters' }],
+  },
+  {
+    // Fan card (Bandai print, code IT-000). A MANSION item: two copies are
+    // shuffled into the Mansion deck (the `mansion` flag routes it there in
+    // setup instead of a Resource Area pile). Trashing it — playing it from
+    // hand — gains one weapon from the Resource Area costing no more than the
+    // coin's own cost.
+    id: 'it-000',
+    name: 'Antique Coin',
+    type: 'item',
+    set: 'custom',
+    text: 'You can Trash this Item to Gain one Weapon from the Resource Area with cost equal to, or less than, Antique Coin\'s cost.',
+    copies: 2,
+    cost: 60,
+    mansion: true,
+    itemEffects: [{ kind: 'gainWeaponFromMarket', costLimit: 60 }],
   },
   {
     id: 'ex-008',

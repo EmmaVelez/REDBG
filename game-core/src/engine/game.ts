@@ -372,6 +372,21 @@ function turnStartAbilityPrompts(
     });
   }
 
+  // CH-000 Rachael Foley L1: at turn start, may get +1 Explore — and if she
+  // does, she must Explore at least twice this turn.
+  if (abilities.some(a => a.kind === 'turnStartPlusExploreRequiresTwoExplores')) {
+    prompts.push({
+      // Distinct id: several turn-start abilities share the generic
+      // `ability-<seat>-v<version>` id, and two prompts with the same id would
+      // collide (chooseOption removes EVERY prompt with that id).
+      id: `rachael-explore-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: abilityText('turnStartPlusExploreRequiresTwoExplores'),
+      options: ['Gain +1 Explore', 'Decline'],
+      payload: { kind: 'turnStartPlusExploreRequiresTwoExplores' },
+    });
+  }
+
   return prompts;
 }
 
@@ -555,7 +570,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   // Custom EVENT cards (ev-001 Zombie Grab) live in the Mansion too, even though
   // isMansionCard() only covers the official set's card types.
   const isCustomMansionCard = (c: CardDef): boolean =>
-    c.set === 'custom' && (isMansionCard(c) || c.type === 'event');
+    c.set === 'custom' && (c.mansion === true || isMansionCard(c) || c.type === 'event');
   const customMansion = cards.filter(isCustomMansionCard);
   const mansionIds: string[] = [];
   if (mansionCards !== undefined) {
@@ -931,6 +946,8 @@ function startTurnInternal(state: GameState): GameState {
       gainedCardsGoToHand: false,
       damagePerAdditionalActionThisTurn: 0,
       mustExplore: false,
+      // Rachael Foley L1: a downed (skipped) turn clears the Explore debt.
+      exploresRequiredThisTurn: undefined,
       skipRewardPending: false,
       healedFirstTimeThisTurn: false,
       // pendingHerbHeal intentionally preserved: a skipped (downed) turn does
@@ -1084,6 +1101,9 @@ function startTurnInternal(state: GameState): GameState {
     chrisAmmoDiscountTypes: undefined,
     pendingSkillEffects: undefined,
     skillAmmoDiscountTypes: undefined,
+    // Rachael Foley L1: the "must Explore at least twice" debt is per-turn, so
+    // it is cleared here; the turn-start prompt may set it again.
+    exploresRequiredThisTurn: undefined,
     // Jill Valentine (Mercenaries) L1: the targeted player's weapons cost
     // +amount Ammo THIS turn (the "next turn" the ability named).
     ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,
