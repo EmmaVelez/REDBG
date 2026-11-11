@@ -1,6 +1,7 @@
 import type { CharacterAbility, GameState } from '../types';
 import {
   characterAbilities,
+  partnerAbilities,
   ammoReqForWeapon,
   singleWeaponAmmoDiscount,
   chosenWeaponTypeAmmoDiscount,
@@ -33,7 +34,12 @@ export function exploreAmmoReq(
   const player = state.seats[seat];
   const inst = state.cards[weaponId];
   const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
-  const abils = abilities ?? characterAbilities(state, seat);
+  // Partner-attached weapons use the Partner's abilities for ammo discounts,
+  // not the leader's abilities. This ensures that if the Partner has an
+  // ammoReqReduction ability (e.g., Leon L1 pistols -10), it applies to their
+  // own attached weapons.
+  const isPartnerAttached = (player?.partnerAttached ?? []).includes(weaponId);
+  const abils = abilities ?? (isPartnerAttached ? partnerAbilities(state, seat) : characterAbilities(state, seat));
 
   let req = ammoReqForWeapon(abils, def, effectiveWeaponTags(state, seat, weaponId));
   if (weaponCount === 1) req -= singleWeaponAmmoDiscount(abils);
