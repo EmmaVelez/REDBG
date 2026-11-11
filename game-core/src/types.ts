@@ -829,6 +829,12 @@ export interface GameState {
    *  prompt is resolved. Cleared at turn start. */
   readonly survivalHorrorRolledThisTurn?: boolean;
 
+  /** Track which start-of-turn abilities have been used this turn.
+   *  Key: ability kind string (e.g. 'turnStartDrawThenDiscardCard').
+   *  Prevents the same ability from being used again via the action button.
+   *  Cleared at turn start. */
+  readonly usedStartOfTurnAbilities?: Readonly<Record<string, boolean>>;
+
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when
    *  the Character dies it returns here ("return to the Resource Area"). */

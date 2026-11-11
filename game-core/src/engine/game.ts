@@ -869,6 +869,11 @@ function startTurnInternal(state: GameState): GameState {
     state = { ...state, survivalHorrorRolledThisTurn: undefined };
   }
 
+  // Clear the start-of-turn abilities used flag so they can fire next turn.
+  if (state.usedStartOfTurnAbilities !== undefined) {
+    state = { ...state, usedStartOfTurnAbilities: undefined };
+  }
+
   // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of
   // the attached Character's turn, before anything else. Reaching 0 Health
   // downs the Character, which skips the rest of this turn; it revives (at

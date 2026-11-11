@@ -524,6 +524,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               return { ok: false, reason: 'useCharacterAbility: already used this turn' };
             }
           }
+          // Check if this start-of-turn ability was already used via the turn-start prompt.
+          if (state.usedStartOfTurnAbilities?.[ability.kind]) {
+            return { ok: false, reason: 'useCharacterAbility: start-of-turn ability already used this turn' };
+          }
           if (ability.kind === 'forceAllyExploreWithSupport') {
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
             if (others.length === 0) {

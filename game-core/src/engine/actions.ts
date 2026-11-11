@@ -5563,6 +5563,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? { ...player, hp: ric.hp, exploresLeft: player.exploresLeft + 1 }
             : s)),
           prompts: [...newPrompts, ...ricPrompts],
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDamageForExplore: true },
         };
       }
 
@@ -6420,6 +6421,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : s,
           ),
           prompts: newPrompts,
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
         };
         // Now prompt to discard a card from hand.
         const drewPlayer = drewState.seats[seat];
@@ -6480,6 +6482,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             s.seat === seat ? { ...p, hand: [...p.hand, chosenId], discard: p.discard.filter(id => id !== chosenId) } : s,
           ),
           prompts: newPrompts,
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), searchDiscardForAmmoAtTurnStart: true },
         };
       }
 
