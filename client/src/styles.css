@@ -2193,13 +2193,17 @@ h1, h2 { margin: 0 0 8px; }
 .app-action-dock .zone-pile { min-width: 64px; }
 .app-action-dock .zone-pile-stack { width: 76px; height: 103px; }
 /* prompts grow to fill the controls band; the buttons spread across it */
-.app-action-dock .action-prompts { flex: 1 1 auto; min-width: 260px; }
+.app-action-dock .action-prompts { min-width: 260px; }
 /* The controls band (prompts + the turn's buttons) is pulled OUT of the dock and
    floats just ABOVE it, over the board, with a transparent background so the
    board shows through between the buttons. It is position:fixed against the
    viewport, anchored to the dock's measured height (--dock-h, published by
    App.tsx), so it still follows the dock when the dock wraps or grows. */
 .app-action-dock .action-row-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
   position: fixed;
   left: 0;
   right: 0;
@@ -2208,11 +2212,32 @@ h1, h2 { margin: 0 0 8px; }
   background: transparent;
   border: none;
   padding: 0 16px 8px;
-  max-height: none;
 }
+/* Scrollable content area — prompts, picker, errors etc. */
+.app-action-dock .action-scroll-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 200px;
+  scrollbar-width: thin;
+  min-width: 0;
+  /* Shrink to content width; don't consume extra space */
+  flex: 0 1 auto;
+}
+/* Button row — stretches, End Turn pinned to right edge via margin-left: auto */
 .app-action-dock .action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1 1 auto;
   justify-content: space-between;
+  white-space: nowrap;
+}
+/* End Turn button — always visible at the far right */
+.action-end-turn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* The log scrim only exists on a narrow screen; App.tsx renders it whenever
@@ -2363,7 +2388,15 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .app-action-dock .action-bar { gap: 6px; }
   .app-board .action-row { gap: 6px; flex-wrap: wrap; }
   /* the controls band is out of the dock now, so it carries its own padding */
-  .app-board .app-action-dock .action-row-controls { padding: 0 8px 6px; }
+  .app-board .app-action-dock .action-row-controls {
+    padding: 0 8px 6px;
+    gap: 6px;
+  }
+  /* Scrollable content area — tighter on mobile */
+  .app-board .app-action-dock .action-scroll-content {
+    max-height: 140px;
+    gap: 4px;
+  }
   /* stat pills inherit the borderless 25%-smaller base pill; only the padding
      tightens further so all five still fit on one row */
   .app-board .action-stat { padding: 2.25px 5.25px; gap: 2.25px; }
@@ -2394,12 +2427,14 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .app-action-dock .player-character-card { --cc-w: 56px; }
   /* prompts and buttons each take a full row; the buttons wrap instead of
      overflowing the viewport (they measured 403px in a 390px window) */
-  .app-board .app-action-dock .action-prompts { flex: 1 1 100%; min-width: 0; }
+  /* prompts and buttons — row layout; prompts stay narrow, buttons stretch */
+  .app-board .app-action-dock .action-prompts { flex: 0 1 auto; min-width: 0; }
   .app-board .app-action-dock .action-prompt { min-width: 0; }
+  .app-board .app-action-dock .action-scroll-content { max-height: 140px; }
   .app-board .app-action-dock .action-buttons {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    flex: 1 1 auto;
+    justify-content: space-between;
+    white-space: nowrap;
     gap: 6px;
   }
   .app-board .prompt-options { gap: 5px; }
