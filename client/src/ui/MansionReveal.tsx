@@ -120,10 +120,11 @@ export function MansionReveal({
             </div>
           )}
           <div
-            className="mansion-door-card"
+            className={`mansion-door-card${isInfected && damage > 0 ? ' has-defeated-infected' : ''}`}
             key={`${def.id}-${index}`}
             style={{ backgroundImage: art ? `url(${art})` : undefined, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}
           >
+            <div className="mansion-door-dmg-flash" />
             <CardView def={def} hideCost />
           </div>
         </div>

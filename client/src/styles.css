@@ -1022,6 +1022,40 @@ h1, h2 { margin: 0 0 8px; }
   from { transform: translateX(-46px) scale(0.8); opacity: 0; }
   to   { transform: translateX(0) scale(1); opacity: 1; }
 }
+/* Defeated Infected — shake + crimson border flash after entrance.
+   The damage burst layers on top of the entrance transform via
+   matching origin; the border overlay appears mid-entrance. */
+.mansion-door-card.has-defeated-infected {
+  animation: door-card-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15),
+             infected-dmg-shake 1.6s ease-in-out 0.38s;
+  transform-origin: center center;
+}
+@keyframes infected-dmg-shake {
+  0%   { transform: translateX(0) scale(1); }
+  8%   { transform: translateX(-6px) scale(1.05); }
+  20%  { transform: translateX(6px) scale(1.08); }
+  32%  { transform: translateX(-4px) scale(1.03); }
+  48%  { transform: translateX(4px) scale(1.02); }
+  60%  { transform: translateX(-2px) scale(1); }
+  76%  { transform: translateX(1px) scale(1); }
+  100% { transform: translateX(0) scale(1); }
+}
+/* Crimson border overlay for defeated Infected — flashes on mid-entrance */
+.mansion-door-card .mansion-door-dmg-flash {
+  position: absolute;
+  inset: 0;
+  border: 3px solid rgba(220, 40, 40, 0.85);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  animation: dmg-border-flash 1s ease-out 0.4s forwards;
+}
+@keyframes dmg-border-flash {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  60%  { opacity: 0.6; }
+  100% { opacity: 0; }
+}
 /* The battle line: your character + Partner | weapons used | revealed card. */
 .mansion-door-battle {
   display: flex;
