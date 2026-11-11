@@ -1,5 +1,6 @@
 export * from "./types";
 export { setup, startTurn, checkWin } from "./engine/game";
+export { canBePartner } from "./engine/characters";
 export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { exploreDamage, grantedExploresFor } from "./engine/explore";

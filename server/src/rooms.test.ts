@@ -206,6 +206,20 @@ describe('createRoomStore', () => {
     expect(() => store.setCustomCards(room.roomCode, 'c1', ['mx-001'])).toThrow('game already started');
   });
 
+  it('rejects a main-only character (ch-008) as a partner', () => {
+    const store = createRoomStore(() => 0.3);
+    expect(() => store.createRoom('c1', 'Host', 'firstTimer', true, 'ch-001', 'ch-008')).toThrow(/cannot be a partner/);
+
+    const room = store.createRoom('c1', 'Host', 'firstTimer', true, 'ch-001', 'ch-002');
+    expect(room.players[0]?.mainCharacterId).toBe('ch-001');
+    expect(room.players[0]?.partnerCharacterId).toBe('ch-002');
+
+    expect(() => store.setCharacterSelection(room.roomCode, 'c1', 'ch-001', 'ch-008')).toThrow(/cannot be a partner/);
+    // a legal partner selection still works
+    const changed = store.setCharacterSelection(room.roomCode, 'c1', 'ch-001', 'ch-003');
+    expect(changed.players[0]?.partnerCharacterId).toBe('ch-003');
+  });
+
   it('setConnected flips a player connection flag; guards unknown players', () => {
     const store = createRoomStore(() => 0.3);
     const room = store.createRoom('c1', 'Host');

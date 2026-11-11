@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE } from '@re/game-core';
+import { SCENARIOS, PREMIER_CARDS, ALLIANCE_CARDS, NIGHTMARE_CARDS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE, canBePartner } from '@re/game-core';
 
 /** Custom characters are only selectable when the room enabled them. */
 function selectableCharacters(room: RoomSnapshot): ReadonlyArray<typeof PREMIER_CARDS[number]> {
@@ -338,7 +338,9 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {selectableCharacters(room).filter(c => c.id !== 'ch-008').filter(c => {
+                      {/* Chris (ch-008) cannot receive attachments, so he can
+                          only ever be a Main character — never a Partner. */}
+                      {selectableCharacters(room).filter(c => canBePartner(c)).filter(c => {
                         const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                         return !taken.has(c.id) || c.id === me?.partnerCharacterId;
                       }).map(c => <option key={c.id} value={c.id}>{c.id.toUpperCase()} {c.name}</option>)}

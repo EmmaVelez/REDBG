@@ -1,4 +1,4 @@
-import type { CharacterAbility } from '../types';
+import type { CardDef, CharacterAbility } from '../types';
 
 export interface CharacterState {
   readonly hp: number;
@@ -101,4 +101,16 @@ export function abilitiesForLevel(abilities: readonly CharacterAbility[] | undef
 export function hasAbilityAtLevel(abilities: readonly CharacterAbility[] | undefined, level: 0 | 1 | 2, kind: CharacterAbility['kind']): boolean {
   const abilitiesForCurrentLevel = abilitiesForLevel(abilities, level);
   return abilitiesForCurrentLevel.some(ability => ability.kind === kind);
+}
+
+/**
+ * Whether this character may be picked as a Partner (Alliance Partner
+ * Modification). A character that cannot receive attachments — Chris's L1
+ * "cannot be healed and cannot attach non-Infected cards" — can only ever be
+ * a Main character: the Partner slot exists to hold attached cards, so such
+ * a character is never a legal partner. Unknown ids stay lenient (the setup
+ * layer's legacy behavior for cards outside the database).
+ */
+export function canBePartner(def: CardDef | undefined): boolean {
+  return !(def?.abilities ?? []).some(a => a.kind === 'noHealingNoNonInfectedAttach');
 }

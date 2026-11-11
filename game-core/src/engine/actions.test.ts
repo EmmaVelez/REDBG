@@ -345,6 +345,9 @@ test('Alliance Josh L2: partner may attach up to 4 cards', () => {
 test('Chris L1 as main: may still attach weapons to partner (cap 2)', () => {
   const base = baseState({ seat0: { characterInstanceId: 'c008', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'c0', partnerAttached: [], actionsLeft: 4 } });
   expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'wp' }).ok).toBe(true);
+  // The client builds its buttons from the enumerator, so the attach action
+  // must actually surface there for a Chris-main seat too.
+  expect(enumerateLegalActions(base, 0).some(a => a.type === 'attachToPartner' && a.instanceId === 'wp')).toBe(true);
   const two = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['a1', 'a2'] } : s)) };
   expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk' }).ok).toBe(false);
   expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk', replaceIndex: 0 }).ok).toBe(true);

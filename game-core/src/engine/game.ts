@@ -1,7 +1,7 @@
 import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt, SkillDraftState } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
-import { levelForDecorations, revive, abilitiesForLevel, flipDown } from './characters';
+import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities } from './abilities';
@@ -326,14 +326,21 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     const wantPartner = setup.partnerMode === true || !!p.partnerCharacterId;
     if (wantPartner) {
       let partnerCardId = p.partnerCharacterId || undefined;
+      // A character that cannot receive attachments (Chris L1) can only ever
+      // be a Main character — never a Partner.
+      if (partnerCardId !== undefined && !canBePartner(defsById.get(partnerCardId))) {
+        throw new Error(`character ${partnerCardId} cannot be a partner`);
+      }
       if (partnerCardId === undefined) {
-        if (remainingCharacters.length === 0) {
+        // Random partners draw from the pool minus main-only characters.
+        const partnerPool = remainingCharacters.filter(id => canBePartner(defsById.get(id)));
+        if (partnerPool.length === 0) {
           throw new Error(`not enough unique characters for partner of seat ${i}`);
         }
-        const pick = nextInt(rng, remainingCharacters.length);
+        const pick = nextInt(rng, partnerPool.length);
         rng = pick.rng;
-        partnerCardId = remainingCharacters[pick.value] as string;
-        remainingCharacters.splice(pick.value, 1);
+        partnerCardId = partnerPool[pick.value] as string;
+        remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
       } else if (remainingCharacters.includes(partnerCardId)) {
         remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
       } else if (characterIds.includes(partnerCardId)) {

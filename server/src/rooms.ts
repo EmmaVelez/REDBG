@@ -1,4 +1,5 @@
 import type { PlayerInfo, RoomPhase, RoomSnapshot } from './protocol';
+import { ALL_CARDS, CUSTOM_CARDS, canBePartner } from '@re/game-core';
 import type { ScenarioId } from '@re/game-core';
 
 /**
@@ -65,6 +66,23 @@ const CODE_LENGTH = 6;
 const MAX_SEATS = 4;
 const MAX_CODE_TRIES = 10;
 
+/**
+ * Characters that can only ever be a Main character (Chris L1: cannot receive
+ * attachments) — never a legal Partner pick. Mirrors the engine's setup rule
+ * so an illegal selection is rejected in the lobby instead of at game start.
+ */
+const MAIN_ONLY_CHARACTERS: ReadonlySet<string> = new Set(
+  [...ALL_CARDS, ...CUSTOM_CARDS]
+    .filter(c => c.type === 'character' && !canBePartner(c))
+    .map(c => c.id),
+);
+
+const requireLegalPartner = (partnerCharacterId: string | undefined): void => {
+  if (partnerCharacterId !== undefined && MAIN_ONLY_CHARACTERS.has(partnerCharacterId)) {
+    throw new Error(`character ${partnerCharacterId} cannot be a partner`);
+  }
+};
+
 export function createRoomStore(rand: () => number = Math.random): RoomStore {
   const rooms = new Map<string, Room>();
   /** roomCode -> clientId of the current host (default = creator). */
@@ -125,6 +143,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
     rooms,
 
     createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string, skillSystem: boolean = false, customCards: readonly string[] = []): Room {
+      requireLegalPartner(partnerCharacterId);
       const roomCode = allocateCode();
       const room: Room = {
         roomCode,
@@ -292,6 +311,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       const room = requireRoom(roomCode);
       requireLobby(room);
       requireHost(roomCode, hostClientId);
+      requireLegalPartner(partnerCharacterId);
       const host = room.players.find(p => p.clientId === hostClientId);
       if (host === undefined) throw new Error('not in room');
       const nextPlayers = room.players.map(p =>

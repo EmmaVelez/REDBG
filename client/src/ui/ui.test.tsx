@@ -1424,6 +1424,28 @@ describe('Lobby (T08)', () => {
     expect(on).toContain('Zombie Grab');
     expect(on).toContain('Sherry Birkin');
   });
+
+  it('offers ch-008 as a main character but never as a partner', () => {
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: true,
+      skillSystem: false,
+      customCards: [] as string[],
+    };
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    // Main character dropdown still offers Chris
+    const mainSection = html.split('Main character:')[1]?.split('Partner character:')[0] ?? '';
+    expect(mainSection).toContain('value="ch-008"');
+    // Partner dropdown excludes him (he cannot receive attachments) but keeps
+    // every other character
+    const partnerSection = html.split('Partner character:')[1] ?? '';
+    expect(partnerSection).not.toContain('value="ch-008"');
+    expect(partnerSection).toContain('value="ch-001"');
+  });
 });
 
 describe('HoverCard (M4-T11)', () => {

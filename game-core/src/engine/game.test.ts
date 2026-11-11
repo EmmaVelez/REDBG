@@ -243,6 +243,60 @@ test('setup rejects when players outnumber unique characters', () => {
   ).toThrow(/not enough unique characters/);
 });
 
+test('setup partner mode: ch-008 is never dealt as a partner', () => {
+  for (let seed = 0; seed < 25; seed++) {
+    const s = setup(
+      {
+        seed,
+        partnerMode: true,
+        players: [
+          { name: 'A', controller: 'human' as const },
+          { name: 'B', controller: 'human' as const },
+        ],
+      },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES
+    );
+    for (const p of s.seats) {
+      expect(p.partnerInstanceId?.replace(/#.*$/, '')).not.toBe('ch-008');
+    }
+  }
+});
+
+test('setup allows ch-008 as a main character with a partner', () => {
+  const s = setup(
+    {
+      seed: 1,
+      partnerMode: true,
+      players: [
+        { name: 'A', controller: 'human' as const, characterCardId: 'ch-008' },
+        { name: 'B', controller: 'human' as const },
+      ],
+    },
+    PREMIER_CARDS,
+    FIRST_TIMER_PILES
+  );
+  expect(s.seats[0]?.characterInstanceId).toBe('ch-008#1');
+  expect(s.seats[0]?.partnerInstanceId).toBeDefined();
+});
+
+test('setup rejects ch-008 as an explicit partner', () => {
+  expect(() =>
+    setup(
+      {
+        seed: 1,
+        partnerMode: true,
+        players: [
+          { name: 'A', controller: 'human' as const, characterCardId: 'ch-001', partnerCharacterId: 'ch-008' },
+          { name: 'B', controller: 'human' as const },
+        ],
+      },
+      PREMIER_CARDS,
+      FIRST_TIMER_PILES
+    )
+  ).toThrow(/cannot be a partner/);
+});
+
 test('setup deterministic', () => {
   expect(setup2(1)).toEqual(setup2(1));
 });
