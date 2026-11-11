@@ -74,6 +74,15 @@ function cardDef(state: GameState, instanceId: string | undefined): CardDef | un
   return state.cardDefs[inst.cardId];
 }
 
+/** Sum attachment damage bonuses for the given weapon tags. */
+function attachmentDamageBonusForTags(tags: readonly string[], bonusByTag: Map<string, number>): number {
+  let total = 0;
+  for (const tag of tags) {
+    total += bonusByTag.get(tag) ?? 0;
+  }
+  return total;
+}
+
 /**
  * Distinct weapon instance ids, order preserved. One entry in an explore
  * action's `weapons` array is one USE, so a weapon declared twice (Leon L2:
@@ -1331,6 +1340,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamageIfSelfHpAtLeast');
             return sum + (eff && eff.kind === 'plusDamageIfSelfHpAtLeast' && player.hp >= eff.hp ? eff.amount : 0);
           }, 0);
+          // Mansion attachment effects: plusDamageForWeaponTag (e.g., Close Combat: Knife +10, Melee +5)
+          const attachmentDamageByTag = new Map<string, number>();
+          for (const attId of state.mansionAttachments ?? []) {
+            const attDef = cardDef(state, attId);
+            if (attDef?.attachmentEffects === undefined) continue;
+            for (const effect of attDef.attachmentEffects) {
+              if (effect.kind === 'plusDamageForWeaponTag') {
+                const current = attachmentDamageByTag.get(effect.tag) ?? 0;
+                attachmentDamageByTag.set(effect.tag, current + effect.amount);
+              }
+            }
+          }
 
           const exploreWeapons = weaponDefs.map((w, i) => {
             const instId = weapons[i];
@@ -1347,7 +1368,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast') as { amount: number }).amount
               : 0;
             return {
-              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0)),
+              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isGatling ? 0 : isX ? assigned : exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities),
               weaponEffects: (instId !== undefined && player.copiedWeaponEffects?.instanceId === instId)
                 ? [...(w?.weaponEffects ?? []), ...player.copiedWeaponEffects.effects]

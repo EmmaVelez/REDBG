@@ -373,4 +373,18 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'trashTopInventoryAtTurnEnd', count: 1, removeAfter: 6 }],
   },
+  {
+    id: 'ce-006',
+    name: 'Close Combat',
+    type: 'event',
+    set: 'custom',
+    text: '"Knife" Weapons get +10 Damage and "Melee" Weapons get +5 Damage. Players must Explore if able.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [
+      { kind: 'plusDamageForWeaponTag', tag: 'knife', amount: 10 },
+      { kind: 'plusDamageForWeaponTag', tag: 'melee', amount: 5 },
+      { kind: 'mustExploreIfAble' },
+    ],
+  },
 ];

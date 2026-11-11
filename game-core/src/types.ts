@@ -365,6 +365,8 @@ export type CounterEffect =
  *  is attached to the mansion. Trigger points are handled by the engine. */
 export type AttachmentEffect =
   | { readonly kind: "trashTopInventoryAtTurnEnd"; readonly count: number; readonly removeAfter: number } // Rampage: trash top inventory card at end of each player's turn; remove after N trashes
+  | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number } // Close Combat: Knife +10, Melee +5
+  | { readonly kind: "mustExploreIfAble" }; // Close Combat: all players must Explore if able
 ;
 
 /**

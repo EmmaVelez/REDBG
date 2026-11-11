@@ -219,6 +219,32 @@ describe('custom attachment event cards', () => {
     expect(s.mansionAttachments).toEqual([]);
     expect(s.attachmentTrashCounts).toEqual({});
   });
+
+  it('Close Combat (ce-006) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-006');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-006',
+      name: 'Close Combat',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: expect.arrayContaining([
+        { kind: 'plusDamageForWeaponTag', tag: 'knife', amount: 10 },
+        { kind: 'plusDamageForWeaponTag', tag: 'melee', amount: 5 },
+        { kind: 'mustExploreIfAble' },
+      ]),
+    }));
+  });
+
+  it('Close Combat is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const cc = pool.find(c => c.id === 'ce-006');
+    expect(cc).toBeDefined();
+    expect(cc!.type).toBe('event');
+    expect(cc!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

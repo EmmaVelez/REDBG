@@ -9,6 +9,17 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 
+/** Check if any active mansion attachment has the given effect kind. */
+function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects?.some(e => e.kind === kind)) return true;
+  }
+  return false;
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.
@@ -942,6 +953,9 @@ function startTurnInternal(state: GameState): GameState {
       player.skipNextTurn ? 0 :
       (player.mustExplore === true ? 2 : 1) +
       (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores,
+    // Mansion attachment: mustExploreIfAble (Close Combat) — all players must
+    // Explore if able. Set the flag so validate blocks endTurn until explored.
+    mustExplore: player.mustExplore === true || hasMansionAttachmentEffect(state, 'mustExploreIfAble'),
     weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
