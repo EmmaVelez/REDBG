@@ -15,7 +15,7 @@ export function useDamageEffect(hp: number, maxHp: number, key = '') {
       const tid = window.setTimeout(() => {
         setFlash(false);
         setAnimHp(hp);
-      }, 800);
+      }, 4900);
       return () => window.clearTimeout(tid);
     }
     prevRef.current = { hp, maxHp };

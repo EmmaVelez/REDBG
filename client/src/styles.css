@@ -759,7 +759,7 @@ h1, h2 { margin: 0 0 8px; }
 
 /* Health ring pulse-on-damage — scales to ~2× then shrinks back. */
 .cc-hp-ring-flash {
-  animation: hp-pulse 1s ease-out;
+  animation: hp-pulse 5s ease-out;
 }
 @keyframes hp-pulse {
   0%   { transform: scale(1); }
@@ -2454,6 +2454,6 @@ h1, h2 { margin: 0 0 8px; }
 }
 .player-character-card.has-damage > .card,
 .player-character-card.has-damage > * > .card {
-  animation: card-shake 1s ease-out;
+  animation: card-shake 5s ease-out;
 }
 
