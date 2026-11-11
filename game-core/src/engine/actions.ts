@@ -6916,7 +6916,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           prompts: newPrompts,
         };
       }
-
+      
+      // RC-001 Rebecca Chambers L1: at turn start, may draw 1 card then discard 1.
+      if (kind === 'rebeccaTurnStartDrawAndDiscard') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Pass') return { ...state, ...nextBase, prompts: newPrompts };
+        // Draw +1 card from inventory to hand
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+        const drawnPlayer: PlayerState = { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        // Now prompt to discard 1 card
+        if (drawnPlayer.hand.length === 0) {
+          return {
+            ...state,
+            ...nextBase,
+            rngState: d.rngState,
+            seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
+            prompts: newPrompts,
+          };
+        }
+        const handCards = drawnPlayer.hand;
+        const discardOptions = handCards.map(id => {
+          const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+          return `${cd?.name ?? 'Unknown'} (${id})`;
+        });
+        discardOptions.push('No Discard');
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:discard`,
+            seat,
+            text: 'Rebecca Chambers L1: choose a card to discard.',
+            options: discardOptions,
+            payload: { kind: 'rebeccaDiscard' },
+          }],
+        };
+      }
+      
       if (kind === 'sergeiSelfDamage') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
@@ -7321,10 +7359,46 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   };
                 }
               }
-              return { ...state, ...nextBase, prompts: newPrompts };
             }
 
+      // RC-001 Rebecca Chambers L2: when discarding due to a card effect during your turn, gain +20 gold.
+      if (kind === 'rebeccaDiscard') {
+        const chosenOpt = prompt.options[option];
+        if (chosenOpt === undefined || chosenOpt === 'No Discard') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        // Find which hand card was chosen (strip name part)
+        const handCards = player.hand;
+        const discardedCardId = handCards.find(id => {
+          const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+          return `${cd?.name ?? 'Unknown'} (${id})` === chosenOpt;
+        });
+        if (!discardedCardId) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        // Apply L2 bonus if present
+        let nextSeat: PlayerState = { ...player };
+        const abL2 = seatAbilities(state, seat).find(a => a.kind === 'goldWhenDiscardingAtTurnStart');
+        if (abL2 && abL2.kind === 'goldWhenDiscardingAtTurnStart' && abL2.amount > 0) {
+          nextSeat = { ...nextSeat, turnGold: nextSeat.turnGold + abL2.amount };
+        }
+        // Move discarded card from hand to discard
+        const updatedHand = nextSeat.hand.filter(id => id !== discardedCardId);
+
+        const updatedSeats = state.seats.map(s => (s.seat === seat ? nextSeat : s));
+        const discardedInst = state.cards[discardedCardId];
+        if (!discardedInst) { return { ...state, ...nextBase, prompts: newPrompts }; }
+        return {
+          ...state,
+          ...nextBase,
+          seats: updatedSeats,
+          cards: { ...state.cards, [discardedCardId]: { instanceId: discardedInst.instanceId, cardId: discardedInst.cardId, xp: discardedInst.xp, location: { zone: 'discard', index: nextSeat.discard.length - 1 } } },
+          prompts: newPrompts,
+        };
+      }
+      
       // lookAtMansionTop + unknown payload: informational, no state change
+
       return {
         ...state,
         ...nextBase,

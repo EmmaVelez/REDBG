@@ -182,6 +182,25 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    id: 'rc-001',
+    name: 'Rebecca Chambers',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: At the beginning of your turn, you can get +1 card, and if you do, discard a card.\nLevel 2: When you discard a card because of a card effect during your turn, you gain +20 gold.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 2,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'At the beginning of your turn, you can get +1 card, and if you do, discard a card.' },
+      { level: 2, text: 'When you discard a card because of a card effect during your turn, you gain +20 gold.' },
+    ],
+    abilities: [
+      { kind: 'turnStartDrawThenDiscardCard', level: 1 },
+      { kind: 'goldWhenDiscardingAtTurnStart', amount: 20, level: 2 },
+    ],
+  },
+  {
     // Fan card (printed code CH-001, which is already Albert Wesker in the
     // Premier set, so the id uses Jake's initials like cu-001 / lk-001).
     id: 'jm-001',
