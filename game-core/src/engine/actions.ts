@@ -343,6 +343,38 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
   };
   if (action.type === 'explore') {
     mark(action.seat);
+    // Detect which mansion deck card was revealed by comparing decks before/after.
+    // A revealed card disappears from mansionDeck and/or mansionBottom and appears
+    // in a player's inventory/discard/playArea — track what left the mansion pool.
+    const prevDeck = new Set(prev.mansionDeck);
+    const prevBottom = new Set(prev.mansionBottom);
+    const nextDeck = new Set(state.mansionDeck ?? []);
+    const nextBottom = new Set(state.mansionBottom ?? []);
+    // Cards that were in the mansion pool but aren't anymore (revealed/removed cards).
+    const revealedInstances: string[] = [];
+    for (const id of prevDeck) { if (!nextDeck.has(id)) revealedInstances.push(id); }
+    for (const id of prevBottom) { if (!nextBottom.has(id)) revealedInstances.push(id); }
+    // Filter to instances that are now in a player's non-mansion zone.
+    const validCards = revealedInstances.filter(id => {
+      const loc = state.cards[id]?.location;
+      return loc && loc.zone !== 'mansionDeck';
+    });
+    if (validCards.length > 0) {
+      // Use the first revealed card as the primary reveal.
+      const instanceId = validCards[0]!;
+      const cardData = state.cards[instanceId];
+      let name = 'Unknown';
+      if (cardData && typeof cardData.cardId === 'string' && cardData.cardId.length > 0) {
+        const cdef = state.cardDefs[cardData.cardId];
+        name = (cdef?.name ?? cardData.cardId);
+      } else if (cardData) {
+        name = cardData.cardId ?? 'Unknown';
+      }
+      state = {
+        ...state,
+        log: [...state.log, { seq: state.log.length + 1, action: { type: 'exploreReveal' as const, seat: action.seat, instanceId, name } }],
+      };
+    }
   } else if (action.type === 'attack') {
     const target = state.seats[action.targetSeat];
     if (target?.isInfectedCharacter === true) mark(action.seat);

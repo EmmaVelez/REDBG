@@ -36,6 +36,7 @@ const VERBS: Record<Action['type'], string> = {
   useSkill: 'used a Skill',
   useWeaponAbility: 'activated a weapon effect',
   removeAttachedItem: 'removed an attached item',
+  exploreReveal: '', // supplementary — no verb of its own, text comes from describe() below
 };
 
 function cardName(state: GameState, instanceId: string | undefined): string | null {
@@ -84,14 +85,25 @@ function describe(state: GameState, action: Action): string {
 /**
  * Renders the action log as human-readable lines with turn numbers.
  * Turn counter increments on every endTurn (matches the engine's advanceTurn).
+ * Explore reveal entries are merged into the preceding explore line so the
+ * log reads naturally: "explored the Mansion with … — revealed [card]".
  */
 export function formatTurnHistory(state: GameState): readonly HistoryLine[] {
   const seatNames = state.seats.map(s => s.name);
   let turn = 1;
   const lines: HistoryLine[] = [];
+  let lastExploreText: string | null = null;
+  let lastExploreSeq = -1;
+  let lastExploreIndex = -1;
   for (const entry of state.log) {
     const a = entry.action;
     const seat = 'seat' in a ? a.seat : -1;
+    // Handle supplementary exploreReveal entries by appending to prior explore.
+    if (a.type === 'exploreReveal' && lastExploreText !== null && lastExploreIndex >= 0) {
+      const prev = lines[lastExploreIndex]!;
+      lines[lastExploreIndex] = { seq: prev.seq, turn: prev.turn, seat: prev.seat, seatName: prev.seatName, text: `${lastExploreText} — revealed ${a.name}` };
+      continue;
+    }
     const line: HistoryLine = {
       seq: entry.seq,
       turn,
@@ -99,6 +111,15 @@ export function formatTurnHistory(state: GameState): readonly HistoryLine[] {
       seatName: seat >= 0 ? (seatNames[seat] ?? `Seat ${seat}`) : '—',
       text: describe(state, a),
     };
+    if (a.type === 'explore') {
+      lastExploreText = line.text;
+      lastExploreSeq = entry.seq;
+      lastExploreIndex = lines.length;
+    } else {
+      lastExploreText = null;
+      lastExploreSeq = -1;
+      lastExploreIndex = -1;
+    }
     lines.push(line);
     if (a.type === 'endTurn') turn += 1;
   }
