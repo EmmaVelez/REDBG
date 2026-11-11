@@ -27,7 +27,7 @@ for (const scenario of ['outbreak' as const, 'firstTimer' as const]) {
     for (const entry of result.state.log) {
       if (entry.action.type === 'endTurn' && 'seat' in entry.action) {
         const s = (entry.action as any).seat as number;
-        if (s >= 0 && s < 4) eTcounts[s] += 1;
+        if (s >= 0 && s < 4) eTcounts[s] = (eTcounts[s] ?? 0) + 1;
       }
     }
     
