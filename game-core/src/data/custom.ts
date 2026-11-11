@@ -648,6 +648,21 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     weaponEffects: [{ kind: 'playFromDiscardOnExplore' }],
   },
   {
+    // Fan card. Thanatos-R boss from RE: Outbreak File #2.
+    // "If this infected was not defeated, the exploring character gains 3 'Ammo x10'"
+    // maps to the existing onNotDefeatedExploringPlayerGainsAmmoX10 effect.
+    id: 'tr-001',
+    name: 'Thanatos-R',
+    type: 'infected',
+    set: 'custom',
+    text: 'If this infected was not defeated, the exploring character gains 3 "Ammo x10".',
+    copies: 1,
+    hp: 90,
+    attack: 70,
+    decorations: 9,
+    infectedEffects: [{ kind: 'onNotDefeatedExploringPlayerGainsAmmoX10', count: 3 }],
+  },
+  {
     // Fan card. Manny's ruling: "when selected add a resource pile of 5 of
     // them to the game" — copies: 5 creates the supply pile. "Trash once used"
     // maps to the existing trashAfterUse weapon effect.
