@@ -344,7 +344,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
   // ── Fan ammunition cards (from trading-card prints) ────────────────
   {
     id: 'ca-001',
-    name: 'RED HAWK',
+    name: 'Ammo x40',
     type: 'ammunition',
     set: 'custom',
     text: 'Grants +40 Ammo and +40 Gold for the turn.',
@@ -357,9 +357,9 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     name: 'Ammunition Box',
     type: 'ammunition',
     set: 'custom',
-    text: 'Grants +30 Ammo and +30 Gold for the turn.',
+    text: 'Grants +40 Ammo for the turn.',
     copies: 15,
     cost: 40,
-    bonuses: { ammo: 30, gold: 30 },
+    bonuses: { ammo: 40 },
   },
 ];

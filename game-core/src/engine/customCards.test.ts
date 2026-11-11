@@ -133,12 +133,12 @@ describe('MX-001 Mr. X data', () => {
 // ---------------------------------------------------------------------------
 
 describe('custom ammunition cards', () => {
-  it('RED HAWK (ca-001) is correctly defined', () => {
+  it('Ammo x40 (ca-001) is correctly defined', () => {
     const c = CUSTOM_CARDS.find(x => x.id === 'ca-001');
     expect(c).toBeDefined();
     expect(c).toEqual(expect.objectContaining({
       id: 'ca-001',
-      name: 'RED HAWK',
+      name: 'Ammo x40',
       type: 'ammunition',
       set: 'custom',
       text: 'Grants +40 Ammo and +40 Gold for the turn.',
@@ -156,10 +156,10 @@ describe('custom ammunition cards', () => {
       name: 'Ammunition Box',
       type: 'ammunition',
       set: 'custom',
-      text: 'Grants +30 Ammo and +30 Gold for the turn.',
+      text: 'Grants +40 Ammo for the turn.',
       copies: 15,
       cost: 40,
-      bonuses: { ammo: 30, gold: 30 },
+      bonuses: { ammo: 40 },
     }));
   });
 
