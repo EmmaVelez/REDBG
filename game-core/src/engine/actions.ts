@@ -109,12 +109,13 @@ function uniqueWeapons(ids: readonly string[]): string[] {
 function marketWeaponIds(state: GameState, maxCost?: number): string[] {
   const out: string[] = [];
   for (const pile of Object.values(state.marketPiles)) {
-    for (const id of pile.cards) {
-      const def = cardDef(state, id);
-      if (def?.type !== 'weapon') continue;
-      if (maxCost !== undefined && (def.cost ?? Infinity) > maxCost) continue;
-      out.push(id);
-    }
+    // Antique Coin: only the top card of each pile is visible/available.
+    const topId = pile.cards[0];
+    if (topId === undefined) continue;
+    const def = cardDef(state, topId);
+    if (def?.type !== 'weapon') continue;
+    if (maxCost !== undefined && (def.cost ?? Infinity) > maxCost) continue;
+    out.push(topId);
   }
   return out;
 }
