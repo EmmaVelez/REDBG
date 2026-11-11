@@ -824,6 +824,11 @@ export interface GameState {
    *  top 10 of Mansion instead of normal disposition. Cleared at turn end. */
   readonly storyModeBossShuffleActive?: boolean;
 
+  /** CE-004 Survival Horror: true when the d6 has been rolled this turn.
+   *  Prevents re-rolling when the explore action is re-dispatched after the
+   *  prompt is resolved. Cleared at turn start. */
+  readonly survivalHorrorRolledThisTurn?: boolean;
+
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when
    *  the Character dies it returns here ("return to the Resource Area"). */

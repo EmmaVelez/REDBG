@@ -1301,7 +1301,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           // Survival Horror: before exploring, roll a d6 and apply the result.
           // The die roll is handled via a prompt so the player sees the result.
-          if (hasSurvivalHorror(state) && !state.prompts.some(p => p.payload?.kind === 'survivalHorrorRoll')) {
+          // Check both for an active prompt AND the flag to prevent re-rolling
+          // when the explore action is re-dispatched after prompt resolution.
+          if (hasSurvivalHorror(state) && !state.survivalHorrorRolledThisTurn && !state.prompts.some(p => p.payload?.kind === 'survivalHorrorRoll')) {
             const roll = nextInt(makeRng(state.rngState), 6).value + 1;
             const newRng = nextInt(makeRng(state.rngState), 6).rng.s;
             return {
@@ -6048,6 +6050,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           seats: newState.seats.map(s => (s.seat === shSeat ? newPlayer : s)),
           prompts: newPrompts,
+          survivalHorrorRolledThisTurn: true,
         };
       }
 

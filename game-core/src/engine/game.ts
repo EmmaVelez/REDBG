@@ -864,6 +864,11 @@ function startTurnInternal(state: GameState): GameState {
     state = { ...state, storyModeBossShuffleActive: undefined };
   }
 
+  // CE-004 Survival Horror: clear the rolled flag so it can fire next turn.
+  if (state.survivalHorrorRolledThisTurn !== undefined) {
+    state = { ...state, survivalHorrorRolledThisTurn: undefined };
+  }
+
   // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of
   // the attached Character's turn, before anything else. Reaching 0 Health
   // downs the Character, which skips the rest of this turn; it revives (at
