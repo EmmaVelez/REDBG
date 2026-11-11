@@ -818,6 +818,9 @@ export interface GameState {
   /** Mansion attachment event cards currently active (instance ids). Mode 1
    *  holds at most 1 card (new replaces old); mode 2 allows multiple. */
   readonly mansionAttachments?: readonly string[];
+  /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed.
+   *  Set from room config; overrides per-card attachmentMode. */
+  readonly mansionAttachmentMode?: 1 | 2;
   /** Per-attachment trash counters (for effects like Rampage that remove
    *  themselves after trashing N cards). Keyed by attachment instance id. */
   readonly attachmentTrashCounts?: Readonly<Record<string, number>>;
@@ -947,6 +950,8 @@ export interface GameSetup {
   readonly partnerMode?: boolean;
   /** Enable the Mercenaries Skill System (Skill cards, XP, draft). */
   readonly skillSystem?: boolean;
+  /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed. */
+  readonly mansionAttachmentMode?: 1 | 2;
 }
 
 /**

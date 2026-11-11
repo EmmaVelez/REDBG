@@ -40,6 +40,8 @@ export interface HotseatOptions {
   readonly skillSystem?: boolean;
   /** Custom card ids (MX-001..) shuffled into the Mansion deck. */
   readonly customCards?: readonly string[];
+  /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed. */
+  readonly mansionAttachmentMode?: 1 | 2;
 }
 
 export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
@@ -52,7 +54,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards }), pilesForScenario(scenario, { customCards: opts.customCards }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards }), pilesForScenario(scenario, { customCards: opts.customCards }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

@@ -251,7 +251,7 @@ export function App(): JSX.Element {
         room={room}
         clientId={clientId}
         status={status}
-        onCreateRoom={(name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards })}
+        onCreateRoom={(name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode })}
         onJoinRoom={(code, name) => dispatchClient({ kind: 'joinRoom', roomCode: code, playerName: name })}
         onSelectSeat={seat => dispatchClient({ kind: 'selectSeat', seat })}
         onAddBot={seat => dispatchClient({ kind: 'addBot', seat })}
@@ -260,9 +260,10 @@ export function App(): JSX.Element {
         onSetPartnerMode={partnerMode => dispatchClient({ kind: 'setPartnerMode', partnerMode })}
         onSetSkillSystem={skillSystem => dispatchClient({ kind: 'setSkillSystem', skillSystem })}
         onSetCustomCards={customCards => dispatchClient({ kind: 'setCustomCards', customCards })}
+        onSetMansionAttachmentMode={mansionAttachmentMode => dispatchClient({ kind: 'setMansionAttachmentMode', mansionAttachmentMode })}
         onSetCharacterSelection={(main?: string, partner?: string) => dispatchClient({ kind: 'setCharacterSelection', mainCharacterId: main, partnerCharacterId: partner })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
-        onStartHotseat={(names, scenario, skillSystem, customCards) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards })}
+        onStartHotseat={(names, scenario, skillSystem, customCards, mansionAttachmentMode) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards, mansionAttachmentMode })}
       />
     );
   }

@@ -1708,7 +1708,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           for (const attId of attachmentIds) {
             const attDef = cardDef(state, attId);
-            if (attDef?.attachmentMode === 1) {
+            // Use room-level mansionAttachmentMode if set, otherwise fall back to card's attachmentMode
+            const effectiveMode = state.mansionAttachmentMode ?? attDef?.attachmentMode ?? 1;
+            if (effectiveMode === 1) {
               // Mode 1: replace all existing attachments
               const oldToRemove = [...newAttachments];
               newAttachments = [attId];
@@ -2890,7 +2892,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'event' && revealedDef.attachmentMode !== undefined) {
         const currentAttachments = state.mansionAttachments ?? [];
         let newAttachments: string[];
-        if (revealedDef.attachmentMode === 1) {
+        // Use room-level mansionAttachmentMode if set, otherwise fall back to card's attachmentMode
+        const effectiveMode = state.mansionAttachmentMode ?? revealedDef.attachmentMode;
+        if (effectiveMode === 1) {
           // Mode 1: new attachment replaces all existing ones
           const oldAttachments = [...currentAttachments];
           newAttachments = [revealedInstanceId];

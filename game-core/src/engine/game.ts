@@ -785,6 +785,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     ...(winInfectedCardId !== undefined ? { endInfectedCardId: winInfectedCardId } : {}),
     supply: supplyIds,
     mansionAttachments: [],
+    mansionAttachmentMode: setup.mansionAttachmentMode ?? 1,
     attachmentTrashCounts: {},
   };
 

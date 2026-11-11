@@ -26,7 +26,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[]) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -35,9 +35,10 @@ export interface LobbyProps {
   readonly onSetPartnerMode: (partnerMode: boolean) => void;
   readonly onSetSkillSystem: (skillSystem: boolean) => void;
   readonly onSetCustomCards: (customCards: readonly string[]) => void;
+  readonly onSetMansionAttachmentMode: (mansionAttachmentMode: 1 | 2) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[]) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -241,18 +242,25 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[]) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [skillSystem, setSkillSystem] = useState(false);
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
+  const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
   const effective = names.slice(0, count).map((n, i) => (n.trim() === '' ? (DEFAULT_NAMES[i] ?? `Player ${i + 1}`) : n.trim()));
   const ready = effective.length >= 2 && effective.every(n => n !== '');
+
+  // Check if any selected custom cards are attachment events
+  const hasAttachmentCards = customCards.some(id => {
+    const card = CUSTOM_CARDS.find(c => c.id === id);
+    return card?.type === 'event' && card?.attachmentMode !== undefined;
+  });
 
   return (
     <div className="passandplay" data-testid="pass-and-play">
@@ -269,6 +277,21 @@ function PassAndPlay(props: {
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
       </label>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
+      {hasAttachmentCards && (
+        <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Mansion Attachment Mode:</span>
+            <select
+              value={mansionAttachmentMode}
+              onChange={e => setMansionAttachmentMode(Number(e.target.value) as 1 | 2)}
+              data-testid="hotseat-mansion-attachment-mode"
+            >
+              <option value={1}>Single (new replaces old)</option>
+              <option value={2}>Multiple (all stack)</option>
+            </select>
+          </label>
+        </div>
+      )}
       <div className="passandplay-count">
         {[2, 3, 4].map(n => (
           <button
@@ -297,7 +320,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode)}
       >
         Start pass &amp; play
       </button>
@@ -318,6 +341,7 @@ export function Lobby({
   onSetPartnerMode,
   onSetSkillSystem,
   onSetCustomCards,
+  onSetMansionAttachmentMode,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -373,6 +397,24 @@ export function Lobby({
                 </label>
               </div>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
+              {room.customCards.some(id => {
+                const card = CUSTOM_CARDS.find(c => c.id === id);
+                return card?.type === 'event' && card?.attachmentMode !== undefined;
+              }) && (
+                <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>Mansion Attachment Mode:</span>
+                    <select
+                      value={room.mansionAttachmentMode ?? 1}
+                      onChange={e => onSetMansionAttachmentMode(Number(e.target.value) as 1 | 2)}
+                      data-testid="mansion-attachment-mode"
+                    >
+                      <option value={1}>Single (new replaces old)</option>
+                      <option value={2}>Multiple (all stack)</option>
+                    </select>
+                  </label>
+                </div>
+              )}
               <div style={{ marginTop: '8px' }}>
                 <label style={{ display: 'block', fontSize: '0.9em' }}>
                   Main character:
@@ -450,13 +492,14 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[]) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
   const [partnerMode, setPartnerMode] = useState(false);
   const [skillSystem, setSkillSystem] = useState(false);
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
+  const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -464,7 +507,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -502,6 +545,24 @@ function RoomEntry(props: {
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
         </label>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
+        {customCards.some(id => {
+          const card = CUSTOM_CARDS.find(c => c.id === id);
+          return card?.type === 'event' && card?.attachmentMode !== undefined;
+        }) && (
+          <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Mansion Attachment Mode:</span>
+              <select
+                value={mansionAttachmentMode}
+                onChange={e => setMansionAttachmentMode(Number(e.target.value) as 1 | 2)}
+                data-testid="create-mansion-attachment-mode"
+              >
+                <option value={1}>Single (new replaces old)</option>
+                <option value={2}>Multiple (all stack)</option>
+              </select>
+            </label>
+          </div>
+        )}
       </div>
       <form className="lobby-form" onSubmit={handleJoin}>
         <input name="code" placeholder="Room code" required />

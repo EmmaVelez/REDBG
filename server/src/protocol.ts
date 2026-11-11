@@ -45,6 +45,8 @@ export interface RoomSnapshot {
   readonly skillSystem: boolean;
   /** Custom card ids (MX-001..) added to the Mansion deck. */
   readonly customCards: readonly string[];
+  /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed. */
+  readonly mansionAttachmentMode: 1 | 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +54,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[] }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mansionAttachmentMode?: 1 | 2 }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -71,6 +73,8 @@ export type ClientMessage =
   | { readonly kind: 'setSkillSystem'; readonly skillSystem: boolean }
   /** Host control: choose which custom cards (MX-001..) join the Mansion. */
   | { readonly kind: 'setCustomCards'; readonly customCards: readonly string[] }
+  /** Host control: set mansion attachment mode (1 = single, 2 = multiple). */
+  | { readonly kind: 'setMansionAttachmentMode'; readonly mansionAttachmentMode: 1 | 2 }
   | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
@@ -154,7 +158,7 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown; mansionAttachmentMode?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
@@ -169,6 +173,9 @@ export function validateMessage(value: unknown): DecodeResult {
     }
     if (m.customCards !== undefined && (!Array.isArray(m.customCards) || m.customCards.some(c => typeof c !== 'string'))) {
       return { ok: false, error: 'createRoom requires a customCards string array when present' };
+    }
+    if (m.mansionAttachmentMode !== undefined && m.mansionAttachmentMode !== 1 && m.mansionAttachmentMode !== 2) {
+      return { ok: false, error: 'createRoom requires mansionAttachmentMode to be 1 or 2 when present' };
     }
     return { ok: true, msg: value as WireMessage };
   }
@@ -197,6 +204,13 @@ export function validateMessage(value: unknown): DecodeResult {
     const m = value as { kind: string; customCards?: unknown };
     if (!Array.isArray(m.customCards) || m.customCards.some(c => typeof c !== 'string')) {
       return { ok: false, error: 'setCustomCards requires a customCards string array' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setMansionAttachmentMode') {
+    const m = value as { kind: string; mansionAttachmentMode?: unknown };
+    if (m.mansionAttachmentMode !== 1 && m.mansionAttachmentMode !== 2) {
+      return { ok: false, error: 'setMansionAttachmentMode requires mansionAttachmentMode to be 1 or 2' };
     }
     return { ok: true, msg: value as WireMessage };
   }
