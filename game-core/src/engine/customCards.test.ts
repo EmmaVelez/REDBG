@@ -430,6 +430,28 @@ describe('custom attachment event cards', () => {
     expect(sh!.type).toBe('event');
     expect(sh!.attachmentMode).toBe(1);
   });
+
+  it('Short Supplys (ce-005) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-005');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-005',
+      name: 'Short Supplys',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'shortSupplysHealPrevention' }],
+    }));
+  });
+
+  it('Short Supplys is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const ss = pool.find(c => c.id === 'ce-005');
+    expect(ss).toBeDefined();
+    expect(ss!.type).toBe('event');
+    expect(ss!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

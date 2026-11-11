@@ -513,4 +513,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'survivalHorrorDieRoll' }],
   },
+  {
+    id: 'ce-005',
+    name: 'Short Supplys',
+    type: 'event',
+    set: 'custom',
+    text: 'Prevent half the Damage Characters are Healed for rounded down, Then they deal additional Damage that turn equal to the amount Healed.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'shortSupplysHealPrevention' }],
+  },
 ];

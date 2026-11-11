@@ -147,6 +147,21 @@ export function hasSurvivalHorror(state: GameState): boolean {
   return hasMansionAttachmentEffect(state, 'survivalHorrorDieRoll');
 }
 
+/** Check if any active mansion attachment has Short Supplys heal prevention effect. */
+export function hasShortSupplys(state: GameState): boolean {
+  return hasMansionAttachmentEffect(state, 'shortSupplysHealPrevention');
+}
+
+/**
+ * Apply Short Supplys healing prevention: prevent half the healing (rounded down),
+ * return the actual heal amount and the bonus damage amount.
+ */
+export function applyShortSupplysHeal(healAmount: number): { actualHeal: number; bonusDamage: number } {
+  const prevented = Math.floor(healAmount / 2);
+  const actualHeal = healAmount - prevented;
+  return { actualHeal, bonusDamage: actualHeal };
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.

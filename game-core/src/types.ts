@@ -378,6 +378,7 @@ export type AttachmentEffect =
   | { readonly kind: "shotgunTwicePerTurn" } // The Maze: shotgun weapons can be used twice per turn
   | { readonly kind: "damagePenaltyForMultipleActions"; readonly actions: number; readonly penalty: number } // The Maze: if play area has >N actions, weapons get -penalty damage
   | { readonly kind: "survivalHorrorDieRoll" } // Survival Horror: before exploring, roll d6 and apply result
+  | { readonly kind: "shortSupplysHealPrevention" } // Short Supplys: prevent half healing (rounded down), deal that much extra damage
 ;
 
 /**

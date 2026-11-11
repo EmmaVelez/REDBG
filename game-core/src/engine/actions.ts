@@ -68,7 +68,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1050,12 +1050,50 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                       const partnerMaxHp = played.player.partnerMaxHp ?? player.partnerMaxHp ?? played.player.maxHp;
                       const healTarget: 'main' | 'partner' = action.healTarget ?? 'main';
                       const partnerAlive = played.player.partnerInstanceId !== undefined;
+                      let weaponDamageBonusThisTurn = played.player.weaponDamageBonusThisTurn ?? 0;
                       /** Heal exactly one character; undefined amount = to full. */
                       const healOne = (amount: number | undefined): void => {
+                        const shortSupplys = hasShortSupplys(state);
                         if (healTarget === 'partner' && partnerHp !== undefined) {
-                          partnerHp = amount === undefined ? partnerMaxHp : Math.min(partnerHp + amount, partnerMaxHp);
+                          if (amount === undefined) {
+                            // Heal to full - calculate amount first
+                            const fullHeal = partnerMaxHp - partnerHp;
+                            if (shortSupplys && fullHeal > 0) {
+                              const { actualHeal, bonusDamage } = applyShortSupplysHeal(fullHeal);
+                              partnerHp = Math.min(partnerHp + actualHeal, partnerMaxHp);
+                              weaponDamageBonusThisTurn += bonusDamage;
+                            } else {
+                              partnerHp = partnerMaxHp;
+                            }
+                          } else {
+                            if (shortSupplys && amount > 0) {
+                              const { actualHeal, bonusDamage } = applyShortSupplysHeal(amount);
+                              partnerHp = Math.min(partnerHp + actualHeal, partnerMaxHp);
+                              weaponDamageBonusThisTurn += bonusDamage;
+                            } else {
+                              partnerHp = Math.min(partnerHp + amount, partnerMaxHp);
+                            }
+                          }
                         } else {
-                          hp = amount === undefined ? maxHp : Math.min(hp + amount, maxHp);
+                          if (amount === undefined) {
+                            // Heal to full - calculate amount first
+                            const fullHeal = maxHp - hp;
+                            if (shortSupplys && fullHeal > 0) {
+                              const { actualHeal, bonusDamage } = applyShortSupplysHeal(fullHeal);
+                              hp = Math.min(hp + actualHeal, maxHp);
+                              weaponDamageBonusThisTurn += bonusDamage;
+                            } else {
+                              hp = maxHp;
+                            }
+                          } else {
+                            if (shortSupplys && amount > 0) {
+                              const { actualHeal, bonusDamage } = applyShortSupplysHeal(amount);
+                              hp = Math.min(hp + actualHeal, maxHp);
+                              weaponDamageBonusThisTurn += bonusDamage;
+                            } else {
+                              hp = Math.min(hp + amount, maxHp);
+                            }
+                          }
                         }
                       };
                       const healEffects = (def.itemEffects ?? []).filter(
@@ -1157,7 +1195,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         maxHp,
         ...(partnerHp !== undefined ? { partnerHp } : {}),
         weaponDamageBonusThisTurn:
-          (played.player.weaponDamageBonusThisTurn ?? 0) + ((trashedGreen || trashedRed) ? claireBonus : 0),
+          weaponDamageBonusThisTurn + ((trashedGreen || trashedRed) ? claireBonus : 0),
         ...(trashedRed && trashGreenHerbId !== undefined && claireDoubleDamage
           ? { damageMultiplierThisTurn: (played.player.damageMultiplierThisTurn ?? 1) * 2 }
           : {}),
