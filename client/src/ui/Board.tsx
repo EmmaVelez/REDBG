@@ -99,7 +99,7 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
           <div className="mansion-counts">
             <span>Removed: {state.removed.length}</span>
             {(state.mansionAttachments ?? []).length > 0 && (
-              <span>Attached: {state.mansionAttachments.length}</span>
+              <span>Attached: {(state.mansionAttachments ?? []).length}</span>
             )}
           </div>
           {counterAttached && (
