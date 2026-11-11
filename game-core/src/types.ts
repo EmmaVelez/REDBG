@@ -373,6 +373,8 @@ export type AttachmentEffect =
   | { readonly kind: "trashDiscardOnInfectedDefeat" } // Ecliptic Express: when defeating an infected, may trash a discard card
   | { readonly kind: "plusExploreAndMustExploreOrDamage"; readonly explores: number; readonly damage: number } // Infected Horde: +N explore, must explore or take N damage
   | { readonly kind: "actionsCapAndRemoveOnDowned"; readonly actions: number } // Final Action: cap actions at N, remove when character loses all health
+  | { readonly kind: "plusHpForLowHpInfected"; readonly hpThreshold: number; readonly bonus: number } // Virus Mutates: infected with <=N hp get +bonus hp
+  | { readonly kind: "bonusXpPerExplore"; readonly amount: number } // Virus Mutates: players gain N extra XP for exploring
 ;
 
 /**

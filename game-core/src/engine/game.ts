@@ -99,6 +99,28 @@ export function finalActionBonus(state: GameState): { actionsCap: number; attach
   return { actionsCap, attachmentIds };
 }
 
+/** Get Virus Mutates bonuses: HP bonus for low-HP infected, and XP bonus per explore. */
+export function virusMutatesBonus(state: GameState): { hpThreshold: number; hpBonus: number; xpBonus: number } {
+  let hpThreshold = 0;
+  let hpBonus = 0;
+  let xpBonus = 0;
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'plusHpForLowHpInfected') {
+        hpThreshold = Math.max(hpThreshold, effect.hpThreshold);
+        hpBonus += effect.bonus;
+      } else if (effect.kind === 'bonusXpPerExplore') {
+        xpBonus += effect.amount;
+      }
+    }
+  }
+  return { hpThreshold, hpBonus, xpBonus };
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.

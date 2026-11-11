@@ -358,6 +358,31 @@ describe('custom attachment event cards', () => {
     expect(fa!.type).toBe('event');
     expect(fa!.attachmentMode).toBe(1);
   });
+
+  it('Virus Mutates (ce-002) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-002');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-002',
+      name: 'Virus Mutates',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: expect.arrayContaining([
+        { kind: 'plusHpForLowHpInfected', hpThreshold: 40, bonus: 10 },
+        { kind: 'bonusXpPerExplore', amount: 1 },
+      ]),
+    }));
+  });
+
+  it('Virus Mutates is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const vm = pool.find(c => c.id === 'ce-002');
+    expect(vm).toBeDefined();
+    expect(vm!.type).toBe('event');
+    expect(vm!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

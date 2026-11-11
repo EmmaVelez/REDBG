@@ -440,4 +440,17 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'actionsCapAndRemoveOnDowned', actions: 1 }],
   },
+  {
+    id: 'ce-002',
+    name: 'Virus Mutates',
+    type: 'event',
+    set: 'custom',
+    text: 'All Infected with 40 or less Health have +10 additional Health. Players gain one extra XP for Exploring.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [
+      { kind: 'plusHpForLowHpInfected', hpThreshold: 40, bonus: 10 },
+      { kind: 'bonusXpPerExplore', amount: 1 },
+    ],
+  },
 ];

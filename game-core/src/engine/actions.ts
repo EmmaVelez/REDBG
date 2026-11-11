@@ -66,7 +66,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1707,7 +1707,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
           }
           const buff = nemesisPursuitBuff(state);
-          targets.push({ cardId: def.id, hp: (def.hp ?? 0) + hpBonus + buff.hp, attack: (def.attack ?? 0) + atkBonus + buff.attack, infectedEffects: def.infectedEffects });
+          // Virus Mutates: infected with <= threshold HP get bonus HP
+          const virusBonus = virusMutatesBonus(state);
+          const virusHpBonus = (def.hp ?? 0) <= virusBonus.hpThreshold && virusBonus.hpThreshold > 0 ? virusBonus.hpBonus : 0;
+          targets.push({ cardId: def.id, hp: (def.hp ?? 0) + hpBonus + buff.hp + virusHpBonus, attack: (def.attack ?? 0) + atkBonus + buff.attack, infectedEffects: def.infectedEffects });
         }
 
         // MA-081/MA-049: weapons whose damage is zeroed for this explore.
@@ -1882,7 +1885,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const maximizerXp = activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration')
             ? defeatedIds.filter(id => (cardDef(state, id)?.decorations ?? 0) >= 2).length
             : 0;
-          xp = (player.xp ?? 0) + 1 + maximizerXp;
+          // Virus Mutates: bonus XP per explore
+          const virusXpBonus = virusMutatesBonus(state).xpBonus;
+          xp = (player.xp ?? 0) + 1 + maximizerXp + virusXpBonus;
           // On-defeat "may" prompts, one set per defeated Infected.
           for (const { id } of infectedEntries) {
             const hasSkip = !negatedIds.has(id) && (cardDef(state, id)?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
@@ -2850,7 +2855,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ammoCardsInPlayArea,
               revealed: {
                 ...revealedDef,
-                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp,
+                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0),
                 attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
               },
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,
@@ -3093,7 +3098,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   decorations,
                   level,
                   hp: Math.min(player.hp + singleDefeatHeal, player.maxHp),
-                  xp: (player.xp ?? 0) + 1 + maximizerXp,
+                  xp: (player.xp ?? 0) + 1 + maximizerXp + virusMutatesBonus(state).xpBonus,
                   pendingSkillEffects: undefined,
                   pendingBackstab: undefined,
                   attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
