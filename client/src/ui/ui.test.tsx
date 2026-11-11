@@ -1325,6 +1325,7 @@ describe('Lobby (T08)', () => {
     onSetPartnerMode: () => {},
     onSetSkillSystem: () => {},
     onSetCustomCards: () => {},
+    onSetMansionAttachmentMode: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -1358,6 +1359,7 @@ describe('Lobby (T08)', () => {
       partnerMode: false,
       skillSystem: false,
       customCards: [],
+      mansionAttachmentMode: 1 as const,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -1418,6 +1420,7 @@ describe('Lobby (T08)', () => {
       partnerMode: false,
       skillSystem: false,
       customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
     };
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
@@ -1443,6 +1446,7 @@ describe('Lobby (T08)', () => {
       partnerMode: true,
       skillSystem: false,
       customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Chris
