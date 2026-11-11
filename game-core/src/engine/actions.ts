@@ -1,4 +1,4 @@
-import type { GameState, Action, PlayerState, CardDef, WeaponEffect, Prompt } from '../types';
+import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
@@ -2489,6 +2489,68 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
           removed: [...removedAfter, revealedInstanceId],
           mansionDeck,
+          rngState: currentRng,
+          prompts: state.prompts,
+        };
+      }
+      if (revealedDef?.type === 'event' && revealedDef.id === 'ce-012') {
+        // Disappearance: if any player has 10+ decorations, the player with
+        // most decorations swaps their Main Character for another at random,
+        // gains full HP, and keeps their deck. Otherwise shuffle back.
+        const playersWith10Plus = state.seats.filter(s => s.decorations >= 10 && !s.dead);
+        if (playersWith10Plus.length > 0) {
+          // Find player with most decorations
+          const targetPlayer = playersWith10Plus.reduce((max, s) => s.decorations > max.decorations ? s : max);
+          // Get all character card IDs
+          const characterIds = Object.values(state.cardDefs)
+            .filter((c): c is CardDef => c.type === 'character' && c.set !== 'custom')
+            .map(c => c.id);
+          // Pick a random character different from current
+          const currentCharId = state.cards[targetPlayer.characterInstanceId]?.cardId;
+          const otherChars = characterIds.filter(id => id !== currentCharId);
+          if (otherChars.length > 0) {
+            const roll = nextInt(makeRng(currentRng), otherChars.length);
+            const newCharId = otherChars[roll.value];
+            if (newCharId !== undefined) {
+              const newCharDef = state.cardDefs[newCharId];
+              if (newCharDef !== undefined) {
+                const newCharInstanceId = `${newCharId}#${targetPlayer.seat + 1}`;
+                const newPlayerState: PlayerState = {
+                  ...targetPlayer,
+                  characterInstanceId: newCharInstanceId,
+                  hp: newCharDef.maxHp ?? 100,
+                  maxHp: newCharDef.maxHp ?? 100,
+                };
+                const newCards: Record<string, CardInstance> = {
+                  ...state.cards,
+                  [newCharInstanceId]: { instanceId: newCharInstanceId, cardId: newCharId, location: { zone: 'hand', index: 0 } },
+                };
+                return {
+                  ...state,
+                  ...nextBase,
+                  seats: state.seats.map(s => (s.seat === targetPlayer.seat ? newPlayerState : s)),
+                  cards: newCards,
+                  removed: [...removedAfter, revealedInstanceId],
+                  mansionDeck,
+                  rngState: roll.rng.s,
+                  prompts: state.prompts,
+                };
+              }
+            }
+          }
+        }
+        // No player has 10+ decorations or character swap failed: shuffle back
+        const shuffled = shuffleBack({ deck: mansionDeck }, revealedInstanceId, (items) => {
+          const r = shuffle(makeRng(currentRng), items);
+          currentRng = r.rng.s;
+          return r.value;
+        });
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
+          removed: removedAfter,
+          mansionDeck: shuffled.deck,
           rngState: currentRng,
           prompts: state.prompts,
         };

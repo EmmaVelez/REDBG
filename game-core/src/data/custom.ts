@@ -523,4 +523,12 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'shortSupplysHealPrevention' }],
   },
+  {
+    id: 'ce-012',
+    name: 'Disappearance',
+    type: 'event',
+    set: 'custom',
+    text: 'When this Event is Revealed, if a Player has 10+ Decorations. Then the Player with the most Decorations swaps their Main Character for another at random they gain full hp and keep their deck. Otherwise shuffle this card into the Mansion.',
+    copies: 1,
+  },
 ];

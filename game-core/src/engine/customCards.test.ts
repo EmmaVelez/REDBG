@@ -452,6 +452,27 @@ describe('custom attachment event cards', () => {
     expect(ss!.type).toBe('event');
     expect(ss!.attachmentMode).toBe(1);
   });
+
+  it('Disappearance (ce-012) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-012');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-012',
+      name: 'Disappearance',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+    }));
+    // Disappearance is a standard event, not an attachment
+    expect(c!.attachmentMode).toBeUndefined();
+  });
+
+  it('Disappearance is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const disp = pool.find(c => c.id === 'ce-012');
+    expect(disp).toBeDefined();
+    expect(disp!.type).toBe('event');
+  });
 });
 
 describe('MX-001 mansion membership', () => {
