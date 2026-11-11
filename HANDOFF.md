@@ -1,5 +1,27 @@
 # HANDOFF — resume here
 
+**CI-009 / MA-000 RACHAEL FOLEY CUSTOM CARDS (2026-11-11):** Manny sent two fan-card
+scans — CI-009 "Rachael Foley (First Encounter)" (Infected, 60/50/5) and MA-000 "Rachael
+Foley (ooze)" (Infected, 30/50/5) — and asked for both in the Mansion deck. Three new
+`InfectedEffect` kinds in `types.ts`: `onRevealDamageReductionPerAmmoX10InDiscard` (CI-009
+takes 10 less damage per "Ammo x10" in the exploring player's discard pile),
+`onDefeatShuffleCardIntoMansion` (CI-009 shuffles a fresh copy of a named card into the
+Mansion on defeat), and `onDefeatShuffleBackIfDamageAtMost` (MA-000 returns to the Mansion
+when defeated with ≤80 damage). The soak is a combat modifier, so it lives in
+`resolveExplore`/`resolveMultiExplore` behind a new `ammoX10InDiscardCount` param (the
+pure resolvers cannot read the discard pile); the two defeat effects are applied by the
+explore reducer, which owns `attached` and the Mansion deck. New helper module
+`engine/rachaelFoley.ts` (`ammoX10CountInDiscard`, `oozeShufflesBackOnDefeat`,
+`shuffleCopyIntoMansion`, `shuffleIntoMansion`) is called from the single-explore,
+multi-explore, MA-039 and ally-explore paths. `cardsForScenario` pulls `ma-000` in as a
+dependency when `ci-009` is selected, exactly like EX-006/EX-008 → EX-009. MA-000's
+shuffle-back still awards its Decoration (the MA-053 Lisa Trevor precedent: the trophy is
+not attached but the Decoration is paid). Tests: `engine/customRachaelFoley.test.ts`
+(11 tests, all fail without the wiring). Art: `CARD-ART/CI-009.png` + `MA-000.png`
+(320x446, P-mode, ~120 KB). Known limitation: the ally-explore and MA-039 paths get the
+damage soak but not the defeat effects (both are pre-existing simplified paths — CI-002
+Crow's chain is absent there too).
+
 **CHARACTER HOVER CARD: SKILL TEXT CLIPPED IN THE PLAYER PANEL (2026-11-11):** Manny asked to
 "scale the skill text in the character hover card in the player panel so that the full text is
 visible when hovered". Two independent clipping bugs, both measured on a live pass-and-play board
@@ -1428,3 +1450,4 @@ engine are unused union members in `types.ts`
 9. CH-000 RACHAEL FOLEY (this change): a custom character whose L1 is a COUNT-based Explore obligation. `PlayerState.exploresRequiredThisTurn` (2 when she takes the turn-start +1 Explore) is paid down by `payExploreDebt` in `applyOutbreakHooks` (by `exploreCount`, so a multi-explore of 2 counts twice) and by the Sherry forced-explore path; `startTurn` clears it; `validate` blocks endTurn while it is > 0 AND `canExploreLegally`. `mustExploreNow(state, seat)` is the shared "is this seat obliged to explore" predicate (Wesker `mustExplore` OR the debt) — use it for any new obligation instead of reading `mustExplore` directly. Her L2 is a per-explore bonus on the shared `abilityDamage` term.
 10. PULL FALLOUT FIXES (this change): the three failures commit 43eb09c left behind are fixed (details in the top paragraph). The MA-078 lesson is the one to remember — in the MULTI-explore path, `applyMercenariesNotDefeatedEffects` already shuffles an `infectedShuffledBack` infected into the deck, so the caller must NOT shuffle it again AND the disposition pass must NOT bottom it either; and `newPlayer` is built from the PRE-explore seat, so any seat mutation a not-defeated effect makes (MA-078 drops the highest-Decoration trophy from `attached` and adjusts `decorations`) must be carried over from `fxState` or it is silently lost and the card lands in two zones at once.
 11. LATER PULL FALLOUT (this change): commit 8c0cc06 added `ai/win_turns.ts`, which failed `tsc --noEmit` under `noUncheckedIndexedAccess` (`eTcounts[s] += 1` on a fixed 4-slot array) — guarded with `?? 0`. And the soak's natural-end floor moved 0.6 → 0.55 once the conservation fix let the rate assertion run: the pulled AI reweight lengthens every game, and the MA-078 fix costs one alliance natural ending (measured 18/30 without it, 17/30 with). Balance signal, not a defect — conservation stays the real gate.
+12. CI-009 / MA-000 RACHAEL FOLEY (this change): the fan-card pair is in `data/custom.ts` with three new `InfectedEffect` kinds. The damage soak is applied inside `resolveExplore`/`resolveMultiExplore` via the `ammoX10InDiscardCount` param — any NEW combat modifier that depends on the discard pile must be threaded the same way (the resolvers are pure). The defeat effects live in the explore reducer: CI-009's `onDefeatShuffleCardIntoMansion` creates a fresh instance and shuffles it in (`shuffleCopyIntoMansion`), and MA-000's `onDefeatShuffleBackIfDamageAtMost` removes the instance from `attached` while still paying its Decoration. `cardsForScenario` pulls `ma-000` in when `ci-009` is selected. If a future card shuffles a named card into the Mansion, add its dependency to the same `wanted` loop.

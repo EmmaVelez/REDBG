@@ -68,6 +68,37 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     decorations: 2,
     infectedEffects: [{ kind: 'onRevealRevealNextMansionCard' }],
   },
+  {
+    // Fan cards (printed codes CI-009 / MA-000). Rachael Foley's first
+    // encounter soaks damage from spent "Ammo x10" cards and spawns the Ooze
+    // (ma-000) into the Mansion when defeated; the Ooze itself returns to the
+    // Mansion whenever it is defeated with 80 or less damage.
+    id: 'ci-009',
+    name: 'Rachael Foley (First Encounter)',
+    type: 'infected',
+    set: 'custom',
+    text: 'When Revealed, this infected takes 10 Damage less for each 10xAmmo in the Exploring Player\'s Discard Pile.\nWhen defeated, shuffle a card named "RACHAEL FOLEY OOZE" into the Mansion.',
+    copies: 1,
+    hp: 60,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [
+      { kind: 'onRevealDamageReductionPerAmmoX10InDiscard', amount: 10 },
+      { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ma-000' },
+    ],
+  },
+  {
+    id: 'ma-000',
+    name: 'Rachael Foley (ooze)',
+    type: 'infected',
+    set: 'custom',
+    text: 'If this Infected is Defeated with 80 or less Damage, shuffle it back into the Mansion (it deals no damage this turn).',
+    copies: 1,
+    hp: 30,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [{ kind: 'onDefeatShuffleBackIfDamageAtMost', maxDamage: 80 }],
+  },
 
   {
     id: 'ev-001',

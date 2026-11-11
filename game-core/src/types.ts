@@ -271,6 +271,10 @@ export type InfectedEffect =
   | { readonly kind: "onNotDefeatedInsertIntoMansionAt"; readonly position: number } // MX-001 Mr. X
   | { readonly kind: "onRevealRevealNextMansionCard" } // CI-002 Infected Crow: reveal the next Mansion card; an Infected joins the battle, anything else is shuffled back
   | { readonly kind: "onRevealFlatDamageToNonExploringCharacters"; readonly amount: number } // MA-025 NYX
+  // --- Custom card line: CI-009 / MA-000 (Rachael Foley) ---
+  | { readonly kind: "onRevealDamageReductionPerAmmoX10InDiscard"; readonly amount: number } // CI-009: takes `amount` less damage per "Ammo x10" in the exploring player's discard pile
+  | { readonly kind: "onDefeatShuffleCardIntoMansion"; readonly cardId: string } // CI-009: on defeat, shuffle a fresh copy of `cardId` into the Mansion
+  | { readonly kind: "onDefeatShuffleBackIfDamageAtMost"; readonly maxDamage: number } // MA-000 (ooze): defeated with <= maxDamage -> shuffled back into the Mansion instead of attached
   // --- Unofficial Expansion (EX-006/EX-008) ---
   | { readonly kind: "onNotDefeatedAttachCounter"; readonly counterCardId: string } // EX-006 Web Spinner / EX-008 Yawn: attach a Poison counter to the exploring Character
 

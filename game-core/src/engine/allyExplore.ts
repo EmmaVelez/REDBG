@@ -5,6 +5,7 @@ import { characterAbilities, passiveDamageBonus, infectedDamageReduction, applyR
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
+import { ammoX10CountInDiscard } from './rachaelFoley';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -118,6 +119,7 @@ export function resolveAllyExplore(
     characterDamage: Math.max(target.maxHp - target.hp, 0),
     characterAbilities: targetAbilities,
     characterXp: target.xp ?? 0,
+    ammoX10InDiscardCount: ammoX10CountInDiscard(state, targetSeat),
   });
 
   if (outcome.kind === 'insufficientAmmo') return state;
