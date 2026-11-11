@@ -328,14 +328,23 @@ h1, h2 { margin: 0 0 8px; }
   transition: opacity 0.12s ease;
 }
 .card.card-character.card-art-only .card-skills { display: flex; flex-direction: column; gap: 1px; }
-.card.card-character.card-art-only .skill-row { flex-direction: column; align-items: flex-start; gap: 1px; }
-.card.card-character.card-art-only .skill-box { font-size: 7px; min-width: 0; padding: 0 2px; }
+/* stretch, NOT flex-start. With flex-start the text's cross-size is its
+   max-content width, so a long word ("attacking/exploring", 19 chars) ends up
+   WIDER than the 80px card and is clipped by the panel's overflow — the skill
+   text ran past the card's right edge and lost its last few characters.
+   Stretch makes the text wrap at the row's width; the level box opts back out
+   with align-self so it stays shrink-to-fit above the text. */
+.card.card-character.card-art-only .skill-row { flex-direction: column; align-items: stretch; gap: 1px; padding: 2px 2px 2px 0; }
+.card.card-character.card-art-only .skill-box { font-size: 7px; min-width: 0; padding: 0 2px; align-self: flex-start; }
 .card.card-character.card-art-only .skill-text {
   color: #dde2ea;
   font-size: 7px;
   /* no line clamp: the whole ability text is rendered */
   display: block;
   overflow: visible;
+  /* the one compound word in the card pool that is wider than the card itself
+     breaks instead of running past the panel edge and being clipped */
+  overflow-wrap: break-word;
 }
 /* locked tiers stay greyed until unlocked */
 .card.card-character.card-art-only .skill-locked { opacity: 0.55; }
@@ -719,6 +728,14 @@ h1, h2 { margin: 0 0 8px; }
 }
 .player-panel:not([data-me]):hover {
   max-height: 800px;
+}
+/* The enlarged character card's rules panel grows UP past the panel's top edge
+   (long ability text is taller than the card), so the panel must stop clipping
+   while one is hovered — the same fix `.app-action-dock` already has for the
+   viewing player's own character cards. Without it the first lines of the
+   skill text are cut off at the panel's top edge. */
+.player-panel:not([data-me]):has(.player-character-card:hover) {
+  overflow: visible;
 }
 /* What stays visible always in collapsed mode */
 .player-panel:not([data-me]) > :nth-child(n+3) {

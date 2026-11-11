@@ -1,5 +1,25 @@
 # HANDOFF — resume here
 
+**CHARACTER HOVER CARD: SKILL TEXT CLIPPED IN THE PLAYER PANEL (2026-11-11):** Manny asked to
+"scale the skill text in the character hover card in the player panel so that the full text is
+visible when hovered". Two independent clipping bugs, both measured on a live pass-and-play board
+at 1440x1250 (headless Chrome never advances CSS transitions, so they were disabled before measuring):
+1. **Horizontal** — `.card.card-character.card-art-only .skill-row` used `align-items: flex-start`,
+   so the text's cross-size was its MAX-CONTENT width. Any word wider than the 80px card (Barry's
+   "attacking/exploring", 19 chars ≈ 80px at the 7px font) made the whole text box wider than the
+   card, and `.card-skills`' `overflow-y: auto` (which computes `overflow-x: auto` too) clipped the
+   right-hand characters — the text ran ~20px past the card's right edge. The row is now
+   `align-items: stretch` (the text wraps at the row's width) with the level box opting back out via
+   `align-self: flex-start`; the row's right padding went 6px → 2px. `overflow-wrap: break-word` on
+   `.skill-text` is the safety net for that one over-wide compound word.
+2. **Vertical** — `.player-panel:not([data-me])` keeps `overflow: hidden` even on hover, so the
+   enlarged card's rules panel (which grows UP past the panel's top edge by design) had its first
+   lines cut off. Added `:has(.player-character-card:hover) { overflow: visible }` — the exact fix
+   `.app-action-dock` already had for the viewing player's own cards.
+**Verified:** enemy-panel hover at 1440x1250 — panel `overflow: visible`, `skillsOverflowX: 0`,
+`textOverflowX: 0`, `scrollHeight == clientHeight`, and the full ability text read off the screenshot
+with nothing cut at the top, bottom or right. Gates: typecheck clean, client 206, game-core 958.
+
 **Fixed the 3 pre-existing failures the pull left behind (2026-11-11):**
 All three reproduced on the clean pulled tree with this work stashed, and all three are now green.
 1. **Soak conservation (`ai/soak.test.ts`, `alliance/2`)** — THREE duplicate-instance bugs in the
