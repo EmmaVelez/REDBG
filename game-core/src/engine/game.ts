@@ -859,6 +859,11 @@ function startTurnInternal(state: GameState): GameState {
     state = { ...state, infectedBuffThisTurn: undefined };
   }
 
+  // AH-001 Abandon All Hope: the boss shuffle flag lasts "this turn" only.
+  if (state.storyModeBossShuffleActive !== undefined) {
+    state = { ...state, storyModeBossShuffleActive: undefined };
+  }
+
   // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of
   // the attached Character's turn, before anything else. Reaching 0 Health
   // downs the Character, which skips the rest of this turn; it revives (at

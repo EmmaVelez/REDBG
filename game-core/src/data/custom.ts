@@ -741,4 +741,18 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     weaponTags: ['magnum'],
     weaponEffects: [{ kind: 'trashAfterUse' }],
   },
+  {
+    // Fan card. "Abandon All Hope..." — Story Mode action.
+    // During this turn, if the Boss (endInfectedCardId) is revealed while
+    // Exploring and not Defeated, player can shuffle it into top 10 of Mansion.
+    id: 'ah-001',
+    name: 'Abandon All Hope...',
+    type: 'action',
+    set: 'custom',
+    text: 'STORY MODE: During this turn, if the Boss is revealed while Exploring and it is not Defeated, you can shuffle it into the top 10 cards of the Mansion instead.',
+    copies: 1,
+    cost: 100,
+    bonuses: { ammo: 20, cards: 2, actions: 2 },
+    actionEffects: [{ kind: 'storyModeBossShuffleToTop10' }],
+  },
 ];

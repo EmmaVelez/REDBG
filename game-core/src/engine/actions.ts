@@ -526,9 +526,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             );
 
             let weaponDamageBonusThisTurn = played.player.weaponDamageBonusThisTurn;
+            let storyModeBossShuffleActive = state.storyModeBossShuffleActive;
             for (const e of def.actionEffects ?? []) {
               if (e.kind === 'allWeaponsPlusDamageThisTurn') {
                 weaponDamageBonusThisTurn += e.amount;
+              } else if (e.kind === 'storyModeBossShuffleToTop10') {
+                storyModeBossShuffleActive = true;
               }
             }
             if (def.id === 'ac-023') {
@@ -1255,6 +1258,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         cards: cleared.cards,
         prompts,
         rngState: played.rngState,
+        ...(storyModeBossShuffleActive ? { storyModeBossShuffleActive: true } : {}),
       };
           }
 
@@ -3732,7 +3736,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const insertPosition = !infectedEffectNegated && insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt'
         ? insertEffect.position
         : undefined;
-      if (insertPosition !== undefined) {
+      // AH-001 Abandon All Hope: if active and this is the Boss, insert at top 10
+      const isBoss = state.endInfectedCardId !== undefined && revealedDef?.id === state.endInfectedCardId;
+      const bossShuffleToTop10 = state.storyModeBossShuffleActive === true && isBoss && outcome.kind === 'notDefeated';
+      if (bossShuffleToTop10) {
+        const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 10);
+        mansionDeck = inserted.deck;
+      } else if (insertPosition !== undefined) {
         const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, insertPosition);
         mansionDeck = inserted.deck;
       } else if (outcome.shuffleBack) {
