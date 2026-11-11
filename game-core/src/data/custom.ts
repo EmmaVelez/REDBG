@@ -647,4 +647,20 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     weaponTags: ['melee', 'knife'],
     weaponEffects: [{ kind: 'playFromDiscardOnExplore' }],
   },
+  {
+    // Fan card. Manny's ruling: "when selected add a resource pile of 5 of
+    // them to the game" — copies: 5 creates the supply pile. "Trash once used"
+    // maps to the existing trashAfterUse weapon effect.
+    id: 'cw-021',
+    name: 'Self Defense Gun',
+    type: 'weapon',
+    set: 'custom',
+    text: '(Trash once used).',
+    copies: 5,
+    cost: 60,
+    ammoReq: 0,
+    damage: 40,
+    weaponTags: ['magnum'],
+    weaponEffects: [{ kind: 'trashAfterUse' }],
+  },
 ];
