@@ -513,7 +513,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const { seat, instanceId } = action;
       const player = state.seats[seat] as PlayerState;
       const def = cardDef(state, instanceId) as CardDef;
-      let storyModeBossShuffleActive = state.storyModeBossShuffleActive;
 
       const played = withBonusesAndDraws(
               {
@@ -530,8 +529,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             for (const e of def.actionEffects ?? []) {
               if (e.kind === 'allWeaponsPlusDamageThisTurn') {
                 weaponDamageBonusThisTurn += e.amount;
-              } else if (e.kind === 'storyModeBossShuffleToTop10') {
-                storyModeBossShuffleActive = true;
               }
             }
             if (def.id === 'ac-023') {
@@ -1258,7 +1255,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         cards: cleared.cards,
         prompts,
         rngState: played.rngState,
-        ...(storyModeBossShuffleActive ? { storyModeBossShuffleActive: true } : {}),
+        ...((state.storyModeBossShuffleActive || (def.actionEffects ?? []).some(e => e.kind === 'storyModeBossShuffleToTop10'))
+          ? { storyModeBossShuffleActive: true }
+          : {}),
       };
           }
 
