@@ -397,4 +397,17 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     attachmentMode: 1,
     attachmentEffects: [{ kind: 'healAndAmmoAtTurnStart', heal: 10, ammo: 10 }],
   },
+  {
+    id: 'ce-008',
+    name: 'Low on Ammo',
+    type: 'event',
+    set: 'custom',
+    text: 'Players may use "Pistol" Weapons without paying their ammo cost if they do Trash them at the end of the turn. Ammunition cards grant 10 less Ammo.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [
+      { kind: 'freePistolTrashAtEnd' },
+      { kind: 'reduceAmmoBonus', amount: 10 },
+    ],
+  },
 ];

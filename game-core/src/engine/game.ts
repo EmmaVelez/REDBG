@@ -39,6 +39,28 @@ function mansionAttachmentTurnStartBonuses(state: GameState): { heal: number; am
   return { heal, ammo };
 }
 
+/** Check if any active mansion attachment has freePistolTrashAtEnd effect. */
+export function hasFreePistolTrashAtEnd(state: GameState): boolean {
+  return hasMansionAttachmentEffect(state, 'freePistolTrashAtEnd');
+}
+
+/** Get the total ammo bonus reduction from mansion attachments. */
+export function mansionAmmoBonusReduction(state: GameState): number {
+  let reduction = 0;
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'reduceAmmoBonus') {
+        reduction += effect.amount;
+      }
+    }
+  }
+  return reduction;
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.

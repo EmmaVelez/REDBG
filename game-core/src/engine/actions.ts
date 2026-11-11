@@ -66,6 +66,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1191,14 +1192,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
             // Claire: ammunition cards give extra Ammo (L1) / Gold (L2).
             const extra = ammunitionCardBonus(seatAbilities(state, seat), def);
-            const playerAfterBonus: PlayerState =
-              extra.ammo === 0 && extra.gold === 0
-                ? played.player
-                : {
-                    ...played.player,
-                    turnAmmo: played.player.turnAmmo + extra.ammo,
-                    turnGold: played.player.turnGold + extra.gold,
-                  };
+            // Low on Ammo: ammunition cards grant N less Ammo
+            const ammoReduction = mansionAmmoBonusReduction(state);
+            const adjustedAmmoBonus = Math.max((played.player.turnAmmo - player.turnAmmo) - ammoReduction, 0);
+            const playerAfterBonus: PlayerState = {
+              ...played.player,
+              turnAmmo: player.turnAmmo + adjustedAmmoBonus + extra.ammo,
+              turnGold: played.player.turnGold + extra.gold,
+            };
 
             return {
               ...state,
@@ -1369,7 +1370,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : 0;
             return {
               damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
-              ammoReq: isGatling ? 0 : isX ? assigned : exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities),
+              ammoReq: isGatling ? 0 : isX ? assigned : (() => {
+                const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
+                // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
+                if (hasFreePistolTrashAtEnd(state) && (w?.weaponTags ?? []).includes('pistol')) {
+                  return 0;
+                }
+                return baseReq;
+              })(),
               weaponEffects: (instId !== undefined && player.copiedWeaponEffects?.instanceId === instId)
                 ? [...(w?.weaponEffects ?? []), ...player.copiedWeaponEffects.effects]
                 : w?.weaponEffects,
@@ -2169,6 +2177,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             : {}),
           downed,
+          // Low on Ammo: pistols used for free (0 ammo cost) are trashed at end of turn
+          trashAtEndOfTurn: hasFreePistolTrashAtEnd(state)
+            ? [...(player.trashAtEndOfTurn ?? []), ...weapons.filter(id => {
+                const wDef = cardDef(state, id);
+                return wDef?.type === 'weapon' && (wDef.weaponTags ?? []).includes('pistol');
+              })]
+            : player.trashAtEndOfTurn,
         });
         // MA-092 "Gain 1 copy" lands in the discard. newPlayer was built before
         // these gains, so carry the gained copies into the exploring seat's

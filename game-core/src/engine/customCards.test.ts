@@ -267,6 +267,31 @@ describe('custom attachment event cards', () => {
     expect(sr!.type).toBe('event');
     expect(sr!.attachmentMode).toBe(1);
   });
+
+  it('Low on Ammo (ce-008) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-008');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-008',
+      name: 'Low on Ammo',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: expect.arrayContaining([
+        { kind: 'freePistolTrashAtEnd' },
+        { kind: 'reduceAmmoBonus', amount: 10 },
+      ]),
+    }));
+  });
+
+  it('Low on Ammo is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const loa = pool.find(c => c.id === 'ce-008');
+    expect(loa).toBeDefined();
+    expect(loa!.type).toBe('event');
+    expect(loa!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {
