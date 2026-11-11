@@ -711,23 +711,23 @@ h1, h2 { margin: 0 0 8px; }
   flex-direction: column;
   gap: 6px;
 }
-/* Collapsed state for non-viewing panels: show only name + HP row, expand on hover */
-.player-panel[data-me="false"] {
+/* Collapsed state for non-viewing panels (any panel without data-me): show only name + HP row, expand on hover */
+.player-panel:not([data-me]) {
   max-height: 60px;
   overflow: hidden;
   transition: max-height 0.3s ease-out;
 }
-.player-panel[data-me="false"]:hover {
+.player-panel:not([data-me]):hover {
   max-height: 800px;
 }
 /* What stays visible always in collapsed mode */
-.player-panel[data-me="false"] > :nth-child(n+3) {
+.player-panel:not([data-me]) > :nth-child(n+3) {
   display: none;
 }
-.player-panel[data-me="false"]:hover > :nth-child(n+3) {
+.player-panel:not([data-me]):hover > :nth-child(n+3) {
   display: flex; /* pools, deck-stats, public-zones etc. */
 }
-.player-panel[data-me="false"]:hover {
+.player-panel:not([data-me]):hover {
   border-color: #35404a;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
