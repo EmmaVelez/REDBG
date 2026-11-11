@@ -12,9 +12,13 @@ const AMMO_PER_POINT = 3;
 /** Ammo beyond the heaviest weapon requirement has no marginal value. */
 const AMMO_USEFUL_CAP = 40;
 const AMMO_EXCESS_PER_POINT = 0.1;
+/** Ammunition x10 cards (>cap) get a small positive weight so the bot still
+ *  considers them; otherwise the cap made everything above 40 ammo worthless
+ *  and prevented bots from ever upgrading from stock ammo. */
+const AMMO_CAP_BONUS = 8;
 const POOL_PER_BONUS = 40; // buys / actions / explores each top out at 40/point
 /** Value of drawing one card (a fresh draw is worth about an average card). */
-const CARD_DRAW_VALUE = 12;
+const CARD_DRAW_VALUE = 20;
 /** Cards are held at half value: you can only play one Action a turn. */
 const HOLD_FACTOR = 0.5;
 /** Deck total (hand + inventory + discard + playArea) beyond which trash
@@ -220,8 +224,11 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
   }
 
   // 2.13. Affordable piles — market potential is worth LESS than owned cards
-  // (affordable = possibility, not possession): base 10, plus the card's
-  // affinity/pull so characters steer toward their favored piles.
+  // (affordable = possibility, not possession): base 10 weighted by the card's
+  // owned value so that higher-cost / higher-yield cards score above cheaper
+  // ones (otherwise bots always buy the cheapest pile first, capping out at
+  // whatever fits in starting gold). Market pull gives character-specific
+  // preferences on top of raw value.
   let affordablePiles = 0;
   for (const pile of Object.values(state.marketPiles)) {
     const topCardInstanceId = pile.cards[0];
@@ -233,7 +240,8 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     // Buy-cost discounts (Mikhail L1, Billy melee L1) make the card
     // affordable at a lower gold total — price it the same way validate does.
     if (buyCostAfterReduction(abilities, topCardDef) > player.turnGold) continue;
-    affordablePiles += 10 + marketPull(topCardDef, abilities, bloat);
+    const ownedVal = cardOwnedValue(topCardDef, abilities, state, bloat);
+    affordablePiles += 8 + Math.floor(ownedVal * 0.6) + marketPull(topCardDef, abilities, bloat);
   }
   total += affordablePiles;
 
@@ -368,12 +376,23 @@ function weaponBaseValue(damage: number): number {
 
 /**
  * Value of an ammunition card's yield when played: what its bonuses grant in
- * pools, scored at the pool weights (ammo 3/point, gold 1/point).
+ * pools, scored at the pool weights (ammo 3/point, gold 1-point). Ammo cards
+ * with raw ammo > AMMO_USEFUL_CAP (e.g. ammo x10 = ~50) get a flat bonus so
+ * they are worth buying even though turn-ammo is capped; otherwise bots never
+ * upgrade from stock ammo.
  */
 function ammoYieldValue(cardDef: CardDef): number {
   const b = cardDef.bonuses;
   if (b === undefined) return 8;
-  return 8 + (b.ammo ?? 0) * AMMO_PER_POINT + (b.gold ?? 0) * GOLD_PER_POINT;
+  const rawAmmo = b.ammo ?? 0;
+  let v = 8 + Math.min(rawAmmo, AMMO_USEFUL_CAP) * AMMO_PER_POINT
+    + Math.max(0, rawAmmo - AMMO_USEFUL_CAP) * AMMO_EXCESS_PER_POINT
+    + (b.gold ?? 0) * GOLD_PER_POINT;
+  // Cap-bonus: push high-ammo x10 cards above zero marginal value
+  if (rawAmmo > AMMO_USEFUL_CAP) {
+    v += AMMO_CAP_BONUS;
+  }
+  return v;
 }
 
 /** True when the action card trashes cards (deck thinning). */
