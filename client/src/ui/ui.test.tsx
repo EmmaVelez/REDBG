@@ -1404,6 +1404,7 @@ describe('Lobby (T08)', () => {
       partnerMode: false,
       skillSystem: false,
       customCards: ['mx-001'],
+      mansionAttachmentMode: 1 as const,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
