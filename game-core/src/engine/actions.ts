@@ -69,7 +69,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -6226,6 +6226,71 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'giveOneCardNoChain' },
             },
           ],
+        };
+      }
+
+      if (kind === 'rebeccaDrawDiscard') {
+        // RC-001 Rebecca Chambers L1: draw +1 card, then discard a card.
+        if (option !== 0) {
+          // Decline
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const d = drawWithReshuffle({
+          deck: player.inventory,
+          discard: player.discard,
+          count: 1,
+          rngState: state.rngState,
+        });
+        const drewState: GameState = {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
+        // Now prompt to discard a card from hand.
+        const drewPlayer = drewState.seats[seat];
+        if (drewPlayer === undefined || drewPlayer.hand.length === 0) {
+          return drewState;
+        }
+        return {
+          ...drewState,
+          prompts: [
+            ...drewState.prompts,
+            {
+              id: `rebecca-discard-${seat}-v${nextBase.version}`,
+              seat,
+              text: 'Rebecca Chambers: discard a card.',
+              options: [...drewPlayer.hand],
+              payload: { kind: 'rebeccaDiscard' },
+            },
+          ],
+        };
+      }
+
+      if (kind === 'rebeccaDiscard') {
+        // RC-001 Rebecca Chambers L1: discard the chosen card.
+        // L2: if discarding due to card effect during turn, gain +20 gold.
+        const chosenId = prompt.options[option];
+        if (chosenId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const p = state.seats[seat];
+        if (p === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const goldBonus = rebeccaDiscardGoldBonus(state, seat);
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat ? { ...p, hand: p.hand.filter(id => id !== chosenId), discard: [...p.discard, chosenId], turnGold: p.turnGold + goldBonus } : s,
+          ),
+          prompts: newPrompts,
         };
       }
 

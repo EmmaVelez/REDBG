@@ -540,6 +540,25 @@ describe('custom attachment event cards', () => {
     }));
   });
 
+  it('Rebecca Chambers (rc-001) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'rc-001');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'rc-001',
+      name: 'Rebecca Chambers',
+      type: 'character',
+      set: 'custom',
+      copies: 1,
+      maxHp: 70,
+      level1At: 2,
+      level2At: 7,
+      abilities: [
+        { kind: 'turnStartDrawThenDiscardCard', level: 1 },
+        { kind: 'goldWhenDiscardingAtTurnStart', amount: 20, level: 2 },
+      ],
+    }));
+  });
+
   it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
     const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
     // Knife pile should include Combat Knife

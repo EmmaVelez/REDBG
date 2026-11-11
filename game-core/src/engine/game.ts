@@ -80,6 +80,27 @@ export function infectedHordeBonus(state: GameState): { explores: number; damage
   return { explores, damage };
 }
 
+/**
+ * Get Rebecca Chambers L2 gold bonus for discarding due to card effect.
+ * Returns the gold amount if the seat has the ability, 0 otherwise.
+ */
+export function rebeccaDiscardGoldBonus(state: GameState, seat: number): number {
+  const player = state.seats[seat];
+  if (player === undefined) return 0;
+  const charInst = state.cards[player.characterInstanceId];
+  const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
+  if (charDef === undefined) return 0;
+  const level = player.level;
+  const hasAbility = (charDef.abilities ?? []).some(
+    a => a.kind === 'goldWhenDiscardingAtTurnStart' && a.level <= level
+  );
+  if (!hasAbility) return 0;
+  const ability = (charDef.abilities ?? []).find(
+    a => a.kind === 'goldWhenDiscardingAtTurnStart' && a.level <= level
+  ) as { amount: number } | undefined;
+  return ability?.amount ?? 0;
+}
+
 /** Get the Final Action cap: max actions per turn, and attachment IDs to remove on downed. */
 export function finalActionBonus(state: GameState): { actionsCap: number; attachmentIds: string[] } {
   let actionsCap = 0;
@@ -250,6 +271,17 @@ function turnStartAbilityPrompts(
         payload: { kind: 'giveOneCardToPlayer' },
       });
     }
+  }
+
+  // RC-001 Rebecca Chambers L1: at turn start, may get +1 card and discard a card.
+  if (abilities.some(a => a.kind === 'turnStartDrawThenDiscardCard')) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: abilityText('turnStartDrawThenDiscardCard'),
+      options: ['Draw +1 card', 'Decline'],
+      payload: { kind: 'rebeccaDrawDiscard' },
+    });
   }
 
   // PR-010 Hunk L1: reveal hand; 2+ different card types -> +10 damage this turn.
