@@ -5746,7 +5746,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (newPlayer.inventory.length > 0) {
               const [topCard, ...rest] = newPlayer.inventory;
               newPlayer.inventory = rest;
-              newState = { ...newState, removed: [...newState.removed, topCard] };
+              if (topCard !== undefined) {
+                newState = { ...newState, removed: [...newState.removed, topCard] };
+              }
             }
             break;
           case 4: // +2 cards
