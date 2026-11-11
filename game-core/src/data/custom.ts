@@ -362,4 +362,15 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     cost: 40,
     bonuses: { ammo: 40 },
   },
+  // ── Mansion attachment event cards ────────────────────────────────
+  {
+    id: 'ce-001',
+    name: 'Rampage',
+    type: 'event',
+    set: 'custom',
+    text: 'At the end of a player\'s turn, trash the top card in their inventory. When 6 cards have been trashed by this effect, remove this card.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'trashTopInventoryAtTurnEnd', count: 1, removeAfter: 6 }],
+  },
 ];

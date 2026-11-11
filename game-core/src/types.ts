@@ -149,6 +149,12 @@ export interface CardDef {
   // -- counter (Unofficial Expansion) --
   /** Machine-readable effect keys (see CounterEffect). */
   readonly counterEffects?: readonly CounterEffect[];
+
+  /** Attachment event cards: mode 1 = single attachment (new replaces old),
+   *  mode 2 = multiple attachments allowed. */
+  readonly attachmentMode?: 1 | 2;
+  /** Machine-readable effect keys for attachment cards (see AttachmentEffect). */
+  readonly attachmentEffects?: readonly AttachmentEffect[];
 }
 
 /**
@@ -354,6 +360,12 @@ export type TokenEffect =
  *  attached to a Character (Poison). Max one of each counter per Character. */
 export type CounterEffect =
   | { readonly kind: "damageAtTurnStart"; readonly amount: number }; // EX-009 Poison: 5 damage at the start of the attached Character's turns
+
+/** Mansion attachment event effects — ongoing rules applied while the card
+ *  is attached to the mansion. Trigger points are handled by the engine. */
+export type AttachmentEffect =
+  | { readonly kind: "trashTopInventoryAtTurnEnd"; readonly count: number; readonly removeAfter: number } // Rampage: trash top inventory card at end of each player's turn; remove after N trashes
+;
 
 /**
  * Mercenaries Skill System effects. A Skill is active once the XP on it reaches
@@ -773,6 +785,13 @@ export interface GameState {
    *  ids). A counter cycles between here and a Character's `counters`; when
    *  the Character dies it returns here ("return to the Resource Area"). */
   readonly supply?: readonly string[];
+
+  /** Mansion attachment event cards currently active (instance ids). Mode 1
+   *  holds at most 1 card (new replaces old); mode 2 allows multiple. */
+  readonly mansionAttachments?: readonly string[];
+  /** Per-attachment trash counters (for effects like Rampage that remove
+   *  themselves after trashing N cards). Keyed by attachment instance id. */
+  readonly attachmentTrashCounts?: Readonly<Record<string, number>>;
 
   /** Outbreak: the Infection Deck (face down above the Mansion). */
   readonly infectionDeck?: readonly string[];

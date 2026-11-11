@@ -1538,6 +1538,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const infectedEntries: Array<{ id: string; def: CardDef }> = [];
         const nonInfectedIds: string[] = [];
         const zombieGrabIds: string[] = [];
+        const attachmentIds: string[] = [];
         for (const id of revealedIds) {
           if (eventIdsToRemove.includes(id)) continue;
           const d = cardDef(state, id);
@@ -1547,8 +1548,42 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // choice or a silent shuffle-back (check BEFORE expansionIds — a
           // Crow chain or MA-039/072 expansion reveal must offer the choice).
           else if (d.type === 'event' && d.id === 'ev-001') zombieGrabIds.push(id);
+          // Mansion attachment events: attach to mansion, don't enter normal flow
+          else if (d.type === 'event' && d.attachmentMode !== undefined) attachmentIds.push(id);
           else if (expansionIds.includes(id)) shuffleBackIds.push(id);
           else nonInfectedIds.push(id);
+        }
+
+        // Process attachment events revealed in multi-explore
+        if (attachmentIds.length > 0) {
+          const currentAttachments = state.mansionAttachments ?? [];
+          let newAttachments = [...currentAttachments];
+          const oldCounters = state.attachmentTrashCounts ?? {};
+          let newCounters = { ...oldCounters };
+
+          for (const attId of attachmentIds) {
+            const attDef = cardDef(state, attId);
+            if (attDef?.attachmentMode === 1) {
+              // Mode 1: replace all existing attachments
+              const oldToRemove = [...newAttachments];
+              newAttachments = [attId];
+              removedAfter = [...removedAfter, ...oldToRemove.filter(id => !removedAfter.includes(id))];
+              // Clear counters for old attachments
+              newCounters = {};
+              for (const [k, v] of Object.entries(oldCounters)) {
+                if (k !== attId) newCounters[k] = v;
+              }
+            } else {
+              // Mode 2: append
+              newAttachments = [...newAttachments, attId];
+            }
+          }
+
+          state = {
+            ...state,
+            mansionAttachments: newAttachments,
+            attachmentTrashCounts: newCounters,
+          };
         }
 
         // Unofficial Expansion: EX-002 Special Rocket Launcher — auto-defeats
@@ -2597,6 +2632,48 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             options: [...es.hand.filter(id => cardDef(state, id)?.id === 'ac-042'), 'Decline'],
             payload: { kind: 'fightOrFlight' },
           }];
+        }
+      }
+      // Mansion attachment event cards: when revealed, the card attaches to
+      // the mansion and its ongoing rules apply. Mode 1 = single attachment
+      // (new replaces old); mode 2 = multiple attachments allowed.
+      if (revealedDef?.type === 'event' && revealedDef.attachmentMode !== undefined) {
+        const currentAttachments = state.mansionAttachments ?? [];
+        let newAttachments: string[];
+        if (revealedDef.attachmentMode === 1) {
+          // Mode 1: new attachment replaces all existing ones
+          const oldAttachments = [...currentAttachments];
+          newAttachments = [revealedInstanceId];
+          // Old attachments go to removed (they're done)
+          const newRemoved = [...removedAfter, ...oldAttachments.filter(id => !removedAfter.includes(id))];
+          // Clear trash counters for old attachments
+          const oldCounters = state.attachmentTrashCounts ?? {};
+          const newCounters: Record<string, number> = {};
+          for (const [k, v] of Object.entries(oldCounters)) {
+            if (k !== revealedInstanceId) newCounters[k] = v;
+          }
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
+            removed: newRemoved,
+            mansionDeck,
+            mansionAttachments: newAttachments,
+            attachmentTrashCounts: newCounters,
+            prompts: [...reactivePrompts],
+          };
+        } else {
+          // Mode 2: append the new attachment
+          newAttachments = [...currentAttachments, revealedInstanceId];
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? applyNightmareGains({ ...player, hand: handAfter, playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft: exploresLeft + grantedExplores, turnAmmo: turnAmmoAfter, turnGold: turnGoldAfter, mustExplore: false }) : s)),
+            removed: removedAfter,
+            mansionDeck,
+            mansionAttachments: newAttachments,
+            prompts: [...reactivePrompts],
+          };
         }
       }
       if (revealedDef?.type === 'event' && revealedDef.id === 'ev-001') {
@@ -4262,6 +4339,47 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? [...state.removed, ...trashNow.filter(id => !state.removed.includes(id))]
             : state.removed;
 
+          // Mansion attachment effects at end of turn (e.g., Rampage trashing
+          // inventory cards). Applied to the active player's inventory.
+          let currentInventory = player.inventory;
+          let currentRemoved = removedAfterTrash;
+          let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
+          let currentAttachments = [...(state.mansionAttachments ?? [])];
+          const attachmentsToRemove: string[] = [];
+
+          for (const attId of currentAttachments) {
+            const attDef = cardDef(state, attId);
+            if (attDef?.attachmentEffects === undefined) continue;
+            for (const effect of attDef.attachmentEffects) {
+              if (effect.kind === 'trashTopInventoryAtTurnEnd') {
+                // Trash the top N cards from inventory
+                const toTrash = currentInventory.slice(0, effect.count);
+                if (toTrash.length > 0) {
+                  currentInventory = currentInventory.slice(effect.count);
+                  currentRemoved = [...currentRemoved, ...toTrash.filter(id => !currentRemoved.includes(id))];
+                  // Update trash counter
+                  const currentCount = currentTrashCounts[attId] ?? 0;
+                  const newCount = currentCount + toTrash.length;
+                  currentTrashCounts[attId] = newCount;
+                  // Check if attachment should be removed
+                  if (newCount >= effect.removeAfter) {
+                    attachmentsToRemove.push(attId);
+                  }
+                }
+              }
+            }
+          }
+
+          // Remove attachments that have reached their limit
+          if (attachmentsToRemove.length > 0) {
+            currentAttachments = currentAttachments.filter(id => !attachmentsToRemove.includes(id));
+            currentRemoved = [...currentRemoved, ...attachmentsToRemove.filter(id => !currentRemoved.includes(id))];
+            // Clean up counters for removed attachments
+            for (const attId of attachmentsToRemove) {
+              delete currentTrashCounts[attId];
+            }
+          }
+
           // Outbreak: if the active Player did not Explore the Mansion or
           // Attack an Infected Character this turn, increase their Infection
           // Level by 1 (draw the top Infection card, place it face up next to
@@ -4311,10 +4429,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ...state,
               ...nextBase,
               seats: state.seats.map(s => (s.seat === seat ? downedPlayer : s)),
-              removed: removedAfterTrash,
+              removed: currentRemoved,
               activeSeat: ctx.activeSeat,
               turnNumber: ctx.turnNumber,
               ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+              mansionAttachments: currentAttachments,
+              attachmentTrashCounts: currentTrashCounts,
             };
           }
 
@@ -4322,7 +4442,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // (reshuffle discard into inventory if needed)" — rulebook.
           // MA-093 Los Ganados (Handscythe): draw 1 additional card.
           const extraDraws = player.pendingEndOfTurnDraws ?? 0;
-          const d = drawWithReshuffle({ deck: player.inventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
+          const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
 
           const newPlayer: PlayerState = {
             ...player,
@@ -4337,11 +4457,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ...state,
             ...nextBase,
             seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-            removed: removedAfterTrash,
+            removed: currentRemoved,
             activeSeat: ctx.activeSeat,
             turnNumber: ctx.turnNumber,
             rngState: d.rngState,
             ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+            mansionAttachments: currentAttachments,
+            attachmentTrashCounts: currentTrashCounts,
           };
         }
 

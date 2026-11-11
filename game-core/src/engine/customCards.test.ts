@@ -181,6 +181,46 @@ describe('custom ammunition cards', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Custom mansion attachment event cards
+// ---------------------------------------------------------------------------
+
+describe('custom attachment event cards', () => {
+  it('Rampage (ce-001) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-001');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-001',
+      name: 'Rampage',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'trashTopInventoryAtTurnEnd', count: 1, removeAfter: 6 }],
+    }));
+  });
+
+  it('Rampage is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const rampage = pool.find(c => c.id === 'ce-001');
+    expect(rampage).toBeDefined();
+    expect(rampage!.type).toBe('event');
+    expect(rampage!.attachmentMode).toBe(1);
+  });
+
+  it('setup includes Rampage in the Mansion when custom cards are enabled', () => {
+    const s = customGame();
+    const rampageCopies = s.mansionDeck.filter(id => id.startsWith('ce-001'));
+    expect(rampageCopies).toHaveLength(1);
+  });
+
+  it('initial state has empty mansionAttachments', () => {
+    const s = customGame();
+    expect(s.mansionAttachments).toEqual([]);
+    expect(s.attachmentTrashCounts).toEqual({});
+  });
+});
+
 describe('MX-001 mansion membership', () => {
   it('setup shuffles both copies into the Mansion when the card is in the pool', () => {
     const s = customGame();

@@ -565,6 +565,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
     ...(winInfectedCardId !== undefined ? { endInfectedCardId: winInfectedCardId } : {}),
     supply: supplyIds,
+    mansionAttachments: [],
+    attachmentTrashCounts: {},
   };
 
   // Turn 1 has to go through startTurn just like every later turn: it is what
