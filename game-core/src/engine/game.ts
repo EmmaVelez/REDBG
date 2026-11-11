@@ -20,6 +20,25 @@ function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
   return false;
 }
 
+/** Sum heal and ammo bonuses from mansion attachments for turn start. */
+function mansionAttachmentTurnStartBonuses(state: GameState): { heal: number; ammo: number } {
+  let heal = 0;
+  let ammo = 0;
+  for (const attId of state.mansionAttachments ?? []) {
+    const inst = state.cards[attId];
+    if (!inst) continue;
+    const def = state.cardDefs[inst.cardId];
+    if (def?.attachmentEffects === undefined) continue;
+    for (const effect of def.attachmentEffects) {
+      if (effect.kind === 'healAndAmmoAtTurnStart') {
+        heal += effect.heal;
+        ammo += effect.ammo;
+      }
+    }
+  }
+  return { heal, ammo };
+}
+
 /**
  * Turn-start character-ability prompts ("At beginning of your turn, may ...").
  * Returns [] when the starting player has no triggerable ability this turn.
@@ -911,10 +930,13 @@ function startTurnInternal(state: GameState): GameState {
     return player.decorations <= min ? krauserAbility.amount : 0;
   })();
 
+  // Mansion attachment turn-start bonuses (Save Room: heal 10, +10 ammo)
+  const attBonuses = mansionAttachmentTurnStartBonuses(state);
+
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
-    hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal, player.maxHp),
+    hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal + attBonuses.heal, player.maxHp),
     // The Partner's own recovery (Steve Burnside L1 and the like) restores the
     // Partner's separate Health, never the Main Character's.
     ...(player.partnerInstanceId !== undefined
@@ -926,7 +948,7 @@ function startTurnInternal(state: GameState): GameState {
         }
       : {}),
     pendingHerbHeal: 0,
-    turnAmmo: skillTurn.ammo,
+    turnAmmo: skillTurn.ammo + attBonuses.ammo,
     turnGold: ((herbHeal > 0 && seatAbils.some(a => a.kind === 'goldOnFirstHealThisTurn'))
       ? (seatAbils.find(a => a.kind === 'goldOnFirstHealThisTurn') as { amount: number }).amount
       : 0) +

@@ -245,6 +245,28 @@ describe('custom attachment event cards', () => {
     expect(cc!.type).toBe('event');
     expect(cc!.attachmentMode).toBe(1);
   });
+
+  it('Save Room (ce-007) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'ce-007');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'ce-007',
+      name: 'Save Room',
+      type: 'event',
+      set: 'custom',
+      copies: 1,
+      attachmentMode: 1,
+      attachmentEffects: [{ kind: 'healAndAmmoAtTurnStart', heal: 10, ammo: 10 }],
+    }));
+  });
+
+  it('Save Room is included in the custom mansion deck', () => {
+    const pool = customPool();
+    const sr = pool.find(c => c.id === 'ce-007');
+    expect(sr).toBeDefined();
+    expect(sr!.type).toBe('event');
+    expect(sr!.attachmentMode).toBe(1);
+  });
 });
 
 describe('MX-001 mansion membership', () => {

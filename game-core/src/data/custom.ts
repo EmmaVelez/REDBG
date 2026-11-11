@@ -387,4 +387,14 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'mustExploreIfAble' },
     ],
   },
+  {
+    id: 'ce-007',
+    name: 'Save Room',
+    type: 'event',
+    set: 'custom',
+    text: 'At the beginning of the player\'s turn, heal their character by 10 health and gain +10 ammo this turn.',
+    copies: 1,
+    attachmentMode: 1,
+    attachmentEffects: [{ kind: 'healAndAmmoAtTurnStart', heal: 10, ammo: 10 }],
+  },
 ];
