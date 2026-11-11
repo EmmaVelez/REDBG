@@ -2435,25 +2435,25 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .action-note { font-size: 9px; }
 }
 
-/* ── Card shake + flash on damage / poison ─────────────────────────── */
+/* ── Card shake + red flash on damage ─────────────────────────────── */
 @keyframes card-shake {
-  0%   { box-shadow: inset 0 0 0 2px rgba(239,68,68,.9),  drop-shadow(0 0 10px rgba(239,68,68,.7)); filter: brightness(1.2); }
-  10%  { box-shadow: inset 0 0 16px 6px rgba(239,68,68,1), drop-shadow(0 0 20px rgba(239,68,68,.9)); filter: brightness(1.4) saturate(1.3); }
-  25%  { box-shadow: inset 0 0 10px 3px rgba(239,68,68,.8), drop-shadow(0 0 12px rgba(239,68,68,.6)); filter: brightness(1.15); }
+  0%   { box-shadow: inset 0 0 0 2px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),var(--_dmg-a,.9)), drop-shadow(0 0 10px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),.7)); filter: brightness(1.2); }
+  10%  { box-shadow: inset 0 0 16px 6px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),1), drop-shadow(0 0 20px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),.9)); filter: brightness(1.4) saturate(1.3); }
+  25%  { box-shadow: inset 0 0 10px 3px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),.8), drop-shadow(0 0 12px rgba(var(--_dmg-r,239),var(--_dmg-g,68),var(--_dmg-b,68),.6)); filter: brightness(1.15); }
   35%  { transform: translateX(-5px) translateY(1px); }
   50%  { transform: translateX(5px) translateY(-2px); }
   65%  { transform: translateX(-3px); }
   80%  { transform: translateX(1px); filter: brightness(1); }
   100% { transform: translateX(0); box-shadow: none; filter: brightness(1); }
 }
+/* Purple override for poison */
+.player-character-card.has-damage[data-poison],
+.player-character-card.has-damage[data-poison] > .card {
+  --_dmg-r: 139; --_dmg-g: 92; --_dmg-b: 246;
+  --_dmg-a: .9;
+}
 .player-character-card.has-damage > .card,
 .player-character-card.has-damage > * > .card {
   animation: card-shake 1s ease-out;
-}
-/* Purple variant for poison */
-.player-character-card.has-damage[data-poison] > .card,
-.player-character-card.has-damage[data-poison] > * > .card {
-  --flash-hue: rgb(139,92,246);
-  --flash-hsv: hsl(271,78%,68%);
 }
 
