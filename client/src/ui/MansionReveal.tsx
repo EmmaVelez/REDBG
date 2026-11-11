@@ -83,7 +83,7 @@ export function MansionReveal({
           {party !== undefined && party.length > 0 && (
             <div className="mansion-door-party" data-reveal-party>
               {party.map((m, i) => {
-                // Only show damage flash when combat occurred and this character's HP dropped
+                // Damage flashes only when combat occurred AND this character's HP is below max — the party snapshot comes from post-combat state so we compare against maxHp.
                 const wasHit = damage > 0 && m.hp !== undefined && m.maxHp !== undefined && m.hp < m.maxHp;
                 return (
                   <div
