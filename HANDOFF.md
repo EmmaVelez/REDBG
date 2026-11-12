@@ -1,5 +1,35 @@
 # HANDOFF — resume here
 
+**BOT DEADLOCK FIXED (2026-11-12):** the idle loop above is fixed in `ai/policy.ts`. Two
+triggers, both feed one override — "take the seat's best explore instead of endTurn":
+1. `isUnarmedDeadEnd(state, seat)`: no Weapon card anywhere in hand / inventory / discard /
+   play area / attached / partnerAttached AND no Weapon in the Resource Area it can afford this
+   turn (`buysLeft`, `turnGold`).
+2. `idleTurnsInARow(state, seat)` >= `STALL_TURNS` = 5: consecutive COMPLETED turns whose only
+   logged actions were passes (playAmmo/playWeapon/prompts/endTurn). Counted from `state.log`,
+   so no engine state was added; the seat's still-open turn is skipped when counting.
+Scoring is untouched — `EXPLORE_BIAS` still never applies to an unarmed explore, and unarmed
+explores only enter the candidate set when a trigger fires — so normal play is unchanged.
+`choosePlayoutAction` delegates to `chooseGreedyAction` when a trigger fires (every rollout line
+is equally dead).
+
+TUNING (seeds 1-8, 4 hard bots, firstTimer, 8000-action cap): before the fix 2/8 seeds capped
+(turn 2679 and 4490) and games ran 637-1365 turns; STALL_TURNS 2 or 3 ended most seeds with
+EVERY seat dead (bots suicide right after a quiet start); STALL_TURNS 5 ends all 8 seeds with
+4 survivors, turns 321-707, decoration spread comparable to baseline. Verified after the fix:
+`unofficialExpansion` bot-conservation seed 3 went cap(turn 2467) -> gameOver(turn 145);
+no-custom seed 4 cap(turn 1982) -> gameOver(turn 430); poison seed 5 cap(2242) -> 178;
+poison seed 6 cap(1050) -> 356.
+
+TEST STATE after the fix: game-core engine 40/45 files pass, 7 failures, ALL pre-existing and
+reproduced with the policy change stashed (`actions.test.ts` Barry L1 log scan, `customAntiqueCoin`
+IT-000, `customRachael` prompt id, `customRachaelFoley` x3, `unofficialExpansion` custom-ex-002
+pile). The bot-conservation test in `unofficialExpansion` is now GREEN. `src/ai` all green
+(policy/playout/bot/sim/soak/evaluate/enumerate = 127 tests) including "hard bots explore at a
+healthy rate and games end naturally" and the full-game soak "every scenario plays a full game
+with conserved, sane, terminating state". client 207, server 105 green (server includes the
+bot-only-endgame no-freeze test).
+
 **EX-009 POISON IS FIVE COUNTER CARDS (2026-11-12):** Manny: "make the number of poison
 counter card 5 instead of 1". `CUSTOM_CARDS` EX-009 `copies: 1 -> 5` (data/custom.ts); setup
 already seeds `supply` from `copies`, so a poison game now starts with `ex-009#1..#5` in the
