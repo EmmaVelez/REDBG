@@ -373,6 +373,7 @@ export type ActionEffect =
   | { readonly kind: "otherPlayersDrawCard" } // AC-003 Member of S.T.A.R.S: every other player draws +1 card
   | { readonly kind: "martialArtsChoice" } // AC-000 Martial Arts: choose +10 damage to Knife/Melee this turn OR attach for double damage at turn start
   | { readonly kind: "tacticalAdvanceChooseType" } // AC-003 Tactical Advance: choose weapon type for +5 damage (+10 for Melee/Knife)
+  | { readonly kind: "mysteriousFindRoll" } // AC-003 Mysterious Find: roll d6 for cards/ammo/gold
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007

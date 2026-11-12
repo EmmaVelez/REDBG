@@ -1057,6 +1057,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 promptKind = 'tacticalAdvanceChooseType';
                 promptOptions = ['Pistol', 'Shotgun', 'Magnum', 'Rifle', 'Machine Gun', 'Melee', 'Knife', 'Explosive'];
               }
+              if (e.kind === 'mysteriousFindRoll') {
+                // AC-003 Mysterious Find: roll d6 for cards/ammo/gold
+                promptKind = 'mysteriousFindRoll';
+                promptOptions = ['Roll'];
+              }
             }
 
       return {
@@ -5166,6 +5171,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             prompts: newPrompts,
           };
         }
+      }
+      if (kind === 'mysteriousFindRoll') {
+        // AC-003 Mysterious Find: roll d6 for cards/ammo/gold
+        const roll = nextInt(makeRng(state.rngState), 6).value + 1;
+        const newRng = nextInt(makeRng(state.rngState), 6).rng.s;
+        let newPlayer = { ...player };
+        // 1-2: +3 Cards, 3-4: +30 Ammo, 5-6: +30 Gold
+        if (roll <= 2) {
+          const d = drawWithReshuffle({ deck: newPlayer.inventory, discard: newPlayer.discard, count: 3, rngState: newRng });
+          newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        } else if (roll <= 4) {
+          newPlayer = { ...newPlayer, turnAmmo: newPlayer.turnAmmo + 30 };
+        } else {
+          newPlayer = { ...newPlayer, turnGold: newPlayer.turnGold + 30 };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          rngState: newRng,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          prompts: newPrompts,
+        };
       }
       if (kind === 'recoverWeaponFromDiscardToHand' && chosenId !== undefined) {
         if (chosenId === 'Decline') {

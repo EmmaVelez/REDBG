@@ -917,4 +917,15 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     bonuses: { actions: 1, cards: 1 },
     actionEffects: [{ kind: 'tacticalAdvanceChooseType' }],
   },
+  {
+    id: 'mf-001',
+    name: 'Mysterious Find',
+    type: 'action',
+    set: 'custom',
+    text: 'Roll a six sided die and apply the result.\n1-2: +3 Cards.\n3-4: +30 Ammo.\n5-6: +30 Gold.',
+    copies: 1,
+    cost: 20,
+    bonuses: { actions: 1, explores: 1 },
+    actionEffects: [{ kind: 'mysteriousFindRoll' }],
+  },
 ];
