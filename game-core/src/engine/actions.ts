@@ -1064,6 +1064,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             }
 
+      // Create prompt if promptKind was set in the loop above
+      if (promptKind !== undefined && promptOptions !== undefined) {
+        finalPrompts = [
+          ...finalPrompts,
+          {
+            id: 'p' + (finalPrompts.length + state.prompts.length + 1),
+            seat,
+            text: def.text,
+            options: promptOptions,
+            payload: { kind: promptKind, instanceId },
+          },
+        ];
+      }
+
       return {
               ...state,
               ...nextBase,
