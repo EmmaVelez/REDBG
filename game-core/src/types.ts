@@ -278,6 +278,7 @@ export type InfectedEffect =
   // --- Custom card line: CI-009 / MA-000 (Rachael Foley) ---
   | { readonly kind: "onRevealDamageReductionPerAmmoX10InDiscard"; readonly amount: number } // CI-009: takes `amount` less damage per "Ammo x10" in the exploring player's discard pile
   | { readonly kind: "onDefeatShuffleCardIntoMansion"; readonly cardId: string } // CI-009: on defeat, shuffle a fresh copy of `cardId` into the Mansion
+  | { readonly kind: "onRevealRollD6ForEffect" } // TUA-001 Tyrant Ultimate Abyss: roll d6 on reveal for random effect
   | { readonly kind: "onDefeatShuffleBackIfDamageAtMost"; readonly maxDamage: number } // MA-000 (ooze): defeated with <= maxDamage -> shuffled back into the Mansion instead of attached
   // --- Custom card line: CI-001 / CI-003 (Oscar, Saddler) ---
   | { readonly kind: "onNotDefeatedTrashHighestDamageUsedWeapons" } // CI-001 Oscar: on not-defeated, trash the highest-Damage Weapon(s) the exploring Character is using
@@ -833,6 +834,10 @@ export interface GameState {
    *  Prevents re-rolling when the explore action is re-dispatched after the
    *  prompt is resolved. Cleared at turn start. */
   readonly survivalHorrorRolledThisTurn?: boolean;
+
+  /** TUA-001 Tyrant Ultimate Abyss: weapon types disabled this turn (set by
+   *  the d6 roll on reveal). Cleared at turn start. */
+  readonly disabledWeaponTypesThisTurn?: ReadonlyArray<string>;
 
   /** Track which start-of-turn abilities have been used this turn.
    *  Key: ability kind string (e.g. 'turnStartDrawThenDiscardCard').

@@ -1,5 +1,5 @@
 import type { CardDef, GameState } from '../types';
-import { makeRng, shuffle } from '../util/rng';
+import { makeRng, nextInt, shuffle } from '../util/rng';
 
 /**
  * Custom-card-line infected helpers.
@@ -103,4 +103,22 @@ export function trashHighestDamageUsedWeapons(state: GameState, weaponIds: reado
     })),
     removed: [...state.removed, ...toTrash],
   };
+}
+
+/**
+ * TUA-001 Tyrant Ultimate Abyss: roll a d6 on reveal for a random effect.
+ * Returns the HP bonus to apply to the infected and any weapon type to disable.
+ */
+export function tyrantUltimateAbyssRoll(
+  state: GameState,
+): { hpBonus: number; disabledWeaponType: string | undefined; rngState: number } {
+  const { value, rng } = nextInt(makeRng(state.rngState), 6);
+  const roll = value + 1; // 1-6
+  // 1: +20 Health, 6: -20 Health, 2-4: disable weapon type, 5: no effect
+  if (roll === 1) return { hpBonus: 20, disabledWeaponType: undefined, rngState: rng.s };
+  if (roll === 6) return { hpBonus: -20, disabledWeaponType: undefined, rngState: rng.s };
+  if (roll === 2) return { hpBonus: 0, disabledWeaponType: 'pistol', rngState: rng.s };
+  if (roll === 3) return { hpBonus: 0, disabledWeaponType: 'shotgun', rngState: rng.s };
+  if (roll === 4) return { hpBonus: 0, disabledWeaponType: 'machineGun', rngState: rng.s };
+  return { hpBonus: 0, disabledWeaponType: undefined, rngState: rng.s };
 }

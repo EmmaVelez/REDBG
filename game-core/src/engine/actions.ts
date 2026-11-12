@@ -68,7 +68,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
-import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons } from './customInfected';
+import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
 
@@ -2572,6 +2572,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? saddlerAmmoGrantPerPlayer(revealedDef)
         : 0;
 
+      // TUA-001 Tyrant Ultimate Abyss: roll d6 on reveal for random effect.
+      let tuaHpBonus = 0;
+      let tuaDisabledWeaponType: string | undefined;
+      if (revealedDef?.type === 'infected' && !infectedEffectNegated &&
+          (revealedDef.infectedEffects ?? []).some(e => e.kind === 'onRevealRollD6ForEffect')) {
+        const rollResult = tyrantUltimateAbyssRoll(state);
+        tuaHpBonus = rollResult.hpBonus;
+        tuaDisabledWeaponType = rollResult.disabledWeaponType;
+        state = { ...state, rngState: rollResult.rngState };
+        if (tuaDisabledWeaponType !== undefined) {
+          state = {
+            ...state,
+            disabledWeaponTypesThisTurn: [...(state.disabledWeaponTypesThisTurn ?? []), tuaDisabledWeaponType],
+          };
+        }
+      }
+
       const zeroDamageIds = [...revealFx.zeroDamageWeaponIds, ...outbreakRevealFx.zeroDamageWeaponIds];
       if (zeroDamageIds.length > 0) {
         const zero = new Set(zeroDamageIds);
@@ -2580,6 +2597,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (wid !== undefined && zero.has(wid)) {
             const w = exploreWeapons[i];
             if (w !== undefined) exploreWeapons[i] = { ...w, damage: 0, weaponEffects: [] };
+          }
+        }
+      }
+      // TUA-001: zero out weapons of the disabled type for this turn.
+      if (tuaDisabledWeaponType !== undefined) {
+        for (let i = 0; i < exploreWeapons.length; i++) {
+          const wid = weapons[i];
+          if (wid !== undefined) {
+            const wdef = cardDef(state, wid);
+            if ((wdef?.weaponTags ?? []).includes(tuaDisabledWeaponType as any)) {
+              const w = exploreWeapons[i];
+              if (w !== undefined) exploreWeapons[i] = { ...w, damage: 0, weaponEffects: [] };
+            }
           }
         }
       }
@@ -3144,7 +3174,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
               revealed: {
                 ...revealedDef,
-                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0),
+                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
                 attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
               },
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,

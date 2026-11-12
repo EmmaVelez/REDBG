@@ -874,6 +874,11 @@ function startTurnInternal(state: GameState): GameState {
     state = { ...state, usedStartOfTurnAbilities: undefined };
   }
 
+  // TUA-001 Tyrant Ultimate Abyss: clear disabled weapon types so they reset next turn.
+  if (state.disabledWeaponTypesThisTurn !== undefined) {
+    state = { ...state, disabledWeaponTypesThisTurn: undefined };
+  }
+
   // Unofficial Expansion: EX-009 Poison deals its damage at the beginning of
   // the attached Character's turn, before anything else. Reaching 0 Health
   // downs the Character, which skips the rest of this turn; it revives (at

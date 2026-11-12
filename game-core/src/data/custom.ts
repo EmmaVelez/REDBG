@@ -726,6 +726,20 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     infectedEffects: [{ kind: 'onNotDefeatedExploringPlayerGainsAmmoX10', count: 3 }],
   },
   {
+    // Fan card. Tyrant Ultimate Abyss — roll d6 on reveal for random effect.
+    // 1: +20 Health, 2-4: disable weapon type, 5: no effect, 6: -20 Health.
+    id: 'tua-001',
+    name: 'Tyrant Ultimate Abyss',
+    type: 'infected',
+    set: 'custom',
+    text: 'When this Infected is Revealed, Roll a Six-Sided Die to get the following effect.\n1- This Infected gets +20 Health.\n2- "Pistol" Weapons Deal 0 Damage this turn.\n3- "Shotgun" Weapons Deal 0 Damage this turn.\n4- "Machine Gun" Weapons Deal 0 Damage this turn.\n5- No Effect\n6- This Infected gets -20 Health.',
+    copies: 1,
+    hp: 90,
+    attack: 80,
+    decorations: 9,
+    infectedEffects: [{ kind: 'onRevealRollD6ForEffect' }],
+  },
+  {
     // Fan card. "Abandon All Hope..." — Story Mode action.
     // During this turn, if the Boss (endInfectedCardId) is revealed while
     // Exploring and not Defeated, player can shuffle it into top 10 of Mansion.
