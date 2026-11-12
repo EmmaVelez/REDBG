@@ -5886,6 +5886,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
               : s)),
             prompts: newPrompts,
+            usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartRevealActionsForCards: true },
           };
         }
         const isAction = cardDef(state, chosenId)?.type === 'action';
@@ -6771,6 +6772,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : s,
           ),
           prompts: newPrompts,
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), revealHandForDamageIfTwoTypes: true },
         };
       }
 
@@ -7108,7 +7110,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 destination: 'discard',
                 reason: 'turnStart',
               });
-              return afterPile;
+              return {
+                ...afterPile,
+                usedStartOfTurnAbilities: { ...(afterPile.usedStartOfTurnAbilities ?? {}), gainKnifeAtTurnStart: true },
+              };
             }
 
             if (kind === 'drawOncePerTurnIfDamaged') {
@@ -7133,6 +7138,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     : s
                 ),
                 prompts: newPrompts,
+                usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), drawOncePerTurnIfDamaged: true },
               };
             }
 
