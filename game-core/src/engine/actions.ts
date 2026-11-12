@@ -5760,6 +5760,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? { ...s, infectionCards: remainingInfections }
               : s)),
             prompts: newPrompts,
+            usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDiscardForInfection: true },
           };
           if (remove > 0) return applyInfectionDecreaseDraws(base, seat);
           return base;
@@ -5815,6 +5816,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? { ...s, exploresLeft: s.exploresLeft + 1, exploresRequiredThisTurn: 2 }
             : s)),
           prompts: newPrompts,
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartPlusExploreRequiresTwoExplores: true },
         };
       }
 
