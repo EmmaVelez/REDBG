@@ -344,9 +344,9 @@ test('Alliance Josh L2: partner may attach up to 4 cards', () => {
 test('Chris L1 as main: may still attach weapons to partner (cap 2)', () => {
   const base = baseState({ seat0: { characterInstanceId: 'c008', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'c0', partnerAttached: [], actionsLeft: 4 } });
   expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'wp' }).ok).toBe(true);
-  // The client builds its buttons from the enumerator, so the attach action
-  // must actually surface there for a Chris-main seat too.
-  expect(enumerateLegalActions(base, 0).some(a => a.type === 'attachToPartner' && a.instanceId === 'wp')).toBe(true);
+  // The client builds its ONE guided button from the enumerator, so the start
+  // action must surface there for a Chris-main seat too.
+  expect(enumerateLegalActions(base, 0).some(a => a.type === 'attachToPartnerStart')).toBe(true);
   const two = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, partnerAttached: ['a1', 'a2'] } : s)) };
   expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk' }).ok).toBe(false);
   expect(validateAction(two, { type: 'attachToPartner', seat: 0, instanceId: 'wk', replaceIndex: 0 }).ok).toBe(true);
@@ -355,6 +355,66 @@ test('Chris L1 as main: may still attach weapons to partner (cap 2)', () => {
 test('Chris L1 as partner: cannot receive attachments', () => {
   const base = baseState({ seat0: { characterInstanceId: 'c0', level: 2 as const, hand: ['wp'], partnerInstanceId: 'c008', partnerAttached: [], actionsLeft: 4 } });
   expect(validateAction(base, { type: 'attachToPartner', seat: 0, instanceId: 'wp' }).ok).toBe(false);
+});
+
+test('attachToPartnerStart: human seats get one guided action, bots keep per-card', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'cp#1', partnerAttached: [], actionsLeft: 4 } });
+  const human = enumerateLegalActions(base, 0);
+  expect(human.filter(a => a.type === 'attachToPartnerStart')).toHaveLength(1);
+  expect(human.some(a => a.type === 'attachToPartner')).toBe(false);
+
+  const bot = { ...base, seats: base.seats.map(s => (s.seat === 0 ? { ...s, controller: 'bot' as const } : s)) };
+  const botLegal = enumerateLegalActions(bot, 0);
+  expect(botLegal.some(a => a.type === 'attachToPartnerStart')).toBe(false);
+  expect(botLegal.some(a => a.type === 'attachToPartner' && a.instanceId === 'wp')).toBe(true);
+});
+
+test('attachToPartnerStart raises a card prompt and spends nothing', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'cp#1', partnerAttached: [], actionsLeft: 4 } });
+  const after = applyAction(base, { type: 'attachToPartnerStart', seat: 0 });
+  expect(after.prompts).toHaveLength(1);
+  const prompt = pr(after);
+  expect(prompt.payload?.kind).toBe('attachToPartnerCard');
+  expect(prompt.options).toContain('wp');
+  expect(prompt.options).toContain('wk');
+  expect(p0(after).actionsLeft).toBe(4);
+});
+
+test('guided attach: picking a card attaches when the partner has room', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'cp#1', partnerAttached: [], actionsLeft: 4 } });
+  const started = applyAction(base, { type: 'attachToPartnerStart', seat: 0 });
+  const prompt = pr(started);
+  const after = applyAction(started, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: prompt.options.indexOf('wp') });
+  expect(after.prompts).toHaveLength(0);
+  expect(p0(after).partnerAttached).toEqual(['wp']);
+  expect(p0(after).hand).not.toContain('wp');
+  expect(p0(after).actionsLeft).toBe(3);
+});
+
+test('guided attach: a full partner raises a slot prompt, then replaces', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['wp', 'wk'], partnerInstanceId: 'cp#1', partnerAttached: ['a1', 'a2'], actionsLeft: 4 } });
+  const started = applyAction(base, { type: 'attachToPartnerStart', seat: 0 });
+  const cardPrompt = pr(started);
+  const slotted = applyAction(started, { type: 'chooseOption', seat: 0, promptId: cardPrompt.id, option: cardPrompt.options.indexOf('wp') });
+  expect(slotted.prompts).toHaveLength(1);
+  const slotPrompt = pr(slotted);
+  expect(slotPrompt.payload?.kind).toBe('attachToPartnerSlot');
+  expect(slotPrompt.payload?.instanceId).toBe('wp');
+  expect(slotPrompt.options).toEqual(['a1', 'a2']);
+
+  const after = applyAction(slotted, { type: 'chooseOption', seat: 0, promptId: slotPrompt.id, option: 0 });
+  expect(after.prompts).toHaveLength(0);
+  // the displaced card leaves its slot; the new card is appended (same as the
+  // direct attachToPartner action).
+  expect(p0(after).partnerAttached).toEqual(['a2', 'wp']);
+  expect(p0(after).discard).toContain('a1');
+  expect(p0(after).actionsLeft).toBe(3);
+});
+
+test('attachToPartnerStart is rejected with no eligible card in hand', () => {
+  const base = baseState({ seat0: { characterInstanceId: 'c0', level: 1 as const, hand: ['am1'], partnerInstanceId: 'cp#1', partnerAttached: [], actionsLeft: 4 } });
+  expect(validateAction(base, { type: 'attachToPartnerStart', seat: 0 }).ok).toBe(false);
+  expect(enumerateLegalActions(base, 0).some(a => a.type === 'attachToPartnerStart')).toBe(false);
 });
 
 test('Alliance Jill L1: +10 damage when her partner has 1 or fewer attached', () => {

@@ -967,6 +967,10 @@ export type Action =
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string; readonly instanceId?: string }
   | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number; readonly character?: "main" | "partner" }
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
+  /** Alliance: human seats get ONE guided action that raises a card prompt (and,
+   *  when the Partner is full, a slot prompt) instead of a button per legal card.
+   *  Bots keep the direct `attachToPartner` actions. */
+  | { readonly type: "attachToPartnerStart"; readonly seat: number }
   | { readonly type: "chooseExploreLeader"; readonly seat: number; readonly leader: "main" | "partner" }
   | { readonly type: "endTurn"; readonly seat: number }
   /** Mercenaries: activate a manual ("can") weapon effect (free action). */

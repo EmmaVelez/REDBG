@@ -772,6 +772,20 @@ export function partnerAttachCap(abilities: readonly CharacterAbility[]): number
   }
   return cap;
 }
+/** Hand cards the seat may attach to its Partner: Weapons and Actions. Shared by
+ *  the validator, the enumerator and the guided attach prompt so the eligible
+ *  set can never drift between them. */
+export function attachEligibleHandCards(state: GameState, seat: number): readonly string[] {
+  const player = state.seats[seat];
+  if (player === undefined) return [];
+  const eligible: string[] = [];
+  for (const instanceId of player.hand) {
+    const inst = state.cards[instanceId];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    if (def?.type === 'weapon' || def?.type === 'action') eligible.push(instanceId);
+  }
+  return eligible;
+}
 export function partnerAttachedDamageBonus(
   abilities: readonly CharacterAbility[],
   partnerAttached: readonly string[] | undefined,

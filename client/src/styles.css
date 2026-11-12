@@ -1499,8 +1499,12 @@ h1, h2 { margin: 0 0 8px; }
   background: var(--panel);
   padding: 8px 16px;
   max-height: 45vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* One scroll container: the dock itself never scrolls. The controls band
+     flexes and its .action-scroll-content is the only region that scrolls,
+     so the action buttons stay pinned at the bottom. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 /* While a character card is hovered, lift the WHOLE dock above every other UI
    element — the log slide-over (60) and its scrim (55) included — so the
@@ -1519,14 +1523,23 @@ h1, h2 { margin: 0 0 8px; }
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
-.app-action-dock .action-buttons { flex-shrink: 0; }
+/* the dock's own action row: persistent turn controls (End turn) only */
+.app-action-dock .action-row-dock-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
 .app-action-dock .action-prompt {
   border-top: none;
   padding-top: 0;
-  flex: 1;
-  min-width: 260px;
+  min-width: 0;
 }
+.app-action-dock .action-error { flex: 0 0 auto; }
 .action-stats {
   display: flex;
   gap: 8px;
@@ -1587,7 +1600,6 @@ h1, h2 { margin: 0 0 8px; }
 .action-note { color: var(--muted); }
 .action-prompt { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .prompt-text { font-weight: 700; }
-.prompt-options { display: flex; gap: 6px; flex-wrap: wrap; }
 .action-prompts { display: flex; flex-direction: column; gap: 6px; }
 .action-extra { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .action-extra-title { font-weight: 700; }
@@ -1740,42 +1752,7 @@ h1, h2 { margin: 0 0 8px; }
 .passandplay { width: 100%; align-self: stretch; }
 .lobby-entry { width: 100%; }
 
-/* ---- character ability buttons ---- */
-.ability-button {
-  background: linear-gradient(180deg, #2c2340 0%, #1a1428 100%);
-  border: 1px solid #6b5a9e;
-  color: #d8ccf0;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 7px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  max-width: 340px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ability-button:hover:not(:disabled) { border-color: #a58ce0; background: linear-gradient(180deg, #3a2f56 0%, #241b36 100%); }
-.ability-button:disabled { opacity: 0.5; cursor: default; }
-
-/* ---- explore button ---- */
-.explore-button {
-  background: linear-gradient(180deg, #14381f 0%, #0c2413 100%);
-  border: 1px solid #2f6b3f;
-  color: #b9f0c0;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 7px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.explore-button:hover:not(:disabled) {
-  border-color: #4ade80;
-  background: linear-gradient(180deg, #1d5029 0%, #123319 100%);
-}
-.explore-button:disabled { opacity: 0.5; cursor: default; }
-.explore-choose-button { white-space: nowrap; font-size: 12px; }
+/* ---- action buttons: see the M7 unified control system ---- */
 
 /* ---- explore weapon picker ---- */
 .explore-picker {
@@ -1807,21 +1784,6 @@ h1, h2 { margin: 0 0 8px; }
   gap: 8px;
   cursor: pointer;
 }
-/* Leon L2 double use: pay the ammo twice, effect and damage twice. */
-.explore-option-double {
-  font-size: 11px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.explore-option-double[data-active='true'] {
-  color: var(--gold);
-  border-color: var(--gold);
-}
 .explore-option-name { font-weight: 700; }
 .explore-option-stats { color: var(--muted); white-space: nowrap; }
 .explore-option-reuse {
@@ -1829,7 +1791,6 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 11px;
   white-space: nowrap;
 }
-.explore-picker-total { font-size: 12px; font-weight: 700; }
 .explore-picker-reason {
   color: #ff8f8f;
   font-size: 12px;
@@ -1870,13 +1831,7 @@ h1, h2 { margin: 0 0 8px; }
 }
 .skill-panel .skill-row-name { font-size: 10px; }
 .skill-panel .skill-row-pips { font-size: 9px; }
-.skill-panel .skill-use,
-.skill-panel .skill-move-xp {
-  align-self: center;
-  padding: 0 6px;
-  font-size: 9px;
-  line-height: 1.4;
-}
+.skill-panel .action-btn { align-self: center; }
 .skill-panel-head { display: flex; gap: 8px; align-items: baseline; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
 .skill-panel-xp { color: var(--accent); font-weight: 700; }
 .skill-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.04); }
@@ -1884,8 +1839,6 @@ h1, h2 { margin: 0 0 8px; }
 .skill-row-inactive { opacity: 0.6; }
 .skill-row-name { font-weight: 600; }
 .skill-row-pips { color: var(--muted-foreground); }
-.skill-use, .skill-move-xp { font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border); background: var(--accent); color: #1d1f23; cursor: pointer; }
-.skill-move-xp:disabled, .skill-use:disabled { opacity: 0.45; cursor: default; }
 
 /* ---- Custom Cards picker ---- */
 .custom-cards { margin-top: 10px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,0.03); }
@@ -2044,43 +1997,7 @@ h1, h2 { margin: 0 0 8px; }
   color: #fff;
 }
 
-.app-board .explore-button {
-  background: linear-gradient(180deg, #1c4a2a 0%, #0d2716 100%);
-  border: 1px solid #2f6b3f;
-  border-radius: 5px;
-  color: #a8e0b0;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 7px 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.55);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-.app-board .explore-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #266036 0%, #12331c 100%);
-  border-color: #57a86a;
-  color: #d6f5dc;
-}
-
-.app-board .ability-button {
-  background: linear-gradient(180deg, #2e2440 0%, #181226 100%);
-  border: 1px solid #584a80;
-  border-radius: 5px;
-  color: #c9bce4;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 7px 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.55);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-.app-board .ability-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #3a2e52 0%, #211832 100%);
-  border-color: #8470b8;
-  color: #e6dcf7;
-}
+/* action buttons: M7 unified control system */
 
 /* ---- stat pills ---- */
 .app-board .action-stat {
@@ -2158,21 +2075,7 @@ h1, h2 { margin: 0 0 8px; }
 .app-board .skill-row-inactive { opacity: 0.6; }
 .app-board .skill-row-name { color: #e2ddd0; }
 .app-board .skill-row-pips { color: #7f8896; }
-.app-board .skill-use,
-.app-board .skill-move-xp {
-  background: linear-gradient(180deg, #2a3039 0%, #181c22 100%);
-  border: 1px solid #383f4b;
-  color: #d3cfc4;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.app-board .skill-use:hover:not(:disabled),
-.app-board .skill-move-xp:hover:not(:disabled) {
-  background: linear-gradient(180deg, #343b46 0%, #20252d 100%);
-  color: #fff;
-}
+/* skill Use / +N XP buttons: M7 unified control system */
 
 /* ---- misc labels ---- */
 .app-board .zone-label,
@@ -2300,52 +2203,246 @@ h1, h2 { margin: 0 0 8px; }
 /* deck / discard read as labelled boxes under their header */
 .app-action-dock .zone-pile { min-width: 64px; }
 .app-action-dock .zone-pile-stack { width: 76px; height: 103px; }
-/* prompts grow to fill the controls band; the buttons spread across it */
-.app-action-dock .action-prompts { min-width: 260px; }
-/* The controls band (prompts + the turn's buttons) is pulled OUT of the dock and
-   floats just ABOVE it, over the board, with a transparent background so the
-   board shows through between the buttons. It is position:fixed against the
-   viewport, anchored to the dock's measured height (--dock-h, published by
-   App.tsx), so it still follows the dock when the dock wraps or grows. */
-.app-action-dock .action-row-controls {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  gap: 8px;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: var(--dock-h, 0px);
-  z-index: 45;
-  background: transparent;
-  border: none;
-  padding: 0 16px 8px;
-}
-/* Scrollable content area — prompts, picker, errors etc. */
-.app-action-dock .action-scroll-content {
-  display: flex;
-  flex-direction: column;
+/* ==========================================================================
+   M7 · UNIFIED ACTION CONTROLS
+   One button component, four colour variants, one size scale. Replaces the
+   scattered `.explore-button` / `.ability-button` / `.action-end-turn` /
+   `.skill-use` treatments, which disagreed on radius (3/4/5), padding
+   (2/8 … 7/14) and font size (9 … 12). Prompts are a separate family
+   (`.choice` rows) because a decision is not an action.
+   ========================================================================== */
+
+/* ---- the one action button ---- */
+.app-board .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
-  overflow-y: auto;
-  max-height: 200px;
-  scrollbar-width: thin;
-  min-width: 0;
-  /* Shrink to content width; don't consume extra space */
-  flex: 0 1 auto;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid #383f4b;
+  background: #1c212a;
+  color: #e8e2d4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
 }
-/* Button row — stretches, End Turn pinned to right edge via margin-left: auto */
-.app-action-dock .action-buttons {
+.app-board .action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* compact size for inline contexts (skill rows, picker actions) */
+.app-board .action-btn-compact { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 5px; }
+/* primary — the turn's main verb */
+.app-board .action-btn-primary {
+  background: linear-gradient(180deg, #1c4a2a 0%, #0d2716 100%);
+  border-color: #2f6b3f;
+  color: #a8e0b0;
+}
+.app-board .action-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #266036 0%, #12331c 100%);
+  border-color: #57a86a;
+  color: #d6f5dc;
+}
+/* secondary — optional actions (abilities, items, skills) */
+.app-board .action-btn-secondary {
+  background: linear-gradient(180deg, #2e2440 0%, #181226 100%);
+  border-color: #584a80;
+  color: #c9bce4;
+}
+.app-board .action-btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3a2e52 0%, #211832 100%);
+  border-color: #8470b8;
+  color: #e6dcf7;
+}
+/* ghost — navigation / utility (log, choose weapons, select all) */
+.app-board .action-btn-ghost {
+  background: transparent;
+  border-color: #383f4b;
+  color: #7f8896;
+}
+.app-board .action-btn-ghost:hover:not(:disabled) {
+  color: #e8e2d4;
+  border-color: #59626e;
+}
+.app-board .action-btn-ghost[data-log-open="true"] {
+  border-color: #554d3a;
+  color: #ffd479;
+}
+/* terminal — end turn, pinned to the right of the button row */
+.app-board .action-btn-terminal {
+  background: linear-gradient(180deg, #2a3039 0%, #181c22 100%);
+  border-color: #383f4b;
+  color: #d3cfc4;
+  margin-left: auto;
+}
+.app-board .action-btn-terminal:hover:not(:disabled) {
+  border-color: #4a5563;
+  color: #ffffff;
+}
+/* the double-use (×2) toggle in the weapon picker */
+.app-board .action-btn[data-active="true"] {
+  color: #d4af37;
+  border-color: #d4af37;
+}
+
+/* band 1's right-aligned utility cluster (the log toggle) */
+.app-board .action-row-actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* the generic "Other actions" list (Outbreak attack, Alliance attach) */
+.app-board .action-extra-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- prompt options: decisions, not actions ---- */
+.app-board .choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.app-board .choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid #383f4b;
+  background: #1c212a;
+  color: #e8e2d4;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.app-board .choice:hover { border-color: #4a5563; background: #20262f; }
+.app-board .choice:focus-visible { outline: 2px solid #57a86a; outline-offset: 1px; }
+.app-board .choice-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #59626e;
+  flex: 0 0 auto;
+}
+.app-board .choice-label { min-width: 0; }
+
+/* ---- segmented controls (explore count, leader) ---- */
+.app-board .segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.app-board .segmented-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f8896;
+  margin-right: 2px;
+}
+.app-board .segmented-option {
+  min-width: 32px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 5px;
+  border: 1px solid #383f4b;
+  background: transparent;
+  color: #7f8896;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-board .segmented-option:hover { color: #e8e2d4; border-color: #59626e; }
+.app-board .segmented-option-active {
+  background: linear-gradient(180deg, #1c4a2a 0%, #0d2716 100%);
+  border-color: #2f6b3f;
+  color: #a8e0b0;
+}
+
+/* ---- the decision card: the contextual action surface ----
+   Anchored above the dock (bottom: --dock-h). It is a REAL surface — a
+   bordered panel with a header that names the decision — not the old
+   transparent floating buttons over the board. It is position:fixed, so it
+   escapes the dock's overflow clipping and sits on top of the board. */
+.decision-card {
+  position: fixed;
+  left: 50%;
+  bottom: var(--dock-h, 0px);
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #383f4b;
+  /* Translucent: the board stays visible (and readable) through the card. */
+  background: linear-gradient(180deg, rgba(23, 28, 36, 0.62) 0%, rgba(14, 17, 22, 0.68) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  max-height: 46vh;
+}
+.decision-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.decision-card-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8d96a4;
+}
+.decision-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
   flex: 1 1 auto;
-  justify-content: space-between;
+}
+.decision-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.decision-card-total {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d3cfc4;
   white-space: nowrap;
 }
-/* End Turn button — always visible at the far right */
-.action-end-turn {
-  flex-shrink: 0;
-  white-space: nowrap;
+.decision-card-foot .explore-picker-reason { margin-right: auto; }
+/* grouped action buttons inside the card */
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* With the log sidebar open (its default state on a wide screen), centre the
+   card over the BOARD, not the viewport, so it never slides under the log.
+   Board area = 100vw - 32 (main padding) - 16 (gap) - 340 (sidebar). */
+@media (min-width: 821px) {
+  .app-board.app-log-open .decision-card {
+    left: calc((100vw - 356px) / 2);
+    width: min(560px, calc(100vw - 420px));
+  }
 }
 
 /* The log scrim only exists on a narrow screen; App.tsx renders it whenever
@@ -2488,23 +2585,29 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .play-area-cards { gap: 6px; }
   .app-board .play-area-cards .card { width: 56px; }
 
-  /* ---- action dock: compacted ---- */
+  /* ---- action dock: a bottom sheet ---- */
   .app-board .app-action-dock {
     padding: 5px 8px;
     max-height: 52vh;
   }
   .app-board .app-action-dock .action-bar { gap: 6px; }
   .app-board .action-row { gap: 6px; flex-wrap: wrap; }
-  /* the controls band is out of the dock now, so it carries its own padding */
-  .app-board .app-action-dock .action-row-controls {
-    padding: 0 8px 6px;
-    gap: 6px;
+  /* the decision card becomes a full-width sheet above the dock */
+  .app-board .decision-card {
+    left: 0;
+    right: 0;
+    transform: none;
+    width: auto;
+    max-height: 42vh;
+    border-radius: 10px 10px 0 0;
+    border-bottom: none;
+    padding: 8px 10px;
   }
-  /* Scrollable content area — tighter on mobile */
-  .app-board .app-action-dock .action-scroll-content {
-    max-height: 140px;
-    gap: 4px;
-  }
+  /* touch targets: one size scale, 44px */
+  .app-board .action-btn { height: 44px; padding: 0 12px; }
+  .app-board .action-btn-compact { height: 34px; }
+  .app-board .choice { min-height: 48px; }
+  .app-board .segmented-option { height: 38px; min-width: 40px; }
   /* stat pills inherit the borderless 25%-smaller base pill; only the padding
      tightens further so all five still fit on one row */
   .app-board .action-stat { padding: 2.25px 5.25px; gap: 2.25px; }
@@ -2533,29 +2636,11 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .app-action-dock .zone-pile { min-width: 0; }
   .app-board .app-action-dock .zone-pile-stack { width: 54px; height: 73px; }
   .app-board .app-action-dock .player-character-card { --cc-w: 56px; }
-  /* prompts and buttons each take a full row; the buttons wrap instead of
-     overflowing the viewport (they measured 403px in a 390px window) */
-  /* prompts and buttons — row layout; prompts stay narrow, buttons stretch */
-  .app-board .app-action-dock .action-prompts { flex: 0 1 auto; min-width: 0; }
-  .app-board .app-action-dock .action-prompt { min-width: 0; }
-  .app-board .app-action-dock .action-scroll-content { max-height: 140px; }
-  .app-board .app-action-dock .action-buttons {
-    flex: 1 1 auto;
-    justify-content: space-between;
-    white-space: nowrap;
-    gap: 6px;
-  }
-  .app-board .prompt-options { gap: 5px; }
+  /* prompts are full-width choice rows inside the card */
+  .app-board .decision-card-body { gap: 6px; }
+  .app-board .choice-list { gap: 5px; }
   .app-board .explore-picker { padding: 6px 8px; }
   .app-board .explore-option { font-size: 11px; gap: 6px; }
-  .app-board .ability-button {
-    max-width: 100%;
-    font-size: 11px;
-    padding: 5px 8px;
-  }
-  .app-board .explore-button,
-  .app-board .explore-choose-button,
-  .app-board .log-button { font-size: 11px; padding: 5px 8px; }
   /* .dock-status / .app-room / .app-status corner rules are gone: the room
      code and connection status are .action-stat chips in the stats row now */
 

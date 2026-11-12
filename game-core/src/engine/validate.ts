@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
-import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards } from './abilities';
 import { requiredAmmoForExplore } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
 import { isSkillActive } from './skill';
@@ -689,6 +689,33 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       return { ok: true };
     }
+
+    case 'attachToPartnerStart':
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'attachToPartnerStart: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `attachToPartnerStart: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'attachToPartnerStart: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'attachToPartnerStart: not your turn' };
+      }
+      if (player.actionsLeft < 1) {
+        return { ok: false, reason: 'attachToPartnerStart: no actions left' };
+      }
+      if (!player.partnerInstanceId) {
+        return { ok: false, reason: 'attachToPartnerStart: no partner' };
+      }
+      if (characterCannotBeHealed(state, action.seat, 'partner')) {
+        return { ok: false, reason: 'attachToPartnerStart: partner cannot accept attachments' };
+      }
+      if (attachEligibleHandCards(state, action.seat).length === 0) {
+        return { ok: false, reason: 'attachToPartnerStart: no eligible card in hand' };
+      }
+      return { ok: true };
 
     case 'attachToPartner':
       if (state.phase !== 'main') {

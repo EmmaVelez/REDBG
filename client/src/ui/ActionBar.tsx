@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { JSX } from 'react';
+import type { JSX, ButtonHTMLAttributes } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import type { ConnectionStatus } from '../net/ws';
@@ -30,7 +30,27 @@ const UI_HANDLED_ACTION_TYPES = new Set<Action['type']>([
   'playActionCard', 'playItem', 'playAmmo', 'explore', 'buy',
   'useCharacterAbility', 'useWeaponAbility', 'moveXp', 'useSkill',
   'removeAttachedItem', 'endTurn', 'chooseOption',
+  // Alliance attach: humans get ONE guided `attachToPartnerStart` button that
+  // raises the card/slot prompts; the direct per-card actions stay bot-only.
+  'attachToPartner',
 ]);
+
+/** The four colour variants of the one action button. Shape, size and type are
+ *  identical across them — only colour carries meaning (see styles.css M7). */
+type ActionButtonVariant = 'primary' | 'secondary' | 'ghost' | 'terminal';
+
+interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  readonly variant?: ActionButtonVariant;
+}
+
+/** The single button component for every in-game action. Previously each kind
+ *  of action had its own class (`.explore-button`, `.ability-button`,
+ *  `.action-end-turn`, …) with its own radius, padding and font size; they now
+ *  share one scale and differ only by variant colour. */
+function ActionButton({ variant = 'secondary', className, ...rest }: ActionButtonProps): JSX.Element {
+  const classes = `action-btn action-btn-${variant}${className === undefined ? '' : ` ${className}`}`;
+  return <button type="button" className={classes} {...rest} />;
+}
 
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
@@ -44,6 +64,10 @@ const UI_HANDLED_ACTION_TYPES = new Set<Action['type']>([
  *   turn (Leon L2 pistols), which sit in the play area.
  * - Prompt resolution (chooseOption) when a prompt awaits this seat
  * - Card-level play/buy remain click-driven (Hand / Board market piles)
+ *
+ * Layout: one dock, three bands — stats (band 1), identity (band 2), controls
+ * (band 3). The controls band used to be `position: fixed` floating above the
+ * dock; it is a normal band now so every control shares one surface.
  */
 
 export interface ActionBarProps {
@@ -63,9 +87,12 @@ export interface ActionBarProps {
   readonly status?: ConnectionStatus;
   /** Room code, shown beside the status (null/undefined in pass-and-play). */
   readonly roomCode?: string | null;
+  /** Force the decision card away — set while a full-screen overlay (mansion
+   *  reveal, you died) is showing, because those carry their own prompts. */
+  readonly cardHidden?: boolean;
 }
 
-export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false, status, roomCode = null }: ActionBarProps): JSX.Element {
+export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false, status, roomCode = null, cardHidden = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legalExplores(state, seat);
@@ -173,6 +200,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
       const infect = (a.infectionCardIds?.length ?? 0) > 0 ? ' + infection card' : '';
       return `Attack ${target?.name ?? `seat ${a.targetSeat}`}${weapon !== undefined ? ` with ${weapon}` : ''}${infect}`;
     }
+    if (a.type === 'attachToPartnerStart') {
+      return 'Attach to partner';
+    }
     if (a.type === 'attachToPartner') {
       const def = defForInstance(state, a.instanceId);
       return `Attach ${def?.name ?? a.instanceId} to Partner${a.replaceIndex !== undefined ? ` (replace slot ${a.replaceIndex + 1})` : ''}`;
@@ -199,6 +229,23 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     : state.activeSeat === seat ? undefined
     : `Waiting for ${state.seats[state.activeSeat]?.name ?? `seat ${state.activeSeat}`}…`;
 
+  // The decision card is the contextual action surface: it is rendered only
+  // when there is something to decide (a prompt, a legal explore, or any legal
+  // ability/item/extra action). Its header names that decision.
+  const decisionTitle = prompts.length > 0
+    ? 'Resolve'
+    : canExplore
+      ? (pickerOpen ? 'Explore · Choose your weapons' : 'Explore')
+      : 'Actions';
+  const hasError = lastError !== undefined && lastError !== null && lastError !== '';
+  const showDecisionCard = !cardHidden
+    && (prompts.length > 0
+      || canExplore
+      || abilities.length > 0
+      || weaponAbilities.length > 0
+      || attachedItems.length > 0
+      || extraActions.length > 0);
+
   return (
     <div className="action-bar" data-seat={seat}>
       {/* band 1 — the player's numbers */}
@@ -220,6 +267,20 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           />
         )}
         {phaseNote !== undefined && <div className="action-note">{phaseNote}</div>}
+        {onOpenLog !== undefined && (
+          <div className="action-row-actions">
+            <ActionButton
+              variant="ghost"
+              className="log-button"
+              data-log-button
+              data-log-open={logOpen}
+              onClick={onOpenLog}
+              title="Toggle game log"
+            >
+              📜 Log
+            </ActionButton>
+          </div>
+        )}
       </div>
 
       {/* band 2 — character, deck, hand, discard */}
@@ -265,207 +326,284 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           </div>
         </div>
       )}
-      {/* band 3 — prompts and the turn's actions */}
-      <fieldset className="action-row action-row-controls" data-action-controls>
-        <div className="action-scroll-content">
-          {lastError !== undefined && lastError !== null && lastError !== '' && (
-            <div className="action-error" data-action-error role="alert">{lastError}</div>
-          )}
+      {hasError && (
+        <div className="action-error" data-action-error role="alert">{lastError}</div>
+      )}
 
-          {prompts.length > 0 && (
-            <div className="action-prompts" data-prompts={prompts.length}>
-              {prompts.map((p, promptIndex) => (
-                <div key={p.id} className="action-prompt" data-prompt={p.id} data-prompt-index={promptIndex}>
-                  <span className="prompt-text">{p.text}</span>
-                  <div className="prompt-options">
-                    {p.options.map((opt, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        data-option={i}
-                        onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
-                      >
-                        {optionLabel(state, opt, p.payload?.kind)}
-                      </button>
-                    ))}
+      {/* the dock's own action row — persistent turn controls only. Everything
+          contextual lives in the decision card above the dock. */}
+      <div className="action-row action-row-dock-actions action-buttons">
+        <ActionButton
+          variant="terminal"
+          data-end-turn
+          onClick={() => onAction({ type: 'endTurn', seat })}
+          disabled={disabled || !canEndTurn}
+        >
+          End turn
+        </ActionButton>
+      </div>
+
+      {/* the decision card — the contextual action surface, anchored above the
+          dock. A real surface (not floating buttons): a header names the
+          decision, the body holds the controls, the footer holds the primary. */}
+      {showDecisionCard && (
+        <div className="decision-card" data-decision-card data-decision={decisionTitle}>
+          <div className="decision-card-head">
+            <span className="decision-card-title">{decisionTitle}</span>
+            {canExplore && weaponOptions.length > 1 && prompts.length === 0 && (
+              <ActionButton
+                variant="ghost"
+                className="action-btn-compact"
+                data-explore-choose
+                aria-expanded={pickerOpen}
+                disabled={disabled}
+                onClick={() => setPickerOpen(open => !open)}
+              >
+                {pickerOpen ? 'Hide weapons' : 'Choose weapons'}
+              </ActionButton>
+            )}
+          </div>
+
+          <div className="decision-card-body">
+            {prompts.length > 0 && (
+              <div className="action-prompts" data-prompts={prompts.length}>
+                {prompts.map((p, promptIndex) => (
+                  <div key={p.id} className="action-prompt" data-prompt={p.id} data-prompt-index={promptIndex}>
+                    <span className="prompt-text">{p.text}</span>
+                    {/* A prompt is a DECISION, not an action: options render as
+                        full-width choice rows, never as action buttons. */}
+                    <div className="choice-list">
+                      {p.options.map((opt, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="choice"
+                          data-option={i}
+                          onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
+                        >
+                          <span className="choice-dot" aria-hidden="true" />
+                          <span className="choice-label">{optionLabel(state, opt, p.payload?.kind)}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {extraActions.length > 0 && (
-            <div className="action-extra" data-extra-actions={extraActions.length}>
-              <span className="action-extra-title">Other actions</span>
-              <div className="prompt-options">
-                {extraActions.map((a, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className="extra-action-button"
-                    data-extra-action={a.type}
-                    disabled={disabled}
-                    onClick={() => onAction(a)}
-                  >
-                    {extraLabel(a)}
-                  </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {pickerOpen && canExplore && (
-            <div className="explore-picker" data-explore-picker>
-              <div className="explore-picker-list">
-                {weaponOptions.map(opt => {
-                  const times = selected.filter(id => id === opt.instanceId).length;
-                  return (
-                    <div key={opt.instanceId} className="explore-option" data-explore-option={opt.instanceId}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={times >= 1}
+            {prompts.length === 0 && (
+              <>
+                {extraActions.length > 0 && (
+                  <div className="action-extra" data-extra-actions={extraActions.length}>
+                    <span className="action-extra-title">Other actions</span>
+                    <div className="action-extra-list">
+                      {extraActions.map((a, i) => (
+                        <ActionButton
+                          key={i}
+                          variant="secondary"
+                          data-extra-action={a.type}
                           disabled={disabled}
-                          onChange={() => toggleWeapon(opt.instanceId)}
-                        />
-                        <span className="explore-option-name">{opt.name}</span>
-                        <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
-                      </label>
-                      {opt.partner && (
-                        <span
-                          className="explore-option-partner"
-                          title="Attached to your Partner. It joins this explore but stays attached."
+                          onClick={() => onAction(a)}
                         >
-                          partner
-                        </span>
-                      )}
-                      {opt.reusable && (
-                        <span
-                          className="explore-option-reuse"
-                          title="This weapon is in your play area and an ability lets you use it again this turn."
-                        >
-                          use again ({opt.remainingUses} left)
-                        </span>
-                      )}
-                      {opt.remainingUses >= 2 && (
+                          {extraLabel(a)}
+                        </ActionButton>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {canExplore && pickerOpen && (
+                  <div className="explore-picker" data-explore-picker>
+                    <div className="explore-picker-list">
+                      {weaponOptions.map(opt => {
+                        const times = selected.filter(id => id === opt.instanceId).length;
+                        return (
+                          <div key={opt.instanceId} className="explore-option" data-explore-option={opt.instanceId}>
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={times >= 1}
+                                disabled={disabled}
+                                onChange={() => toggleWeapon(opt.instanceId)}
+                              />
+                              <span className="explore-option-name">{opt.name}</span>
+                              <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
+                            </label>
+                            {opt.partner && (
+                              <span
+                                className="explore-option-partner"
+                                title="Attached to your Partner. It joins this explore but stays attached."
+                              >
+                                partner
+                              </span>
+                            )}
+                            {opt.reusable && (
+                              <span
+                                className="explore-option-reuse"
+                                title="This weapon is in your play area and an ability lets you use it again this turn."
+                              >
+                                use again ({opt.remainingUses} left)
+                              </span>
+                            )}
+                            {opt.remainingUses >= 2 && (
+                              <ActionButton
+                                variant="ghost"
+                                className="action-btn-compact"
+                                data-explore-double={opt.instanceId}
+                                data-active={times >= 2}
+                                disabled={disabled}
+                                onClick={() => setSelected(toggleWeaponDouble(selected, opt.instanceId, opt.remainingUses))}
+                                title="Use this weapon twice in one explore: pay its Ammo Requirement twice, and its effect and damage apply twice."
+                              >
+                                {times >= 2 ? '×2 ✓' : '×2'}
+                              </ActionButton>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {blowbackArmed && pistolOptions.length > 0 && (
+                      <div className="explore-picker-pistols" data-explore-pistols>
+                        <div className="explore-picker-pistols-title">
+                          Blowback Pistol: discard Pistols for +10 damage each
+                        </div>
+                        {pistolOptions.map(id => (
+                          <label key={id} className="explore-option">
+                            <input
+                              type="checkbox"
+                              checked={discardPistols.includes(id)}
+                              onChange={() => toggleDiscardPistol(id)}
+                            />
+                            <span className="explore-option-name">{defForInstance(state, id)?.name ?? id}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <div className="explore-picker-actions">
+                      <ActionButton variant="ghost" className="action-btn-compact" disabled={disabled} onClick={() => setSelected(weaponOptions.map(o => o.instanceId))}>
+                        Select all
+                      </ActionButton>
+                      <ActionButton variant="ghost" className="action-btn-compact" disabled={disabled} onClick={() => setSelected([])}>
+                        Clear
+                      </ActionButton>
+                    </div>
+                  </div>
+                )}
+
+                {canExplore && (
+                  <div className="explore-options">
+                    {exploreCounts.length > 1 && (
+                      <div className="segmented" data-explore-count>
+                        <span className="segmented-label">Explores</span>
+                        {exploreCounts.map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={exploreCount === n ? 'segmented-option segmented-option-active' : 'segmented-option'}
+                            data-explore-count-option={n}
+                            onClick={() => setExploreCount(n)}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {grantedExplores > 0 && (
+                      <div className="explore-granted-hint" data-explore-granted-hint>
+                        +{grantedExplores} Explore{grantedExplores === 1 ? '' : 's'} from {grantedWeaponNames.join(', ') || 'the selected weapon'} —
+                        use {exploreCounts[exploreCounts.length - 1] ?? 1} to reveal that many cards now, or fewer to save some for later.
+                      </div>
+                    )}
+                    {player?.partnerInstanceId !== undefined && (
+                      <div className="segmented" data-explore-leader>
+                        <span className="segmented-label">Leading</span>
                         <button
                           type="button"
-                          className="explore-option-double"
-                          data-explore-double={opt.instanceId}
-                          data-active={times >= 2}
-                          disabled={disabled}
-                          onClick={() => setSelected(toggleWeaponDouble(selected, opt.instanceId, opt.remainingUses))}
-                          title="Use this weapon twice in one explore: pay its Ammo Requirement twice, and its effect and damage apply twice."
+                          className={leader === 'main' ? 'segmented-option segmented-option-active' : 'segmented-option'}
+                          data-leader-option="main"
+                          onClick={() => setLeader('main')}
                         >
-                          {times >= 2 ? '×2 ✓' : '×2'}
+                          Main
                         </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="explore-picker-total" data-explore-total>
-                {combo.damage} damage · {combo.ammo} ammo
-              </div>
-              {combo.reason !== null && (
-                <div className="explore-picker-reason" data-explore-reason>{combo.reason}</div>
-              )}
-              {blowbackArmed && pistolOptions.length > 0 && (
-                <div className="explore-picker-pistols" data-explore-pistols>
-                  <div className="explore-picker-pistols-title">
-                    Blowback Pistol: discard Pistols for +10 damage each
+                        <button
+                          type="button"
+                          className={leader === 'partner' ? 'segmented-option segmented-option-active' : 'segmented-option'}
+                          data-leader-option="partner"
+                          onClick={() => setLeader('partner')}
+                        >
+                          Partner
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {pistolOptions.map(id => (
-                    <label key={id} className="explore-option">
-                      <input
-                        type="checkbox"
-                        checked={discardPistols.includes(id)}
-                        onChange={() => toggleDiscardPistol(id)}
-                      />
-                      <span className="explore-option-name">{defForInstance(state, id)?.name ?? id}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              <div className="explore-picker-actions">
-                <button type="button" disabled={disabled} onClick={() => setSelected(weaponOptions.map(o => o.instanceId))}>
-                  Select all
-                </button>
-                <button type="button" disabled={disabled} onClick={() => setSelected([])}>
-                  Clear
-                </button>
-              </div>
-            </div>
-          )}
+                )}
+
+                {abilities.length > 0 && (
+                  <div className="decision-actions" data-decision-group="abilities">
+                    {abilities.map(a => (
+                      <ActionButton
+                        key={`ability-${a.abilityIndex}`}
+                        variant="secondary"
+                        data-ability-index={a.abilityIndex}
+                        data-ability-character={a.character ?? 'main'}
+                        onClick={() => onAction(a)}
+                        disabled={disabled}
+                        title={abilityLabel(a)}
+                      >
+                        Ability: {abilityLabel(a)}
+                      </ActionButton>
+                    ))}
+                  </div>
+                )}
+
+                {weaponAbilities.length > 0 && (
+                  <div className="decision-actions" data-decision-group="weapon-abilities">
+                    {weaponAbilities.map(a => (
+                      <ActionButton
+                        key={`weapon-ability-${a.instanceId}`}
+                        variant="secondary"
+                        data-weapon-ability={a.instanceId}
+                        onClick={() => onAction(a)}
+                        disabled={disabled}
+                        title={defForInstance(state, a.instanceId)?.name ?? 'Activate weapon effect'}
+                      >
+                        Weapon: {defForInstance(state, a.instanceId)?.name ?? 'Activate'}
+                      </ActionButton>
+                    ))}
+                  </div>
+                )}
+
+                {attachedItems.length > 0 && (
+                  <div className="decision-actions" data-decision-group="items">
+                    {attachedItems.map(a => (
+                      <ActionButton
+                        key={`attached-item-${a.instanceId}`}
+                        variant="secondary"
+                        data-attached-item={a.instanceId}
+                        onClick={() => onAction(a)}
+                        disabled={disabled}
+                        title={defForInstance(state, a.instanceId)?.name ?? 'Remove attached item'}
+                      >
+                        Item: {defForInstance(state, a.instanceId)?.name ?? 'Remove'}
+                      </ActionButton>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {canExplore && (
-            <div className="explore-options">
-              {exploreCounts.length > 1 && (
-                <div className="explore-picker-count" data-explore-count>
-                  <span>Explores to use:</span>
-                  {exploreCounts.map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={exploreCount === n ? 'explore-count-active' : undefined}
-                      data-explore-count-option={n}
-                      onClick={() => setExploreCount(n)}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
+            <div className="decision-card-foot">
+              <span className="decision-card-total" data-explore-total>
+                {combo.damage} DMG · {combo.ammo} ammo
+              </span>
+              {combo.reason !== null && (
+                <span className="explore-picker-reason" data-explore-reason>{combo.reason}</span>
               )}
-              {grantedExplores > 0 && (
-                <div className="explore-granted-hint" data-explore-granted-hint>
-                  +{grantedExplores} Explore{grantedExplores === 1 ? '' : 's'} from {grantedWeaponNames.join(', ') || 'the selected weapon'} —
-                  use {exploreCounts[exploreCounts.length - 1] ?? 1} to reveal that many cards now, or fewer to save some for later.
-                </div>
-              )}
-              {player?.partnerInstanceId !== undefined && (
-                <div className="explore-picker-leader" data-explore-leader>
-                  <span>Leading (takes damage):</span>
-                  <button
-                    type="button"
-                    className={leader === 'main' ? 'explore-count-active' : undefined}
-                    data-leader-option="main"
-                    onClick={() => setLeader('main')}
-                  >
-                    Main
-                  </button>
-                  <button
-                    type="button"
-                    className={leader === 'partner' ? 'explore-count-active' : undefined}
-                    data-leader-option="partner"
-                    onClick={() => setLeader('partner')}
-                  >
-                    Partner
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="action-buttons">
-          {onOpenLog !== undefined && (
-            <button
-              type="button"
-              className="log-button"
-              data-log-button
-              data-log-open={logOpen}
-              onClick={onOpenLog}
-              title="Toggle game log"
-            >
-              📜 Log
-            </button>
-          )}
-
-          {canExplore && (
-            <>
-              <button
-                type="button"
-                className="explore-button"
+              <span className="spacer" />
+              <ActionButton
+                variant="primary"
                 data-explore-button
                 data-combos={explores.length}
                 data-weapons={selected.length}
@@ -481,77 +619,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                 })}
               >
                 {pickerOpen ? 'Explore selected' : 'Explore'}
-              </button>
-              {weaponOptions.length > 1 && (
-                <button
-                  type="button"
-                  className="explore-choose-button"
-                  data-explore-choose
-                  aria-expanded={pickerOpen}
-                  disabled={disabled}
-                  onClick={() => setPickerOpen(open => !open)}
-                >
-                  {pickerOpen ? 'Hide weapons' : 'Choose weapons'}
-                </button>
-              )}
-            </>
+              </ActionButton>
+            </div>
           )}
-
-          {abilities.map(a => (
-            <button
-              key={`ability-${a.abilityIndex}`}
-              type="button"
-              className="ability-button"
-              data-ability-index={a.abilityIndex}
-              data-ability-character={a.character ?? 'main'}
-              onClick={() => onAction(a)}
-              disabled={disabled}
-              title={abilityLabel(a)}
-            >
-              Ability: {abilityLabel(a)}
-            </button>
-          ))}
-
-          {weaponAbilities.map(a => (
-            <button
-              key={`weapon-ability-${a.instanceId}`}
-              type="button"
-              className="ability-button"
-              data-weapon-ability={a.instanceId}
-              onClick={() => onAction(a)}
-              disabled={disabled}
-              title={defForInstance(state, a.instanceId)?.name ?? 'Activate weapon effect'}
-            >
-              Weapon: {defForInstance(state, a.instanceId)?.name ?? 'Activate'}
-            </button>
-          ))}
-
-          {attachedItems.map(a => (
-            <button
-              key={`attached-item-${a.instanceId}`}
-              type="button"
-              className="ability-button"
-              data-attached-item={a.instanceId}
-              onClick={() => onAction(a)}
-              disabled={disabled}
-              title={defForInstance(state, a.instanceId)?.name ?? 'Remove attached item'}
-            >
-              Item: {defForInstance(state, a.instanceId)?.name ?? 'Remove'}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="action-end-turn"
-            onClick={() => onAction({ type: 'endTurn', seat })}
-            disabled={disabled || !canEndTurn}
-          >
-            End turn
-          </button>
-
         </div>
-
-      </fieldset>
+      )}
     </div>
   );
 }

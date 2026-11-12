@@ -31,6 +31,7 @@ const VERBS: Record<Action['type'], string> = {
   chooseOption: 'resolved a choice',
   startGame: 'started the game',
   attachToPartner: 'attached to partner',
+  attachToPartnerStart: 'chose a card to attach to their partner',
   chooseExploreLeader: 'chose explore leader',
   moveXp: 'moved XP onto a Skill',
   useSkill: 'used a Skill',

@@ -17,6 +17,7 @@ import {
   chosenWeaponTypeAmmoDiscount,
   partnerAttachedDamageBonus,
   partnerAttachCap,
+  attachEligibleHandCards,
   herbTrashDamageBonus,
   hasDoubleDamageOnBothHerbs,
   hasPerfectExploreReward,
@@ -494,6 +495,39 @@ function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
     };
   }
   return state;
+}
+
+/** Shared attach-to-Partner mutation: moves `instanceId` from hand to the
+ *  Partner's attachment list (optionally replacing a full slot, discarding the
+ *  displaced card). Used by the direct `attachToPartner` action and by the
+ *  guided prompt chain (attachToPartnerStart → card prompt → slot prompt). */
+function attachToPartnerSeats(
+  state: GameState,
+  seat: number,
+  instanceId: string,
+  replaceIndex?: 0 | 1,
+): readonly PlayerState[] {
+  const player = state.seats[seat] as PlayerState;
+  let attached = [...(player.partnerAttached ?? [])];
+  const hand = player.hand.filter(id => id !== instanceId);
+  let newDiscard = [...player.discard];
+  const attachCap = partnerAttachCap(seatAbilities(state, seat));
+  if (attached.length >= attachCap && replaceIndex !== undefined && replaceIndex >= 0 && replaceIndex < attachCap) {
+    const removed = attached[replaceIndex];
+    if (removed !== undefined) {
+      attached = attached.filter((_, i) => i !== replaceIndex);
+      newDiscard = [...newDiscard, removed];
+    }
+  }
+  attached = [...attached, instanceId];
+  const newPlayer: PlayerState = {
+    ...player,
+    hand,
+    actionsLeft: player.actionsLeft - 1,
+    partnerAttached: attached,
+    discard: newDiscard,
+  };
+  return state.seats.map(s => (s.seat === seat ? newPlayer : s));
 }
 
 function applyActionInternal(state: GameState, action: Action): GameState {
@@ -4633,30 +4667,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
         }
 
+    case 'attachToPartnerStart': {
+      const { seat } = action;
+      const eligible = attachEligibleHandCards(state, seat);
+      return {
+        ...state,
+        ...nextBase,
+        prompts: [...state.prompts, {
+          id: `atp-card-${seat}-${state.version}`,
+          seat,
+          text: 'Choose a card to attach to your Partner.',
+          options: [...eligible],
+          payload: { kind: 'attachToPartnerCard' },
+        }],
+      };
+    }
+
     case 'attachToPartner': {
-          const { seat, instanceId, replaceIndex } = action;
-          const player = state.seats[seat] as PlayerState;
-          let attached = [...(player.partnerAttached ?? [])];
-          const hand = player.hand.filter(id => id !== instanceId);
-          let newDiscard = [...player.discard];
-          const attachCap = partnerAttachCap(seatAbilities(state, seat));
-          if (attached.length >= attachCap && replaceIndex !== undefined && replaceIndex >= 0 && replaceIndex < attachCap) {
-            const removed = attached[replaceIndex];
-            if (removed !== undefined) {
-              attached = attached.filter((_, i) => i !== replaceIndex);
-              newDiscard = [...newDiscard, removed];
-            }
-          }
-          attached = [...attached, instanceId];
-          const newPlayer: PlayerState = {
-            ...player,
-            hand,
-            actionsLeft: player.actionsLeft - 1,
-            partnerAttached: attached,
-            discard: newDiscard,
-          };
-          return { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)) };
-        }
+      const { seat, instanceId, replaceIndex } = action;
+      return { ...state, ...nextBase, seats: attachToPartnerSeats(state, seat, instanceId, replaceIndex) };
+    }
 
     case 'chooseExploreLeader': {
           const { seat, leader } = action;
@@ -5098,6 +5128,42 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Mercenaries Skill draft: advance the draft state machine.
       if (kind === 'skillDraftPick' || kind === 'skillDraftKeep') {
         return advanceDraft({ ...state, ...nextBase, prompts: newPrompts }, seat, chosenId ?? '');
+      }
+
+      // Alliance guided attach: pick a card, then — only when the Partner is
+      // already full — pick which slot to replace.
+      if (kind === 'attachToPartnerCard') {
+        const chosen = chosenId ?? '';
+        const attached = player.partnerAttached ?? [];
+        const cap = partnerAttachCap(seatAbilities(state, seat));
+        if (attached.length >= cap) {
+          return {
+            ...state,
+            ...nextBase,
+            prompts: [...newPrompts, {
+              id: `atp-slot-${seat}-${state.version}`,
+              seat,
+              text: 'Your Partner already has 2 cards attached — choose one to replace.',
+              options: attached.slice(0, cap),
+              payload: { kind: 'attachToPartnerSlot', instanceId: chosen },
+            }],
+          };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          prompts: newPrompts,
+          seats: attachToPartnerSeats(state, seat, chosen),
+        };
+      }
+      if (kind === 'attachToPartnerSlot') {
+        const chosen = String(prompt.payload?.instanceId ?? '');
+        return {
+          ...state,
+          ...nextBase,
+          prompts: newPrompts,
+          seats: attachToPartnerSeats(state, seat, chosen, option as 0 | 1),
+        };
       }
 
       if (kind === 'weskersSecretMansion' && chosenId !== undefined) {

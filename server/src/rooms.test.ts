@@ -189,6 +189,7 @@ describe('createRoomStore', () => {
       partnerMode: false,
       skillSystem: false,
       customCards: [],
+      mansionAttachmentMode: 1,
     });
   });
 

@@ -60,7 +60,7 @@ export function SkillPanel({ state, seat, onAction, disabled }: SkillPanelProps)
             {active && manual && (
               <button
                 type="button"
-                className="skill-use"
+                className="action-btn action-btn-ghost action-btn-compact"
                 disabled={disabled}
                 onClick={() => onAction({ type: 'useSkill', seat, skillInstanceId: id })}
               >
@@ -70,7 +70,7 @@ export function SkillPanel({ state, seat, onAction, disabled }: SkillPanelProps)
             {!active && need > 0 && (
               <button
                 type="button"
-                className="skill-move-xp"
+                className="action-btn action-btn-ghost action-btn-compact"
                 disabled={disabled || xp < need}
                 onClick={() => onAction({ type: 'moveXp', seat, skillInstanceId: id, amount: need })}
               >

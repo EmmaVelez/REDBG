@@ -85,6 +85,20 @@ describe('ActionBar prompt panel', () => {
     expect(html).toContain('Decline');
   });
 
+  it('labels the attach-to-partner slot prompt as the card being replaced', () => {
+    const base = twoPlayerState();
+    const hand = base.seats[0]?.hand ?? [];
+    const weapon = hand.find(id => base.cards[id]?.cardId === 'we-009');
+    expect(weapon).toBeDefined();
+    if (weapon === undefined) return;
+    const s = withPrompts(base, [
+      { id: 'p1', seat: 0, text: 'Your Partner already has 2 cards attached — choose one to replace.', options: [weapon], payload: { kind: 'attachToPartnerSlot', instanceId: weapon } },
+    ]);
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    expect(html).toContain('Replace Handgun');
+    expect(html).toContain('data-option="0"');
+  });
+
   it('offers CU-001 L1 as a button once he reaches Level 1', () => {
     const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
     expect(ric).toBeDefined();
@@ -129,7 +143,7 @@ describe('ActionBar unhandled actions fallback', () => {
     expect(html).toContain('Attack Bot with Combat Knife');
   });
 
-  it('renders Alliance attachToPartner actions as buttons', () => {
+  it('renders one guided Attach to partner button for a human seat', () => {
     // Wesker (ch-001) has no "cannot attach non-Infected cards" restriction.
     // Partner is Leon (ch-002), who also has no restriction, so a weapon
     // can be attached to the partner.
@@ -141,7 +155,7 @@ describe('ActionBar unhandled actions fallback', () => {
       PREMIER_CARDS,
       FIRST_TIMER_PILES,
     ));
-    // Guarantee a weapon in hand so attachToPartner is legal.
+    // Guarantee a weapon in hand so the guided attach is legal.
     const handgunId = 'we-009#probe';
     const s: GameState = {
       ...base,
@@ -149,7 +163,11 @@ describe('ActionBar unhandled actions fallback', () => {
       seats: base.seats.map((p, i) => (i === 0 ? { ...p, hand: [handgunId, ...p.hand] } : p)),
     };
     const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
-    expect(html).toContain('Attach Handgun to Partner');
+    expect(html).toContain('Other actions');
+    expect(html).toContain('Attach to partner');
+    // One button, not one per legal card.
+    expect(html).not.toContain('Attach Handgun to Partner');
+    expect(html).toContain('data-extra-action="attachToPartnerStart"');
   });
 
   it('renders the Skill Area immediately right of the character/partner cards', () => {

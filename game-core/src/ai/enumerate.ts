@@ -2,7 +2,7 @@
 import type { Action, GameState, PlayerState, CardDef, CharacterAbility } from '../types';
 import { validateAction } from '../engine/validate';
 import { explorableWeapons, remainingWeaponUses } from '../engine/weaponReuse';
-import { characterAbilities, weaponCostCap } from '../engine/abilities';
+import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../engine/abilities';
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
@@ -207,19 +207,26 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   }
 
-  // --- attachToPartner (weapons in hand) ---
-  if (player.partnerInstanceId) {
-    for (const instanceId of player.hand) {
-      const cardData = state.cards[instanceId];
-      if (cardData) {
-        const cd = state.cardDefs[cardData.cardId];
-        if (cd?.type === 'weapon' || cd?.type === 'action') {
-          const attached = player.partnerAttached ?? [];
-          if (attached.length < 2) {
-            generatedActions.push({ type: 'attachToPartner', seat, instanceId });
-          } else {
-            generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 0 });
-            generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 1 });
+  // --- attachToPartner ---
+  // Humans get ONE guided action (`attachToPartnerStart`) that raises a card
+  // prompt, then a slot prompt when the Partner is full. Bots keep the direct
+  // per-card actions so the greedy policy never has to resolve a prompt chain.
+  if (player.partnerInstanceId && attachEligibleHandCards(state, seat).length > 0) {
+    if (player.controller === 'human') {
+      generatedActions.push({ type: 'attachToPartnerStart', seat });
+    } else {
+      for (const instanceId of player.hand) {
+        const cardData = state.cards[instanceId];
+        if (cardData) {
+          const cd = state.cardDefs[cardData.cardId];
+          if (cd?.type === 'weapon' || cd?.type === 'action') {
+            const attached = player.partnerAttached ?? [];
+            if (attached.length < 2) {
+              generatedActions.push({ type: 'attachToPartner', seat, instanceId });
+            } else {
+              generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 0 });
+              generatedActions.push({ type: 'attachToPartner', seat, instanceId, replaceIndex: 1 });
+            }
           }
         }
       }

@@ -958,7 +958,7 @@ describe('ActionBar (T07)', () => {
     const noExplore = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, exploresLeft: 0 } : s)) };
     const html = renderToStaticMarkup(<ActionBar state={noExplore} seat={0} onAction={() => {}} />);
     expect(html).toContain('End turn');
-    expect(html).not.toContain("explore-button"); // no legal explore action
+    expect(html).not.toContain('data-explore-button'); // no legal explore action
   });
 
   it('offers explore when weapons make it legal', () => {
@@ -968,7 +968,7 @@ describe('ActionBar (T07)', () => {
     // Handgun explore legal.
     const armed = { ...state, seats: state.seats.map((s, i) => (i === 0 ? { ...s, turnAmmo: 30 } : s)) };
     const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
-    expect(html).toContain("explore-button");
+    expect(html).toContain('data-explore-button');
     expect(html).toContain('data-weapons="1"');
   });
 
@@ -1113,14 +1113,14 @@ describe('ActionBar (T07)', () => {
     );
     // level 0: no ability button
     const html0 = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
-    expect(html0).not.toContain('ability-button');
+    expect(html0).not.toContain('data-ability-index');
     // level 1: the ability button appears with the card text
     const leveled = {
       ...s,
       seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 2 } : p)),
     };
     const html1 = renderToStaticMarkup(<ActionBar state={leveled} seat={0} onAction={() => {}} />);
-    expect(html1).toContain('ability-button');
+    expect(html1).toContain('action-btn action-btn-secondary');
     expect(html1).toContain('data-ability-index="0"');
     expect(html1).toContain('Ability:');
     expect(html1).toContain('+5 damage');

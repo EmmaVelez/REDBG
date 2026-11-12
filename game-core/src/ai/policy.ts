@@ -53,6 +53,19 @@ function isSkipTurnOption(state: GameState, action: Action): boolean {
 }
 
 /**
+ * Legal actions the greedy policies may consider.
+ *
+ * `attachToPartnerStart` is a UI prompt starter, not a resolvable move: it only
+ * raises a prompt and leaves the seat's pools untouched, so a 1-ply simulation
+ * scores it as a free win (it beats every real action and stalls the bot). It is
+ * enumerated for human seats — bots get the direct per-card `attachToPartner`
+ * actions instead — but the greedy policies are bot-only and must never pick it.
+ */
+function greedyCandidates(state: GameState, seat: number): Action[] {
+  return enumerateLegalActions(state, seat).filter((a) => a.type !== 'attachToPartnerStart');
+}
+
+/**
  * Chooses the greedy 1-ply action for a given seat.
  * It simulates every legal action, evaluates the resulting state, and selects the action
  * that yields the highest score. Ties are broken deterministically by action order.
@@ -77,7 +90,7 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     return { type: 'endTurn', seat };
   }
 
-  const legal = enumerateLegalActions(state, seat);
+  const legal = greedyCandidates(state, seat);
 
   // 2. If legal.length === 0, return endTurn as a safe deterministic fallback.
   if (legal.length === 0) {
@@ -293,7 +306,7 @@ export function choosePlayoutAction(state: GameState, seat: number): Action {
     return { type: 'endTurn', seat };
   }
 
-  const legal = enumerateLegalActions(state, seat);
+  const legal = greedyCandidates(state, seat);
   if (legal.length === 0) {
     return { type: 'endTurn', seat };
   }

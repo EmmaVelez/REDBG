@@ -314,6 +314,7 @@ export function App(): JSX.Element {
           logOpen={logOpen}
           status={status}
           roomCode={room?.roomCode ?? null}
+          cardHidden={revealCurrent !== null || youDied !== null}
         />
       </footer>
       {revealCurrent !== null && (
