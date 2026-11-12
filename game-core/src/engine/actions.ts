@@ -802,6 +802,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             payload: { kind: promptKind, instanceId, ...(promptExtra ?? {}) },
           },
         ];
+        // Reset to prevent duplicate prompt from second loop
+        promptKind = undefined;
+        promptOptions = undefined;
       }
 
       // AC-016 Archrival: all players discard down to one or fewer cards attached to their partners.
