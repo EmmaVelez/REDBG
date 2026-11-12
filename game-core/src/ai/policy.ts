@@ -53,6 +53,120 @@ function isSkipTurnOption(state: GameState, action: Action): boolean {
 }
 
 /**
+ * A seat that can never fight again: no Weapon card anywhere in its deck,
+ * discard, hand, play area, Character or Partner, and no Weapon it can afford
+ * in the Resource Area this turn.
+ *
+ * Why this matters: the policies never VOLUNTEER an unarmed explore (it only
+ * takes damage), so such a seat has no line that can ever change its position
+ * — it loops playAmmo/endTurn forever and the game never reaches 'all players
+ * dead'. Measured on seed 4 with no custom cards (cap at turn 1982, four seats
+ * alive) and on the EX-001..EX-009 seed 3 (cap at turn 2467). The seat is
+ * still allowed to buy/play its way out first - the override below only fires
+ * once the normal scoring has chosen to end the turn.
+ */
+export function isUnarmedDeadEnd(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined) return false;
+  const zones: ReadonlyArray<readonly string[]> = [
+    player.hand,
+    player.inventory,
+    player.discard,
+    player.playArea,
+    player.attached,
+    player.partnerAttached ?? [],
+  ];
+  const hasWeapon = zones.some(ids =>
+    ids.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'weapon'),
+  );
+  if (hasWeapon) return false;
+  // A Weapon it could still buy this turn breaks the dead end (the buy is a
+  // normal candidate and will be scored on its own merits).
+  if (player.buysLeft < 1) return true;
+  for (const pile of Object.values(state.marketPiles)) {
+    for (const id of pile.cards) {
+      const def = state.cardDefs[state.cards[id]?.cardId ?? ''];
+      if (def?.type !== 'weapon') continue;
+      if (def.cost !== undefined && def.cost <= player.turnGold) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Actions that can actually move the game forward. A turn made only of
+ * playAmmo / playWeapon / prompts / endTurn is a passing turn: the seat has
+ * spent nothing and gained nothing that persists.
+ */
+function isProgressAction(action: Action): boolean {
+  switch (action.type) {
+    case 'explore':
+    case 'buy':
+    case 'attack':
+    case 'playItem':
+    case 'playActionCard':
+    case 'useCharacterAbility':
+    case 'useWeaponAbility':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Consecutive completed turns of `seat` with no progress action at all.
+ *
+ * The log is chronological, so walking backwards sees the seat's actions of
+ * its LAST turn before that turn's endTurn; the first turn that actually did
+ * something stops the count.
+ */
+export function idleTurnsInARow(state: GameState, seat: number): number {
+  let idle = 0;
+  let progressed = false;
+  // The seat's CURRENT turn is still open: everything logged after its last
+  // endTurn belongs to this turn, so it must not be judged. Start counting at
+  // that endTurn and evaluate each completed turn by the actions before it.
+  let judging = false;
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const action = state.log[i]?.action;
+    if (action === undefined) continue;
+    if (!('seat' in action) || action.seat !== seat) continue;
+    if (action.type === 'endTurn') {
+      if (!judging) {
+        judging = true;
+        progressed = false;
+        continue;
+      }
+      if (progressed) break;
+      idle += 1;
+      progressed = false;
+      continue;
+    }
+    if (judging && isProgressAction(action)) progressed = true;
+  }
+  return idle;
+}
+
+/**
+ * How many fully idle turns a seat may take before the policy makes it fight
+ * anyway. Tuned by simulation on seeds 1-8 (4 hard bots, firstTimer): 2 or 3
+ * ended most games with every seat dead (bots suicide right after a quiet
+ * start) and roughly halved the decoration totals; 5 ends every seed while
+ * keeping 4 survivors and the baseline decoration spread (8/2/29/13 vs
+ * 6/10/28/21 and similar). Games also get shorter - the deadlocks are gone.
+ */
+export const STALL_TURNS = 5;
+
+/**
+ * True when the seat must be pushed to act: it can never arm itself, or it has
+ * already spent STALL_TURNS turns passing. Left alone, such a seat loops
+ * playAmmo/endTurn forever and the game never reaches 'all players dead'.
+ */
+function mustForceProgress(state: GameState, seat: number): boolean {
+  return isUnarmedDeadEnd(state, seat) || idleTurnsInARow(state, seat) >= STALL_TURNS;
+}
+
+/**
  * Legal actions the greedy policies may consider.
  *
  * `attachToPartnerStart` is a UI prompt starter, not a resolvable move: it only
@@ -92,6 +206,11 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
 
   const legal = greedyCandidates(state, seat);
 
+  // A seat that can never arm itself, or that keeps passing, must be pushed to
+  // explore: otherwise it loops playAmmo/endTurn and the game never ends (see
+  // mustForceProgress).
+  const forceProgress = mustForceProgress(state, seat);
+
   // 2. If legal.length === 0, return endTurn as a safe deterministic fallback.
   if (legal.length === 0) {
     return { type: 'endTurn', seat };
@@ -99,6 +218,8 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
 
   // 3. Simulate each candidate
   let best: { action: Action; score: number } | undefined = undefined;
+  // Best explore (armed or not), kept aside: it is the stall-breaking move.
+  let progressExplore: { action: Action; score: number } | undefined = undefined;
 
   for (const action of legal) {
     // a. Simulate the action
@@ -110,9 +231,12 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
     if (sameCoreState(state, next)) {
       continue;
     }
+    const isExplore = action.type === 'explore';
+    const isUnarmed = isExplore && action.weapons.length === 0;
     // An unarmed explore is only worth playing when a forced-Explore
-    // obligation leaves no alternative; voluntarily it just takes a hit.
-    if (action.type === 'explore' && action.weapons.length === 0 && !mustExploreNow(state, seat)) {
+    // obligation leaves no alternative — or when the seat must be pushed to
+    // act and exploring is the only way the game can still move.
+    if (isUnarmed && !mustExploreNow(state, seat) && !forceProgress) {
       continue;
     }
 
@@ -135,7 +259,15 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
           seat,
           { clampDiscardToHeld: action.type === 'buy' ? false : true },
         );
+        // No bias for an unarmed explore: it is only taken through the
+        // dead-end override below, after normal scoring has chosen to end the
+        // turn (playing Ammo, buying etc. must win first).
         const score = action.type === 'explore' && action.weapons.length > 0 ? raw + EXPLORE_BIAS : raw;
+
+        // The seat's best explore, kept aside as the stall-breaking move.
+        if (isExplore && (progressExplore === undefined || score > progressExplore.score)) {
+          progressExplore = { action, score };
+        }
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).
@@ -147,7 +279,14 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
   // 4. Return best.action. If every legal action was a no-op (extreme edge),
   // fall back to endTurn — the one action that always changes the turn state.
   if (best === undefined) {
-    return { type: 'endTurn', seat };
+    return progressExplore?.action ?? { type: 'endTurn', seat };
+  }
+  // Stall override: passing here is how the game deadlocks (the seat is stuck
+  // or has been idle for STALL_TURNS turns), so explore instead — even at a
+  // score the evaluator dislikes. Losing fights still drain Health, and Health
+  // reaching zero is what ends these games.
+  if (forceProgress && (best.action.type === 'endTurn' || isSkipTurnOption(state, best.action)) && progressExplore !== undefined) {
+    return progressExplore.action;
   }
   return best.action;
 }
@@ -309,6 +448,12 @@ export function choosePlayoutAction(state: GameState, seat: number): Action {
   const legal = greedyCandidates(state, seat);
   if (legal.length === 0) {
     return { type: 'endTurn', seat };
+  }
+
+  // Stuck or idle seat: every rollout line is equally dead, so delegate — the
+  // 1-ply policy carries the explore override that keeps the game moving.
+  if (mustForceProgress(state, seat)) {
+    return chooseGreedyAction(state, seat);
   }
 
   // 1-ply score every candidate (cheap) and keep the best of each kind.

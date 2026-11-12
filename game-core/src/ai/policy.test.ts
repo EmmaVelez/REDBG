@@ -1,5 +1,5 @@
 
-import { chooseGreedyAction, EXPLORE_BIAS } from './policy';
+import { chooseGreedyAction, EXPLORE_BIAS, isUnarmedDeadEnd, idleTurnsInARow, STALL_TURNS } from './policy';
 import { enumerateLegalActions } from './enumerate';
 import { evaluateState } from './evaluate';
 import { applyAction } from '../engine/actions';
@@ -128,7 +128,9 @@ describe('chooseGreedyAction', () => {
 
   // 6. 'bails out to endTurn for a seat with no legal moves'
   test('bails out to endTurn for a seat with no legal moves', () => {
-    const s = baseState({ seats: [player(0), player(1)] });
+    // Empty mansion: no explore is legal, so the weaponless seat has nothing
+    // to do at all (the dead-end escape needs an explore to offer).
+    const s = baseState({ seats: [player(0), player(1)], mansionDeck: [] });
     expect(chooseGreedyAction(s, 1)).toEqual({ type: 'endTurn', seat: 1 });
   });
 
@@ -145,10 +147,12 @@ describe('chooseGreedyAction', () => {
 
   // 9. 'no-op actions never win; first real action breaks ties'
     test('no-op actions never win; first real action breaks ties', () => {
-      // Empty hand + turnGold 0: the only candidates are the two no-op ability uses
-      // (ch-1 generic abilities are pass-throughs) and endTurn. The no-ops must be
-      // skipped — the policy must return the only real action: endTurn.
-      const s = baseState({ seats: [player(0, { hand: [] }), player(1)] });
+      // Empty hand, a Weapon still in the deck and turnGold 0: the only candidates
+      // are the two no-op ability uses (ch-1 generic abilities are pass-throughs)
+      // and endTurn — the seat is NOT in a dead end (it still owns a Weapon), so
+      // no unarmed explore is volunteered. The no-ops must be skipped — the
+      // policy must return the only real action: endTurn.
+      const s = baseState({ seats: [player(0, { hand: [], inventory: ['we-3#1'] }), player(1)] });
       const a = chooseGreedyAction(s, 0);
       expect(a).toEqual({ type: 'endTurn', seat: 0 });
     });
@@ -159,5 +163,54 @@ describe('chooseGreedyAction', () => {
     const before = JSON.stringify(s);
     chooseGreedyAction(s, 0);
     expect(JSON.stringify(s)).toBe(before);
+  });
+  test('a weaponless seat that cannot buy explores unarmed instead of stalling', () => {
+    // No Weapon anywhere and no affordable buy: passing the turn forever is the
+    // old stall. The policy must take the only move that can still change the
+    // game — an unarmed explore.
+    const s = baseState({ seats: [player(0, { hand: [], inventory: [] }), player(1)] });
+    const a = chooseGreedyAction(s, 0);
+    expect(a.type).toBe('explore');
+    if (a.type === 'explore') expect(a.weapons).toEqual([]);
+  });
+
+  test('isUnarmedDeadEnd: needs no Weapon anywhere AND no affordable one', () => {
+    const armed = baseState({ seats: [player(0, { inventory: ['we-3#1'] }), player(1)] });
+    expect(isUnarmedDeadEnd(armed, 0)).toBe(false);
+    const brokeButAffordable = baseState({ seats: [player(0, { inventory: [], turnGold: 20 }), player(1)] });
+    expect(isUnarmedDeadEnd(brokeButAffordable, 0)).toBe(false); // hg pile: we-1 costs 20
+    const hopeless = baseState({ seats: [player(0, { inventory: [] }), player(1)] });
+    expect(isUnarmedDeadEnd(hopeless, 0)).toBe(true);
+  });
+  test('idleTurnsInARow counts only completed passing turns', () => {
+    const end = (seq: number) => ({ seq, action: { type: 'endTurn', seat: 0 } as Action });
+    const ammo = (seq: number) => ({ seq, action: { type: 'playAmmo', seat: 0, instanceId: 'am-1#1' } as Action });
+    const explore = (seq: number) => ({ seq, action: { type: 'explore', seat: 0, weapons: [], exploreCount: 1 } as Action });
+    // Open turn (ammo only) + two completed passing turns.
+    const s = baseState({ log: [end(1), ammo(2), end(3), ammo(4), end(5), ammo(6)] });
+    expect(idleTurnsInARow(s, 0)).toBe(2);
+    // The most recent COMPLETED turn explored, so the count stops immediately.
+    const t = baseState({ log: [end(1), ammo(2), end(3), explore(4), end(5), ammo(6)] });
+    expect(idleTurnsInARow(t, 0)).toBe(0);
+    // ...and a passing turn on top of it counts exactly once.
+    const u = baseState({ log: [end(1), explore(2), end(3), ammo(4), end(5), ammo(6)] });
+    expect(idleTurnsInARow(u, 0)).toBe(1);
+    // No completed turn at all yet.
+    expect(idleTurnsInARow(baseState({ log: [ammo(1)] }), 0)).toBe(0);
+  });
+
+  test('a seat that has idled for STALL_TURNS keeps fighting instead of passing', () => {
+    const log: { seq: number; action: Action }[] = [];
+    // STALL_TURNS + 1 completed passing turns, plus an open one.
+    for (let i = 0; i < STALL_TURNS + 1; i++) {
+      log.push({ seq: log.length + 1, action: { type: 'playAmmo', seat: 0, instanceId: 'am-1#1' } });
+      log.push({ seq: log.length + 1, action: { type: 'endTurn', seat: 0 } });
+    }
+    // Empty hand, no Weapon anywhere: the seat must explore unarmed, not pass.
+    const s = baseState({ seats: [player(0, { hand: [], inventory: [] }), player(1)], log });
+    expect(idleTurnsInARow(s, 0)).toBeGreaterThanOrEqual(STALL_TURNS);
+    const a = chooseGreedyAction(s, 0);
+    expect(a.type).toBe('explore');
+    if (a.type === 'explore') expect(a.weapons).toEqual([]);
   });
 });

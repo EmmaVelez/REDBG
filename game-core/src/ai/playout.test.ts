@@ -82,7 +82,9 @@ describe('choosePlayoutAction', () => {
   });
 
   test('no legal actions falls back to endTurn', () => {
-    const s = baseState({ seats: [player(0), player(1)] });
+    // Empty mansion: nothing to explore, so the dead-end escape hatch (unarmed
+    // explore) is not available either and endTurn is the only move.
+    const s = baseState({ seats: [player(0), player(1)], mansionDeck: [] });
     expect(choosePlayoutAction(s, 0)).toEqual({ type: 'endTurn', seat: 0 });
   });
 
