@@ -1041,7 +1041,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (e.kind === 'otherPlayersDrawCard') {
                 // AC-003 Member of S.T.A.R.S: every other player draws +1 card
                 // Apply immediately - other players draw from their inventory
-                for (const s of state.seats) {
+                for (const s of seatsAfterEffects) {
                   if (s.seat !== seat && !s.dead && !s.downed) {
                     const d = drawWithReshuffle({ deck: s.inventory, discard: s.discard, count: 1, rngState: rngAfterEffects });
                     const updated = { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard };
