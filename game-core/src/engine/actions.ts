@@ -1020,6 +1020,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
                 }
               }
+              if (e.kind === 'lookAtMansionTop3AndReorder') {
+                // AC-003 The Ecliptic Express: look at top 3 mansion, reorder, must explore
+                const top3 = state.mansionDeck.slice(0, 3);
+                if (top3.length > 0) {
+                  promptKind = 'lookAtMansionTop3AndReorder';
+                  promptOptions = top3;
+                }
+              }
+              if (e.kind === 'rollD6ForDamageEffect') {
+                // AC-003 Unknown Odds: roll d6 for damage effect
+                promptKind = 'rollD6ForDamageEffect';
+                promptOptions = ['Roll'];
+              }
+              if (e.kind === 'otherPlayersDrawCard') {
+                // AC-003 Member of S.T.A.R.S: every other player draws +1 card
+                // Apply immediately - other players draw from their inventory
+                for (const s of state.seats) {
+                  if (s.seat !== seat && !s.dead && !s.downed) {
+                    const d = drawWithReshuffle({ deck: s.inventory, discard: s.discard, count: 1, rngState: rngAfterEffects });
+                    const updated = { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+                    seatsAfterEffects = seatsAfterEffects.map(x => (x.seat === s.seat ? updated : x));
+                    rngAfterEffects = d.rngState;
+                  }
+                }
+              }
             }
 
       return {
@@ -5048,6 +5073,42 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         const remaining = top4.filter(id => id !== chosenId);
         return { ...state, ...nextBase, mansionDeck: [chosenId, ...rest, ...remaining], prompts: newPrompts };
+      }
+      if (kind === 'lookAtMansionTop3AndReorder') {
+        // AC-003 The Ecliptic Express: show top 3, player reorders (simplified: keep order for now)
+        // The "must explore" effect is handled via mustExplore flag
+        const top3 = state.mansionDeck.slice(0, 3);
+        const rest = state.mansionDeck.slice(3);
+        // For now, keep the order as-is. Full reordering requires multi-step prompt.
+        return {
+          ...state,
+          ...nextBase,
+          mansionDeck: [...top3, ...rest],
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, mustExplore: true } : s)),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'rollD6ForDamageEffect') {
+        // AC-003 Unknown Odds: roll d6 and apply damage effect
+        const roll = nextInt(makeRng(state.rngState), 6).value + 1;
+        const newRng = nextInt(makeRng(state.rngState), 6).rng.s;
+        let newPlayer = { ...player };
+        // 1-2: take 20 damage, 3-4: +20 damage this turn, 5-6: +10 damage and take 10 damage
+        if (roll <= 2) {
+          newPlayer.hp = Math.max(0, newPlayer.hp - 20);
+        } else if (roll <= 4) {
+          newPlayer.weaponDamageBonusThisTurn = (newPlayer.weaponDamageBonusThisTurn ?? 0) + 20;
+        } else {
+          newPlayer.weaponDamageBonusThisTurn = (newPlayer.weaponDamageBonusThisTurn ?? 0) + 10;
+          newPlayer.hp = Math.max(0, newPlayer.hp - 10);
+        }
+        return {
+          ...state,
+          ...nextBase,
+          rngState: newRng,
+          seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+          prompts: newPrompts,
+        };
       }
       if (kind === 'recoverWeaponFromDiscardToHand' && chosenId !== undefined) {
         if (chosenId === 'Decline') {

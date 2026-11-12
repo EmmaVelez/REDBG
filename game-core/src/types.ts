@@ -368,6 +368,9 @@ export type ActionEffect =
   // --- Custom actions ---
   | { readonly kind: "storyModeBossShuffleToTop10" } // AH-001 Abandon All Hope: during this turn, if Boss revealed & not defeated, can shuffle to top 10
   | { readonly kind: "attachAndRestrictWeapons"; readonly maxNonMelee: number } // CQ-001 Close Quarters Combat: attach, restrict non-Melee/Knife weapons, +1 card on Melee/Knife play, discard at turn start
+  | { readonly kind: "lookAtMansionTop3AndReorder" } // AC-003 The Ecliptic Express: look at top 3 mansion, reorder, must explore
+  | { readonly kind: "rollD6ForDamageEffect" } // AC-003 Unknown Odds: roll d6 for damage/heal effect
+  | { readonly kind: "otherPlayersDrawCard" } // AC-003 Member of S.T.A.R.S: every other player draws +1 card
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
