@@ -1128,6 +1128,18 @@ function startTurnInternal(state: GameState): GameState {
   const cqDiscard = cqAttached.length > 0 ? cqAttached : [];
   const attachedAfterCq = (player.attached ?? []).filter(id => !cqDiscard.includes(id));
 
+  // AC-000 Martial Arts (option 2): at the beginning of your turn, if this card
+  // is attached to your Character, Knife and Melee Weapons deal double Damage
+  // this turn, then Discard this card.
+  const maAttached = attachedAfterCq.filter(id => {
+    const ci = state.cards[id];
+    const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+    return cd?.id === 'ma-000';
+  });
+  const maDiscard = maAttached.length > 0 ? maAttached : [];
+  const attachedAfterMa = attachedAfterCq.filter(id => !maDiscard.includes(id));
+  const maDoubleDamage = maAttached.length > 0;
+
 
   const skillTurn = turnStartSkillEffects(state, player.seat);
 
@@ -1158,9 +1170,11 @@ function startTurnInternal(state: GameState): GameState {
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
-    attached: attachedAfterCq,
-    discard: [...player.discard, ...cqDiscard],
+    attached: attachedAfterMa,
+    discard: [...player.discard, ...cqDiscard, ...maDiscard],
     hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal + attBonuses.heal, player.maxHp),
+    // AC-000 Martial Arts (option 2): Knife and Melee Weapons deal double Damage this turn.
+    ...(maDoubleDamage ? { damageMultiplierThisTurn: 2 } : {}),
     // The Partner's own recovery (Steve Burnside L1 and the like) restores the
     // Partner's separate Health, never the Main Character's.
     ...(player.partnerInstanceId !== undefined

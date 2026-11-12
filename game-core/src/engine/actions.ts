@@ -1045,6 +1045,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   }
                 }
               }
+              if (e.kind === 'martialArtsChoice') {
+                // AC-000 Martial Arts: choose +10 damage to Knife/Melee OR attach for double damage at turn start
+                promptKind = 'martialArtsChoice';
+                promptOptions = ['+10 Damage to Knife/Melee', 'Attach for Double Damage'];
+              }
             }
 
       return {
@@ -1530,7 +1535,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isGatling ? 0 : isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -5109,6 +5114,32 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
           prompts: newPrompts,
         };
+      }
+      if (kind === 'martialArtsChoice') {
+        // AC-000 Martial Arts: choose +10 damage to Knife/Melee OR attach for double damage
+        if (chosenId === '+10 Damage to Knife/Melee') {
+          // Option 1: +10 damage to Knife and Melee weapons this turn
+          const newPlayer = { ...player, knifeMeleeDamageBonusThisTurn: (player.knifeMeleeDamageBonusThisTurn ?? 0) + 10 };
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+            prompts: newPrompts,
+          };
+        } else if (chosenId === 'Attach for Double Damage') {
+          // Option 2: Attach to character
+          const newPlayer = {
+            ...player,
+            attached: [...player.attached, instanceId],
+            playArea: player.playArea.filter(id => id !== instanceId),
+          };
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+            prompts: newPrompts,
+          };
+        }
       }
       if (kind === 'recoverWeaponFromDiscardToHand' && chosenId !== undefined) {
         if (chosenId === 'Decline') {

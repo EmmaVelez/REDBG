@@ -874,4 +874,15 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     bonuses: { cards: 4, ammo: 10, gold: 10, explores: 1 },
     actionEffects: [{ kind: 'otherPlayersDrawCard' }],
   },
+  {
+    id: 'ma-000',
+    name: 'Martial Arts',
+    type: 'action',
+    set: 'custom',
+    text: 'Choose one: Your Knife and Melee Weapons get +10 Damage this turn. Or, attach this card to your Character. At the beginning of your turn, if this card is attached to your Character, your Knife and Melee Weapons deal double Damage this turn, then Discard this card.',
+    copies: 1,
+    cost: 40,
+    bonuses: { actions: 1 },
+    actionEffects: [{ kind: 'martialArtsChoice' }],
+  },
 ];
