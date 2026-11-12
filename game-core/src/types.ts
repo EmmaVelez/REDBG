@@ -508,6 +508,10 @@ export type CharacterAbility =
   | { readonly kind: "herbTrashDamageBonus"; readonly amount: number; readonly level: 1 | 2 } // Claire Redfield (Alliance) L1: +amount damage this turn when a Green/Red Herb is trashed
   | { readonly kind: "doubleDamageOnBothHerbs"; readonly level: 1 | 2 } // Claire Redfield (Alliance) L2: double all damage this turn when a Green and a Red Herb are both trashed
   | { readonly kind: "perfectExploreReward"; readonly level: 1 | 2 } // Carlos Oliveira (Alliance) L2: on a perfect explore (damage == health), take one discard card to hand
+  // --- Custom character: Albert Wesker (AW-001) ---
+  | { readonly kind: "drawOncePerTurnIfDamaged"; readonly level: 1 | 2 } // AW-001 Albert Wesker L0: once per turn, if HP < maxHP, draw +1 card
+  | { readonly kind: "allDamageReduction"; readonly amount: number; readonly level: 1 | 2 } // AW-001 Albert Wesker L1: all damage received reduced by amount
+  | { readonly kind: "exploreDamageIfHpAtMost"; readonly amount: number; readonly hpThreshold: number; readonly level: 1 | 2 } // AW-001 Albert Wesker L2: when exploring, if HP <= threshold, +amount damage this turn
   // --- Outbreak characters ---
   | { readonly kind: "plusDamageIfTwoOrMoreWeapons"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Mark Wilkins L1
   | { readonly kind: "exploreBonusIfAmmoAbove"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // Chris Redfield (Outbreak) L2

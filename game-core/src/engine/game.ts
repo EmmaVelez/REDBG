@@ -244,6 +244,17 @@ function turnStartAbilityPrompts(
     }
   }
 
+  // AW-001 Albert Wesker L0: once per turn, if HP < maxHP, draw +1 card.
+  if (abilities.some(a => a.kind === 'drawOncePerTurnIfDamaged') && player.hp < player.maxHp) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: abilityText('drawOncePerTurnIfDamaged'),
+      options: ['Draw +1 card', 'Decline'],
+      payload: { kind: 'drawOncePerTurnIfDamaged' },
+    });
+  }
+
   // PR-002 Jill: skip this turn for a super next turn (once per turn; not
   // while a skip reward is already pending).
   if (

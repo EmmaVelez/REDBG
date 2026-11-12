@@ -885,4 +885,25 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     bonuses: { actions: 1 },
     actionEffects: [{ kind: 'martialArtsChoice' }],
   },
+  // ── Custom character: Albert Wesker (AW-001) ────────────────────
+  {
+    id: 'aw-001',
+    name: 'Albert Wesker',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Once during your turn, if Albert\'s Health is less than his Maximum Health, you get +1 card. All Damage Albert receives is reduced by 10.\nLevel 2: When Exploring, if Albert\'s Health is 50 or less, Albert gets +20 Damage this turn.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 2,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'Once during your turn, if Albert\'s Health is less than his Maximum Health, you get +1 card. All Damage Albert receives is reduced by 10.' },
+      { level: 2, text: 'When Exploring, if Albert\'s Health is 50 or less, Albert gets +20 Damage this turn.' },
+    ],
+    abilities: [
+      { kind: 'drawOncePerTurnIfDamaged', level: 1 },
+      { kind: 'allDamageReduction', amount: 10, level: 1 },
+      { kind: 'exploreDamageIfHpAtMost', amount: 20, hpThreshold: 50, level: 2 },
+    ],
+  },
 ];

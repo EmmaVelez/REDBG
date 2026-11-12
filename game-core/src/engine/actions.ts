@@ -37,6 +37,8 @@ import {
   canAttachToCharacter,
   isExplosive,
   infectedDamageReduction,
+  allDamageReduction,
+  exploreDamageIfHpAtMost,
   exploreBigHandBonus,
   exploreActionsBonus,
   exploreDamageIfNoPartnerLowHp,
@@ -1585,6 +1587,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             dualWieldBonus(state, seat, abilities, weapons) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
             exploreDamageIfNoPartnerLowHp(abilities, player.partnerInstanceId, player.hp) +
+            exploreDamageIfHpAtMost(abilities, player.hp) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
@@ -2148,7 +2151,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
             ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
             : 0;
-          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction;
+          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction + allDamageReduction(abilities);
           const damageSkillEffects = activeSkillEffects(state, seat);
           const negateConsumption = consumeNegateDamage(state, seat);
           state = negateConsumption.state;
@@ -7039,6 +7042,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 reason: 'turnStart',
               });
               return afterPile;
+            }
+
+            if (kind === 'drawOncePerTurnIfDamaged') {
+              // AW-001 Albert Wesker L0: draw +1 card from inventory.
+              const chosenId = prompt.options[option];
+              if (chosenId === 'Decline') {
+                return { ...state, ...nextBase, prompts: newPrompts };
+              }
+              const d = drawWithReshuffle({
+                deck: player.inventory,
+                discard: player.discard,
+                count: 1,
+                rngState: state.rngState,
+              });
+              return {
+                ...state,
+                ...nextBase,
+                rngState: d.rngState,
+                seats: state.seats.map(s =>
+                  s.seat === seat
+                    ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+                    : s
+                ),
+                prompts: newPrompts,
+              };
             }
 
       if (kind === 'ricardoL2') {

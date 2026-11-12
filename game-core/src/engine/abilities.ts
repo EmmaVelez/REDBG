@@ -318,6 +318,25 @@ export function ricardoGiveAmount(abilities: readonly CharacterAbility[]): numbe
   return 0;
 }
 
+/** AW-001 Albert Wesker L1: all damage received reduced by amount. */
+export function allDamageReduction(abilities: readonly CharacterAbility[]): number {
+  return abilities.reduce(
+    (sum, a) => (a.kind === 'allDamageReduction' ? sum + a.amount : sum),
+    0
+  );
+}
+
+/** AW-001 Albert Wesker L2: +amount damage when exploring if HP <= threshold. */
+export function exploreDamageIfHpAtMost(
+  abilities: readonly CharacterAbility[],
+  hp: number,
+): number {
+  for (const a of abilities) {
+    if (a.kind === 'exploreDamageIfHpAtMost' && hp <= a.hpThreshold) return a.amount;
+  }
+  return 0;
+}
+
 /**
  * Damage reduction vs Weapon attacks for this seat (PR-001 Chris L2: -10).
  * No PvP weapon-attack action exists in the engine yet, so this is encoded
