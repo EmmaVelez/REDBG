@@ -372,6 +372,7 @@ export type ActionEffect =
   | { readonly kind: "rollD6ForDamageEffect" } // AC-003 Unknown Odds: roll d6 for damage/heal effect
   | { readonly kind: "otherPlayersDrawCard" } // AC-003 Member of S.T.A.R.S: every other player draws +1 card
   | { readonly kind: "martialArtsChoice" } // AC-000 Martial Arts: choose +10 damage to Knife/Melee this turn OR attach for double damage at turn start
+  | { readonly kind: "tacticalAdvanceChooseType" } // AC-003 Tactical Advance: choose weapon type for +5 damage (+10 for Melee/Knife)
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -629,6 +630,10 @@ export interface PlayerState {
   readonly weaponDamageBonusThisTurn: number;
   /** AC-000 Martial Arts: +10 damage to Knife/Melee weapons this turn (option 1). */
   readonly knifeMeleeDamageBonusThisTurn?: number;
+  /** AC-003 Tactical Advance: chosen weapon type for bonus damage this turn. */
+  readonly tacticalAdvanceType?: string;
+  /** AC-003 Tactical Advance: bonus damage amount for chosen type. */
+  readonly tacticalAdvanceBonus?: number;
   /** Claire Redfield (Alliance) L2: multiplies all damage dealt this turn. */
   readonly damageMultiplierThisTurn?: number;
   /** Vengeful Intention etc: damage added per additional action played this turn. */

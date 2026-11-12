@@ -906,4 +906,15 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'exploreDamageIfHpAtMost', amount: 20, hpThreshold: 50, level: 2 },
     ],
   },
+  {
+    id: 'ta-001',
+    name: 'Tactical Advance',
+    type: 'action',
+    set: 'custom',
+    text: 'Choose a weapon type; all of the weapons of the chosen type deal +5 damage this turn. "Melee" and "Knife" deal an additional +5 damage.',
+    copies: 1,
+    cost: 60,
+    bonuses: { actions: 1, cards: 1 },
+    actionEffects: [{ kind: 'tacticalAdvanceChooseType' }],
+  },
 ];
