@@ -99,6 +99,35 @@ describe('ActionBar prompt panel', () => {
     expect(html).toContain('data-option="0"');
   });
 
+  it('wraps Skill Draft choices in a hover card so the card can be read', () => {
+    const skillInst = 'sk-001#probe';
+    const skillDef = MERCENARIES_CARDS.find(c => c.id === 'sk-001');
+    expect(skillDef).toBeDefined();
+    if (skillDef === undefined) return;
+    const base = startTurn(setup(
+      { seed: 11, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'human' }], skillSystem: true },
+      [...PREMIER_CARDS, ...MERCENARIES_CARDS],
+      FIRST_TIMER_PILES,
+    ));
+    const s: GameState = {
+      ...base,
+      cardDefs: { ...base.cardDefs, 'sk-001': skillDef },
+      cards: { ...base.cards, [skillInst]: { instanceId: skillInst, cardId: 'sk-001', location: { zone: 'hand', index: 0 } } },
+      prompts: [{ id: 'p1', seat: 0, text: 'Skill Draft — round 1 of 5: choose 1 Skill card.', options: [skillInst], payload: { kind: 'skillDraftPick' } }],
+    };
+    const html = renderToStaticMarkup(<ActionBar state={s} seat={0} onAction={() => {}} />);
+    // The choice row itself is wrapped in the HoverCard trigger span…
+    expect(html).toMatch(/hover-card[^>]*><button[^>]*class="choice"/);
+    expect(html).toContain('data-option="0"');
+    // …and a non-draft prompt of the same shape is NOT (the hand also uses
+    // HoverCard, so a bare `hover-card` substring is not a valid probe).
+    const plain = withPrompts(base, [
+      { id: 'p2', seat: 0, text: 'Trash a card', options: [skillInst], payload: { kind: 'trashHandCard' } },
+    ]);
+    const plainHtml = renderToStaticMarkup(<ActionBar state={plain} seat={0} onAction={() => {}} />);
+    expect(plainHtml).not.toMatch(/hover-card[^>]*><button[^>]*class="choice"/);
+  });
+
   it('offers CU-001 L1 as a button once he reaches Level 1', () => {
     const ric = CUSTOM_CARDS.find(c => c.id === 'cu-001');
     expect(ric).toBeDefined();

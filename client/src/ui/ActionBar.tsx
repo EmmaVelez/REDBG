@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { JSX, ButtonHTMLAttributes } from 'react';
 import type { Action, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
@@ -21,6 +21,7 @@ import {
   toggleWeaponDouble,
 } from './explorePicker';
 import { optionLabel } from './promptLabels';
+import { HoverCard } from './HoverCard';
 
 /** Action types the rest of the UI already exposes (Hand / Board / SkillPanel /
  *  ActionBar). Any OTHER legal action is rendered as a generic button in the
@@ -34,6 +35,10 @@ const UI_HANDLED_ACTION_TYPES = new Set<Action['type']>([
   // raises the card/slot prompts; the direct per-card actions stay bot-only.
   'attachToPartner',
 ]);
+
+/** Prompt kinds whose options are Skill cards being drafted. The choice row is
+ *  wrapped in a HoverCard so the player can read the whole card before picks. */
+const SKILL_DRAFT_KINDS = new Set(['skillDraftPick', 'skillDraftKeep']);
 
 /** The four colour variants of the one action button. Shape, size and type are
  *  identical across them — only colour carries meaning (see styles.css M7). */
@@ -217,12 +222,20 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const partnerInst = player?.partnerInstanceId === undefined ? undefined : state.cards[player.partnerInstanceId];
   const partnerDef = partnerInst === undefined ? undefined : state.cardDefs[partnerInst.cardId];
   // Alliance Partner Modification: a legal ability button may belong to the
-  // Partner, so label it from that character's own level text.
+  // Partner, so label it from that character's own card. The button reads the
+  // character's first name + the ability's level ("Jill Lv1"); the full rules
+  // text rides in the tooltip so the button stays short.
+  const abilityDef = (a: Extract<Action, { type: 'useCharacterAbility' }>) => (a.character === 'partner' ? partnerDef : charDef);
+  const abilityLevel = (a: Extract<Action, { type: 'useCharacterAbility' }>): number =>
+    abilityDef(a)?.abilities?.[a.abilityIndex]?.level ?? 1;
   const abilityLabel = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
-    const def = a.character === 'partner' ? partnerDef : charDef;
-    const levelText = def?.levels?.find(l => l.level === (def.abilities?.[a.abilityIndex]?.level ?? 1))?.text;
-    if (a.character === 'partner') return 'Partner: ' + (levelText ?? 'Use ability');
-    return levelText ?? 'Use ability';
+    const def = abilityDef(a);
+    const firstName = (def?.name ?? '').trim().split(/\s+/)[0] || 'Character';
+    return `${firstName} Lv${abilityLevel(a)}`;
+  };
+  const abilityText = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
+    const def = abilityDef(a);
+    return def?.levels?.find(l => l.level === abilityLevel(a))?.text ?? abilityLabel(a);
   };
   const phaseNote = state.phase === 'gameOver' ? 'Game over'
     : state.phase === 'turnEnd' ? 'Resolving turn end…'
@@ -373,18 +386,28 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                     {/* A prompt is a DECISION, not an action: options render as
                         full-width choice rows, never as action buttons. */}
                     <div className="choice-list">
-                      {p.options.map((opt, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          className="choice"
-                          data-option={i}
-                          onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
-                        >
-                          <span className="choice-dot" aria-hidden="true" />
-                          <span className="choice-label">{optionLabel(state, opt, p.payload?.kind)}</span>
-                        </button>
-                      ))}
+                      {p.options.map((opt, i) => {
+                        const choice = (
+                          <button
+                            type="button"
+                            className="choice"
+                            data-option={i}
+                            onClick={() => onAction({ type: 'chooseOption', seat, promptId: p.id, option: i })}
+                          >
+                            <span className="choice-dot" aria-hidden="true" />
+                            <span className="choice-label">{optionLabel(state, opt, p.payload?.kind)}</span>
+                          </button>
+                        );
+                        // Skill Draft: the options are Skill cards, so hovering a
+                        // choice pops the whole card up to read before picking.
+                        const kind = p.payload?.kind;
+                        const draftDef = typeof kind === 'string' && SKILL_DRAFT_KINDS.has(kind)
+                          ? defForInstance(state, opt)
+                          : null;
+                        return draftDef !== null
+                          ? <HoverCard key={i} def={draftDef}>{choice}</HoverCard>
+                          : <Fragment key={i}>{choice}</Fragment>;
+                      })}
                     </div>
                   </div>
                 ))}
@@ -548,9 +571,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                         data-ability-character={a.character ?? 'main'}
                         onClick={() => onAction(a)}
                         disabled={disabled}
-                        title={abilityLabel(a)}
+                        title={abilityText(a)}
                       >
-                        Ability: {abilityLabel(a)}
+                        {abilityLabel(a)}
                       </ActionButton>
                     ))}
                   </div>

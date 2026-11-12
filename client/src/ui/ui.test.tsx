@@ -1122,7 +1122,7 @@ describe('ActionBar (T07)', () => {
     const html1 = renderToStaticMarkup(<ActionBar state={leveled} seat={0} onAction={() => {}} />);
     expect(html1).toContain('action-btn action-btn-secondary');
     expect(html1).toContain('data-ability-index="0"');
-    expect(html1).toContain('Ability:');
+    expect(html1).toContain('Barry Lv1');
     expect(html1).toContain('+5 damage');
   });
 
@@ -1152,7 +1152,7 @@ describe('ActionBar (T07)', () => {
     };
     const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
     expect(html).toContain('data-ability-character="partner"');
-    expect(html).toContain('Partner:');
+    expect(html).toContain('Barry Lv1');
     expect(html).toContain('+5 damage');
   });
 

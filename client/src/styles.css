@@ -2335,6 +2335,9 @@ h1, h2 { margin: 0 0 8px; }
   flex: 0 0 auto;
 }
 .app-board .choice-label { min-width: 0; }
+/* A HoverCard wrapped around a choice row must still fill the list — the base
+   `.hover-card` is inline-block, which would shrink the row to its content. */
+.app-board .choice-list > .hover-card { display: block; width: 100%; }
 
 /* ---- segmented controls (explore count, leader) ---- */
 .app-board .segmented {
