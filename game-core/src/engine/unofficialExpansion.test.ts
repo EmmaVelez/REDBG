@@ -88,7 +88,7 @@ describe('Unofficial Expansion data', () => {
     expect(byId.get('ex-006')).toEqual(expect.objectContaining({ name: 'Web Spinner', type: 'infected', hp: 35, attack: 10, decorations: 3, copies: 2 }));
     expect(byId.get('ex-007')).toEqual(expect.objectContaining({ name: 'Blue Herb', type: 'item', cost: 20 }));
     expect(byId.get('ex-008')).toEqual(expect.objectContaining({ name: 'Yawn', type: 'infected', hp: 50, attack: 20, decorations: 5, copies: 2 }));
-    expect(byId.get('ex-009')).toEqual(expect.objectContaining({ name: 'Poison', type: 'counter', copies: 1 }));
+    expect(byId.get('ex-009')).toEqual(expect.objectContaining({ name: 'Poison', type: 'counter', copies: 5 }));
   });
 
   it('pulls the Poison counter in when an infected that needs it is selected', () => {
@@ -132,7 +132,8 @@ describe('Unofficial Expansion data', () => {
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-004')).toHaveLength(1);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-006')).toHaveLength(2);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-008')).toHaveLength(2);
-    expect(s.supply).toContain('ex-009#1');
+    // Five Poison counters seed the shared supply (Manny's ruling).
+    expect(s.supply?.filter(id => s.cards[id]?.cardId === 'ex-009')).toHaveLength(5);
     // The Poison bundle stacks FIVE Blue Herbs in the Resource Area.
     expect(s.marketPiles['custom-ex-007']?.cards).toHaveLength(5);
   });
@@ -154,7 +155,7 @@ describe('Unofficial Expansion data', () => {
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-006')).toHaveLength(2);
     expect(mansion.filter(id => s.cards[id]?.cardId === 'ex-008')).toHaveLength(2);
     expect(s.marketPiles['custom-ex-007']?.cards).toHaveLength(5);
-    expect(s.supply).toContain('ex-009#1');
+    expect(s.supply?.filter(id => s.cards[id]?.cardId === 'ex-009')).toHaveLength(5);
   });
 });
 

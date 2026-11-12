@@ -494,7 +494,12 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     type: 'counter',
     set: 'custom',
     text: 'A maximum of one "Poison" counter may be attached to a Character.\nWhile this card is attached to a Character, that Character takes 5 damage at the beginning of each turn.\nIf the Character dies, return this card to the "Resource Area".',
-    copies: 1,
+    // Five copies (Manny's ruling, 2026-11-12): the bundle ships 2x Web
+    // Spinner + 2x Yawn that attach a counter, so a single physical card
+    // left every other not-defeated Infected with nothing to attach. Five
+    // lets each Infected poison a different Character; the printed "max
+    // one per Character" rule stays enforced in counters.ts.
+    copies: 5,
     cost: 0,
     counterEffects: [{ kind: 'damageAtTurnStart', amount: 5 }],
   },
