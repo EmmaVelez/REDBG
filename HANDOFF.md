@@ -20,7 +20,12 @@ out), so once two seats die and the survivors hold no Weapon and cannot afford a
 (10 Gold vs cost 20), they loop `playAmmo` / `endTurn` forever — the game can never reach
 "all players dead". Same loop can hang a live game where only weaponless bots remain. NOT
 fixed here (bot policy decision for Manny). The other red in that file, `custom-ex-002` pile,
-is the known stale assertion documented above.
+is the known stale assertion documented above. The loop is NOT poison-specific: a sweep of
+seeds 3-6 with NO custom cards stalls too (`noCustom seed=4` ends `'cap'` at turn 1982 with all
+four seats alive), so it is a pre-existing bot/idle bug — the extra poison deaths just make more
+seeds reach it. Sweep data: noCustom 3/5/6 = gameOver (turns 1096/637/1365), noCustom 4 = cap;
+poison bundle 4 = gameOver turn 11, 3 = gameOver turn 189, 5 = cap turn 2242 (3 alive), 6 = cap
+turn 1050 (1 alive).
 
 **CI-001 / CI-003 OSCAR + OSMUND SADDLER (FIRST ENCOUNTER) (2026-11-11):** Manny sent a second
 pair of fan-card scans. CI-001 "Oscar - Zombie Elephant" (Infected, 120/10/7): when he is not
