@@ -431,8 +431,9 @@ export function Lobby({
                     Partner character:
                     <select value={me?.partnerCharacterId ?? ''} onChange={e => onSetCharacterSelection(me?.mainCharacterId, e.target.value || undefined)}>
                       <option value="">Random</option>
-                      {/* Chris (ch-008) cannot receive attachments, so he can
-                          only ever be a Main character — never a Partner. */}
+                      {/* Chris (ch-008) cannot receive attachments and
+                          Sherry (fch-008) is a support character, so both
+                          can only ever be Main characters — never Partners. */}
                       {selectableCharacters(room).filter(c => canBePartner(c)).filter(c => {
                         const taken = new Set(room.players.flatMap(p => [p.mainCharacterId, p.partnerCharacterId]).filter(Boolean) as string[]);
                         return !taken.has(c.id) || c.id === me?.partnerCharacterId;

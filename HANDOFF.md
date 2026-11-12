@@ -56,6 +56,18 @@ four seats alive), so it is a pre-existing bot/idle bug — the extra poison dea
 seeds reach it. Sweep data: noCustom 3/5/6 = gameOver (turns 1096/637/1365), noCustom 4 = cap;
 poison bundle 4 = gameOver turn 11, 3 = gameOver turn 189, 5 = cap turn 2242 (3 alive), 6 = cap
 turn 1050 (1 alive).
+**FCH-008 SHERRY BIRKIN CANNOT BE A PARTNER (2026-11-12):** Manny asked to make the fan
+character FCH-008 Sherry Birkin ineligible as a Partner. New `CharacterAbility` kind
+`cannotBePartner` (types.ts, FCH-008 section); FCH-008 carries it at level 1 in
+`data/custom.ts`. `canBePartner` (engine/characters.ts) now rejects either
+`noHealingNoNonInfectedAttach` (Chris) or `cannotBePartner` (Sherry), so the ONE gate covers
+the lobby partner picker (`Lobby.tsx`), the server room validation (`rooms.ts`
+MAIN_ONLY_CHARACTERS) and engine setup + the random partner pool (`game.ts`). The kind is
+passive — validate's `useCharacterAbility` switch rejects it by default, so no dead ability
+button appears and ability indices 0/1 are unchanged. Sherry is still a legal MAIN character.
+Tests: `fanSherry.test.ts` +4 (canBePartner false, explicit partner rejected, 25-seed
+random-partner sweep, main-with-partner still legal), `ui.test.tsx` +1 (lobby dropdowns),
+`rooms.test.ts` +1 (createRoom/setCharacterSelection rejection).
 
 **CI-001 / CI-003 OSCAR + OSMUND SADDLER (FIRST ENCOUNTER) (2026-11-11):** Manny sent a second
 pair of fan-card scans. CI-001 "Oscar - Zombie Elephant" (Infected, 120/10/7): when he is not

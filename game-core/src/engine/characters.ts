@@ -105,12 +105,18 @@ export function hasAbilityAtLevel(abilities: readonly CharacterAbility[] | undef
 
 /**
  * Whether this character may be picked as a Partner (Alliance Partner
- * Modification). A character that cannot receive attachments — Chris's L1
- * "cannot be healed and cannot attach non-Infected cards" — can only ever be
- * a Main character: the Partner slot exists to hold attached cards, so such
- * a character is never a legal partner. Unknown ids stay lenient (the setup
- * layer's legacy behavior for cards outside the database).
+ * Modification). Two characters are Main-only:
+ * - Chris's L1 "cannot be healed and cannot attach non-Infected cards" — the
+ *   Partner slot exists to hold attached cards, so such a character is never
+ *   a legal partner.
+ * - Sherry (FCH-008) prints `cannotBePartner`: she is a support character
+ *   whose ability targets ANOTHER player, so she can only ever be a Main
+ *   character.
+ * Unknown ids stay lenient (the setup layer's legacy behavior for cards
+ * outside the database).
  */
 export function canBePartner(def: CardDef | undefined): boolean {
-  return !(def?.abilities ?? []).some(a => a.kind === 'noHealingNoNonInfectedAttach');
+  return !(def?.abilities ?? []).some(
+    a => a.kind === 'noHealingNoNonInfectedAttach' || a.kind === 'cannotBePartner',
+  );
 }

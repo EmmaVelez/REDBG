@@ -221,6 +221,17 @@ describe('createRoomStore', () => {
     expect(changed.players[0]?.partnerCharacterId).toBe('ch-003');
   });
 
+  it('rejects fch-008 (Sherry) as a partner', () => {
+    const store = createRoomStore(() => 0.3);
+    expect(() => store.createRoom('c1', 'Host', 'firstTimer', true, 'ch-001', 'fch-008')).toThrow(/cannot be a partner/);
+
+    const room = store.createRoom('c1', 'Host', 'firstTimer', true, 'ch-001', 'ch-002');
+    expect(() => store.setCharacterSelection(room.roomCode, 'c1', 'ch-001', 'fch-008')).toThrow(/cannot be a partner/);
+    // Sherry is still a legal MAIN character
+    const changed = store.setCharacterSelection(room.roomCode, 'c1', 'fch-008', 'ch-002');
+    expect(changed.players[0]?.mainCharacterId).toBe('fch-008');
+  });
+
   it('setConnected flips a player connection flag; guards unknown players', () => {
     const store = createRoomStore(() => 0.3);
     const room = store.createRoom('c1', 'Host');

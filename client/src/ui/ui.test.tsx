@@ -1459,6 +1459,28 @@ describe('Lobby (T08)', () => {
     expect(partnerSection).not.toContain('value="ch-008"');
     expect(partnerSection).toContain('value="ch-001"');
   });
+
+  it('offers fch-008 as a main character but never as a partner', () => {
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: true,
+      skillSystem: false,
+      customCards: ['fch-008'],
+      mansionAttachmentMode: 1 as const,
+    };
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    // Main character dropdown still offers Sherry
+    const mainSection = html.split('Main character:')[1]?.split('Partner character:')[0] ?? '';
+    expect(mainSection).toContain('value="fch-008"');
+    // Partner dropdown excludes her (she can only ever be a Main character)
+    const partnerSection = html.split('Partner character:')[1] ?? '';
+    expect(partnerSection).not.toContain('value="fch-008"');
+    expect(partnerSection).toContain('value="ch-001"');
+  });
 });
 
 describe('HoverCard (M4-T11)', () => {

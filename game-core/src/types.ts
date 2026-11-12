@@ -559,6 +559,7 @@ export type CharacterAbility =
   // --- Fan characters (FCH-008..) ---
   | { readonly kind: "cannotUseWeapons"; readonly level: 1 | 2 } // FCH-008 Sherry: she cannot use Weapons
   | { readonly kind: "forceAllyExploreWithSupport"; readonly level: 1 | 2 } // FCH-008 Sherry: once per turn, force another Player to Explore with her
+  | { readonly kind: "cannotBePartner"; readonly level: 1 | 2 } // FCH-008 Sherry: she can only ever be a Main character
   // --- Fan characters (RC-001..) ---
   | { readonly kind: "turnStartDrawThenDiscardCard"; readonly level: 1 | 2 } // RC-001 Rebecca L1: at turn start, may get +1 card and discard a card
   | { readonly kind: "goldWhenDiscardingAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // RC-001 Rebecca L2: when discarding due to card effect during turn, gain +amount gold

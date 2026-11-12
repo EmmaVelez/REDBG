@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState, PlayerState } from '../types';
+import { canBePartner } from './characters';
 import { setup, startTurn } from './game';
 import { applyAction } from './actions';
 import { validateAction } from './validate';
@@ -71,6 +72,7 @@ describe('FCH-008 Sherry Birkin data', () => {
     expect(SHERRY?.abilities).toEqual([
       { kind: 'cannotUseWeapons', level: 1 },
       { kind: 'forceAllyExploreWithSupport', level: 1 },
+      { kind: 'cannotBePartner', level: 1 },
     ]);
   });
 
@@ -238,5 +240,70 @@ describe('FCH-008 — force another Player to Explore with her', () => {
     expect(after.seats[1]?.hand.length).toBe(5);
     // The Infected went to the bottom of the Mansion.
     expect(after.seats[0]?.decorations).toBe(0);
+  });
+});
+
+describe('FCH-008 — cannot be a Partner', () => {
+  it('is never a legal partner pick', () => {
+    expect(canBePartner(SHERRY)).toBe(false);
+    // A normal custom character is still partner-eligible.
+    expect(canBePartner(CUSTOM_CARDS.find(c => c.id === 'lk-001'))).toBe(true);
+  });
+
+  it('setup rejects fch-008 as an explicit partner', () => {
+    expect(() =>
+      setup(
+        {
+          seed: 1,
+          partnerMode: true,
+          players: [
+            { name: 'A', controller: 'human', characterCardId: 'ch-001', partnerCharacterId: 'fch-008' },
+            { name: 'B', controller: 'human' },
+          ],
+        },
+        [...PREMIER_CARDS, ...CUSTOM_CARDS],
+        FIRST_TIMER_PILES,
+        STANDARD_MANSION_DECK,
+      )
+    ).toThrow(/cannot be a partner/);
+  });
+
+  it('partner mode never deals fch-008 as a random partner', () => {
+    for (let seed = 0; seed < 25; seed++) {
+      const s = setup(
+        {
+          seed,
+          partnerMode: true,
+          players: [
+            { name: 'A', controller: 'human' },
+            { name: 'B', controller: 'human' },
+          ],
+        },
+        [...PREMIER_CARDS, ...CUSTOM_CARDS],
+        FIRST_TIMER_PILES,
+        STANDARD_MANSION_DECK,
+      );
+      for (const p of s.seats) {
+        expect(p.partnerInstanceId?.replace(/#.*$/, '')).not.toBe('fch-008');
+      }
+    }
+  });
+
+  it('still allows fch-008 as a main character with a partner', () => {
+    const s = setup(
+      {
+        seed: 1,
+        partnerMode: true,
+        players: [
+          { name: 'Sherry', controller: 'human', characterCardId: 'fch-008' },
+          { name: 'B', controller: 'human' },
+        ],
+      },
+      [...PREMIER_CARDS, ...CUSTOM_CARDS],
+      FIRST_TIMER_PILES,
+      STANDARD_MANSION_DECK,
+    );
+    expect(s.seats[0]?.characterInstanceId).toBe('fch-008#1');
+    expect(s.seats[0]?.partnerInstanceId).toBeDefined();
   });
 });

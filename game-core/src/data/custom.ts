@@ -167,6 +167,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     abilities: [
       { kind: 'cannotUseWeapons', level: 1 },
       { kind: 'forceAllyExploreWithSupport', level: 1 },
+      { kind: 'cannotBePartner', level: 1 },
     ],
   },
   {
