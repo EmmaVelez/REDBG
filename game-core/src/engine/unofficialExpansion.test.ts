@@ -298,6 +298,28 @@ describe('EX-006 / EX-008 Poison counters', () => {
     const next = exploreWith(armed, knife);
     expect((next.seats[0]?.counters ?? []).filter(c => next.cards[c]?.cardId === 'ex-009')).toHaveLength(1);
   });
+  it('five counters let two Characters be poisoned at the same time', () => {
+    // Manny's ruling (2026-11-12): the bundle ships FIVE Poison cards, so more
+    // than one Character at the table can carry a counter.
+    let s = game({ hp: 80, maxHp: 80 });
+    s = setMansionTop(s, ['ex-006']).state;
+    const k0 = addCard(s, 0, 'we-004');
+    s = exploreWith(k0.state, k0.id);
+    expect((s.seats[0]?.counters ?? []).length).toBe(1);
+    expect(s.supply?.length).toBe(4);
+    // Pass the turn: the second seat explores into Yawn and is poisoned too.
+    s = startTurn(applyAction(s, { type: 'endTurn', seat: 0 }));
+    s = setMansionTop(s, ['ex-008']).state;
+    const k1 = addCard(s, 1, 'we-004');
+    s = applyAction(k1.state, { type: 'explore', seat: 1, weapons: [k1.id], exploreCount: 1 });
+    expect((s.seats[0]?.counters ?? []).length).toBe(1);
+    expect((s.seats[1]?.counters ?? []).length).toBe(1);
+    expect(s.supply?.length).toBe(3);
+    // ...and each takes its own 5 damage at its own turn start.
+    const hpBefore = s.seats[0]?.hp;
+    s = startTurn(applyAction(s, { type: 'endTurn', seat: 1 }));
+    expect(s.seats[0]?.hp).toBe((hpBefore ?? 0) - 5);
+  });
 });
 
 describe('EX-009 Poison', () => {
