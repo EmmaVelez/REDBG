@@ -1,5 +1,27 @@
 # HANDOFF — resume here
 
+**EX-009 POISON IS FIVE COUNTER CARDS (2026-11-12):** Manny: "make the number of poison
+counter card 5 instead of 1". `CUSTOM_CARDS` EX-009 `copies: 1 -> 5` (data/custom.ts); setup
+already seeds `supply` from `copies`, so a poison game now starts with `ex-009#1..#5` in the
+shared supply. The printed "a maximum of one Poison counter per Character" rule is unchanged
+(`counters.ts` matches by cardId, not by supply size), so up to five Characters can carry one
+each. Verified: two seats exploring into Web Spinner / Yawn end up with `ex-009#1` and
+`ex-009#2`, supply 5 -> 4 -> 3, and each takes its own 5 damage at its own turn start. New
+regression test `unofficialExpansion.test.ts` "five counters let two Characters be poisoned at
+the same time"; the supply-seeding assertions now expect five instances.
+
+**SIDE EFFECT — bot sim seed 3 now hits the 4000-action cap (not a poison bug):** with 5
+counters, `unofficialExpansion.test.ts` "conserves every instance ... across full games" fails
+on seed 3 with `ended: 'cap'` (turn 2467, 2 seats alive). Reproduced with `['poison']` vs the
+full EX set, and confirmed it is the copy count: on 1 copy the same seed ends `gameOver` at
+turn 988. Root cause is the bot policy, not the counter: `ai/policy.ts` deliberately never
+volunteers an unarmed explore (`action.type === 'explore' && weapons.length === 0` is filtered
+out), so once two seats die and the survivors hold no Weapon and cannot afford a buy
+(10 Gold vs cost 20), they loop `playAmmo` / `endTurn` forever — the game can never reach
+"all players dead". Same loop can hang a live game where only weaponless bots remain. NOT
+fixed here (bot policy decision for Manny). The other red in that file, `custom-ex-002` pile,
+is the known stale assertion documented above.
+
 **CI-001 / CI-003 OSCAR + OSMUND SADDLER (FIRST ENCOUNTER) (2026-11-11):** Manny sent a second
 pair of fan-card scans. CI-001 "Oscar - Zombie Elephant" (Infected, 120/10/7): when he is not
 defeated he tramples the exploring Character, trashing the highest-Damage Weapon(s) they are
