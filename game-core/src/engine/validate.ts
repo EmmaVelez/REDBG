@@ -528,6 +528,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           if (state.usedStartOfTurnAbilities?.[ability.kind]) {
             return { ok: false, reason: 'useCharacterAbility: start-of-turn ability already used this turn' };
           }
+          // plusDamageThisTurn (Barry L1) is a once-per-turn ability that may
+          // be triggered automatically; check the flag to prevent double use.
+          if (ability.kind === 'plusDamageThisTurn' && state.usedStartOfTurnAbilities?.plusDamageThisTurn) {
+            return { ok: false, reason: 'useCharacterAbility: plusDamageThisTurn already used this turn' };
+          }
           if (ability.kind === 'forceAllyExploreWithSupport') {
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
             if (others.length === 0) {

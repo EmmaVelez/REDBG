@@ -4077,6 +4077,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     ? { ...player, weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.amount }
                     : s,
                 ),
+                usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), plusDamageThisTurn: true },
               };
             }
             case 'exchangeHandWithInventoryTop': {
