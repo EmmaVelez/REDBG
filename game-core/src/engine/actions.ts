@@ -922,6 +922,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
+              if (e.kind === 'attachAndRestrictWeapons') {
+                // CQ-001 Close Quarters Combat: attach to character.
+                newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
               if (e.kind === 'beginTurnTrashIfHealthAtMost') {
                 if (newPlayer.hp <= e.threshold) {
                   newPlayer = { ...newPlayer, attached: newPlayer.attached.filter(id => id !== instanceId), discard: [...newPlayer.discard, instanceId] };
@@ -1490,8 +1495,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               (player.xp ?? 0) >= (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast') as { threshold: number }).threshold)
               ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast') as { amount: number }).amount
               : 0;
+            // CW-024 Haymaker: +N damage per other Melee weapon used this turn.
+            const haymakerBonus = (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerOtherMeleeUsedThisTurn') !== undefined)
+              ? (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerOtherMeleeUsedThisTurn') as { amount: number }).amount
+                * weapons.filter(id => {
+                  if (id === instId) return false;
+                  const d = cardDef(state, id);
+                  return (d?.weaponTags ?? []).includes('melee');
+                }).length
+              : 0;
             return {
-              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isGatling ? 0 : isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -1563,16 +1577,43 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
       // RNG threading for the explore (single- and multi-explore share these).
       let currentRng = state.rngState;
+      // CW-023 Combo Punch: discard from inventory top until a Melee weapon is
+      // discarded, then move that weapon to hand.
+      const applyComboPunch = (p: PlayerState): PlayerState => {
+        const hasComboPunch = weapons.some(id => {
+          const d = cardDef(state, id);
+          return (d?.weaponEffects ?? []).some(e => e.kind === 'discardInventoryUntilMeleeWeapon');
+        });
+        if (!hasComboPunch) return p;
+        let inventory = [...p.inventory];
+        let discard = [...p.discard];
+        let hand = [...p.hand];
+        while (inventory.length > 0) {
+          const top = inventory.shift();
+          if (top === undefined) break;
+          const def = cardDef(state, top);
+          if (def?.type === 'weapon' && (def.weaponTags ?? []).includes('melee')) {
+            hand.push(top);
+            break;
+          }
+          discard.push(top);
+        }
+        return { ...p, hand, inventory, discard };
+      };
       // Applies the Nightmare on-use weapon gains (+cards/+actions/+gold) to a
       // post-explore seat. Drawn cards come off the top of the inventory.
+      // Also applies CW-023 Combo Punch.
       const applyNightmareGains = (p: PlayerState): PlayerState => {
-        if (nightmareGains.cards === 0 && nightmareGains.actions === 0 && nightmareGains.gold === 0) return p;
-        let np = { ...p, actionsLeft: p.actionsLeft + nightmareGains.actions, turnGold: p.turnGold + nightmareGains.gold };
-        if (nightmareGains.cards > 0) {
-          const d = drawWithReshuffle({ deck: np.inventory, discard: np.discard, count: nightmareGains.cards, rngState: currentRng });
-          currentRng = d.rngState;
-          np = { ...np, hand: [...np.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+        let np = p;
+        if (nightmareGains.cards !== 0 || nightmareGains.actions !== 0 || nightmareGains.gold !== 0) {
+          np = { ...np, actionsLeft: np.actionsLeft + nightmareGains.actions, turnGold: np.turnGold + nightmareGains.gold };
+          if (nightmareGains.cards > 0) {
+            const d = drawWithReshuffle({ deck: np.inventory, discard: np.discard, count: nightmareGains.cards, rngState: currentRng });
+            np = { ...np, hand: [...np.hand, ...d.hand], inventory: d.deck, discard: d.discard };
+            currentRng = d.rngState;
+          }
         }
+        np = applyComboPunch(np);
         return np;
       };
       const rngShuffle = (items: readonly string[]): string[] => {

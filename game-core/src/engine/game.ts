@@ -1113,6 +1113,16 @@ function startTurnInternal(state: GameState): GameState {
     return cd?.id === 'ac-013';
   });
 
+  // CQ-001 Close Quarters Combat: at the beginning of your turn, if this card
+  // is attached to your Character, Discard this card.
+  const cqAttached = (player.attached ?? []).filter(id => {
+    const ci = state.cards[id];
+    const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+    return cd?.id === 'cq-001';
+  });
+  const cqDiscard = cqAttached.length > 0 ? cqAttached : [];
+  const attachedAfterCq = (player.attached ?? []).filter(id => !cqDiscard.includes(id));
+
 
   const skillTurn = turnStartSkillEffects(state, player.seat);
 
@@ -1143,6 +1153,8 @@ function startTurnInternal(state: GameState): GameState {
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
+    attached: attachedAfterCq,
+    discard: [...player.discard, ...cqDiscard],
     hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal + attBonuses.heal, player.maxHp),
     // The Partner's own recovery (Steve Burnside L1 and the like) restores the
     // Partner's separate Health, never the Main Character's.

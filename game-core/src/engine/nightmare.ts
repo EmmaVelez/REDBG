@@ -187,6 +187,10 @@ export function nightmareWeaponGains(weapons: readonly string[], state: GameStat
       if (e.kind === 'gainGoldThisTurn') {
         gold += e.amount;
       }
+      // CW-022 High Kick: +N cards this turn when used.
+      if (e.kind === 'gainCardsThisTurn') {
+        cards += e.amount;
+      }
     }
   }
   return { cards, actions, gold };

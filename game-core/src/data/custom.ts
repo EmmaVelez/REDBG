@@ -770,4 +770,60 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     bonuses: { ammo: 20, cards: 2, actions: 2 },
     actionEffects: [{ kind: 'storyModeBossShuffleToTop10' }],
   },
+  // ── Close Quarters Combat set (CQ-001, CW-022..CW-024) ────────────
+  {
+    // Fan action card. Attach to character, restrict non-Melee/Knife weapons
+    // to 1, +1 card when playing Melee/Knife, discard at turn start.
+    id: 'cq-001',
+    name: 'Close Quarters Combat',
+    type: 'action',
+    set: 'custom',
+    text: 'Attach this card to your Character. While this card is attached you cannot use more than 1 "non-Melee" or "non-Knife" Weapon. You get +1 card when you play a "Melee" or "Knife" Weapon. At the beginning of your turn, if this card is attached to your Character, Discard this card.',
+    copies: 1,
+    cost: 80,
+    actionEffects: [{ kind: 'attachAndRestrictWeapons', maxNonMelee: 1 }],
+  },
+  {
+    // Fan melee weapon. +1 card this turn when used.
+    id: 'cw-022',
+    name: 'High Kick',
+    type: 'weapon',
+    set: 'custom',
+    text: 'You get +1 card during this turn.',
+    copies: 1,
+    cost: 30,
+    ammoReq: 0,
+    damage: 10,
+    weaponTags: ['melee'],
+    weaponEffects: [{ kind: 'gainCardsThisTurn', amount: 1 }],
+  },
+  {
+    // Fan melee weapon. Discard from inventory top until a Melee weapon is
+    // discarded, then move that weapon to hand.
+    id: 'cw-023',
+    name: 'Combo Punch',
+    type: 'weapon',
+    set: 'custom',
+    text: 'Discard cards from the top of your Inventory until you Discard a "Melee" Weapon. Move that Weapon to your Hand.',
+    copies: 1,
+    cost: 30,
+    ammoReq: 0,
+    damage: 5,
+    weaponTags: ['melee'],
+    weaponEffects: [{ kind: 'discardInventoryUntilMeleeWeapon' }],
+  },
+  {
+    // Fan melee weapon. +5 damage per other Melee weapon used this turn.
+    id: 'cw-024',
+    name: 'Haymaker',
+    type: 'weapon',
+    set: 'custom',
+    text: 'This Weapon gets +5 Damage for every other "Melee" Weapon used this turn.',
+    copies: 1,
+    cost: 50,
+    ammoReq: 0,
+    damage: 10,
+    weaponTags: ['melee'],
+    weaponEffects: [{ kind: 'plusDamagePerOtherMeleeUsedThisTurn', amount: 5 }],
+  },
 ];

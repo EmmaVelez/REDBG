@@ -210,6 +210,10 @@ export type WeaponEffect =
   | { readonly kind: "plusDamageIfRevealedInfectedHpAtLeast"; readonly threshold: number; readonly amount: number } // CW-005 Combat Knife: +N damage when infected with >= threshold HP is revealed
   | { readonly kind: "optionalSelfDamageForDamageAndType"; readonly damage: number; readonly amount: number; readonly type: WeaponTag } // CW-013 Pump-Action: take N damage to gain +amount damage and the type
   | { readonly kind: "playFromDiscardOnExplore" } // CW-006 Kukri: may play from discard when exploring
+  // --- Custom melee weapons (CW-022..) ---
+  | { readonly kind: "plusDamagePerOtherMeleeUsedThisTurn"; readonly amount: number } // CW-024 Haymaker: +N damage per other Melee weapon used this turn
+  | { readonly kind: "discardInventoryUntilMeleeWeapon" } // CW-023 Combo Punch: discard from inventory top until a Melee weapon is discarded, move it to hand
+  | { readonly kind: "gainCardsThisTurn"; readonly amount: number } // CW-022 High Kick: +N cards this turn when used
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -361,7 +365,8 @@ export type ActionEffect =
   | { readonly kind: "reactiveResuscitate" } // AC-050: on lethal damage, trash to set the Character's Health to 10
   | { readonly kind: "discardInventoryUntilWeaponForDamage"; readonly amount: number } // AC-051 Tear Gas
   // --- Custom actions ---
-  | { readonly kind: "storyModeBossShuffleToTop10" }; // AH-001 Abandon All Hope: during this turn, if Boss revealed & not defeated, can shuffle to top 10
+  | { readonly kind: "storyModeBossShuffleToTop10" } // AH-001 Abandon All Hope: during this turn, if Boss revealed & not defeated, can shuffle to top 10
+  | { readonly kind: "attachAndRestrictWeapons"; readonly maxNonMelee: number } // CQ-001 Close Quarters Combat: attach, restrict non-Melee/Knife weapons, +1 card on Melee/Knife play, discard at turn start
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
