@@ -9,6 +9,7 @@ import {
   requiredAmmoForWeapons,
   isPartnerWeapon,
   leaderAbilities,
+  xAmmoAllocationError,
 } from '@re/game-core';
 import { defForInstance } from './cards';
 
@@ -36,6 +37,11 @@ export interface ExploreWeaponOption {
   readonly remainingUses: number;
   /** True when the weapon is attached to the seat's Partner (Alliance). */
   readonly partner: boolean;
+  /** X-ammo weapon (Gatling Gun et al.): the player allocates Ammo to it, and
+   *  that amount IS its damage. */
+  readonly xAmmo: boolean;
+  /** Printed cap on the allocation, when the card has one. */
+  readonly ammoCap?: number;
 }
 
 /** Weapons the seat may use in an explore right now, with display metadata. */
@@ -55,6 +61,8 @@ export function exploreWeaponOptions(
       reusable: canReuseWeapon(state, seat, instanceId),
       remainingUses: remainingWeaponUses(state, seat, instanceId),
       partner: isPartnerWeapon(state, seat, instanceId),
+      xAmmo: def?.xAmmo === true,
+      ammoCap: def?.ammoCap,
     };
   });
 }
@@ -103,10 +111,48 @@ export function resolveExploreLeader(
   return state.seats[seat]?.partnerInstanceId === undefined ? 'main' : leader;
 }
 
-/** Stable key for a weapon-id set + explore count, so selections can be
- *  compared to legal combos. */
-function comboKey(weaponIds: readonly string[], exploreCount: number): string {
-  return `${exploreCount}:${[...weaponIds].sort().join('|')}`;
+/** Stable key for a weapon-id set + explore count + X-ammo allocations, so
+ *  selections can be compared against legal combos. */
+function comboKey(
+  weaponIds: readonly string[],
+  exploreCount: number,
+  ammoByWeapon?: Readonly<Record<string, number>>,
+): string {
+  const alloc = Object.entries(ammoByWeapon ?? {})
+    .filter(([, v]) => v > 0)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join(',');
+  return `${exploreCount}:${[...weaponIds].sort().join('|')}#${alloc}`;
+}
+
+/**
+ * The most Ammo a player can allocate to one X-ammo weapon in this selection:
+ * the turn's Ammo minus what the OTHER selected weapons cost (their own
+ * allocations included), capped by the weapon's printed cap.
+ */
+export function maxXAllocation(
+  state: GameState,
+  seat: number,
+  instanceId: string,
+  selected: readonly string[],
+  leader?: 'main' | 'partner',
+  ammoByWeapon?: Readonly<Record<string, number>>,
+): number {
+  const player = state.seats[seat];
+  const def = defForInstance(state, instanceId);
+  if (player === undefined || def === null || def.xAmmo !== true) return 0;
+  const abilities = leaderAbilities(state, seat, leader ?? 'main');
+  const others = selected.filter(id => id !== instanceId);
+  const fixed = requiredAmmoForWeapons(
+    state,
+    seat,
+    others,
+    wid => defForInstance(state, wid) ?? undefined,
+    abilities,
+    ammoByWeapon,
+  );
+  return Math.max(0, Math.min(player.turnAmmo - fixed, def.ammoCap ?? Infinity));
 }
 
 /**
@@ -180,20 +226,36 @@ export function evaluateExploreCombo(
   weaponIds: readonly string[],
   exploreCount = 1,
   leader?: 'main' | 'partner',
+  ammoByWeapon?: Readonly<Record<string, number>>,
 ): ComboEvaluation {
   const who = leader ?? 'main';
   const abilities = leaderAbilities(state, seat, who);
-  const damage = exploreDamage(state, seat, weaponIds, who);
-  const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined, abilities);
+  const damage = exploreDamage(state, seat, weaponIds, who, ammoByWeapon);
+  const ammo = requiredAmmoForWeapons(state, seat, weaponIds, wid => defForInstance(state, wid) ?? undefined, abilities, ammoByWeapon);
 
   // Legality is checked against the SELECTED leader: a combo that is only
   // affordable because of the Partner's abilities must not read as illegal
   // while the Main leads, and vice versa. The empty selection is the unarmed
   // explore, which the engine enumerates whenever exploring is possible.
-  const isLegal = legalExplores(state, seat).some(e =>
+  const legal = legalExplores(state, seat);
+  const exact = legal.some(e =>
+    (e.leader ?? 'main') === who && comboKey(e.weapons, e.exploreCount, e.ammoByWeapon) === comboKey(weaponIds, exploreCount, ammoByWeapon));
+
+  // An X-ammo weapon accepts ANY amount up to what the seat can afford, but the
+  // bot's enumeration only carries two allocations (none / all-in), so an
+  // intermediate slider value has no enumerated twin. Accept it when the SHAPE
+  // is enumerated and every allocation is itself legal.
+  const allocationError = xAmmoAllocationError(state, weaponIds, ammoByWeapon);
+  const hasX = weaponIds.some(id => defForInstance(state, id)?.xAmmo === true);
+  const shape = legal.some(e =>
     (e.leader ?? 'main') === who && comboKey(e.weapons, e.exploreCount) === comboKey(weaponIds, exploreCount));
+  const isLegal = exact
+    || (hasX && allocationError === null && shape && (state.seats[seat]?.turnAmmo ?? 0) >= ammo);
   if (isLegal) {
     return { damage, ammo, legal: true, reason: null };
+  }
+  if (hasX && allocationError !== null) {
+    return { damage, ammo, legal: false, reason: allocationError };
   }
   if (weaponIds.length === 0) {
     return { damage: 0, ammo: 0, legal: false, reason: 'Select at least one weapon.' };

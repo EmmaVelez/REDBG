@@ -1436,7 +1436,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const chrisSingleDiscount = weapons.length === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
           const chrisTypeDiscount = chosenWeaponTypeAmmoDiscount(abilities);
           const chrisTypeDiscountTypes = player.chrisAmmoDiscountTypes ?? [];
-          const requiredAmmo = requiredAmmoForExplore(state, seat, weapons, abilities);
+          const requiredAmmo = requiredAmmoForExplore(state, seat, weapons, abilities, action.ammoByWeapon);
           const turnAmmoAfter = Math.max(player.turnAmmo - requiredAmmo, 0);
 
           // WE-025 Blowback Pistol: "Discard any number of 'Pistol' cards from
@@ -1592,7 +1592,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           const exploreWeapons = weaponDefs.map((w, i) => {
             const instId = weapons[i];
-            const isGatling = w?.weaponEffects?.some(e => e.kind === 'damageEqualsCurrentAmmo');
             const isX = w?.xAmmo === true;
             const assigned = isX ? Math.min(ammoByWeapon?.[instId ?? ''] ?? 0, w?.ammoCap ?? 999) : 0;
             const coup = player.pendingCoupDeGrace;
@@ -1614,8 +1613,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isGatling ? player.turnAmmo : isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
-              ammoReq: isGatling ? 0 : isX ? assigned : (() => {
+              damage: isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
                 if (hasFreePistolTrashAtEnd(state) && (w?.weaponTags ?? []).includes('pistol')) {
@@ -1976,6 +1975,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             for (const bid of r3.movedToBottom) {
               if (!mDeck.includes(bid)) mDeck = [...mDeck, bid];
             }
+            // Custom card line: CI-010 James Marcus — on reveal the exploring
+            // player nominates a player who must spend their WHOLE Explore pool
+            // on their next turn.
+            if ((def.infectedEffects ?? []).some(e => e.kind === 'onRevealChoosePlayerMustUseAllExploresNextTurn')) {
+              revealPrompts.push({
+                id: `james-marcus-${seat}-${id}-v${state.version}`,
+                seat,
+                text: 'James Marcus: choose a Player. That Player must use all their Explores in their next turn.',
+                options: state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
+                payload: { kind: 'jamesMarcusChoosePlayer' },
+              });
+            }
           }
           const buff = nemesisPursuitBuff(state);
           // Virus Mutates: infected with <= threshold HP get bonus HP
@@ -2041,6 +2052,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               inventoryCount: player.inventory.length,
               actionsInPlayArea: player.playArea.filter(pid => cardDef(state, pid)?.type === 'action').length,
               ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
+              exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
             });
         const defeated = multi.defeated;
         const autoDefeatedIds = autoDefeatedEntries.map(e => e.id);
@@ -2691,6 +2703,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Re-read the exploring seat: MA-045 can lower its Health.
       player = state.seats[seat] as PlayerState;
 
+      // Custom card line: CI-010 James Marcus — on reveal the exploring player
+      // nominates a player who must spend their WHOLE Explore pool on their
+      // next turn.
+      if (revealedDef?.type === 'infected' && !infectedEffectNegated &&
+          (revealedDef.infectedEffects ?? []).some(e => e.kind === 'onRevealChoosePlayerMustUseAllExploresNextTurn')) {
+        state = {
+          ...state,
+          prompts: [...state.prompts, {
+            id: `james-marcus-${seat}-${revealedInstanceId}-v${state.version}`,
+            seat,
+            text: 'James Marcus: choose a Player. That Player must use all their Explores in their next turn.',
+            options: state.seats.filter(s => !s.dead && !s.downed).map(s => String(s.seat)),
+            payload: { kind: 'jamesMarcusChoosePlayer' },
+          }],
+        };
+      }
+
       // Custom card line: CI-003 Osmund Saddler (First Encounter) — each player
       // gains a 10x Ammo. Applied AFTER the explore's own seat updates, since
       // the rebuilt seat would otherwise drop the gained card.
@@ -2838,6 +2867,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
           ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
+          exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
             cardId: d!.id, hp: (d!.hp ?? 0) + nemesisPursuitBuff(state).hp, attack: (d!.attack ?? 0) + nemesisPursuitBuff(state).attack, infectedEffects: d!.infectedEffects,
           })),
@@ -3313,6 +3343,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               actionsInPlayArea: player.playArea.filter(id => cardDef(state, id)?.type === 'action').length,
               inventoryCount: player.inventory.length,
               characterDamage: Math.max(player.maxHp - player.hp, 0),
+              exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
             });
 
       if (outcome.kind === 'insufficientAmmo') {
@@ -6557,6 +6588,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'jamesMarcusChoosePlayer') {
+        // CI-010 James Marcus: the chosen player must spend their WHOLE Explore
+        // pool on their next turn. The obligation is a flag consumed at that
+        // turn's start, where it becomes exploresRequiredThisTurn = exploresLeft
+        // (endTurn is blocked while the debt is unpaid).
+        const targetSeat = Number(prompt.options[option]);
+        if (Number.isNaN(targetSeat)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustUseAllExploresNextTurn: true } : s)),
           prompts: newPrompts,
         };
       }

@@ -1,6 +1,6 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards } from './abilities';
-import { requiredAmmoForExplore } from './ammo';
+import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
@@ -305,9 +305,18 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                 return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
               }
             }
+            // X-ammo weapons (Gatling Gun et al.): the player allocates how much
+            // Ammo to spend, and that amount IS the weapon's cost and damage.
+            // Only an x-ammo weapon IN the selection may be allocated, and never
+            // more than its printed cap.
+            const allocationError = xAmmoAllocationError(state, action.weapons, action.ammoByWeapon);
+            if (allocationError !== null) {
+              return { ok: false, reason: `explore: ${allocationError}` };
+            }
             // Ability-aware ammo cost (Leon L1 pistols -10, Sheva L2 rifles -20,
-            // Skill discounts, Claire/Jill Mercenaries modifiers).
-            const requiredAmmo = requiredAmmoForExplore(state, action.seat, action.weapons, leaderAbils);
+            // Skill discounts, Claire/Jill Mercenaries modifiers). X-ammo weapons
+            // cost exactly what was allocated.
+            const requiredAmmo = requiredAmmoForExplore(state, action.seat, action.weapons, leaderAbils, action.ammoByWeapon);
             if (player.turnAmmo < requiredAmmo) {
               return { ok: false, reason: 'explore: insufficient ammo' };
             }

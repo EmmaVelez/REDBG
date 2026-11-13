@@ -79,7 +79,10 @@ test('weapon effects map to union kinds', () => {
   expect(card('we-014').weaponEffects).toEqual([{ kind: 'instantKillAtOrBelowHp', hp: 40 }, { kind: 'grantExplores', amount: 1 }]);
   expect(card('we-015').weaponEffects).toEqual([{ kind: 'revealTopOfInventoryCostGate', threshold: 40, amount: 30 }]);
   expect(card('we-012').weaponEffects).toEqual([{ kind: 'plusDamageIfAmmoAbove', threshold: 100, amount: 30 }]);
-  expect(card('we-007').weaponEffects).toEqual([{ kind: 'damageEqualsCurrentAmmo' }]);
+  // Gatling Gun is an X-ammo weapon: its damage IS the Ammo the player
+  // allocates, so it carries no static damage effect.
+  expect(card('we-007').xAmmo).toBe(true);
+  expect(card('we-007').weaponEffects).toBeUndefined();
   expect(card('we-010').weaponEffects).toEqual([{ kind: 'plusDamagePerExtraWeapon', amount: 20 }]);
 });
 

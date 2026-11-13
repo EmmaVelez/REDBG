@@ -37,6 +37,9 @@ export interface MansionRevealProps {
   readonly resultText: string;
   /** Total damage the exploring player dealt with this attack. */
   readonly damage: number;
+  /** Effective Health of the revealed Infected, when it is not the printed
+   *  value (CI-011 Queen Leech's Health equals the leader's Max Health). */
+  readonly hp?: number;
   /** Weapon definitions the exploring player used for this attack. */
   readonly weapons?: readonly CardDef[];
   /** "Your damage" for the exploring player; "Damage dealt" for someone
@@ -60,6 +63,7 @@ export function MansionReveal({
   def,
   resultText,
   damage,
+  hp,
   weapons,
   damageLabel = 'Your damage',
   party,
@@ -125,7 +129,7 @@ export function MansionReveal({
             style={{ backgroundImage: art ? `url(${art})` : undefined, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}
           >
             <div className="mansion-door-dmg-flash" />
-            <CardView def={def} hideCost />
+            <CardView def={def} hideCost hp={hp} maxHp={hp} />
           </div>
         </div>
         <span className="mansion-door-result">{resultText}</span>

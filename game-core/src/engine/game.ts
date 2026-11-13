@@ -1181,6 +1181,14 @@ function startTurnInternal(state: GameState): GameState {
   // Mansion attachment turn-start bonuses (Save Room: heal 10, +10 ammo)
   const attBonuses = mansionAttachmentTurnStartBonuses(state);
 
+  // CI-010 James Marcus: a player nominated on reveal must spend their WHOLE
+  // Explore pool this turn, so the debt is seeded from the pool granted here.
+  const exploresLeftAtTurnStart = player.isInfectedCharacter === true
+    ? 1
+    : (player.skipNextTurn ? 0 :
+      (player.mustExplore === true ? 2 : 1) +
+      (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores + infectedHordeBonus(state).explores);
+
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
@@ -1227,10 +1235,7 @@ function startTurnInternal(state: GameState): GameState {
     // (validate blocks endTurn until then; exploring clears the obligation).
     // PR-001 Chris L2: +1 Explore at the beginning of the turn (stacks).
     // Infected Horde: +N explores at turn start.
-    exploresLeft:
-      player.skipNextTurn ? 0 :
-      (player.mustExplore === true ? 2 : 1) +
-      (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores + infectedHordeBonus(state).explores,
+    exploresLeft: exploresLeftAtTurnStart,
     // Mansion attachment: mustExploreIfAble (Close Combat) — all players must
     // Explore if able. Set the flag so validate blocks endTurn until explored.
     // Infected Horde: must explore or take damage.
@@ -1256,7 +1261,10 @@ function startTurnInternal(state: GameState): GameState {
     skillAmmoDiscountTypes: undefined,
     // Rachael Foley L1: the "must Explore at least twice" debt is per-turn, so
     // it is cleared here; the turn-start prompt may set it again.
-    exploresRequiredThisTurn: undefined,
+    // CI-010 James Marcus: a player nominated on reveal must use ALL their
+    // Explores this turn — the debt equals the pool just granted above.
+    exploresRequiredThisTurn: player.mustUseAllExploresNextTurn ? exploresLeftAtTurnStart : undefined,
+    mustUseAllExploresNextTurn: undefined,
     // Jill Valentine (Mercenaries) L1: the targeted player's weapons cost
     // +amount Ammo THIS turn (the "next turn" the ability named).
     ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,

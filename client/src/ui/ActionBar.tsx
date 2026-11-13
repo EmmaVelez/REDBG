@@ -16,6 +16,7 @@ import {
   exploreCountOptions,
   exploreWeaponOptions,
   legalExplores,
+  maxXAllocation,
   resolveExploreLeader,
   grantedExploresForSelection,
   toggleWeaponDouble,
@@ -128,6 +129,9 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const best = bestExploreCombo(state, seat, effectiveLeader);
 
   const [selected, setSelected] = useState<readonly string[]>(() => best ?? []);
+  // X-ammo weapons (Gatling Gun et al.): how much of the turn's Ammo the player
+  // allocates to each. That amount IS the weapon's damage and its cost.
+  const [ammoByWeapon, setAmmoByWeapon] = useState<Readonly<Record<string, number>>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const handScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollHand = (direction: -1 | 1): void => {
@@ -147,7 +151,28 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableKey, bestKey]);
 
-  const combo = evaluateExploreCombo(state, seat, selected, exploreCount, effectiveLeader);
+  // Keep the X-ammo allocations in step with the selection: a newly selected
+  // X weapon defaults to the most it can afford (the card's old "spend it all"
+  // behaviour), one that leaves the selection is dropped, and an allocation
+  // that has become unaffordable is clamped. A value the player chose is kept.
+  useEffect(() => {
+    setAmmoByWeapon(prev => {
+      const next: Record<string, number> = {};
+      for (const id of new Set(selected)) {
+        const def = defForInstance(state, id);
+        if (def?.xAmmo !== true) continue;
+        const room = maxXAllocation(state, seat, id, selected, effectiveLeader, next);
+        next[id] = prev[id] === undefined ? room : Math.min(prev[id] ?? 0, room);
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, state, seat, effectiveLeader]);
+
+  const combo = evaluateExploreCombo(state, seat, selected, exploreCount, effectiveLeader, ammoByWeapon);
+  // X-ammo weapons in the current selection (deduped — a doubled use is still
+  // one allocator, and its allocation applies to every use).
+  const selectedXWeapons = weaponOptions.filter(o => o.xAmmo && selected.includes(o.instanceId));
   const canExplore = explores.length > 0 && prompt === undefined;
   const exploreCounts = exploreCountOptions(state, seat, selected);
   // Explores the selected weapons grant this turn (Pump-Action Shotgun et al.) —
@@ -450,7 +475,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                                 onChange={() => toggleWeapon(opt.instanceId)}
                               />
                               <span className="explore-option-name">{opt.name}</span>
-                              <span className="explore-option-stats">DMG {opt.damage} · AMMO {opt.ammo}</span>
+                              <span className="explore-option-stats">
+                                {opt.xAmmo
+                                  ? <>AMMO {ammoByWeapon[opt.instanceId] ?? 0} → DMG {ammoByWeapon[opt.instanceId] ?? 0}</>
+                                  : <>DMG {opt.damage} · AMMO {opt.ammo}</>}
+                              </span>
                             </label>
                             {opt.partner && (
                               <span
@@ -485,6 +514,35 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                         );
                       })}
                     </div>
+                    {selectedXWeapons.length > 0 && (
+                      <div className="explore-picker-xammo" data-explore-x-ammo>
+                        <div className="explore-picker-xammo-title">
+                          Allocate Ammo — the amount you pick is the damage
+                        </div>
+                        {selectedXWeapons.map(opt => {
+                          const value = ammoByWeapon[opt.instanceId] ?? 0;
+                          const max = maxXAllocation(state, seat, opt.instanceId, selected, effectiveLeader, ammoByWeapon);
+                          return (
+                            <div key={opt.instanceId} className="x-ammo-row" data-x-ammo={opt.instanceId}>
+                              <span className="x-ammo-name">{opt.name}</span>
+                              <input
+                                type="range"
+                                min={0}
+                                max={max}
+                                step={1}
+                                value={value}
+                                disabled={disabled || max <= 0}
+                                data-x-ammo-input={opt.instanceId}
+                                onChange={e => setAmmoByWeapon(prev => ({ ...prev, [opt.instanceId]: Number(e.target.value) }))}
+                              />
+                              <span className="x-ammo-value" data-x-ammo-value={opt.instanceId}>
+                                {value} → {value} DMG
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     {blowbackArmed && pistolOptions.length > 0 && (
                       <div className="explore-picker-pistols" data-explore-pistols>
                         <div className="explore-picker-pistols-title">
@@ -639,6 +697,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                   exploreCount,
                   ...(effectiveLeader === 'partner' ? { leader: 'partner' as const } : {}),
                   ...(discardPistols.length > 0 ? { discardedPistols: discardPistols } : {}),
+                  ...(Object.keys(ammoByWeapon).length > 0 ? { ammoByWeapon } : {}),
                 })}
               >
                 {pickerOpen ? 'Explore selected' : 'Explore'}

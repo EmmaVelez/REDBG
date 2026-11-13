@@ -108,8 +108,27 @@ describe('IT-000 Antique Coin data', () => {
 });
 
 describe('IT-000 Antique Coin resolution', () => {
-  it('trashing it offers every Resource Area weapon costing no more than 60', () => {
-    const { state, id } = addCard(game(), 0, COIN);
+  it('trashing it offers every top-of-pile Resource Area weapon costing no more than 60', () => {
+    const base = game();
+    // we-010 Burst-Fire Handgun costs exactly 60, so it pins the inclusive
+    // boundary — but only a pile's TOP card is available, and in this seed the
+    // hg pile buries it (we-009 x8, we-010, we-009). Put a copy on top.
+    const boundaryId = 'we-010#boundary';
+    const cards = {
+      ...base.cards,
+      [boundaryId]: { instanceId: boundaryId, cardId: 'we-010', location: { zone: 'marketPile' as const, index: 0, pileId: 'hg' } },
+    };
+    const hg = base.marketPiles['hg'];
+    const topped: GameState = {
+      ...base,
+      cards,
+      marketPiles: {
+        ...base.marketPiles,
+        hg: { pileId: 'hg', cards: [boundaryId, ...(hg?.cards ?? [])] },
+      },
+    };
+
+    const { state, id } = addCard(topped, 0, COIN);
     const after = applyAction(state, { type: 'playItem', seat: 0, instanceId: id });
     expect(after.removed).toContain(id);
 
@@ -117,8 +136,15 @@ describe('IT-000 Antique Coin resolution', () => {
     expect(prompt).toBeDefined();
     if (prompt === undefined) return;
     const offered = prompt.options.map(o => after.cards[o]?.cardId);
-    // we-010 Burst-Fire Handgun costs exactly 60 — the boundary is inclusive.
+    // The 60-cost weapon is on top, so the inclusive boundary is offered…
     expect(offered).toContain('we-010');
+    // …but only the top copy: the pile still holds the buried one, and it is
+    // NOT offered (you can only take a pile's top card).
+    expect(offered.filter(c => c === 'we-010')).toHaveLength(1);
+    const inPile = (after.marketPiles['hg']?.cards ?? []).filter(c => after.cards[c]?.cardId === 'we-010');
+    expect(inPile.length).toBeGreaterThan(1);
+    expect(prompt.options).not.toContain(inPile[1]);
+
     // Everything dearer than the coin is excluded.
     for (const tooDear of ['we-006', 'we-012', 'we-014', 'we-016']) {
       expect(offered).not.toContain(tooDear);

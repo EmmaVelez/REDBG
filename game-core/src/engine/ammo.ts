@@ -68,12 +68,47 @@ export function exploreAmmoReq(
   return Math.max(req, 0);
 }
 
+/**
+ * Why an X-ammo allocation (Gatling Gun et al.) is not legal, or null when it
+ * is. Shared by `validateAction` and the client's picker preview so the server
+ * and the UI can never disagree about what an allocation means.
+ */
+export function xAmmoAllocationError(
+  state: GameState,
+  weaponIds: readonly string[],
+  ammoByWeapon?: Readonly<Record<string, number>>,
+): string | null {
+  for (const [id, amount] of Object.entries(ammoByWeapon ?? {})) {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    const name = def?.name ?? id;
+    if (def?.xAmmo !== true) return `${name} cannot take an Ammo allocation.`;
+    if (!weaponIds.includes(id)) return `${name} is not part of this explore.`;
+    if (!Number.isInteger(amount) || amount < 0) return 'Ammo allocation must be a whole, non-negative number.';
+    if (amount > (def.ammoCap ?? Infinity)) return `${name} is capped at ${def.ammoCap} Ammo.`;
+  }
+  return null;
+}
+
 /** Total Ammo Requirement for an explore's weapon set. */
 export function requiredAmmoForExplore(
   state: GameState,
   seat: number,
   weaponIds: readonly string[],
   abilities?: readonly CharacterAbility[],
+  /**
+   * Ammo the player allocated to each `xAmmo` weapon (Gatling Gun et al.).
+   * For those the allocation IS both the cost and the damage, so it replaces
+   * the printed `ammoReq` (which is 0 on an X weapon). Omitted means 0.
+   */
+  ammoByWeapon?: Readonly<Record<string, number>>,
 ): number {
-  return weaponIds.reduce((sum, id) => sum + exploreAmmoReq(state, seat, id, weaponIds.length, abilities), 0);
+  return weaponIds.reduce((sum, id) => {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    if (def?.xAmmo === true) {
+      return sum + Math.min(ammoByWeapon?.[id] ?? 0, def.ammoCap ?? Infinity);
+    }
+    return sum + exploreAmmoReq(state, seat, id, weaponIds.length, abilities);
+  }, 0);
 }

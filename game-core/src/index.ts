@@ -5,6 +5,7 @@ export { applyAction } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { exploreDamage, grantedExploresFor } from "./engine/explore";
 export { requiredAmmoForWeapons, ammoReqForWeapon, leaderAbilities } from "./engine/abilities";
+export { xAmmoAllocationError } from "./engine/ammo";
 export {
   explorableWeapons,
   canReuseWeapon,

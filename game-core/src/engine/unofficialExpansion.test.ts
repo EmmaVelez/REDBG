@@ -117,7 +117,12 @@ describe('Unofficial Expansion data', () => {
   it('gives the cost-bearing customs their own market piles, and never piles the counter', () => {
     const piles = pilesForScenario('firstTimer', { customCards: IDS });
     const pileIds = piles.map(p => p.pileId);
-    expect(pileIds).toContain('custom-ex-002');
+    // EX-002 is a WEAPON, so it is merged into the scenario pile whose cards
+    // share its primary weapon tag (`explosive` -> grn) instead of getting its
+    // own pile. EX-005 (ammunition) and EX-007 (item) are not weapons, so they
+    // do get one.
+    expect(pileIds).not.toContain('custom-ex-002');
+    expect(piles.find(p => p.pileId === 'grn')?.cardIds).toContain('ex-002');
     expect(pileIds).toContain('custom-ex-005');
     expect(pileIds).toContain('custom-ex-007');
     expect(pileIds).not.toContain('custom-ex-009');

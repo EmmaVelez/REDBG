@@ -1796,6 +1796,33 @@ h1, h2 { margin: 0 0 8px; }
   font-size: 12px;
 }
 .explore-picker-actions { display: flex; gap: 6px; }
+/* X-ammo allocation (Gatling Gun et al.): the player picks how much of the
+   turn's Ammo to spend, and that amount IS the weapon's damage. */
+.explore-picker-xammo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+}
+.explore-picker-xammo-title { color: #ffd479; font-size: 11px; }
+.x-ammo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.x-ammo-name { font-weight: 700; flex: 0 0 auto; }
+.x-ammo-row input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #57a86a;
+}
+.x-ammo-value {
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 /* A weapon that grants Explores (Pump-Action Shotgun et al.) — tell the player
    the +N can be spent in THIS explore or saved for a later one. */
 .explore-granted-hint {
@@ -2644,6 +2671,9 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .choice-list { gap: 5px; }
   .app-board .explore-picker { padding: 6px 8px; }
   .app-board .explore-option { font-size: 11px; gap: 6px; }
+  /* A range input is the one control that must stay grabbable on a touch
+     screen — give the thumb room. */
+  .app-board .x-ammo-row input[type="range"] { min-height: 32px; }
   /* .dock-status / .app-room / .app-status corner rules are gone: the room
      code and connection status are .action-stat chips in the stats row now */
 

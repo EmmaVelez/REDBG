@@ -170,7 +170,8 @@ export type WeaponEffect =
   | {readonly kind: "instantKillAtOrBelowHp"; readonly hp: number}        // Automatic/Auto Shotguns  
   | {readonly kind: "plusDamagePerActionPlayedThisTurn"; readonly amount: number} // Semi-Automatic Rifle
   | {readonly kind: "plusDamageIfSelfHpAtLeast"; readonly hp: number; readonly amount: number} // Submission
-  | {readonly kind: "damageEqualsCurrentAmmo"}                            // Gatling Gun: X = current Ammo
+  // Gatling Gun (we-007) is an `xAmmo` weapon instead: its damage IS the Ammo
+  // the player allocates, so it has no static damage effect.
   | {readonly kind: "revealTopOfInventoryCostGate"; readonly threshold: number; readonly amount: number} // Bolt-Action Rifle
   | {readonly kind: "plusDamagePerKnifeUsed"; readonly amount: number}    // Survival Knife
   | {readonly kind: "plusDamageWhenUsingMultipleWeapons"; readonly amount: number} // Burst-Fire Handgun Alliance
@@ -283,6 +284,9 @@ export type InfectedEffect =
   // --- Custom card line: CI-001 / CI-003 (Oscar, Saddler) ---
   | { readonly kind: "onNotDefeatedTrashHighestDamageUsedWeapons" } // CI-001 Oscar: on not-defeated, trash the highest-Damage Weapon(s) the exploring Character is using
   | { readonly kind: "onRevealEachPlayerGainsAmmoX10"; readonly count: number } // CI-003 Saddler (First Encounter): on reveal, every player gains `count` "Ammo x10"
+  // --- Custom card line: CI-010 / CI-011 (James Marcus, Queen Leech) ---
+  | { readonly kind: "onRevealChoosePlayerMustUseAllExploresNextTurn" } // CI-010: on reveal the exploring player picks a player who must spend their whole Explore pool next turn
+  | { readonly kind: "onRevealHpEqualsExploringCharacterMaxHp" } // CI-011: its Health IS the leading exploring Character's Maximum Health
   // --- Unofficial Expansion (EX-006/EX-008) ---
   | { readonly kind: "onNotDefeatedAttachCounter"; readonly counterCardId: string } // EX-006 Web Spinner / EX-008 Yawn: attach a Poison counter to the exploring Character
 
@@ -660,6 +664,10 @@ export interface PlayerState {
    *  she takes the turn-start +1 Explore; each explore decrements it; endTurn
    *  is blocked while it is > 0 and the seat can still explore. */
   readonly exploresRequiredThisTurn?: number;
+  /** CI-010 James Marcus: this player was nominated on reveal and must spend
+   *  their WHOLE Explore pool on their next turn. Consumed at that turn's
+   *  start, where it becomes `exploresRequiredThisTurn = exploresLeft`. */
+  readonly mustUseAllExploresNextTurn?: boolean;
   /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
    *  NEXT real turn (fallen from a herb attached via Explore gain). */
   readonly pendingHerbHeal?: number;

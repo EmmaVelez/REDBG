@@ -21,6 +21,9 @@ interface RevealEntry {
   readonly def: CardDef;
   readonly resultText: string;
   readonly damage: number;
+  /** Effective Health of the revealed Infected, when it is not the printed
+   *  value (CI-011 Queen Leech's Health equals the leader's Max Health). */
+  readonly hp?: number;
   readonly weapons: readonly CardDef[];
   readonly explorerSeat: number;
   readonly party: readonly RevealPartyMember[];
@@ -226,7 +229,12 @@ export function App(): JSX.Element {
       const weaponDefs = r.weapons
         .map(id => defForInstance(state, id))
         .filter((d): d is CardDef => d !== null);
-      queue.push({ def, resultText, damage: r.damage, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
+      // CI-011 Queen Leech: its Health is the leading exploring Character's
+      // Maximum Health, which is not the value printed on the card.
+      const revealedHp = (def.infectedEffects ?? []).some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')
+        ? party.find(m => m.leader)?.maxHp
+        : undefined;
+      queue.push({ def, resultText, damage: r.damage, hp: revealedHp, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
     }
     if (queue.length === 0) return;
     setRevealQueue(queue);
@@ -322,6 +330,7 @@ export function App(): JSX.Element {
           def={revealCurrent.def}
           resultText={revealCurrent.resultText}
           damage={revealCurrent.damage}
+          hp={revealCurrent.hp}
           weapons={revealCurrent.weapons}
           damageLabel={revealCurrent.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
           party={revealCurrent.party}

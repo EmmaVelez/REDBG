@@ -56,6 +56,8 @@ export interface CardViewProps {
 
 export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false, flash, cardAnimHp }: CardViewProps): JSX.Element {
   const art = cardArtUrl(def.id);
+  // Infected Health ring: `hp` overrides the printed value (CI-011 Queen Leech).
+  const infectedHp = hp ?? def.hp;
   if (def.type === 'character') {
     return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} flash={flash} cardAnimHp={cardAnimHp} />;
   }
@@ -75,8 +77,8 @@ export function CardView({ def, compact = false, decorations, hp, maxHp, hideCos
       )}
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
-        {def.type === 'infected' && def.hp !== undefined && (
-          <HealthRing hp={def.hp} maxHp={def.hp} size={27} />
+        {def.type === 'infected' && infectedHp !== undefined && (
+          <HealthRing hp={infectedHp} maxHp={infectedHp} size={27} />
         )}
         {!hideCost && <span className="card-cost" data-card-cost>{costText(def)}</span>}
       </div>

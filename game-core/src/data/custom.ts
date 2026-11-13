@@ -131,6 +131,39 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ma-054' },
     ],
   },
+  {
+    // Fan card (printed code CI-010). On reveal the exploring player nominates
+    // a player who must spend their WHOLE Explore pool on their next turn; on
+    // defeat it shuffles the Queen Leech (ci-011) into the Mansion.
+    id: 'ci-010',
+    name: 'James Marcus',
+    type: 'infected',
+    set: 'custom',
+    text: 'When Revealed, the Exploring Player picks a Player; that Player must use all their Explores in their next turn.\nWhen this Infected is Defeated, shuffle a card named "QUEEN LEECH" into the Mansion.',
+    copies: 1,
+    hp: 60,
+    attack: 50,
+    decorations: 5,
+    infectedEffects: [
+      { kind: 'onRevealChoosePlayerMustUseAllExploresNextTurn' },
+      { kind: 'onDefeatShuffleCardIntoMansion', cardId: 'ci-011' },
+    ],
+  },
+  {
+    // Fan card (printed code CI-011). Its printed Health is "X": it is set when
+    // it is revealed, to the leading exploring Character's Maximum Health.
+    // `hp` below is only the fallback used if the effect is negated.
+    id: 'ci-011',
+    name: 'Queen Leech',
+    type: 'infected',
+    set: 'custom',
+    text: "Queen Leech's Health is equal to the total Maximum Health of Exploring Characters.",
+    copies: 1,
+    hp: 60,
+    attack: 70,
+    decorations: 8,
+    infectedEffects: [{ kind: 'onRevealHpEqualsExploringCharacterMaxHp' }],
+  },
 
   {
     id: 'ev-001',

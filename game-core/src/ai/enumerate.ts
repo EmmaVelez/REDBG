@@ -6,6 +6,7 @@ import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../e
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
+import { exploreAmmoReq } from '../engine/ammo';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
   // 0. Guard
@@ -129,15 +130,40 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
         // is often the better play, and the leader's own abilities apply.
         const leaders: readonly ('main' | 'partner')[] =
           player.partnerInstanceId !== undefined ? ['main', 'partner'] : ['main'];
+        // X-ammo weapons (Gatling Gun, Russian Assault Rifle, Signature
+        // Special): the player allocates how much Ammo to spend and that amount
+        // IS the damage. Offer a bounded set of allocations — none at all, plus
+        // "as much as affordable" for each X weapon in turn — so the bot can
+        // weigh them without an allocation-count explosion.
+        const xIds = [...new Set(comboOf)].filter(id => {
+          const ci = state.cards[id];
+          return ci !== undefined && state.cardDefs[ci.cardId]?.xAmmo === true;
+        });
+        const fixedCost = comboOf.reduce((sum, id) => {
+          const ci = state.cards[id];
+          const def = ci === undefined ? undefined : state.cardDefs[ci.cardId];
+          if (def?.xAmmo === true) return sum;
+          return sum + exploreAmmoReq(state, seat, id, comboOf.length);
+        }, 0);
+        const allocations: Record<string, number>[] = [{}];
+        for (const xid of xIds) {
+          const ci = state.cards[xid];
+          const cap = (ci === undefined ? undefined : state.cardDefs[ci.cardId]?.ammoCap) ?? Infinity;
+          const amount = Math.max(0, Math.min(player.turnAmmo - fixedCost, cap));
+          if (amount > 0) allocations.push({ [xid]: amount });
+        }
         for (const leader of leaders) {
           for (const exploreCount of exploreCounts) {
-            generatedActions.push({
-              type: 'explore',
-              seat,
-              weapons: comboOf,
-              exploreCount,
-              ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
-            });
+            for (const allocation of allocations) {
+              generatedActions.push({
+                type: 'explore',
+                seat,
+                weapons: comboOf,
+                exploreCount,
+                ...(leader === 'partner' ? { leader: 'partner' as const } : {}),
+                ...(Object.keys(allocation).length > 0 ? { ammoByWeapon: allocation } : {}),
+              });
+            }
           }
         }
       }

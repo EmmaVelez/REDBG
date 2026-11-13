@@ -124,6 +124,11 @@ export function exploreDamage(
    * call site).
    */
   leader?: 'main' | 'partner',
+  /**
+   * Ammo allocated to each `xAmmo` weapon (Gatling Gun et al.) — the amount IS
+   * that weapon's damage and cost in the preview.
+   */
+  ammoByWeapon?: Readonly<Record<string, number>>,
 ): number {
   const player = state.seats[seat];
   if (player === undefined) return 0;
@@ -152,8 +157,8 @@ export function exploreDamage(
     const bowBonus = bowEff !== undefined && bowEff.kind === 'plusDamageIfNoActionsInPlayArea' && noActions ? bowEff.amount : 0;
     const xpBonus = xpEff !== undefined && xpEff.kind === 'plusDamageIfCharacterXpAtLeast' && (player.xp ?? 0) >= xpEff.threshold ? xpEff.amount : 0;
     return {
-      damage: (def?.damage ?? 0) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
-      ammoReq: exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
+      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (def?.damage ?? 0)) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
+      ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,
     };
@@ -223,7 +228,7 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number; readonly ammoX10InDiscardCount?: number }): ExploreOutcome {
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number; readonly ammoX10InDiscardCount?: number; readonly exploringCharacterMaxHp?: number }): ExploreOutcome {
   const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp, infectedBattledThisTurn, ammoX10InDiscardCount } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
@@ -292,6 +297,11 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
           boostedAttack -= effect.amount;
         }
       }
+      // CI-011 Queen Leech: its Health IS the leading exploring Character's
+      // Maximum Health — it replaces the printed value outright.
+      if (effect.kind === 'onRevealHpEqualsExploringCharacterMaxHp') {
+        effectiveHp = params.exploringCharacterMaxHp ?? 0;
+      }
     }
   }
 
@@ -349,6 +359,7 @@ export function resolveMultiExplore(params: {
   readonly actionsInPlayArea?: number;
   readonly damageReduction?: number;
   readonly ammoX10InDiscardCount?: number;
+  readonly exploringCharacterMaxHp?: number;
   /**
    * SK-036 Bomber LV.3: the damage the "Explosive" weapons deal in this
    * explore. When present (and > 0) it is dealt to EACH revealed Infected
@@ -422,6 +433,11 @@ export function resolveMultiExplore(params: {
     const cannotInv = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (params.inventoryCount ?? 0) <= e.count) ?? false;
     const cannotAct = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfActionsAtLeast' && (params.actionsInPlayArea ?? 0) >= e.count) ?? false;
     if (cannotInv || cannotAct) blockedByCannotDefeat = true;
+    // CI-011 Queen Leech: its Health IS the leading exploring Character's
+    // Maximum Health — it replaces the printed value outright.
+    if (target.infectedEffects?.some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')) {
+      hp = params.exploringCharacterMaxHp ?? 0;
+    }
     combinedHp += hp;
     combinedAttack += atk;
     effectiveHps.push(hp);

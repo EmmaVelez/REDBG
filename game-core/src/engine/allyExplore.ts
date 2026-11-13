@@ -122,6 +122,7 @@ export function resolveAllyExplore(
     characterAbilities: targetAbilities,
     characterXp: target.xp ?? 0,
     ammoX10InDiscardCount: ammoX10CountInDiscard(state, targetSeat),
+    exploringCharacterMaxHp: target.maxHp,
   });
 
   if (outcome.kind === 'insufficientAmmo') return state;

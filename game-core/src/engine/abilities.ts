@@ -188,9 +188,20 @@ export function requiredAmmoForWeapons(
   defs: (id: string) => CardDef | undefined,
   /** Leading character's abilities; omitted means the Main character's. */
   abilities?: readonly CharacterAbility[],
+  /**
+   * Ammo allocated to each `xAmmo` weapon (Gatling Gun et al.). For those the
+   * allocation IS the cost, replacing the printed `ammoReq`. Omitted means 0.
+   */
+  ammoByWeapon?: Readonly<Record<string, number>>,
 ): number {
   const abils = abilities ?? characterAbilities(state, seat);
-  return weaponIds.reduce((sum, id) => sum + ammoReqForWeapon(abils, defs(id), effectiveWeaponTags(state, seat, id)), 0);
+  return weaponIds.reduce((sum, id) => {
+    const def = defs(id);
+    if (def?.xAmmo === true) {
+      return sum + Math.min(ammoByWeapon?.[id] ?? 0, def.ammoCap ?? Infinity);
+    }
+    return sum + ammoReqForWeapon(abils, def, effectiveWeaponTags(state, seat, id));
+  }, 0);
 }
 
 /** Cost of a card for this seat after any weaponBuyCostReduction (Mikhail

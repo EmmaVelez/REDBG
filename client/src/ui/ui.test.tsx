@@ -15,7 +15,7 @@ import { CharacterCards, attachedOverlap } from './CharacterCards';
 import { playFromHand } from './playFromHand';
 import { Board } from './Board';
 import { ActionBar } from './ActionBar';
-import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions, resolveExploreLeader, toggleWeaponDouble } from './explorePicker';
+import { bestExploreCombo, evaluateExploreCombo, exploreCountOptions, exploreWeaponOptions, maxXAllocation, resolveExploreLeader, toggleWeaponDouble } from './explorePicker';
 import { Lobby } from './Lobby';
 import { GameLog } from './GameLog';
 import { defForInstance, typeLabel, statLine, costText } from './cards';
@@ -126,6 +126,45 @@ describe('CardView (T03)', () => {
     const html = renderToStaticMarkup(<CardView def={mx} />);
     expect(html).toContain('card-has-art');
     expect(html).toMatch(/<img class="card-art-img" src="[^"]*MX-001[^"]*"/i);
+  });
+
+  it('renders the CI-010 / CI-011 fan-card faces from their PNGs', () => {
+    for (const id of ['ci-010', 'ci-011']) {
+      const def = CUSTOM_CARDS.find(c => c.id === id);
+      expect(def).toBeDefined();
+      if (def === undefined) continue;
+      const html = renderToStaticMarkup(<CardView def={def} />);
+      expect(html).toContain('card-has-art');
+      expect(html).toMatch(new RegExp(`<img class="card-art-img" src="[^"]*${def.id.toUpperCase()}[^"]*"`, 'i'));
+    }
+  });
+
+  it('renders the FCH-002 HUNK fan-character face from its PNG', () => {
+    const hunk = CUSTOM_CARDS.find(c => c.id === 'fch-002');
+    expect(hunk).toBeDefined();
+    if (hunk === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={hunk} decorations={0} />);
+    expect(html).toContain('card-portrait-has-art');
+    expect(html).toMatch(/<img class="card-portrait-img" src="[^"]*FCH-002[^"]*"/i);
+    // The printed level rows carry the decoration gates and the rules text.
+    expect(html).toContain('Lv1:2');
+    expect(html).toContain('Lv2:5');
+    expect(html).toContain('All your &quot;Machine Gun&quot; Weapons get -10 Ammo Requirement.');
+    expect(html).toContain('If you have more than 100 Ammo, all your &quot;Machine Gun&quot; Weapons get +10 Damage.');
+  });
+
+  it('shows an overridden Health ring for a dynamic-Health Infected (CI-011)', () => {
+    const queen = CUSTOM_CARDS.find(c => c.id === 'ci-011');
+    expect(queen).toBeDefined();
+    if (queen === undefined) return;
+    // The card's printed fallback is 60; the reveal passes the real value.
+    const html = renderToStaticMarkup(<CardView def={queen} hp={80} maxHp={80} />);
+    expect(html).toContain('data-hp="80"');
+    expect(html).toContain('data-max-hp="80"');
+    expect(html).toContain('Health 80 of 80');
+    // Without the override it falls back to the printed value.
+    const printed = renderToStaticMarkup(<CardView def={queen} />);
+    expect(printed).toContain(`data-hp="${queen.hp}"`);
   });
 
   it('artOnly gives the hand/pile face an art-only card (rows stay for the hover reveal)', () => {
@@ -1075,6 +1114,39 @@ describe('ActionBar (T07)', () => {
     expect(evaluateExploreCombo(armed, 0, [knifeInst]).legal).toBe(true);
   });
 
+  it('explore picker prices an X-ammo weapon from the player’s allocation', () => {
+    const state = twoPlayerState();
+    const gatling = 'we-007#99';
+    const armed = {
+      ...state,
+      cards: { ...state.cards, [gatling]: { instanceId: gatling, cardId: 'we-007', location: { zone: 'hand' as const, index: 5, seat: 0 } } },
+      seats: state.seats.map((s, i) =>
+        i === 0 ? { ...s, hand: [...s.hand, gatling], turnAmmo: 100 } : s,
+      ),
+    };
+    const opt = exploreWeaponOptions(armed, 0).find(o => o.instanceId === gatling);
+    expect(opt?.xAmmo).toBe(true);
+    expect(opt?.damage).toBe(0); // the printed damage is 0 — X is chosen
+
+    // No allocation: legal, but costs and deals nothing.
+    const none = evaluateExploreCombo(armed, 0, [gatling]);
+    expect(none.damage).toBe(0);
+    expect(none.ammo).toBe(0);
+    expect(none.legal).toBe(true);
+
+    // The allocation IS the damage and the cost, and the combo key includes it
+    // (so a 50-ammo Gatling explore is not confused with a 0-ammo one).
+    const alloc = { [gatling]: 50 };
+    const priced = evaluateExploreCombo(armed, 0, [gatling], 1, 'main', alloc);
+    expect(priced.damage).toBe(50);
+    expect(priced.ammo).toBe(50);
+    expect(priced.legal).toBe(true);
+    expect(evaluateExploreCombo(armed, 0, [gatling], 1, 'main', { [gatling]: 101 }).legal).toBe(false);
+
+    // The seat can allocate at most its whole Ammo pool.
+    expect(maxXAllocation(armed, 0, gatling, [gatling])).toBe(100);
+  });
+
   it('renders the weapon picker with per-weapon stats and a reuse badge', () => {
     const state = twoPlayerState();
     const knifeInst = 'we-004#99';
@@ -1598,17 +1670,4 @@ describe('Mercenaries Skill draft UI', () => {
     expect(next.skillDraft?.kept[0]).toHaveLength(1);
     expect(next.prompts.some(p => p.payload?.kind === 'skillDraftPick')).toBe(true);
   });
-});  it('renders the FCH-002 HUNK fan-character face from its PNG', () => {
-    const hunk = CUSTOM_CARDS.find(c => c.id === 'fch-002');
-    expect(hunk).toBeDefined();
-    if (hunk === undefined) return;
-    const html = renderToStaticMarkup(<CardView def={hunk} decorations={0} />);
-    expect(html).toContain('card-portrait-has-art');
-    expect(html).toMatch(/<img class="card-portrait-img" src="[^"]*FCH-002[^"]*"/i);
-    // The printed level rows carry the decoration gates and the rules text.
-    expect(html).toContain('Lv1:2');
-    expect(html).toContain('Lv2:5');
-    expect(html).toContain('All your &quot;Machine Gun&quot; Weapons get -10 Ammo Requirement.');
-    expect(html).toContain('If you have more than 100 Ammo, all your &quot;Machine Gun&quot; Weapons get +10 Damage.');
-  });
-
+});
