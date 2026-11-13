@@ -75,7 +75,7 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
           style={{ '--cc-overlap': attachedOverlap(mainAttached.length) } as CSSProperties}
         >
           <div className="cc-fan">
-            <CardView def={charDef} compact artOnly decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} flash={charFlash || undefined} cardAnimHp={charAnimHp} />
+            <CardView def={charDef} compact artOnly decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} poisoned={hasPoison} cardAnimHp={charAnimHp} />
             {mainAttached.length > 0 && (
               <div className="cc-attached-fan" data-attached-fan={mainAttached.length}>
                 {mainAttached.map(x => (
@@ -84,6 +84,17 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
               </div>
             )}
           </div>
+          {/* Counters (Unofficial Expansion Poison) are attached to the seat's
+              Character. The board only renders other seats' panels, so without
+              this the viewing player's own counter was invisible. */}
+          {(player.counters ?? []).length > 0 && (
+            <span className="cc-counters" data-player-counters>
+              {(player.counters ?? []).map(id => {
+                const counterDef = defForInstance(state, id);
+                return counterDef === null ? null : <CardView key={id} def={counterDef} compact artOnly />;
+              })}
+            </span>
+          )}
           <span className="cc-attached" data-attached-count title="Defeated infected attached to this character">
             {player.attached.length}
           </span>
@@ -102,7 +113,7 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
                 Partner holds no Decorations of its own, so feed it the Main
                 character's count to render the correct level badge / skill
                 gating. */}
-            <CardView def={partnerDef} compact artOnly decorations={player.decorations} hp={hp} maxHp={maxHp} flash={partnerFlash || undefined} cardAnimHp={partnerAnimHp} />
+            <CardView def={partnerDef} compact artOnly decorations={player.decorations} hp={hp} maxHp={maxHp} poisoned={hasPoison} cardAnimHp={partnerAnimHp} />
             {partnerAttached.length > 0 && (
               <div className="cc-attached-fan" data-partner-attached-fan={partnerAttached.length}>
                 {partnerAttached.map(x => (

@@ -193,6 +193,8 @@ export function App(): JSX.Element {
     if (explorer !== undefined) {
       const mainDef = defForInstance(state, explorer.characterInstanceId);
       const partnerDef = defForInstance(state, explorer.partnerInstanceId);
+      // A carried counter (Poison) turns BOTH characters' gauges purple.
+      const poisoned = (explorer.counters ?? []).length > 0;
       if (mainDef !== null) {
         party.push({
           def: mainDef,
@@ -200,6 +202,7 @@ export function App(): JSX.Element {
           hp: explorer.hp,
           maxHp: explorer.maxHp,
           decorations: explorer.decorations,
+          poisoned,
         });
       }
       if (partnerDef !== null) {
@@ -209,6 +212,7 @@ export function App(): JSX.Element {
           hp: explorer.partnerHp ?? explorer.hp,
           maxHp: explorer.partnerMaxHp ?? explorer.maxHp,
           decorations: explorer.decorations,
+          poisoned,
         });
       }
     }

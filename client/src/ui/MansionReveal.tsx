@@ -30,6 +30,8 @@ export interface RevealPartyMember {
   readonly hp?: number;
   readonly maxHp?: number;
   readonly decorations?: number;
+  /** Purple health gauge: this character is carrying a counter (Poison). */
+  readonly poisoned?: boolean;
 }
 
 export interface MansionRevealProps {
@@ -103,7 +105,7 @@ export function MansionReveal({
                       hp={m.hp}
                       maxHp={m.maxHp}
                       decorations={m.decorations}
-                      flash={wasHit}
+                      poisoned={m.poisoned}
                     />
                     {m.leader && <span className="mansion-door-leader-tag">LED</span>}
                   </div>

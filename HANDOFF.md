@@ -1,5 +1,77 @@
 # HANDOFF — resume here
 
+**HEALTH GAUGE: OPAQUE + KEPT INSIDE THE CARD (2026-11-13):** Manny: "Double the size of the
+health gauge, make them not transparent and adjust the centering so that it doesn't leave
+the card." Both gauges are now 2x their ORIGINAL size, and the centering was reworked so
+neither leaves its card:
+- **Character gauge** stays at `--cc-badge-size: 36%` but the anchor moved INBOARD to
+  (78%, 17%) — promo (78%, 27%) — because a 36% ring centred on the printed badge
+  (89.7%, 7.7%) spills past the card's top-right corner. The art-only character card is
+  back to `overflow: hidden` (no longer needs to be visible). The printed badge still sits
+  inside the gauge's disc.
+- **Infected gauge** (the one previously left alone) is doubled 27px -> 54px AND absolutely
+  positioned (`.card-top .health-ring { position: absolute; top/right: 6px }`) so the bigger
+  ring cannot push the card's flex header taller or spill out. The reveal overlay keeps its
+  own `.mansion-door-card .health-ring` positioning — that rule comes later in the file and
+  wins on equal specificity.
+- **Opaque:** `HealthRing` now draws a solid backing disc (`.health-disc`, `#12151c`) under
+  the segments, so card art no longer shows through the ring's centre or the empty segments.
+Measured live: character gauge 28x28 inside the 80x114 card (4px right / 6px top margin),
+15x15 inside the 44x63 phone card, `fullyInside: true` at both sizes.
+
+**POISON GAUGE + COUNTER VISIBILITY (2026-11-13):** Manny: "A poison counter is still not
+being attached to characters when they're supposed to gain one. Remove the health pulse
+animation for the heath gauge. Double the size of all health gauges. When the player is
+being affected by poison a counter, change the health gauge to purple." ENGINE FIRST: the
+counter DOES attach in every reachable path — verified with throwaway tsx probes (single
+explore, multi-explore, Crow chain, partner-led, the explore that downs the character, and
+MA-072's second card, which auto-defeats the revealed Infected so it correctly attaches
+nothing). What was missing was the VIEW: `Board.tsx` renders `PlayerPanel` only for OTHER
+seats, so the viewing player's own counter was drawn NOWHERE — only the transient purple
+card-shake. Fix: `CharacterCards` renders the seat's counters as a small fan pinned to the
+character card's bottom-left (`.cc-counters`, `data-player-counters`). GAUGE: the
+`hp-pulse` keyframes and `.cc-hp-ring-flash` are DELETED, along with the now-dead
+`CardView.flash` prop; the character gauge is 2x (`--cc-badge-size` 18% -> 36%, ring
+viewBox 24/26 -> 48/52, stroke 3/6 -> 6/12) and `.card.card-character.card-art-only` is
+now `overflow: visible` because the bigger ring is centred on the printed badge and spills
+past the card's top-right corner. `HealthRing` gained a `poisoned` prop (purple
+`#a855f7` fill + `data-poisoned`) wired through `CardView` -> `CharacterCards` and
+`MansionReveal`'s party (`RevealPartyMember.poisoned`, fed from `explorer.counters`).
+Measured live: 28x28 on the 80px card (was ~14), 15x15 on the 44px phone card, unclipped,
+no overlap with the next column. The Infected card's OWN Health ring (27px in
+`.card-top`) was deliberately NOT doubled — at 54px it would overflow the 94px card's flex
+header.
+
+**CI-002 CROW CHAIN REVEAL FIXED (2026-11-13):** Manny: "when infect crow is revealed the
+second card reveal animation isnt happening". The client's `detectReveals`
+(`client/src/ui/anims.ts`) rebuilt the revealed set from the top `exploreCount` cards of
+the pre-explore deck plus the zone diff — but a chained card that is RETURNED (an
+undefeated Infected bottomed, or a non-Infected shuffled back) is indistinguishable from
+an unrevealed deck card, and `shuffleBack` shuffles the WHOLE deck, so deck order is no
+signal either. A Crow chain therefore showed only the Crow. Fix: the engine records the
+exact revealed set on the logged explore action (`action.revealedInstanceIds`, in reveal
+order) through `recordExploreReveals()`, which rewrites the explore log entry in place
+(matched by `seq`, so it is position-independent in the very branched explore case); the
+client uses that list and falls back to the old prefix for logs written before the field
+existed. Wired for the plain single reveal, the MULTI block (Crow chains AND
+multi-explores) and the single-path MA-039 / MA-072 branches. Tests: `customCrow.test.ts`
++2 and client `anims.test.ts` +2, both verified RED with the hunk reversed. A pure
+client-side re-derivation of the expansion rules was rejected on purpose — it would
+duplicate the reducer's reveal logic.
+
+**RC-002 PARTNER HEAL FIXED (2026-11-13):** Manny: "rc-002's level 2 ability does not heal
+her when she is a partner" (the heal is her L1 — `healIfDidNotExplore`, 10 Health at end of
+turn; L2 is the Machine Gun damage). Root cause: the end-of-turn block looked the ability up
+with `seatAbilities` (the Main + Partner union) and wrote the recovery to `hordeHp`, i.e. the
+MAIN character's Health — so a Partner Rebecca healed the Main and never herself. Fix: look
+the ability up per character (`characterAbilities` → `hp`, `partnerAbilities` → `partnerHp`),
+the same split `healAtTurnStart` already uses in `startTurn`. The condition stays SEAT-level
+(`exploredOrAttackedThisTurn`) because the Alliance rule is "Partner and Main explore at the
+same time". `newPlayer` is built from `...player`, so the partner value must be written
+explicitly or it is dropped. Tests: `customCards.test.ts` +5 (partner heal lands on partnerHp
+and not hp, capped at partnerMaxHp, suppressed by a seat explore, level-gated below the L1
+gate of 3 Decorations, Main case unchanged); 2 of them verified RED with the hunk reversed.
+
 **BOT DEADLOCK FIXED (2026-11-12):** the idle loop above is fixed in `ai/policy.ts`. Two
 triggers, both feed one override — "take the seat's best explore instead of endTurn":
 1. `isUnarmedDeadEnd(state, seat)`: no Weapon card anywhere in hand / inventory / discard /
@@ -1602,3 +1674,7 @@ engine are unused union members in `types.ts`
 14. FCH-002 HUNK (this change): a fan character whose L2 is a CONDITIONAL per-tag damage bonus. `plusDamageForWeaponTagIfAmmoAbove` is the kind to reach for when a card says "all your <tag> weapons get +N damage while <condition>" — add a pure helper next to `exploreBonusIfAmmoAbove` and wire it into the shared `abilityDamage` term of BOTH `actions.ts` (reducer) and `explore.ts` (overlay helper), or the picker's total will disagree with the resolve. HUNK also shows the custom-character checklist: printed gates go in `level1At`/`level2At`, the printed text goes in `levels[].text` (the card face renders those, not `text`), `canBePartner` defaults to true unless the card prints a restriction, and the art is a whole-card scan normalised to 320px P-mode.
 15. PR-009 START-OF-TURN FLAG (this change): a "start of turn" ability that is ALSO a manual button must set `usedStartOfTurnAbilities` in its prompt resolution, or the button stays after the prompt is answered. When two cards share a prompt kind (PR-009 and AC-017 both used `giveOneCardToPlayer`), give the character its OWN kind before adding a once-per-turn flag keyed by ability kind — the flag map is global, so the shared kind would let either card consume the other's ability.
 16. SK-034..SK-036 BOMBER (this change): three fan Mercenaries Skills. Selecting them in the room's Custom Cards puts them in the def pool and `buildSkillDeck` deals every skill-type def, so they join the Skill deck automatically — the ONLY extra client work was a picker section, because `type: 'skill'` fell through every existing group in `Lobby.tsx` (characters / infectionTokens / resourceAreaCards / otherCards) and would have been invisible. SK-034 is a flat per-Explosive-weapon bonus (`exploreExplosivePlusDamage`), wired into `exploreSkillDamageBonus` AND `exploreDamage` — note `exploreDamage` (the picker's preview, imported from `@re/game-core`) did NOT read skill bonuses at all before this, so SK-030's pistol bonus was missing from the preview too. SK-035 is a reuse ability: `maxWeaponUses` returns `1 + count` for Explosive weapons while the Skill is active, and the explore reducer's disposal now keeps an Explosive with uses left in the play area instead of trashing it (`toTrashAfterUse` had to stop matching Explosives — they are disposed of by the explosive rule, and both paths were adding them to `removed`). SK-036 is the hard one: Manny ruled it deals the Explosive weapons' damage to EACH revealed Infected individually, so a weak one can die while a strong one survives. That needed `resolveMultiExplore` to return per-index `splashDefeated` + `survivingAttack`, and the multi-explore reducer block to split into `defeatedEntries` / `undefeatedEntries` — the on-defeat bookkeeping (decorations, level, XP, Barry chain, on-defeat prompts) runs for the defeated subset and the damage/on-not-defeated block runs for the survivors, so a partial defeat awards the kill AND still charges the survivor's attack. `explosiveDamage` is computed by `exploreExplosiveDamage` (Explosive weapons' own damage + per-Explosive bonuses: Jill L1, SK-034) — reach for that helper rather than re-deriving it. Known limitation: the MA-039 Collapsing Floor Traps path has its own simplified `resolveMultiExplore` call and does not apply the splash. Pre-existing inconsistency noticed while splitting the block (NOT changed, it moves bot XP/balance): the single-explore path always pays the +1 Explore XP (actions.ts ~3582) but the multi-explore path only pays it inside the defeated branch, so a failed multi-explore pays no XP — a partial SK-036 defeat pays it, a total whiff does not. RE-VERIFIED after this change: server M3-T05 still fails, and it is NOT the Bomber work — with the multi-explore split AND the explosive-disposal change both reverted (actions.ts byte-compared against the pre-Bomber tree, only inert deltas left: 3 unused SkillEffect kinds, 3 unselected custom cards, 2 skill helpers that return 0 with no Skill active, and resolveMultiExplore's two extra return fields) the test still fails at the same assertion. The cause is the other session's uncommitted Gatling xAmmo rework in the tree.
+17. RC-002 PARTNER HEAL (this change): a self-healing character ability must be looked up per CHARACTER, not through `seatAbilities`. `healIfDidNotExplore` used the union and wrote `hordeHp`, so a Partner Rebecca healed the Main's Health and never her own — the reported "does not heal her when she is a partner". Now `characterAbilities` heals `hp` and `partnerAbilities` heals `partnerHp` (mirroring `healAtTurnStart` in `startTurn`), and the value is written explicitly into `newPlayer` because it is built from `...player`. The trigger stays seat-level: "Partner and Main explore at the same time", so `exploredOrAttackedThisTurn` suppresses the heal for both. Do NOT use `partnerLeading` to decide who explored — only the legacy `chooseExploreLeader` action persists it, the modern `explore` action's `leader` field does not.
+18. CI-002 CROW CHAIN REVEAL (this change): the client reveal overlay steps through `detectReveals`, which needs the EXACT revealed set — and the deck diff cannot supply it, because a revealed card that is returned (bottomed / shuffled back) looks like an unrevealed deck card and `shuffleBack` reshuffles the whole deck. The engine now writes `action.revealedInstanceIds` (reveal order) onto the logged explore via `recordExploreReveals(ids)`, which rewrites the explore log entry matched by `seq`. Wire it at EVERY site that reveals more than `exploreCount` cards: the plain single reveal, the MULTI block's full `revealedIds`, and the single-path MA-039 / MA-072 branches. The client falls back to the top-`exploreCount` prefix when the field is absent (old logs). Do NOT re-derive the Crow/MA-039/MA-072 expansion rules on the client — that duplicates the reducer.
+19. POISON GAUGE + COUNTER VISIBILITY (superseded by 20 on the gauge geometry): (a) The viewing player's OWN counters were never rendered — `Board.tsx` only renders `PlayerPanel` for other seats, so a Poison counter was invisible except as a transient card-shake. `CharacterCards` now draws them on the character card (`.cc-counters`, `data-player-counters`); if a future surface hides the own panel again, the counter disappears with it. (b) The pulse animation (`hp-pulse` / `.cc-hp-ring-flash` / `CardView.flash`) is gone by request. A counter turns the gauge purple via `HealthRing`'s `poisoned` prop -> `data-poisoned`.
+20. GAUGE ANCHOR + OPACITY (this change): the 36% character gauge could not stay centred on the printed badge (89.7%, 7.7%) and fit inside the card, so the anchor moved inboard to (78%, 17%) — promo (78%, 27%) — and the art-only card went back to `overflow: hidden`. The Infected gauge WAS doubled (27 -> 54) and is absolutely positioned (`.card-top .health-ring`) so it cannot grow the card header. `HealthRing` gained an opaque backing disc (`.health-disc`, `#12151c`). When resizing either gauge, check `fullyInside` against the card rect at desktop (80x114) and phone (44x63) — the phone card is only 44px wide, so a 36% gauge is 15px.

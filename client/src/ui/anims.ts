@@ -140,11 +140,20 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
   const prevZones = zoneIndex(prev);
   const nextZones = zoneIndex(next);
 
-  // Revealed cards come out of the deck top-first, so the pre-explore deck
-  // order IS the reveal order. A bottom reveal (WE-019) comes after every top
-  // card — its instance is the LAST one in the pre-explore deck.
+  // The engine records the exact revealed set on the logged action. The
+  // top-`exploreCount` prefix is only a FALLBACK for logs written before that
+  // field existed: a CI-002 Crow chain or a MA-039 / MA-072 expansion reveals
+  // MORE cards than `exploreCount`, and the extra ones cannot be recovered
+  // from the deck diff — a revealed card that is returned (bottomed / shuffled
+  // back) looks exactly like an unrevealed deck card.
+  const engineOrder = action.revealedInstanceIds ?? null;
+  const revealedIds = engineOrder ?? prev.mansionDeck.slice(0, Math.max(1, action.exploreCount ?? 1));
+
+  // Reveal order: the engine's list IS the reveal order. The pre-explore deck
+  // order is the fallback (top-first; a WE-019 bottom reveal is the LAST card).
   const revealOrder = new Map<string, number>();
-  prev.mansionDeck.forEach((id, i) => revealOrder.set(id, i));
+  if (engineOrder !== null) engineOrder.forEach((id, i) => revealOrder.set(id, i));
+  else prev.mansionDeck.forEach((id, i) => revealOrder.set(id, i));
 
   const outcomes = new Map<string, Reveal['outcomeZone']>();
   for (const [instanceId, nextLoc] of nextZones) {
@@ -158,16 +167,16 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
     }
   }
 
-  // The revealed set is the top `exploreCount` of the pre-explore deck. Two
-  // cases are invisible to the zone diff above:
+  // The revealed set is the engine's list (or, for older logs, the top
+  // `exploreCount` of the pre-explore deck). Two cases are invisible to the
+  // zone diff above:
   //  - a revealed card found back in the deck was RE-INSERTED (MX-001 Mr. X:
   //    "place it on top of the mansion as the 5th upcoming card" — revealing
   //    REMOVES it from the deck, so being back means re-inserted);
   //  - a revealed NON-Infected card sits in NO zone at all. The engine parks it
   //    in limbo while its Take / Send-to-bottom prompt is open, so it is
   //    neither in the deck nor in any seat zone until the prompt is answered.
-  const revealedCount = Math.max(1, action.exploreCount ?? 1);
-  for (const instanceId of prev.mansionDeck.slice(0, revealedCount)) {
+  for (const instanceId of revealedIds) {
     if (instanceId.startsWith('hidden-')) continue;
     if (outcomes.has(instanceId)) continue;
     if (next.mansionDeck.includes(instanceId)) outcomes.set(instanceId, 'mansion');

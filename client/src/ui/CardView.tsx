@@ -48,18 +48,18 @@ export interface CardViewProps {
    * (there is nothing to show but the text).
    */
   readonly artOnly?: boolean;
-  /** When true the health ring scales up and pulses during damage flash. */
-  readonly flash?: boolean;
+  /** Purple health gauge: the character is carrying a counter (Poison). */
+  readonly poisoned?: boolean;
   /** Alternative HP value to display while the damage animation plays. */
   readonly cardAnimHp?: number;
 }
 
-export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false, flash, cardAnimHp }: CardViewProps): JSX.Element {
+export function CardView({ def, compact = false, decorations, hp, maxHp, hideCost = false, artOnly = false, poisoned, cardAnimHp }: CardViewProps): JSX.Element {
   const art = cardArtUrl(def.id);
   // Infected Health ring: `hp` overrides the printed value (CI-011 Queen Leech).
   const infectedHp = hp ?? def.hp;
   if (def.type === 'character') {
-    return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} flash={flash} cardAnimHp={cardAnimHp} />;
+    return <CharacterCard def={def} compact={compact} artOnly={artOnly} decorations={decorations} hp={hp} maxHp={maxHp} art={art} poisoned={poisoned} cardAnimHp={cardAnimHp} />;
   }
   const stats = statLine(def);
   const bonus = bonusLine(def);
@@ -78,7 +78,7 @@ export function CardView({ def, compact = false, decorations, hp, maxHp, hideCos
       <div className="card-top">
         <span className="card-type">{typeLabel(def.type)}</span>
         {def.type === 'infected' && infectedHp !== undefined && (
-          <HealthRing hp={infectedHp} maxHp={infectedHp} size={27} />
+          <HealthRing hp={infectedHp} maxHp={infectedHp} size={54} strokeWidth={12} />
         )}
         {!hideCost && <span className="card-cost" data-card-cost>{costText(def)}</span>}
       </div>
@@ -100,13 +100,13 @@ interface CharacterCardProps {
   readonly hp?: number;
   readonly maxHp?: number;
   readonly art: string | undefined;
-  /** When true the health ring scales up during damage flash. */
-  readonly flash?: boolean;
+  /** Purple health gauge: the character is carrying a counter (Poison). */
+  readonly poisoned?: boolean;
   /** Alternative HP value to display while the damage animation plays. */
   readonly cardAnimHp?: number;
 }
 
-function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, art, flash, cardAnimHp }: CharacterCardProps): JSX.Element {
+function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, art, poisoned, cardAnimHp }: CharacterCardProps): JSX.Element {
   const showRing = hp !== undefined && maxHp !== undefined;
   const level1At = def.level1At ?? 0;
   const level2At = def.level2At ?? 0;
@@ -131,8 +131,8 @@ function CharacterCard({ def, compact, artOnly = false, decorations, hp, maxHp, 
             ring is overlaid on the printed badge instead of sitting in a header
             row — see the --cc-badge-* custom properties in styles.css. */}
         {showRing && (
-          <span className={`cc-hp-ring${flash ? ' cc-hp-ring-flash' : ''}`}>
-            <HealthRing hp={cardAnimHp ?? hp} maxHp={maxHp} size={compact ? 24 : 26} strokeWidth={compact ? 3 : 6} />
+          <span className="cc-hp-ring">
+            <HealthRing hp={cardAnimHp ?? hp} maxHp={maxHp} size={compact ? 48 : 52} strokeWidth={compact ? 6 : 12} poisoned={poisoned} />
           </span>
         )}
       </div>

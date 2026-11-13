@@ -229,6 +229,56 @@ describe('detectReveal', () => {
     expect(detectReveal(prev, next, 0)?.instanceId).toBe('mx-001#1');
   });
 
+  it('reports EVERY card of a Crow chain from the engine reveal list, in order', () => {
+    // The chained card was returned to the deck, so the deck diff alone
+    // cannot tell it apart from an unrevealed card. The engine records the
+    // exact revealed set on the logged action; the client must step through
+    // all of them (the Crow first, then the card it revealed).
+    const prev = makeState({ mansionDeck: ['ci-002#1', 'ma-006#1', 'ma-007#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['ma-007#1', 'ci-002#1', 'ma-006#1'],
+      seats: [{ seat: 0 }],
+      log: [{
+        seq: 1,
+        action: {
+          type: 'explore' as const,
+          seat: 0,
+          weapons: [] as readonly string[],
+          exploreCount: 1,
+          revealedInstanceIds: ['ci-002#1', 'ma-006#1'],
+        },
+      }],
+    });
+    expect(detectReveals(prev, next, 0).map(r => [r.instanceId, r.outcomeZone])).toEqual([
+      ['ci-002#1', 'mansion'],
+      ['ma-006#1', 'mansion'],
+    ]);
+  });
+
+  it('pairs a defeated chained card with the re-inserted Crow', () => {
+    const prev = makeState({ mansionDeck: ['ci-002#1', 'ma-006#1', 'ma-007#1'], seats: [{ seat: 0 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: ['ma-007#1', 'ci-002#1'],
+      seats: [{ seat: 0, attached: ['ma-006#1'] }],
+      log: [{
+        seq: 1,
+        action: {
+          type: 'explore' as const,
+          seat: 0,
+          weapons: [] as readonly string[],
+          exploreCount: 1,
+          revealedInstanceIds: ['ci-002#1', 'ma-006#1'],
+        },
+      }],
+    });
+    expect(detectReveals(prev, next, 0).map(r => [r.instanceId, r.outcomeZone])).toEqual([
+      ['ci-002#1', 'mansion'],
+      ['ma-006#1', 'attached'],
+    ]);
+  });
+
   it('reports several defeated Infected from one multi-explore, top card first', () => {
     const prev = makeState({ mansionDeck: ['ma-001#1', 'ma-002#1', 'ma-003#1'], seats: [{ seat: 0 }] });
     const next = makeState({

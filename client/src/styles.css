@@ -206,10 +206,6 @@ h1, h2 { margin: 0 0 8px; }
   position: relative;
   z-index: 1;
 }
-/* When a child carries the flash class, let it bloom outside this container */
-.card-has-art:has(> .cc-hp-ring-flash) {
-  overflow: visible !important;
-}
 .card-has-art .card-top {
   padding: 2px 4px 4px;
   background: linear-gradient(180deg, rgba(8, 9, 12, 0.72), rgba(8, 9, 12, 0));
@@ -257,10 +253,6 @@ h1, h2 { margin: 0 0 8px; }
   background: transparent;
   box-shadow: none;
   overflow: hidden;
-}
-/* Character-card art-only allows flash ring to bleed out */
-.card.card-character.card-art-only:has(> .cc-hp-ring-flash) {
-  overflow: visible !important;
 }
 /* Promo art (PR-*) is still the shorter 320x292 window. Rather than stretch it
    (distortion) or crop it (the printed Health badge sits near the right edge
@@ -427,6 +419,26 @@ h1, h2 { margin: 0 0 8px; }
   text-align: center;
   pointer-events: none;
 }
+/* Counters attached to the character (Unofficial Expansion Poison) — a small
+   fan of the counter cards pinned to the bottom-left corner, mirroring the
+   attached-count badge on the bottom-right. The board only renders OTHER
+   seats' panels, so this is how the viewing player sees their own counter. */
+.cc-counters {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.cc-counters .card {
+  width: 20px;
+  min-height: 0;
+  aspect-ratio: auto;
+  padding: 1px;
+}
 .hover-card-pop .card-has-art .card-text {
   -webkit-line-clamp: unset;
   display: block;
@@ -505,16 +517,20 @@ h1, h2 { margin: 0 0 8px; }
    (centre ~(287,30)). The percentages resolve against .card-portrait, whose
    aspect ratio matches the art, so the overlay tracks the card at any size. */
 .card-character {
-  --cc-badge-x: 89.7%;
-  --cc-badge-y: 7.7%;
-  /* ~1.5x the printed badge (which is 12.5% of the art width) so the live
-     ring is legible at hand-card size while still sitting on the badge */
-  --cc-badge-size: 18%;
+  /* The live gauge is 36% of the card width, so it can no longer be centred on
+     the printed badge (89.7%, 7.7%) and stay inside the card — a ring that big
+     would spill past the top-right corner. The anchor is pulled inboard instead;
+     the printed badge still sits inside the gauge's disc. */
+  --cc-badge-x: 78%;
+  --cc-badge-y: 17%;
+  --cc-badge-size: 36%;
 }
 .card-character.card-promo {
-  --cc-badge-x: 89.7%;
-  --cc-badge-y: 6.7%;
-  --cc-badge-size: 18%;
+  /* Promo art is the shorter 320x292 window, letterboxed inside the same card,
+     so the same inboard offset is a larger fraction of the portrait's height. */
+  --cc-badge-x: 78%;
+  --cc-badge-y: 27%;
+  --cc-badge-size: 36%;
 }
 .card-character .cc-hp-ring {
   position: absolute;
@@ -801,6 +817,17 @@ h1, h2 { margin: 0 0 8px; }
   flex-shrink: 0;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
+/* The Infected's Health gauge lives in the card's flex header. It is
+   absolutely positioned so the (doubled) ring cannot push that header taller
+   and stays inside the card's bounds. The reveal overlay repositions it with
+   its own `.mansion-door-card .health-ring` rule, which comes later in this
+   file and wins. */
+.card-top .health-ring {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
 .health-ring-label {
   font-weight: 700;
   font-family: inherit;
@@ -814,23 +841,6 @@ h1, h2 { margin: 0 0 8px; }
     0 -2px 2px rgba(0, 0, 0, 0.85);
 }
 .health-segment { transition: stroke 0.25s; }
-
-/* Health ring pulse-on-damage — scales to ~4× then shrinks back. */
-.cc-hp-ring-flash {
-  animation: hp-pulse 5s ease-out;
-}
-@keyframes hp-pulse {
-  0%   { transform: scale(1); }
-  8%   { transform: scale(4); }
-  25%  { transform: scale(2.5); }
-  45%  { transform: scale(3); }
-  70%  { transform: scale(1.5); }
-  100% { transform: scale(1); }
-}
-.cc-hp-ring-flash > * {
-  /* Scale from the ring's exact center so it blooms uniformly in every direction */
-  transform-origin: 50% 50%;
-}
 
 .player-character-row {
   display: flex;

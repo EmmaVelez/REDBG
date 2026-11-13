@@ -7,9 +7,12 @@ export interface HealthRingProps {
   readonly size?: number;
   /** Ring stroke width in px. Default 6. */
   readonly strokeWidth?: number;
+  /** Purple fill: the character is carrying a counter (Unofficial Expansion
+   *  Poison). Overrides the red/orange/green health-tier colour. */
+  readonly poisoned?: boolean;
 }
 
-export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRingProps): JSX.Element {
+export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6, poisoned = false }: HealthRingProps): JSX.Element {
   const segments = Math.max(1, Math.round(maxHp / 10));
   const filled = Math.min(segments, Math.max(0, Math.round(hp / 10)));
   const c = size / 2;
@@ -22,10 +25,18 @@ export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRing
 
   // Health-tier coloring: red at or below 1/3 max HP, orange at or below 1/2,
   // green above. Integer comparisons (hp*3 <= maxHp) avoid float rounding.
+  // A carried counter (Poison) overrides the tier with purple — the gauge is
+  // the persistent "you are poisoned" signal.
   const critical = hp * 3 <= maxHp;
   const warning = hp * 2 <= maxHp;
   const tier = critical ? 'critical' : warning ? 'warn' : 'ok';
-  const fillColor = tier === 'critical' ? '#ef4444' : tier === 'warn' ? '#fb923c' : '#4ade80';
+  const fillColor = poisoned
+    ? '#a855f7'
+    : tier === 'critical'
+      ? '#ef4444'
+      : tier === 'warn'
+        ? '#fb923c'
+        : '#4ade80';
 
   const segmentCircles: JSX.Element[] = [];
   for (let i = 0; i < segments; i++) {
@@ -57,10 +68,23 @@ export function HealthRing({ hp, maxHp, size = 44, strokeWidth = 6 }: HealthRing
       data-segments={segments}
       data-filled={filled}
       data-tier={tier}
+      data-poisoned={poisoned || undefined}
       role="img"
       aria-label={`Health ${hp} of ${maxHp}`}
     >
       <g transform={`rotate(-90 ${c} ${c})`}>
+        {/* Opaque backing disc: the gauge sits on top of card art, so without
+            it the artwork shows straight through the ring and the empty
+            segments. It is drawn first, under the segments. */}
+        <circle
+          className="health-disc"
+          cx={c}
+          cy={c}
+          r={radius + strokeWidth / 2}
+          fill="#12151c"
+          stroke="rgba(255,255,255,0.22)"
+          strokeWidth={1}
+        />
         {segmentCircles}
       </g>
       <text

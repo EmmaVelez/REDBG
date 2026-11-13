@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Action, CardDef, GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
@@ -498,6 +499,43 @@ describe('PlayerPanel (T06)', () => {
     // no counters -> no row
     const plain = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
     expect(plain).not.toContain('data-player-counters');
+  });
+
+  it("shows the seat's counters on the character card and turns its gauge purple", () => {
+    const state = twoPlayerState();
+    const poison = CUSTOM_CARDS.find(c => c.id === 'ex-009');
+    expect(poison).toBeDefined();
+    const withCounter: GameState = {
+      ...state,
+      cardDefs: { ...state.cardDefs, 'ex-009': poison as CardDef },
+      seats: state.seats.map((s, i) => (i === 0 ? { ...s, counters: ['ex-009#1'] } : s)),
+    };
+    const html = renderToStaticMarkup(<PlayerPanel state={withCounter} seat={0} isMe />);
+    expect(html).toContain('data-player-counters');
+    expect(html).toContain('data-poisoned');
+    // Without a counter the gauge keeps its health-tier colour and no badge.
+    const plain = renderToStaticMarkup(<PlayerPanel state={state} seat={0} isMe />);
+    expect(plain).not.toContain('data-player-counters');
+    expect(plain).not.toContain('data-poisoned');
+  });
+
+  it('the health-gauge pulse animation is gone from the stylesheet', () => {
+    const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+    expect(css).not.toContain('hp-pulse');
+    expect(css).not.toContain('cc-hp-ring-flash');
+  });
+
+  it('doubles the Infected health gauge and pins it inside the card', () => {
+    const state = twoPlayerState();
+    const infected = Object.values(state.cardDefs).find(d => d.type === 'infected' && d.hp !== undefined);
+    expect(infected).toBeDefined();
+    const html = renderToStaticMarkup(<CardView def={infected as CardDef} />);
+    expect(html).toContain('width="54"');
+    expect(html).toContain('height="54"');
+    // Absolutely positioned, so the doubled ring cannot push the card's flex
+    // header taller or spill out of the card.
+    const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.card-top \.health-ring\s*\{[^}]*position:\s*absolute/s);
   });
 
   it('never renders the counter supply pile on the board', () => {

@@ -84,6 +84,34 @@ describe('HealthRing', () => {
   });
 });
 
+describe('HealthRing poison', () => {
+  it('turns every filled segment purple while a counter is attached', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={90} maxHp={90} poisoned />);
+    expect(html).toContain('data-poisoned');
+    expect(countOf(html, 'stroke="#a855f7"')).toBe(9);
+    expect(html).not.toContain('stroke="#4ade80"');
+  });
+
+  it('keeps reporting the HP tier even while poisoned', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={20} maxHp={90} poisoned />);
+    expect(html).toContain('data-tier="critical"');
+    expect(countOf(html, 'stroke="#a855f7"')).toBe(2);
+    expect(countOf(html, 'stroke="rgba(255,255,255,0.12)"')).toBe(7);
+  });
+
+  it('leaves a healthy gauge unmarked', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={90} maxHp={90} />);
+    expect(html).not.toContain('data-poisoned');
+    expect(html).not.toContain('stroke="#a855f7"');
+  });
+
+  it('draws an opaque backing disc so the card art cannot show through', () => {
+    const html = renderToStaticMarkup(<HealthRing hp={40} maxHp={80} />);
+    expect(html).toContain('health-disc');
+    expect(html).toContain('fill="#12151c"');
+  });
+});
+
 describe('HealthRing tiers', () => {
   it('full health: green segments, tier ok', () => {
     const html = renderToStaticMarkup(<HealthRing hp={90} maxHp={90} />);

@@ -57,6 +57,7 @@ import {
   queueRicardoL2Prompt,
   leaderAbilities,
   seatAbilities,
+  partnerAbilities,
   characterSource,
     buyCostAfterReduction,
   } from './abilities';
@@ -544,6 +545,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
   const nextBase = {
     version: state.version + 1,
     log: [...state.log, { seq: state.log.length + 1, action }],
+  };
+
+  // The explore case records the cards it revealed, so the client's reveal
+  // overlay can step through ALL of them. A CI-002 Crow chain or a MA-039 /
+  // MA-072 expansion reveals more cards than `exploreCount`, and the client
+  // cannot recover the extra ones from the deck diff — a revealed card that is
+  // returned (bottomed / shuffled back) looks exactly like an unrevealed deck
+  // card. The entry is located by its seq, so it does not matter where in the
+  // (very branched) explore case this runs.
+  const recordExploreReveals = (instanceIds: readonly string[]): void => {
+    const seq = state.log.length + 1;
+    nextBase.log = nextBase.log.map(entry =>
+      entry.seq === seq && entry.action.type === 'explore'
+        ? { ...entry, action: { ...entry.action, revealedInstanceIds: instanceIds } }
+        : entry,
+    );
   };
 
   switch (action.type) {
@@ -1744,6 +1761,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // combined engagement (the chained card joins the same battle).
       const crowChainPending = exploreCount === 1 && revealedDef?.type === 'infected' &&
         (revealedDef.infectedEffects ?? []).some(e => e.kind === 'onRevealRevealNextMansionCard');
+      // The single reveal is the baseline; the Crow-chain / event-expansion
+      // branches below replace it with the full list.
+      recordExploreReveals([revealedInstanceId]);
       // -----------------------------------------------------------------
       // MULTI-EXPLORE (exploreCount > 1)
       // Rulebook "Extra Explore": reveal N cards one at a time and battle ALL
@@ -1837,6 +1857,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // EV-002 Nemesis Pursuit: "this turn, all infected gain +10 health and
         // +20 damage" — the Infected revealed in THIS battle are included.
         if (nemesisPursuit) state = withNemesisPursuitBuff(state);
+
+        // The full revealed set for this explore (Crow chains and MA-039 /
+        // MA-072 expansions included) — the client's reveal overlay steps
+        // through it one card at a time.
+        recordExploreReveals(revealedIds);
 
         const infectedEntries: Array<{ id: string; def: CardDef }> = [];
         const nonInfectedIds: string[] = [];
@@ -2929,6 +2954,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
             }]
           : [];
+        // MA-039 reveals the event card AND the extra Mansion card, so the
+        // client's overlay must step through both.
+        recordExploreReveals([revealedInstanceId, secondId]);
         const ma039Result: GameState = {
           ...state,
           ...nextBase,
@@ -2983,6 +3011,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const tied = alive.filter(x => x.decorations === min);
           const bestHp = tied.length > 0 ? Math.max(...tied.map(x => x.hp)) : 0;
           const chosenSeat = tied.filter(x => x.hp === bestHp).map(x => x.seat)[0] ?? -1;
+          recordExploreReveals([revealedInstanceId, secondId]);
           return {
             ...state,
             ...nextBase,
@@ -3016,6 +3045,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'zombieGrab', amount: '20', instanceId: secondId },
             }]
           : [];
+        // MA-072 reveals the event card AND the extra Mansion card, so the
+        // client's overlay must step through both.
+        recordExploreReveals([revealedInstanceId, secondId]);
         const ma072Result: GameState = {
           ...state,
           ...nextBase,
@@ -5048,10 +5080,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
 
           // RC-002 Rebecca Chambers L1: if didn't explore this turn, heal at end of turn.
-          const rebeccaHealAbility = seatAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
-          if (rebeccaHealAbility !== undefined && rebeccaHealAbility.kind === 'healIfDidNotExplore' &&
-              !player.exploredOrAttackedThisTurn && !player.downed && !player.dead) {
-            hordeHp = Math.min(player.maxHp, hordeHp + rebeccaHealAbility.amount);
+          // Self-healing belongs to the character whose ability it is: a Partner
+          // Rebecca restores her OWN Health (partnerHp), never the Main's — the
+          // same rule `healAtTurnStart` follows in startTurn. The condition is
+          // seat-level because the Main and Partner explore at the same time.
+          const didExploreOrAttack = player.exploredOrAttackedThisTurn === true;
+          const mainHealAbility = characterAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
+          if (mainHealAbility !== undefined && mainHealAbility.kind === 'healIfDidNotExplore' &&
+              !didExploreOrAttack && !player.downed && !player.dead) {
+            hordeHp = Math.min(player.maxHp, hordeHp + mainHealAbility.amount);
+          }
+          let partnerHpOut = player.partnerHp;
+          const partnerHealAbility = partnerAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
+          if (partnerHealAbility !== undefined && partnerHealAbility.kind === 'healIfDidNotExplore' &&
+              !didExploreOrAttack && !player.downed && !player.dead && player.partnerInstanceId !== undefined) {
+            partnerHpOut = Math.min(
+              player.partnerMaxHp ?? player.maxHp,
+              (player.partnerHp ?? player.hp) + partnerHealAbility.amount,
+            );
           }
 
           const ctx = advanceTurn({
@@ -5096,6 +5142,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const newPlayer: PlayerState = {
             ...player,
             hp: hordeHp,
+            ...(partnerHpOut !== undefined ? { partnerHp: partnerHpOut } : {}),
             hand: d.hand,
             inventory: d.deck,
             discard: d.discard,

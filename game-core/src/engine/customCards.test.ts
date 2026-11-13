@@ -759,3 +759,75 @@ describe('MX-001 in a multi-explore', () => {
     expect(after.mansionDeck).toEqual(['x1', 'x2', 'x3', 'x4', 'mx1', 'x5', 'ma1']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// RC-002 Rebecca Chambers L1 — end-of-turn heal
+// ---------------------------------------------------------------------------
+
+describe('RC-002 Rebecca Chambers L1 heal', () => {
+  function rebeccaPartner(over: Partial<PlayerState> = {}): GameState {
+    const s = setup(
+      {
+        seed: 7,
+        partnerMode: true,
+        players: [
+          { name: 'Hero', controller: 'human', characterCardId: 'ch-001', partnerCharacterId: 'rc-002' },
+          { name: 'Foe', controller: 'human', characterCardId: 'ch-002' },
+        ],
+      },
+      customPool(),
+      FIRST_TIMER_PILES,
+      STANDARD_MANSION_DECK,
+    );
+    return tune(s, over);
+  }
+
+  it('as a Partner she heals her OWN Health, not the Main character\'s', () => {
+    // Reported bug: the heal was written to the Main's HP, so a Partner
+    // Rebecca never recovered. 3 Decorations puts her at L1 (gate 3).
+    const s = rebeccaPartner({ decorations: 3, hp: 100, partnerHp: 40, partnerMaxHp: 80 });
+    const after = applyAction(s, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]?.hp).toBe(100);
+    expect(after.seats[0]?.partnerHp).toBe(50);
+  });
+
+  it('as a Partner the heal is capped at her own Max Health', () => {
+    const s = rebeccaPartner({ decorations: 3, hp: 100, partnerHp: 75, partnerMaxHp: 80 });
+    const after = applyAction(s, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]?.partnerHp).toBe(80);
+  });
+
+  it('as a Partner she does not heal once the seat has explored', () => {
+    // The Main and Partner explore at the same time, so a seat-level explore
+    // suppresses the heal for BOTH characters.
+    const s = rebeccaPartner({ decorations: 3, hp: 100, partnerHp: 40, partnerMaxHp: 80, exploredOrAttackedThisTurn: true });
+    const after = applyAction(s, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]?.hp).toBe(100);
+    expect(after.seats[0]?.partnerHp).toBe(40);
+  });
+
+  it('as a Partner her heal is level-gated by the Main\'s Decorations', () => {
+    // Below the L1 gate (3 Decorations) the Partner has no abilities at all.
+    const s = rebeccaPartner({ decorations: 2, hp: 100, partnerHp: 40, partnerMaxHp: 80 });
+    const after = applyAction(s, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]?.partnerHp).toBe(40);
+  });
+
+  it('as the Main character she still heals her own Health', () => {
+    const s = setup(
+      {
+        seed: 7,
+        players: [
+          { name: 'Hero', controller: 'human', characterCardId: 'rc-002' },
+          { name: 'Foe', controller: 'human', characterCardId: 'ch-002' },
+        ],
+      },
+      customPool(),
+      FIRST_TIMER_PILES,
+      STANDARD_MANSION_DECK,
+    );
+    const tuned = tune(s, { decorations: 3, level: 1, hp: 50, maxHp: 80 });
+    const after = applyAction(tuned, { type: 'endTurn', seat: 0 });
+    expect(after.seats[0]?.hp).toBe(60);
+  });
+});

@@ -109,6 +109,27 @@ describe('CI-002 reveal chain', () => {
     expect(next.removed).not.toContain(ids[1]);
   });
 
+  it('records the full revealed set on the logged action for the client reveal overlay', () => {
+    // The chained card cannot be recovered from the deck diff: an undefeated
+    // revealed Infected is bottomed, so it looks like any other deck card.
+    const { state, ids } = setMansionTop(crowGame({ level: 1, hp: 80, turnAmmo: 70 }), ['ci-002', 'ma-006']);
+    const { state: armed, id } = addWeapon(state, 0, 'we-012');
+    const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
+    const logged = next.log[next.log.length - 1]?.action;
+    expect(logged).toMatchObject({ type: 'explore', seat: 0, exploreCount: 1 });
+    if (logged?.type !== 'explore') throw new Error('expected an explore log entry');
+    expect(logged.revealedInstanceIds).toEqual(ids);
+  });
+
+  it('records every card of a multi-Crow chain, in reveal order', () => {
+    const { state, ids } = setMansionTop(crowGame({ level: 1, hp: 100, turnAmmo: 70 }), ['ci-002', 'ci-002', 'ma-006']);
+    const { state: armed, id } = addWeapon(state, 0, 'we-012');
+    const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
+    const logged = next.log[next.log.length - 1]?.action;
+    if (logged?.type !== 'explore') throw new Error('expected an explore log entry');
+    expect(logged.revealedInstanceIds).toEqual(ids);
+  });
+
   it('chains through multiple Crows', () => {
     const { state } = setMansionTop(crowGame({ level: 1, hp: 100, turnAmmo: 70 }), ['ci-002', 'ci-002', 'ma-006']);
     const { state: armed, id } = addWeapon(state, 0, 'we-012');
