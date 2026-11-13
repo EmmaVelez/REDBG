@@ -131,6 +131,24 @@ function CustomCardsPicker(props: {
     }
   };
 
+  // The Bomber line (SK-034..036) is a levelled set, so it gets its own
+  // "add all" row above the individual cards.
+  const bomberSkills = skills.filter(c => c.skillFamily === 'Bomber');
+  const bomberIds = bomberSkills.map(c => c.id.toUpperCase());
+  const allBomberSelected = bomberSkills.length > 0 && bomberSkills.every(c => props.selected.includes(c.id));
+  const toggleAllBomber = (checked: boolean): void => {
+    const ids = bomberSkills.map(c => c.id);
+    if (checked) {
+      const toAdd = ids.filter(id => !props.selected.includes(id));
+      props.onChange([...props.selected, ...toAdd]);
+    } else {
+      props.onChange(props.selected.filter(id => !ids.includes(id)));
+    }
+  };
+  const bomberRangeLabel = bomberIds.length > 1
+    ? `${bomberIds[0]}..${bomberIds[bomberIds.length - 1]?.split('-').slice(1).join('-')}`
+    : (bomberIds[0] ?? '');
+
   return (
     <details className="custom-cards" data-testid="custom-cards">
       <summary className="custom-cards-summary">Custom Cards ({props.selected.length} selected)</summary>
@@ -216,6 +234,18 @@ function CustomCardsPicker(props: {
         <details className="custom-card-section">
           <summary className="custom-card-section-title">🎖️ Mercenaries Skills</summary>
           <p className="lobby-hint-small">Join the Mercenaries Skill deck when the Skill System modification is on.</p>
+          {bomberSkills.length > 0 && (
+            <label className="custom-card-row custom-card-row-sub">
+              <input
+                type="checkbox"
+                checked={allBomberSelected}
+                disabled={props.disabled === true}
+                onChange={e => toggleAllBomber(e.target.checked)}
+                data-testid="custom-card-all-bomber"
+              />
+              <span><em>Add all Bomber skills ({bomberRangeLabel})</em></span>
+            </label>
+          )}
           {skills.map(c => (
             <label key={c.id} className="custom-card-row">
               <input

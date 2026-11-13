@@ -66,48 +66,50 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
         </div>
       </div>
 
-      <div className="board-mansion">
-        <h2 className="board-section-title">Mansion</h2>
-        <div className="mansion-piles">
-          <div className="zone-pile mansion-pile-hover-target" data-anim-zone="mansion" data-pile-count={state.mansionDeck.length}>
-            <span className="zone-pile-label">Deck</span>
-            <div className="zone-pile-stack">
-              <img src="/mansion-deck.svg" alt="Mansion deck" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
-            </div>
-            <span className="zone-pile-count">{state.mansionDeck.length}</span>
-            {(state.mansionAttachments ?? []).length > 0 && (
-              <div className="mansion-attachments-hover">
-                <span className="mansion-attachment-badge">{(state.mansionAttachments ?? []).length}</span>
-                <div className="mansion-attachments-popup">
-                  {(state.mansionAttachments ?? []).map(id => {
-                    const def = defForInstance(state, id);
-                    return def === null ? null : (
-                      <div key={id} className="mansion-attachment-card">
-                        <CardView def={def} compact artOnly />
-                      </div>
-                    );
-                  })}
-                </div>
+      <div className="board-mansion-row">
+        <div className="board-mansion">
+          <h2 className="board-section-title">Mansion</h2>
+          <div className="mansion-piles">
+            <div className="zone-pile mansion-pile-hover-target" data-anim-zone="mansion" data-pile-count={state.mansionDeck.length}>
+              <span className="zone-pile-label">Deck</span>
+              <div className="zone-pile-stack">
+                <img src="/mansion-deck.svg" alt="Mansion deck" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
               </div>
-            )}
-          </div>
-          <div className="mansion-counts">
-            <span>Removed: {state.removed.length}</span>
-            {(state.mansionAttachments ?? []).length > 0 && (
-              <span>Attached: {(state.mansionAttachments ?? []).length}</span>
-            )}
+              <span className="zone-pile-count">{state.mansionDeck.length}</span>
+              {(state.mansionAttachments ?? []).length > 0 && (
+                <div className="mansion-attachments-hover">
+                  <span className="mansion-attachment-badge">{(state.mansionAttachments ?? []).length}</span>
+                  <div className="mansion-attachments-popup">
+                    {(state.mansionAttachments ?? []).map(id => {
+                      const def = defForInstance(state, id);
+                      return def === null ? null : (
+                        <div key={id} className="mansion-attachment-card">
+                          <CardView def={def} compact artOnly />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mansion-counts">
+              <span>Removed: {state.removed.length}</span>
+              {(state.mansionAttachments ?? []).length > 0 && (
+                <span>Attached: {(state.mansionAttachments ?? []).length}</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="board-players">
-        {/* The viewing player's own panel is deliberately absent: their
-            character/partner cards, life, decorations, resources, deck and
-            discard all live in the action bar, so a second copy here was pure
-            duplication (and the biggest block on the board). */}
-        {state.seats.filter(player => player.seat !== mySeat).map(player => (
-          <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={false} showCharacterCards />
-        ))}
+        <div className="board-players">
+          {/* The viewing player's own panel is deliberately absent: their
+              character/partner cards, life, decorations, resources, deck and
+              discard all live in the action bar, so a second copy here was pure
+              duplication (and the biggest block on the board). */}
+          {state.seats.filter(player => player.seat !== mySeat).map(player => (
+            <PlayerPanel key={player.seat} state={state} seat={player.seat} isMe={false} showCharacterCards />
+          ))}
+        </div>
       </div>
 
       <div className="board-self">

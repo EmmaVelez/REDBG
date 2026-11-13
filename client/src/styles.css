@@ -704,6 +704,15 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-counts { display: flex; gap: 14px; color: var(--muted); }
 .board-players { display: flex; flex-wrap: wrap; gap: 10px; }
 .board-self { display: flex; flex-direction: column; gap: 8px; }
+/* The Mansion deck sits on the left; the opponent panels sit to its right. */
+.board-mansion-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+.board-mansion-row > .board-mansion { flex: 0 0 auto; }
+.board-mansion-row > .board-players { flex: 1 1 auto; min-width: 0; }
 
 /* ---- player panel ---- */
 .player-panel {
@@ -2566,6 +2575,8 @@ h1, h2 { margin: 0 0 8px; }
   /* ---- Mansion ---- */
   .app-board .mansion-piles { gap: 12px; }
   .app-board .mansion-counts { flex-wrap: wrap; gap: 10px; font-size: 11px; }
+  /* Too narrow to sit side by side: stack the deck above the opponent row. */
+  .app-board .board-mansion-row { flex-direction: column; }
 
   /* ---- opponents: one slim chip each, in a swipeable row ----
      A full panel is min-width 220px and, with the public play-area/discard

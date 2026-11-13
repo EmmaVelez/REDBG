@@ -1463,6 +1463,36 @@ describe('Lobby (T08)', () => {
     expect(html.indexOf('Mercenaries Skills')).toBeLessThan(html.indexOf('Other Cards'));
   });
 
+  it('offers one "Add all Bomber skills" row above the individual Bomber cards', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(html).toContain('data-testid="custom-card-all-bomber"');
+    expect(html).toContain('Add all Bomber skills (SK-034..036)');
+    // The group row sits above the three individual rows.
+    const allAt = html.indexOf('data-testid="custom-card-all-bomber"');
+    for (const id of ['sk-034', 'sk-035', 'sk-036']) {
+      expect(html.indexOf(`data-testid="custom-card-${id}"`)).toBeGreaterThan(allAt);
+    }
+  });
+
+  it('groups FCH-002 under Characters and the Bomber skills under Mercenaries Skills', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    // Characters section spans from its "add all" row to the first Mansion card.
+    const charsStart = html.indexOf('data-testid="custom-card-all-characters"');
+    const mansionStart = html.indexOf('data-testid="custom-card-mx-001"');
+    expect(charsStart).toBeGreaterThan(-1);
+    expect(mansionStart).toBeGreaterThan(charsStart);
+    expect(html.slice(charsStart, mansionStart)).toContain('data-testid="custom-card-fch-002"');
+    // Mercenaries Skills spans from its Bomber row to the first Other card.
+    const skillsStart = html.indexOf('data-testid="custom-card-all-bomber"');
+    const otherStart = html.indexOf('data-testid="custom-card-ev-001"');
+    expect(skillsStart).toBeGreaterThan(-1);
+    expect(otherStart).toBeGreaterThan(skillsStart);
+    const skillHunk = html.slice(skillsStart, otherStart);
+    for (const id of ['sk-034', 'sk-035', 'sk-036']) {
+      expect(skillHunk).toContain(`data-testid="custom-card-${id}"`);
+    }
+  });
+
   it('offers one Poison check instead of the four EX-006..EX-009 cards', () => {
     const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     expect(html).toContain('data-testid="custom-card-poison"');
