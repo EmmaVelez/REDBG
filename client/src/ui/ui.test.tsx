@@ -461,22 +461,18 @@ describe('PlayerPanel (T06)', () => {
     expect(plain).not.toContain('data-player-counters');
   });
 
-  it('renders the shared counter supply on the board only once a counter is attached', () => {
+  it('never renders the counter supply pile on the board', () => {
     const state = twoPlayerState();
-    // The supply alone (nothing attached yet) must NOT advertise the pile.
-    const supplyOnly = { ...state, supply: ['ex-009#1'] };
-    const hidden = renderToStaticMarkup(<Board state={supplyOnly} mySeat={0} onAction={() => { /* noop */ }} />);
-    expect(hidden).not.toContain('Counter supply');
-    // A counter attached to a Character brings the supply into view.
+    // Even with a counter attached, the shared supply pile stays off the board
+    // (counters are shown on the character panel instead).
     const attached = {
-      ...supplyOnly,
+      ...state,
+      supply: ['ex-009#1'],
       seats: state.seats.map((s, i) => (i === 0 ? { ...s, counters: ['ex-009#1'] } : s)),
     };
     const html = renderToStaticMarkup(<Board state={attached} mySeat={0} onAction={() => { /* noop */ }} />);
-    expect(html).toContain('Counter supply');
-    expect(html).toContain('data-anim-zone="supply"');
-    const plain = renderToStaticMarkup(<Board state={state} mySeat={0} onAction={() => { /* noop */ }} />);
-    expect(plain).not.toContain('Counter supply');
+    expect(html).not.toContain('Counter supply');
+    expect(html).not.toContain('data-anim-zone="supply"');
   });
 
   it('renders the character as a card beneath the player info', () => {
@@ -1122,7 +1118,7 @@ describe('ActionBar (T07)', () => {
     const html1 = renderToStaticMarkup(<ActionBar state={leveled} seat={0} onAction={() => {}} />);
     expect(html1).toContain('action-btn action-btn-secondary');
     expect(html1).toContain('data-ability-index="0"');
-    expect(html1).toContain('Barry Lv1');
+    expect(html1).toContain('Barry:Lv1');
     expect(html1).toContain('+5 damage');
   });
 
@@ -1152,7 +1148,7 @@ describe('ActionBar (T07)', () => {
     };
     const html = renderToStaticMarkup(<ActionBar state={armed} seat={0} onAction={() => {}} />);
     expect(html).toContain('data-ability-character="partner"');
-    expect(html).toContain('Barry Lv1');
+    expect(html).toContain('Barry:Lv1');
     expect(html).toContain('+5 damage');
   });
 

@@ -56,6 +56,18 @@ four seats alive), so it is a pre-existing bot/idle bug — the extra poison dea
 seeds reach it. Sweep data: noCustom 3/5/6 = gameOver (turns 1096/637/1365), noCustom 4 = cap;
 poison bundle 4 = gameOver turn 11, 3 = gameOver turn 189, 5 = cap turn 2242 (3 alive), 6 = cap
 turn 1050 (1 alive).
+**BOARD: COUNTER SUPPLY PILE REMOVED + ABILITY BUTTON LABELS (2026-11-12):** Manny asked to
+"not show zone-pile-counter-supply on the board" and to simplify the ability buttons to
+"<first name>:Lv<level>" (e.g. `Chris:Lv1`). `Board.tsx` no longer renders the shared
+`zone-pile counter-supply` pile (nor the `counterAttached` / `supplyIds` locals that gated
+it) — counters stay visible on the character panel (`data-player-counters`). `CardFlightLayer`
+already no-ops when a zone anchor is missing, so dropping the `data-anim-zone="supply"`
+element is safe; there was no `.counter-supply` CSS to clean up. `abilityLabel` in
+`ActionBar.tsx` now joins name and level with a colon (`Barry:Lv1`); the full rules text still
+rides in the tooltip. Tests: `ui.test.tsx`'s counter-supply test inverted to assert the pile
+never renders, and the two `Barry Lv1` label assertions became `Barry:Lv1`. Gates: typecheck
+clean, client 212/212, client build OK.
+
 **FCH-008 SHERRY BIRKIN CANNOT BE A PARTNER (2026-11-12):** Manny asked to make the fan
 character FCH-008 Sherry Birkin ineligible as a Partner. New `CharacterAbility` kind
 `cannotBePartner` (types.ts, FCH-008 section); FCH-008 carries it at level 1 in

@@ -223,7 +223,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const partnerDef = partnerInst === undefined ? undefined : state.cardDefs[partnerInst.cardId];
   // Alliance Partner Modification: a legal ability button may belong to the
   // Partner, so label it from that character's own card. The button reads the
-  // character's first name + the ability's level ("Jill Lv1"); the full rules
+  // character's first name + the ability's level ("Jill:Lv1"); the full rules
   // text rides in the tooltip so the button stays short.
   const abilityDef = (a: Extract<Action, { type: 'useCharacterAbility' }>) => (a.character === 'partner' ? partnerDef : charDef);
   const abilityLevel = (a: Extract<Action, { type: 'useCharacterAbility' }>): number =>
@@ -231,7 +231,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const abilityLabel = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
     const def = abilityDef(a);
     const firstName = (def?.name ?? '').trim().split(/\s+/)[0] || 'Character';
-    return `${firstName} Lv${abilityLevel(a)}`;
+    return `${firstName}:Lv${abilityLevel(a)}`;
   };
   const abilityText = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
     const def = abilityDef(a);
