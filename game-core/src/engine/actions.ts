@@ -7,7 +7,7 @@ import type { MultiExploreTarget } from './explore';
 import { isNemesisPursuit, withNemesisPursuitBuff, applyNemesisPursuit, nemesisPursuitBuff, NEMESIS_PURSUIT_ID } from './nemesisPursuit';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
-import { canPlayFromDiscard } from './weaponReuse';
+import { canPlayFromDiscard, maxWeaponUses, weaponUsesThisTurn } from './weaponReuse';
 import {
   characterAbilities,
   cardsOnDamageTakenDuringTurn,
@@ -25,6 +25,7 @@ import {
   dualWieldBonus,
   healOnDefeatWithWeaponTag,
   exploreBonusIfAmmoAbove,
+  plusTagDamageIfAmmoAbove,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -67,7 +68,7 @@ import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
-import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
+import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, exploreExplosiveDamage, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
@@ -1472,14 +1473,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               e => e.kind === 'explosivesToDiscardInsteadOfTrash') === true);
           const explosiveIds: string[] = [];
           const playedWeaponIds: string[] = [];
+          // One entry in `weapons` is one USE, so a weapon declared twice spends
+          // two uses. SK-035 Bomber LV.2 lets an "Explosive" weapon be used 1
+          // additional time before being Trashed — until that last use it is
+          // NOT trashed, it stays in the play area and can be used again.
+          const usesThisExplore = new Map<string, number>();
+          for (const id of weapons) usesThisExplore.set(id, (usesThisExplore.get(id) ?? 0) + 1);
+          const exhausted = (id: string): boolean =>
+            weaponUsesThisTurn(state, seat, id) + (usesThisExplore.get(id) ?? 0) >= maxWeaponUses(state, seat, id);
           for (const id of freshWeapons) {
-            if (isExplosive(cardDef(state, id))) {
-              explosiveIds.push(id);
-            } else {
-              playedWeaponIds.push(id);
-            }
+            if (isExplosive(cardDef(state, id)) && exhausted(id)) explosiveIds.push(id);
+            else playedWeaponIds.push(id);
           }
-          let playAreaAfter = [...player.playArea, ...playedWeaponIds];
+          // Explosives reused from the play area are not in freshWeapons; trash
+          // the ones whose last use was this explore.
+          for (const id of uniqueWeapons(weapons)) {
+            if (!player.playArea.includes(id) || partnerWeaponSet.has(id)) continue;
+            if (isExplosive(cardDef(state, id)) && exhausted(id)) explosiveIds.push(id);
+          }
+          let playAreaAfter = [...player.playArea, ...playedWeaponIds].filter(id => !explosiveIds.includes(id));
           // WE-030 Hand Cannon: "Trash one ammunition from your play area."
           const trashAmmoCount = weapons.reduce((sum, id) => {
             const eff = cardDef(state, id)?.weaponEffects?.find(e => e.kind === 'trashAmmoFromPlayAreaOnUse');
@@ -1495,6 +1507,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const toTrashAfterUse = uniqueWeapons(weapons).filter(id => {
             if (partnerWeaponSet.has(id)) return false;
             const def = cardDef(state, id);
+            // "Explosive" weapons are disposed of by the explosive rule above
+            // (trash, or discard under Jill L2 / Grenade Launcher) — trashing
+            // them again here would duplicate the removal.
+            if (isExplosive(def)) return false;
             return def?.weaponEffects?.some(e =>
               e.kind === 'trashAfterUse' ||
               (e.kind === 'grantExploreAndSuppressLowHpInfected' && e.trashAfterUse === true));
@@ -1647,6 +1663,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             plusDamageIfTwoOrMoreWeapons(abilities, weaponDefs.length) +
             dualWieldBonus(state, seat, abilities, weapons) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
+            plusTagDamageIfAmmoAbove(abilities, weaponDefs, player.turnAmmo) +
             exploreDamageIfNoPartnerLowHp(abilities, player.partnerInstanceId, player.hp) +
             exploreDamageIfHpAtMost(abilities, player.hp) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
@@ -2001,11 +2018,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           damageMultiplier: player.damageMultiplierThisTurn ?? 1,
         });
 
+        // SK-036 Bomber LV.3: the "Explosive" weapons deal their damage to EACH
+        // revealed Infected, so a weaker one can be defeated while a stronger
+        // one survives the splash.
+        const bomberSplashEffects = activeSkillEffects(state, seat);
+        const explosiveDamage = bomberSplashEffects.some(e => e.kind === 'exploreExplosiveDamageToAllRevealed')
+          ? exploreExplosiveDamage(bomberSplashEffects, abilities, exploreWeapons)
+          : 0;
         // MA-040 Laser Targeting Device: every revealed Infected is defeated.
         const multi = laserTargeting
-          ? { defeated: true, combinedHp: 0, combinedAttack: 0, shuffleBackCards: [] as string[], blockedByCannotDefeat: false, effectiveDamage: damage }
+          ? { defeated: true, combinedHp: 0, combinedAttack: 0, splashDefeated: targets.map(() => true), survivingAttack: 0, shuffleBackCards: [] as string[], blockedByCannotDefeat: false, effectiveDamage: damage }
           : resolveMultiExplore({
               damage,
+              explosiveDamage,
               revealed: targets,
               attachedInfectedCount: player.attached.length,
               ammo: ammoForEffects,
@@ -2019,12 +2044,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             });
         const defeated = multi.defeated;
         const autoDefeatedIds = autoDefeatedEntries.map(e => e.id);
-        const defeatedIds = defeated ? [...infectedEntries.map(e => e.id), ...autoDefeatedIds] : [...autoDefeatedIds];
-        const undefeatedEntries = defeated ? [] : infectedEntries;
+        const defeatedIds = [
+          ...infectedEntries.filter((_, i) => defeated || multi.splashDefeated[i] === true).map(e => e.id),
+          ...autoDefeatedIds,
+        ];
+        const undefeatedEntries = defeated ? [] : infectedEntries.filter((_, i) => multi.splashDefeated[i] !== true);
+        // SK-036 can defeat SOME of the revealed Infected, so the on-defeat
+        // bookkeeping below has to run for the defeated subset only.
+        const defeatedEntries = defeated ? infectedEntries : infectedEntries.filter((_, i) => multi.splashDefeated[i] === true);
         // JM-001 Jake Muller L1: the combined hit is what he "takes". Collected
         // here, before the defeated/not-defeated split, so the rebuilt seat
         // and the removed list below can both use it.
-        const jakeTrashed = trashTopFromDiscardIds(state, seat, multi.combinedAttack);
+        const jakeTrashed = trashTopFromDiscardIds(state, seat, multi.survivingAttack);
         // ---- Outbreak infection tracking ----
         const infectionBySeat = new Map<number, string[]>();
         for (const s of state.seats) infectionBySeat.set(s.seat, [...(s.infectionCards ?? [])]);
@@ -2060,8 +2091,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let downed = false;
         let resuscitatePending = false;
         const resuscitatePrompts: Prompt[] = [];
-        if (defeated) {
-          for (const { id, def } of infectedEntries) {
+        if (defeated || defeatedEntries.length > 0) {
+          for (const { id, def } of defeatedEntries) {
             if (!negatedIds.has(id)) {
               for (const e of def.infectedEffects ?? []) {
                 if (e.kind === 'onDefeatInfectionIncrease') {
@@ -2144,7 +2175,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const virusXpBonus = virusMutatesBonus(state).xpBonus;
           xp = (player.xp ?? 0) + 1 + maximizerXp + virusXpBonus;
           // On-defeat "may" prompts, one set per defeated Infected.
-          for (const { id } of infectedEntries) {
+          for (const { id } of defeatedEntries) {
             const hasSkip = !negatedIds.has(id) && (cardDef(state, id)?.infectedEffects?.some(e => e.kind === 'skipNextTurnOfAPlayerOnDefeat') ?? false);
             const hasNoActions = !negatedIds.has(id) && (cardDef(state, id)?.infectedEffects?.some(e => e.kind === 'noActionsNextTurnOfAPlayerOnDefeat') ?? false);
             if (hasSkip || hasNoActions) {
@@ -2197,7 +2228,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'leonTrashForGain' },
             });
           }
-          if (infectedEntries.some(({ id, def }) => !negatedIds.has(id) && def.infectedEffects?.some(e => e.kind === 'mustExploreNextTurnOnDefeat'))) {
+          if (defeatedEntries.some(({ id, def }) => !negatedIds.has(id) && def.infectedEffects?.some(e => e.kind === 'mustExploreNextTurnOnDefeat'))) {
             outcomePrompts.push({
               id: `p${state.prompts.length + outcomePrompts.length + 1}`,
               seat,
@@ -2206,8 +2237,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'cephaloChoosePlayer' },
             });
           }
-        } else {
-          // ---- Not defeated: the LEADING character takes the combined Damage ----
+        }
+        if (undefeatedEntries.length > 0) {
+          // ---- Survivors: the LEADING character takes their combined Damage ----
           const hunkReduction = abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
           const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
             ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
@@ -2226,7 +2258,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const damageOnAda = !leadingIsPartner && player.partnerInstanceId === undefined;
           const rawSkillDamage = (skillSuppressed || negateConsumption.negated)
             ? 0
-            : Math.max(multi.combinedAttack - damageReduction - skillReduction, 0);
+            : Math.max(multi.survivingAttack - damageReduction - skillReduction, 0);
           const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
             ? skillLethal
             : rawSkillDamage;
@@ -2397,17 +2429,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
         // shuffled back into the Mansion instead of attached (its Decoration is
         // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
-        const oozeShuffleBackIds = defeated
-          ? infectedEntries
-              .filter(({ id, def }) => !negatedIds.has(id) && oozeShufflesBackOnDefeat(def, multi.effectiveDamage))
-              .map(({ id }) => id)
-          : [];
+        const oozeShuffleBackIds = defeatedEntries
+          .filter(({ id, def }) => !negatedIds.has(id) && oozeShufflesBackOnDefeat(def, multi.effectiveDamage))
+          .map(({ id }) => id);
         for (const id of oozeShuffleBackIds) {
           fxState = shuffleIntoMansion(fxState, id);
         }
         // CI-001 Oscar: when the batch is not defeated he tramples the
         // exploring Character, trashing the highest-Damage Weapon(s) they used.
-        const oscarTrample = !defeated && infectedEntries.some(({ id, def }) =>
+        const oscarTrample = !defeated && undefeatedEntries.some(({ id, def }) =>
           !negatedIds.has(id) && (def.infectedEffects ?? []).some(e => e.kind === 'onNotDefeatedTrashHighestDamageUsedWeapons'));
         mDeck = fxState.mansionDeck;
 
@@ -2479,9 +2509,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           xp,
           pendingSkillEffects: undefined,
           pendingBackstab: undefined,
-          attached: defeated
-            ? [...attachedBase, ...defeatedIds.filter(id => !oozeShuffleBackIds.includes(id)), ...chainAttachedIds]
-            : [...attachedBase, ...autoDefeatedIds],
+          attached: [
+            ...attachedBase,
+            ...defeatedIds.filter(id => !oozeShuffleBackIds.includes(id)),
+            ...chainAttachedIds,
+          ],
           // EX-006/EX-008 may have attached a Poison counter since `player` was
           // read — carry the live value forward.
           counters: (state.seats[seat] as PlayerState).counters,
@@ -4425,7 +4457,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     seat,
                     text: 'Choose a player to give +1 card.',
                     options: [...others.map(s => String(s.seat)), 'Decline'],
-                    payload: { kind: 'giveOneCardToPlayer' },
+                    // Own prompt kind (not AC-017's `giveOneCardToPlayer`): the
+                    // shared kind would let a Fierce Battle gift mark Rebecca's
+                    // start-of-turn ability as used.
+                    payload: { kind: 'rebeccaNurseGift' },
                   },
                 ],
               };
@@ -6653,10 +6688,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
-      if (kind === 'giveOneCardToPlayer') {
-        // PR-009 Rebecca L1: give the chosen player +1 card from their
-        // inventory (reshuffling discard if needed); then offer a second
-        // gift ("If you do, you can have a Player get +1 card").
+      if (kind === 'giveOneCardToPlayer' || kind === 'rebeccaNurseGift') {
+        // PR-009 Rebecca L1 (rebeccaNurseGift): give the chosen player +1 card
+        // from their inventory (reshuffling discard if needed); then offer a
+        // second gift ("If you do, you can have a Player get +1 card").
+        // AC-017 Fierce Battle reuses the gift via its own prompt kind and must
+        // NOT mark Rebecca's start-of-turn ability as used.
+        const isNurseAbility = kind === 'rebeccaNurseGift';
         const targetOpt = prompt.options[option];
         if (targetOpt === 'Decline') {
           return { ...state, ...nextBase, prompts: newPrompts };
@@ -6685,6 +6723,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : s,
           ),
           prompts: newPrompts,
+          // Mark the start-of-turn ability used so the ActionBar button (the
+          // manual trigger) cannot fire a second activation this turn.
+          ...(isNurseAbility
+            ? { usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), giveOneCardToPlayerThenMaybeAnother: true } }
+            : {}),
         };
         // Second gift: same choices, chain prompt.
         const others = gifted.seats.filter(s => s.seat !== seat && !s.dead && !s.downed);

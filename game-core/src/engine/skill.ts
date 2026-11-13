@@ -1,4 +1,4 @@
-import type { CardDef, GameState, PlayerState, PendingSkillEffect, Prompt, SkillDraftState, SkillEffect } from '../types';
+import type { CardDef, GameState, PlayerState, PendingSkillEffect, Prompt, SkillDraftState, SkillEffect, CharacterAbility } from '../types';
 import { makeRng, shuffle } from '../util/rng';
 import { drawWithReshuffle } from './deck';
 import { flipDown } from './characters';
@@ -408,8 +408,52 @@ export function exploreSkillDamageBonus(
       }
       bonus += e.amount * pistols;
     }
+    if (e.kind === 'exploreExplosivePlusDamage') {
+      let explosives = 0;
+      for (let i = 0; i < weaponDefs.length; i++) {
+        const id = weaponIds?.[i];
+        const tags = id !== undefined && state !== undefined && seat !== undefined
+          ? effectiveWeaponTags(state, seat, id)
+          : (weaponDefs[i]?.weaponTags ?? []);
+        if (tags.includes('explosive')) explosives += 1;
+      }
+      bonus += e.amount * explosives;
+    }
   }
   return bonus;
+}
+
+/**
+ * SK-035 Bomber LV.2: how many extra uses an "Explosive" weapon gets before it
+ * is Trashed (0 when the Skill is not active).
+ */
+export function skillExplosiveExtraUses(effects: readonly SkillEffect[]): number {
+  return effects.reduce((sum, e) => (e.kind === 'explosiveExtraUse' ? sum + e.count : sum), 0);
+}
+
+/**
+ * SK-036 Bomber LV.3: the damage the "Explosive" weapons deal in an explore —
+ * each Explosive weapon's own damage plus the bonuses that apply per Explosive
+ * weapon (Jill L1 `explosivesPlusDamage`, SK-034, ...). The Skill deals this
+ * amount to EACH revealed Infected.
+ */
+export function exploreExplosiveDamage(
+  effects: readonly SkillEffect[],
+  abilities: readonly CharacterAbility[],
+  weapons: readonly { readonly damage: number; readonly tags?: readonly string[] }[],
+): number {
+  const explosives = weapons.filter(w => (w.tags ?? []).includes('explosive'));
+  if (explosives.length === 0) return 0;
+  let total = explosives.reduce((sum, w) => sum + w.damage, 0);
+  for (const a of abilities) {
+    if (a.kind === 'explosivesPlusDamage' || (a.kind === 'weaponTagPlusDamage' && a.tag === 'explosive')) {
+      total += a.amount * explosives.length;
+    }
+  }
+  for (const e of effects) {
+    if (e.kind === 'exploreExplosivePlusDamage') total += e.amount * explosives.length;
+  }
+  return total;
 }
 
 // ---------------------------------------------------------------------------

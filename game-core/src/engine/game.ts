@@ -279,7 +279,10 @@ function turnStartAbilityPrompts(
         seat: player.seat,
         text: abilityText('giveOneCardToPlayerThenMaybeAnother'),
         options: [...others.map(s => String(s.seat)), 'Decline'],
-        payload: { kind: 'giveOneCardToPlayer' },
+        // Own prompt kind (not AC-017's `giveOneCardToPlayer`): the shared
+        // kind would let a Fierce Battle gift mark Rebecca's start-of-turn
+        // ability as used.
+        payload: { kind: 'rebeccaNurseGift' },
       });
     }
   }

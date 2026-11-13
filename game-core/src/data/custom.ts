@@ -375,6 +375,27 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'exploreDamageIfNoPartnerLowHp', amount: 20, hpThreshold: 50, level: 2 },
     ],
   },
+  {
+    // Fan card (printed code FCH-002). HUNK — the L1 gate is 2 Decorations,
+    // the L2 gate is 5.
+    id: 'fch-002',
+    name: 'HUNK',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: All your "Machine Gun" Weapons get -10 Ammo Requirement.\nLevel 2: If you have more than 100 Ammo, all your "Machine Gun" Weapons get +10 Damage.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 2,
+    level2At: 5,
+    levels: [
+      { level: 1, text: 'All your "Machine Gun" Weapons get -10 Ammo Requirement.' },
+      { level: 2, text: 'If you have more than 100 Ammo, all your "Machine Gun" Weapons get +10 Damage.' },
+    ],
+    abilities: [
+      { kind: 'ammoReqReduction', tag: 'machineGun', amount: 10, level: 1 },
+      { kind: 'plusDamageForWeaponTagIfAmmoAbove', tag: 'machineGun', threshold: 100, amount: 10, level: 2 },
+    ],
+  },
 
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
@@ -933,5 +954,47 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     cost: 20,
     bonuses: { actions: 1, explores: 1 },
     actionEffects: [{ kind: 'mysteriousFindRoll' }],
+  },
+
+  // ── Custom Mercenaries Skills (SK-034..SK-036, Bomber line) ──────────────
+  // Fan-designed Skill cards. Selecting them in the room's Custom Cards adds
+  // them to the Mercenaries Skill deck when the Skill System modification is on
+  // (cardsForScenario appends every selected custom def; buildSkillDeck then
+  // deals every skill-type def in the database).
+  {
+    id: 'sk-034',
+    name: 'Bomber LV.1',
+    type: 'skill',
+    set: 'custom',
+    text: 'When your Character Explores, "Explosive" Weapons deal +5 Damage.',
+    copies: 1,
+    skillXp: 3,
+    skillFamily: 'Bomber',
+    skillLevel: 1,
+    skillEffects: [{ kind: 'exploreExplosivePlusDamage', amount: 5 }],
+  },
+  {
+    id: 'sk-035',
+    name: 'Bomber LV.2',
+    type: 'skill',
+    set: 'custom',
+    text: 'When your Character Explores, "Explosive" Weapons can be used 1 additional time before being Trashed.',
+    copies: 1,
+    skillXp: 5,
+    skillFamily: 'Bomber',
+    skillLevel: 2,
+    skillEffects: [{ kind: 'explosiveExtraUse', count: 1 }],
+  },
+  {
+    id: 'sk-036',
+    name: 'Bomber LV.3',
+    type: 'skill',
+    set: 'custom',
+    text: 'When your Character Explores, "Explosive" Weapons deal Damage to all Revealed Infected at the same time.',
+    copies: 1,
+    skillXp: 7,
+    skillFamily: 'Bomber',
+    skillLevel: 3,
+    skillEffects: [{ kind: 'exploreExplosiveDamageToAllRevealed' }],
   },
 ];

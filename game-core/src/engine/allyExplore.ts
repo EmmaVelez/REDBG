@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState } from '../types';
 import { revealTop, sendToBottom } from './mansion';
 import { drawWithReshuffle } from './deck';
-import { characterAbilities, passiveDamageBonus, infectedDamageReduction, applyRicardoDamage } from './abilities';
+import { characterAbilities, passiveDamageBonus, plusTagDamageIfAmmoAbove, infectedDamageReduction, applyRicardoDamage } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
@@ -102,7 +102,8 @@ export function resolveAllyExplore(
     weaponEffects: weaponDefs[i]?.weaponEffects,
     tags: weaponDefs[i]?.weaponTags,
   }));
-  const abilityDamage = passiveDamageBonus(targetAbilities, weaponDefs, 1, target.hand.length);
+  const abilityDamage = passiveDamageBonus(targetAbilities, weaponDefs, 1, target.hand.length) +
+    plusTagDamageIfAmmoAbove(targetAbilities, weaponDefs, target.turnAmmo);
   const bonusDamage = target.weaponDamageBonusThisTurn + abilityDamage;
 
   const outcome: ExploreOutcome = resolveExplore({

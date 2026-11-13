@@ -1381,6 +1381,16 @@ describe('Lobby (T08)', () => {
     expect(coinAt).toBeLessThan(resourceAt);
   });
 
+  it('lists the custom Mercenaries Skills in their own picker section', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(html).toContain('Mercenaries Skills');
+    for (const id of ['sk-034', 'sk-035', 'sk-036']) {
+      expect(html).toContain(`data-testid="custom-card-${id}"`);
+    }
+    // The Skill section renders before the "Other Cards" section.
+    expect(html.indexOf('Mercenaries Skills')).toBeLessThan(html.indexOf('Other Cards'));
+  });
+
   it('offers one Poison check instead of the four EX-006..EX-009 cards', () => {
     const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     expect(html).toContain('data-testid="custom-card-poison"');
@@ -1588,4 +1598,17 @@ describe('Mercenaries Skill draft UI', () => {
     expect(next.skillDraft?.kept[0]).toHaveLength(1);
     expect(next.prompts.some(p => p.payload?.kind === 'skillDraftPick')).toBe(true);
   });
-});
+});  it('renders the FCH-002 HUNK fan-character face from its PNG', () => {
+    const hunk = CUSTOM_CARDS.find(c => c.id === 'fch-002');
+    expect(hunk).toBeDefined();
+    if (hunk === undefined) return;
+    const html = renderToStaticMarkup(<CardView def={hunk} decorations={0} />);
+    expect(html).toContain('card-portrait-has-art');
+    expect(html).toMatch(/<img class="card-portrait-img" src="[^"]*FCH-002[^"]*"/i);
+    // The printed level rows carry the decoration gates and the rules text.
+    expect(html).toContain('Lv1:2');
+    expect(html).toContain('Lv2:5');
+    expect(html).toContain('All your &quot;Machine Gun&quot; Weapons get -10 Ammo Requirement.');
+    expect(html).toContain('If you have more than 100 Ammo, all your &quot;Machine Gun&quot; Weapons get +10 Damage.');
+  });
+

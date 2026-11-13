@@ -104,6 +104,8 @@ function CustomCardsPicker(props: {
   const otherCards = CUSTOM_CARDS.filter(c =>
     (c.type === 'event' || c.type === 'action' || c.type === 'counter') && !bundled.has(c.id)
   );
+  // Mercenaries Skill cards join the Skill deck when the Skill System is on.
+  const skills = CUSTOM_CARDS.filter(c => c.type === 'skill' && !bundled.has(c.id));
   const allCustomCardIds = CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => c.id);
 
   const allSelected = allCustomCardIds.every(id => props.selected.includes(id));
@@ -208,6 +210,26 @@ function CustomCardsPicker(props: {
           </label>
         ))}
       </details>
+
+      {/* Mercenaries Skill Cards Section */}
+      {skills.length > 0 && (
+        <details className="custom-card-section">
+          <summary className="custom-card-section-title">🎖️ Mercenaries Skills</summary>
+          <p className="lobby-hint-small">Join the Mercenaries Skill deck when the Skill System modification is on.</p>
+          {skills.map(c => (
+            <label key={c.id} className="custom-card-row">
+              <input
+                type="checkbox"
+                checked={props.selected.includes(c.id)}
+                disabled={props.disabled === true}
+                onChange={e => toggle(c.id, e.target.checked)}
+                data-testid={`custom-card-${c.id}`}
+              />
+              <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
+            </label>
+          ))}
+        </details>
+      )}
 
       {/* Other Cards Section */}
       <details className="custom-card-section">

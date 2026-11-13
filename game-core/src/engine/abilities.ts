@@ -681,6 +681,27 @@ export function exploreBonusIfAmmoAbove(
   return bonus;
 }
 
+/**
+ * FCH-002 HUNK L2: +amount damage to every weapon carrying the tag while the
+ * seat's turn Ammo is above the threshold ("If you have more than 100 Ammo,
+ * all your 'Machine Gun' Weapons get +10 Damage"). Per weapon, so it stacks
+ * with each matching weapon used in the explore.
+ */
+export function plusTagDamageIfAmmoAbove(
+  abilities: readonly CharacterAbility[],
+  weaponDefs: readonly (CardDef | undefined)[],
+  ammo: number,
+): number {
+  let bonus = 0;
+  for (const ability of abilities) {
+    if (ability.kind !== 'plusDamageForWeaponTagIfAmmoAbove' || ammo <= ability.threshold) continue;
+    for (const def of weaponDefs) {
+      if (def !== undefined && (def.weaponTags ?? []).includes(ability.tag)) bonus += ability.amount;
+    }
+  }
+  return bonus;
+}
+
 /** CH-000 Rachael Foley L2: on Explore, +amount damage this turn when she has
  *  no Partner and her Health is at or below hpThreshold. ("No Partner" implies
  *  she is the Main character, so the seat's own hp is hers.) */

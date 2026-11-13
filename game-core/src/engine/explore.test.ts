@@ -91,15 +91,15 @@ test('resolveExplore nonInfected', () => {
 });
 
 test('resolveMultiExplore all defeated', () => {
-  expect(resolveMultiExplore({ damage: 60, revealed: [{ cardId: 'ma-003', hp: 15, attack: 10, infectedEffects: [{ kind: 'noActionsNextTurnOfAPlayerOnDefeat' }] }, { cardId: 'ma-002', hp: 20, attack: 20 }] })).toEqual({ defeated: true, combinedHp: 35, combinedAttack: 30, shuffleBackCards: [], blockedByCannotDefeat: false, effectiveDamage: 60 });
+  expect(resolveMultiExplore({ damage: 60, revealed: [{ cardId: 'ma-003', hp: 15, attack: 10, infectedEffects: [{ kind: 'noActionsNextTurnOfAPlayerOnDefeat' }] }, { cardId: 'ma-002', hp: 20, attack: 20 }] })).toEqual({ defeated: true, combinedHp: 35, combinedAttack: 30, splashDefeated: [true, true], survivingAttack: 0, shuffleBackCards: [], blockedByCannotDefeat: false, effectiveDamage: 60 });
 });
 
 test('resolveMultiExplore not defeated', () => {
-  expect(resolveMultiExplore({ damage: 30, revealed: [{ cardId: 'ma-003', hp: 15, attack: 10, infectedEffects: [{ kind: 'noActionsNextTurnOfAPlayerOnDefeat' }] }, { cardId: 'ma-002', hp: 20, attack: 20 }] })).toEqual({ defeated: false, combinedHp: 35, combinedAttack: 30, shuffleBackCards: [], blockedByCannotDefeat: false, effectiveDamage: 30 });
+  expect(resolveMultiExplore({ damage: 30, revealed: [{ cardId: 'ma-003', hp: 15, attack: 10, infectedEffects: [{ kind: 'noActionsNextTurnOfAPlayerOnDefeat' }] }, { cardId: 'ma-002', hp: 20, attack: 20 }] })).toEqual({ defeated: false, combinedHp: 35, combinedAttack: 30, splashDefeated: [false, false], survivingAttack: 30, shuffleBackCards: [], blockedByCannotDefeat: false, effectiveDamage: 30 });
 });
 
 test('resolveMultiExplore Uroboros flagged', () => {
-  expect(resolveMultiExplore({ damage: 50, revealed: [{ cardId: 'ma-002', hp: 20, attack: 20 }, { cardId: 'ma-010', hp: 90, attack: 70, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] }] })).toEqual({ defeated: false, combinedHp: 110, combinedAttack: 90, shuffleBackCards: ['ma-010'], blockedByCannotDefeat: false, effectiveDamage: 50 });
+  expect(resolveMultiExplore({ damage: 50, revealed: [{ cardId: 'ma-002', hp: 20, attack: 20 }, { cardId: 'ma-010', hp: 90, attack: 70, infectedEffects: [{ kind: 'shuffleBackIfNotDefeated' }] }] })).toEqual({ defeated: false, combinedHp: 110, combinedAttack: 90, splashDefeated: [false, false], survivingAttack: 90, shuffleBackCards: ['ma-010'], blockedByCannotDefeat: false, effectiveDamage: 50 });
 });
 
 test('resolveMultiExplore Gatling Gun Majini boosts the combined attack', () => {

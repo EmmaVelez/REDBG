@@ -17,6 +17,7 @@ import { applyAction } from './actions';
 import { validateAction } from './validate';
 import { setup, startTurn as startTurnImpl } from './game';
 import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
+import { ALLIANCE_CARDS } from '../data/alliance';
 import type { GameState, CardDef, PlayerState, CharacterAbility } from '../types';
 
 /**
@@ -633,10 +634,10 @@ describe('promo characters PR-002 / PR-009 / PR-010', () => {
     const s = gameWith('pr-009');
     const t = startTurnImpl(s); // L1 gate is 1 decoration... level starts 0
     // level 0: no prompt
-    expect(t.prompts.find(p => p.payload?.kind === 'giveOneCardToPlayer')).toBeUndefined();
+    expect(t.prompts.find(p => p.payload?.kind === 'rebeccaNurseGift')).toBeUndefined();
     const l1: GameState = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 1 } : p)) };
     const t1 = startTurnImpl(l1);
-    const gift = t1.prompts.find(p => p.payload?.kind === 'giveOneCardToPlayer');
+    const gift = t1.prompts.find(p => p.payload?.kind === 'rebeccaNurseGift');
     expect(gift).toBeDefined();
     if (gift === undefined) return;
     const handBefore = t1.seats[1]?.hand.length ?? 0;
@@ -648,6 +649,43 @@ describe('promo characters PR-002 / PR-009 / PR-010', () => {
     if (gift2 === undefined) return;
     const given2 = applyAction(given, { type: 'chooseOption', seat: 0, promptId: gift2.id, option: 0 });
     expect(given2.seats[1]?.hand.length).toBe(handBefore + 2);
+    // The start-of-turn ability is spent: the ActionBar's manual-trigger
+    // button must not offer a second activation this turn.
+    expect(given2.usedStartOfTurnAbilities?.giveOneCardToPlayerThenMaybeAnother).toBe(true);
+    expect(validateAction(given2, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }).ok).toBe(false);
+    // Declining the prompt leaves the ability unused, so the button stays.
+    const t2 = startTurnImpl(l1);
+    const g2 = t2.prompts.find(p => p.payload?.kind === 'rebeccaNurseGift');
+    expect(g2).toBeDefined();
+    if (g2 === undefined) return;
+    const declined = applyAction(t2, { type: 'chooseOption', seat: 0, promptId: g2.id, option: g2.options.length - 1 });
+    expect(declined.usedStartOfTurnAbilities?.giveOneCardToPlayerThenMaybeAnother).toBeUndefined();
+    expect(validateAction(declined, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }).ok).toBe(true);
+  });
+
+  it("AC-017 Fierce Battle's gift does not consume Rebecca's start-of-turn ability", () => {
+    const s = setup(
+      { seed: 5, players: [{ name: 'Hero', controller: 'human', characterCardId: 'pr-009' }, { name: 'Foe', controller: 'human' }] },
+      [...PREMIER_CARDS, ...ALLIANCE_CARDS],
+      FIRST_TIMER_PILES,
+    );
+    const l1: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1 as const, decorations: 1, hand: ['ac-017#1', ...p.hand] } : p)),
+      cards: { ...s.cards, 'ac-017#1': { instanceId: 'ac-017#1', cardId: 'ac-017', location: { zone: 'hand', index: 0 } } },
+    };
+    const played = applyAction(l1, { type: 'playActionCard', seat: 0, instanceId: 'ac-017#1' });
+    const gift = played.prompts.find(p => p.payload?.kind === 'giveOneCardToPlayer');
+    expect(gift).toBeDefined();
+    if (gift === undefined) return;
+    let after = applyAction(played, { type: 'chooseOption', seat: 0, promptId: gift.id, option: 0 });
+    // Clear any follow-up prompt so the seat is action-ready again.
+    const chain = after.prompts.find(p => p.payload?.kind === 'giveOneCardNoChain');
+    if (chain !== undefined) {
+      after = applyAction(after, { type: 'chooseOption', seat: 0, promptId: chain.id, option: chain.options.length - 1 });
+    }
+    expect(after.usedStartOfTurnAbilities?.giveOneCardToPlayerThenMaybeAnother).toBeUndefined();
+    expect(validateAction(after, { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }).ok).toBe(true);
   });
 
   it('PR-009 Rebecca L2: +10 explore damage per player with >5 cards in hand', () => {

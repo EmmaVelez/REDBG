@@ -1,18 +1,20 @@
 import type { CardDef, CharacterAbility, GameState } from '../types';
 import { seatAbilities, effectiveWeaponTags } from './abilities';
 import { hasShotgunTwicePerTurn } from './game';
+import { activeSkillEffects, skillExplosiveExtraUses } from './skill';
 
 /**
  * Weapon-reuse rules — "use this weapon more than once per turn".
  *
- * The engine's one such ability is Leon L2 `pistolsTwicePerTurn`: a Pistol can
- * be used TWICE per turn. The two uses may be spent as one double use in a
- * single explore (the official FAQ: "pay its ammo requirement twice for that
- * weapon to apply its effect and damage twice") or split across two explores
- * (the first use moves it out of hand, so the second comes from the play
- * area). One entry in an explore action's `weapons` array is one use.
- * Validation, action enumeration and the UI all read these helpers so the
- * rule cannot drift between layers.
+ * The engine's reuse abilities: Leon L2 `pistolsTwicePerTurn` (a Pistol may be
+ * used TWICE per turn), The Maze attachment (Shotguns), and SK-035 Bomber LV.2
+ * ("Explosive" Weapons get 1 additional use before being Trashed). The extra
+ * uses may be spent as one double use in a single explore (the official FAQ:
+ * "pay its ammo requirement twice for that weapon to apply its effect and
+ * damage twice") or split across two explores (the first use moves it out of
+ * hand, so the second comes from the play area). One entry in an explore
+ * action's `weapons` array is one use. Validation, action enumeration and the
+ * UI all read these helpers so the rule cannot drift between layers.
  */
 
 function weaponDef(state: GameState, weaponId: string): CardDef | undefined {
@@ -51,14 +53,23 @@ export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: str
 
 /**
  * Uses per turn a weapon gets under the seat's reuse abilities (1 = no reuse).
- * Leon L2 doubles Pistols; The Maze attachment doubles Shotguns; everything else stays at one use per turn.
+ * Leon L2 doubles Pistols; The Maze attachment doubles Shotguns; SK-035 Bomber
+ * LV.2 gives "Explosive" weapons one extra use; everything else stays at one
+ * use per turn.
  */
 export function maxWeaponUses(state: GameState, seat: number, weaponId: string): number {
   const def = weaponDef(state, weaponId);
   const tags = effectiveWeaponTags(state, seat, weaponId);
   const pistolReuse = hasAbilityKind(state, seat, 'pistolsTwicePerTurn') && tags.includes('pistol');
   const shotgunReuse = hasShotgunTwicePerTurn(state) && tags.includes('shotgun');
-  return (pistolReuse || shotgunReuse) ? 2 : 1;
+  if (pistolReuse || shotgunReuse) return 2;
+  // SK-035 Bomber LV.2: "Explosive" Weapons can be used 1 additional time
+  // before being Trashed.
+  if (tags.includes('explosive')) {
+    const extra = skillExplosiveExtraUses(activeSkillEffects(state, seat));
+    if (extra > 0) return 1 + extra;
+  }
+  return 1;
 }
 
 /** Uses still available this turn beyond those already spent (0 = exhausted). */

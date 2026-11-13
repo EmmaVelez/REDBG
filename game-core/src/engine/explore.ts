@@ -1,6 +1,7 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, dualWieldBonus, leaderAbilities } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, dualWieldBonus, leaderAbilities } from './abilities';
 import { exploreAmmoReq } from './ammo';
+import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
 export interface ExploreWeapon {
   readonly damage: number;
@@ -180,7 +181,11 @@ export function exploreDamage(
     partnerAttachedDamageBonus(abilities, player.partnerAttached) +
     plusDamageIfTwoOrMoreWeapons(abilities, defs.length) +
     dualWieldBonus(state, seat, abilities, weaponIds ?? []) +
-    exploreBonusIfAmmoAbove(abilities, player.turnAmmo);
+    exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
+    plusTagDamageIfAmmoAbove(abilities, defs, player.turnAmmo) +
+    // Mercenaries Skill damage bonuses (SK-030, SK-034, ...) — the picker's
+    // preview must match what the explore reducer resolves.
+    exploreSkillDamageBonus(activeSkillEffects(state, seat), defs, state, seat, weaponIds ?? []);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;
@@ -344,10 +349,20 @@ export function resolveMultiExplore(params: {
   readonly actionsInPlayArea?: number;
   readonly damageReduction?: number;
   readonly ammoX10InDiscardCount?: number;
+  /**
+   * SK-036 Bomber LV.3: the damage the "Explosive" weapons deal in this
+   * explore. When present (and > 0) it is dealt to EACH revealed Infected
+   * individually instead of only being pooled into `damage`.
+   */
+  readonly explosiveDamage?: number;
 }): {
   readonly defeated: boolean;
   readonly combinedHp: number;
   readonly combinedAttack: number;
+  /** Per revealed index: defeated by the SK-036 Explosive splash (or by the pooled hit). */
+  readonly splashDefeated: readonly boolean[];
+  /** Combined attack of the revealed Infected that survived the splash. */
+  readonly survivingAttack: number;
   readonly shuffleBackCards: readonly string[];
   readonly blockedByCannotDefeat: boolean;
   readonly effectiveDamage: number;
@@ -372,11 +387,13 @@ export function resolveMultiExplore(params: {
     return e ? acc + e.damage : acc;
   }, 0);
 
+  const effectiveHps: number[] = [];
+  const effectiveAttacks: number[] = [];
   let combinedHp = 0;
   let combinedAttack = 0;
   for (let i = 0; i < revealed.length; i++) {
     const target = revealed[i];
-    if (target === undefined) continue;
+    if (target === undefined) { effectiveHps.push(0); effectiveAttacks.push(0); continue; }
     let hp = target.hp + hpBuffFor(i);
     let atk = target.attack + dmgBuffFor(i);
     if (target.infectedEffects?.some(e => e.kind === 'plusHpIfAttackedWithAnotherInfected') && revealed.length > 1) {
@@ -407,9 +424,22 @@ export function resolveMultiExplore(params: {
     if (cannotInv || cannotAct) blockedByCannotDefeat = true;
     combinedHp += hp;
     combinedAttack += atk;
+    effectiveHps.push(hp);
+    effectiveAttacks.push(atk);
   }
 
   const defeated = !blockedByCannotDefeat && damage >= combinedHp;
+  // SK-036 Bomber LV.3: "Explosive" Weapons deal Damage to all Revealed
+  // Infected at the same time. The Explosive damage is applied to EACH
+  // revealed Infected individually, so a weaker one can be defeated while a
+  // stronger one survives the splash.
+  const explosiveDamage = params.explosiveDamage ?? 0;
+  const splashActive = !blockedByCannotDefeat && explosiveDamage > 0;
+  const splashDefeated: boolean[] = revealed.map((_, i) =>
+    defeated || (splashActive && (effectiveHps[i] ?? 0) <= explosiveDamage));
+  const survivingAttack = defeated
+    ? 0
+    : revealed.reduce((sum, _, i) => sum + (splashDefeated[i] === true ? 0 : (effectiveAttacks[i] ?? 0)), 0);
   const shuffleBackCards = revealed
     .filter(target => target.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle') ?? false)
     .map(target => target.cardId);
@@ -418,6 +448,8 @@ export function resolveMultiExplore(params: {
     defeated,
     combinedHp,
     combinedAttack: Math.max(combinedAttack, 0),
+    splashDefeated,
+    survivingAttack,
     shuffleBackCards,
     blockedByCannotDefeat,
     effectiveDamage: damage,

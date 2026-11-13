@@ -441,7 +441,10 @@ export type SkillEffect =
   | { readonly kind: "removeXpForWeaponDamage"; readonly perXp: number } // SK-027 (manual, explore)
   | { readonly kind: "pistolAmmoDiscount"; readonly amount: number } // SK-028
   | { readonly kind: "revealPistolsForExplore"; readonly count: number } // SK-029 (manual, turn start)
-  | { readonly kind: "explorePistolPlusDamage"; readonly amount: number }; // SK-030
+  | { readonly kind: "explorePistolPlusDamage"; readonly amount: number } // SK-030
+  | { readonly kind: "exploreExplosivePlusDamage"; readonly amount: number } // SK-034 Bomber LV.1: +amount to "Explosive" weapons on Explore
+  | { readonly kind: "explosiveExtraUse"; readonly count: number } // SK-035 Bomber LV.2: "Explosive" weapons can be used `count` more time(s) before being Trashed
+  | { readonly kind: "exploreExplosiveDamageToAllRevealed" }; // SK-036 Bomber LV.3: "Explosive" weapons deal damage to all Revealed Infected
 
 export type CharacterAbility =
   | { readonly kind: "weaponPlusDamagePerInfectedFought"; readonly amount: number; readonly level: 1 | 2 } // Chris L1: +5 per Infected being fought
@@ -567,6 +570,7 @@ export type CharacterAbility =
   | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L2: Machine Gun weapons get +N damage
   | { readonly kind: "drawFromInventoryOncePerTurn"; readonly level: 1 | 2 } // FCH-001 Carlos L1: once per turn, draw from inventory; weapon/ammo to hand, else discard
   | { readonly kind: "searchDiscardForAmmoAtTurnStart"; readonly level: 1 | 2 } // FCH-001 Carlos L2: at turn start, search discard for an Ammo card to hand
+  | { readonly kind: "plusDamageForWeaponTagIfAmmoAbove"; readonly tag: WeaponTag; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // FCH-002 HUNK L2: +amount to tag weapons while turn Ammo > threshold
   // --- Fan characters (JM-001..) ---
   | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
   | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats
