@@ -33,7 +33,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1 } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1, mercenariesBasicResources: false } },
     },
     {
       name: 'stateSync',
@@ -143,5 +143,12 @@ describe('protocol validation', () => {
   it('keeps extra fields when structurally valid (forward-compatible)', () => {
     const r = validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, futureField: 7 });
     expect(r.ok).toBe(true);
+  });
+
+  it('validates mercenariesBasicResources as a boolean', () => {
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, mercenariesBasicResources: 'yes' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, mercenariesBasicResources: true }).ok).toBe(true);
+    expect(validateMessage({ kind: 'setMercenariesBasicResources', mercenariesBasicResources: 1 }).ok).toBe(false);
+    expect(validateMessage({ kind: 'setMercenariesBasicResources', mercenariesBasicResources: false }).ok).toBe(true);
   });
 });

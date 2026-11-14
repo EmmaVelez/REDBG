@@ -68,6 +68,7 @@ describe('createHost', () => {
       skillSystem: false,
       customCards: [],
       mansionAttachmentMode: 1,
+      mercenariesBasicResources: false,
     };
     const host = createHost(lonely);
     expect(() => host.start(1)).toThrow('no seated players');

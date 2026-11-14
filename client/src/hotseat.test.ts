@@ -34,6 +34,28 @@ describe('createHotseatGame', () => {
     expect(pileIds).not.toContain('six');
   });
 
+  it('swaps the basic piles for the Mercenaries printings when requested', () => {
+    const s = createHotseatGame(['Chris', 'Jill'], 42, 'firstTimer', { mercenariesBasicResources: true });
+    const cardIdOf = (id: string): string | undefined => s.cards[id]?.cardId;
+    const allIn = (pileId: string): string[] =>
+      (s.marketPiles[pileId]?.cards ?? []).map(id => cardIdOf(id) ?? '?');
+    expect(allIn('am10').every(id => id === 'am-005')).toBe(true);
+    expect(allIn('hg').every(id => id === 'we-049')).toBe(true);
+    expect(allIn('kn').every(id => id === 'we-050')).toBe(true);
+    // non-basic piles keep their own cards
+    expect(allIn('merc').every(id => id === 'ac-006')).toBe(true);
+    // and the swapped defs are registered, so buying one resolves
+    expect(s.cardDefs['we-049']?.name).toBe('Custom Standard Sidearm');
+    // the opening deck uses the Mercenaries printings too
+    for (const seat of s.seats) {
+      const deck = [...seat.hand, ...seat.inventory].map(id => cardIdOf(id));
+      expect(deck.filter(id => id === 'am-005')).toHaveLength(7);
+      expect(deck.filter(id => id === 'we-049')).toHaveLength(1);
+      expect(deck.filter(id => id === 'we-050')).toHaveLength(2);
+      expect(deck).toHaveLength(10);
+    }
+  });
+
   it('builds whaddyaBuyin piles when requested', () => {
     const s = createHotseatGame(['Chris', 'Jill'], 42, 'whaddyaBuyin');
     const pileIds = Object.keys(s.marketPiles);

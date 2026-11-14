@@ -35,6 +35,7 @@ const roomState = (): Extract<ServerMessage, { kind: 'roomState' }> => ({
     skillSystem: false,
     customCards: [],
     mansionAttachmentMode: 1,
+    mercenariesBasicResources: false,
   },
 });
 

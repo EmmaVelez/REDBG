@@ -8,6 +8,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
+import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 
 /** Check if any active mansion attachment has the given effect kind. */
 export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
@@ -581,9 +582,17 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     //   Ammo x10     => ammunition, bonuses { ammo: 10, gold: 10 }
     //   Handgun      => weapon, cost 20, ammoReq 20, damage 10
     //   Combat Knife => weapon, cost 0, ammoReq 0, damage 5
-    const ammoDef = cards.find(c => c.type === 'ammunition' && c.bonuses?.ammo === 10 && c.bonuses?.gold === 10);
-    const handgunDef = cards.find(c => c.type === 'weapon' && c.cost === 20 && c.ammoReq === 20 && c.damage === 10);
-    const knifeDef = cards.find(c => c.type === 'weapon' && c.cost === 0 && c.ammoReq === 0 && c.damage === 5);
+    // With the room's Mercenaries Basic Resources option on, the Mercenaries
+    // printings of those same three cards are preferred so the opening deck
+    // matches the swapped Resource Area (they are stat-identical, so the
+    // derived fallback still finds a card if the Mercenaries one is absent).
+    const mercBasic = setup.mercenariesBasicResources === true;
+    const mercBasicId = (pileId: string): string | undefined => MERCENARIES_BASIC_RESOURCES[pileId]?.[0];
+    const pickBasic = (pileId: string, byStats: () => CardDef | undefined): CardDef | undefined =>
+      (mercBasic ? cards.find(c => c.id === mercBasicId(pileId)) : undefined) ?? byStats();
+    const ammoDef = pickBasic('am10', () => cards.find(c => c.type === 'ammunition' && c.bonuses?.ammo === 10 && c.bonuses?.gold === 10));
+    const handgunDef = pickBasic('hg', () => cards.find(c => c.type === 'weapon' && c.cost === 20 && c.ammoReq === 20 && c.damage === 10));
+    const knifeDef = pickBasic('kn', () => cards.find(c => c.type === 'weapon' && c.cost === 0 && c.ammoReq === 0 && c.damage === 5));
     const ammoId = ammoDef?.id ?? '';
     const handgunId = handgunDef?.id ?? '';
     const knifeId = knifeDef?.id ?? '';

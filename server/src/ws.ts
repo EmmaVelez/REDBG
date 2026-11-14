@@ -273,7 +273,7 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           return;
         }
         if (session.clientId === null) return; // identity issued at connect
-        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId, msg.skillSystem, msg.customCards, msg.mansionAttachmentMode);
+        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId, msg.skillSystem, msg.customCards, msg.mansionAttachmentMode, msg.mercenariesBasicResources);
         session.roomCode = room.roomCode;
         broadcastRoomState(room.roomCode);
         return;
@@ -448,6 +448,17 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         if (session.roomCode === null || session.clientId === null) return;
         try {
           roomStore.setMansionAttachmentMode(session.roomCode, session.clientId, msg.mansionAttachmentMode);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
+      case 'setMercenariesBasicResources': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setMercenariesBasicResources(session.roomCode, session.clientId, msg.mercenariesBasicResources);
           broadcastRoomState(session.roomCode);
         } catch (e) {
           send(ws, { kind: 'error', message: (e as Error).message });

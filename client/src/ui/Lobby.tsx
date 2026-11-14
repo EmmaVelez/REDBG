@@ -26,7 +26,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -36,9 +36,10 @@ export interface LobbyProps {
   readonly onSetSkillSystem: (skillSystem: boolean) => void;
   readonly onSetCustomCards: (customCards: readonly string[]) => void;
   readonly onSetMansionAttachmentMode: (mansionAttachmentMode: 1 | 2) => void;
+  readonly onSetMercenariesBasicResources: (mercenariesBasicResources: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -294,7 +295,7 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
@@ -302,6 +303,7 @@ function PassAndPlay(props: {
   const [skillSystem, setSkillSystem] = useState(false);
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
+  const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -327,6 +329,15 @@ function PassAndPlay(props: {
           data-testid="hotseat-skill-system-toggle"
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={mercenariesBasicResources}
+          onChange={e => setMercenariesBasicResources(e.target.checked)}
+          data-testid="hotseat-mercenaries-basic-resources-toggle"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Mercenaries Basic Resources</span>
       </label>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {hasAttachmentCards && (
@@ -372,7 +383,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources)}
       >
         Start pass &amp; play
       </button>
@@ -394,6 +405,7 @@ export function Lobby({
   onSetSkillSystem,
   onSetCustomCards,
   onSetMansionAttachmentMode,
+  onSetMercenariesBasicResources,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -446,6 +458,17 @@ export function Lobby({
                     data-testid="skill-system-toggle"
                   />
                   {' '}Skill System (Mercenaries expansion)
+                </label>
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.mercenariesBasicResources}
+                    onChange={e => onSetMercenariesBasicResources(e.target.checked)}
+                    data-testid="mercenaries-basic-resources-toggle"
+                  />
+                  {' '}Mercenaries Basic Resources
                 </label>
               </div>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
@@ -545,7 +568,7 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
@@ -553,6 +576,7 @@ function RoomEntry(props: {
   const [skillSystem, setSkillSystem] = useState(false);
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
+  const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -560,7 +584,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -596,6 +620,15 @@ function RoomEntry(props: {
             data-testid="skill-system-toggle"
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={mercenariesBasicResources}
+            onChange={e => setMercenariesBasicResources(e.target.checked)}
+            data-testid="create-mercenaries-basic-resources-toggle"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Mercenaries Basic Resources</span>
         </label>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
         {customCards.some(id => {

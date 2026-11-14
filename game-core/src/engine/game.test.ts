@@ -1,5 +1,5 @@
 import { setup, startTurn, checkWin } from './game';
-import { PREMIER_CARDS, FIRST_TIMER_PILES, pilesForScenario, SCENARIOS } from '../data/cards';
+import { PREMIER_CARDS, FIRST_TIMER_PILES, pilesForScenario, cardsForScenario, SCENARIOS, STANDARD_MANSION_DECK } from '../data/cards';
 import type { GameSetup, GameState, CardInstance, CardDef, PlayerState } from '../types';
 
 function def(id: string, over: Partial<CardDef> = {}): CardDef {
@@ -195,6 +195,57 @@ test('SCENARIOS registry includes all scenarios', () => {
   expect(pilesForScenario('alliance')).toHaveLength(61);
   expect(pilesForScenario('mercenaries')).toHaveLength(18);
   expect(pilesForScenario('nightmare')).toHaveLength(23);
+});
+
+test('Mercenaries Basic Resources: a base scenario game really uses the Mercenaries printings', () => {
+  const s = setup(
+    { seed: 11, players: [{ name: 'A', controller: 'human' as const }, { name: 'B', controller: 'human' as const }], mercenariesBasicResources: true },
+    cardsForScenario('firstTimer', { mercenariesBasicResources: true }),
+    pilesForScenario('firstTimer', { mercenariesBasicResources: true }),
+    STANDARD_MANSION_DECK,
+  );
+  const cardIdOf = (instanceId: string): string | undefined => s.cards[instanceId]?.cardId;
+  // the market piles hold the Mercenaries instances, not the Premier ones
+  // (a pile is seeded with every printed copy, so assert on all of them)
+  const pileCardIds = (pileId: string): string[] =>
+    (s.marketPiles[pileId]?.cards ?? []).map(id => cardIdOf(id) ?? '?');
+  expect(pileCardIds('am10').length).toBeGreaterThan(0);
+  expect(pileCardIds('am10').every(id => id === 'am-005')).toBe(true);
+  expect(pileCardIds('am20').every(id => id === 'am-006')).toBe(true);
+  expect(pileCardIds('am30').every(id => id === 'am-007')).toBe(true);
+  expect(pileCardIds('hg').every(id => id === 'we-049')).toBe(true);
+  expect(pileCardIds('kn').every(id => id === 'we-050')).toBe(true);
+  // and their defs are registered, so buying one resolves
+  expect(s.cardDefs['we-049']?.name).toBe('Custom Standard Sidearm');
+  expect(s.cardDefs['we-050']?.name).toBe('Reliable Blade');
+  // the rest of the table is untouched
+  expect(pileCardIds('herb').every(id => id === 'it-001')).toBe(true);
+  // the opening deck uses the Mercenaries printings too: 7x Ammo x10,
+  // 1x Custom Standard Sidearm, 2x Reliable Blade
+  for (const seat of s.seats) {
+    const deck = [...seat.hand, ...seat.inventory].map(id => cardIdOf(id));
+    expect(deck.filter(id => id === 'am-005')).toHaveLength(7);
+    expect(deck.filter(id => id === 'we-049')).toHaveLength(1);
+    expect(deck.filter(id => id === 'we-050')).toHaveLength(2);
+    expect(deck).toHaveLength(10);
+  }
+});
+
+test('Mercenaries Basic Resources off: the opening deck keeps the Premier printings', () => {
+  const s = setup(
+    { seed: 11, players: [{ name: 'A', controller: 'human' as const }, { name: 'B', controller: 'human' as const }] },
+    cardsForScenario('firstTimer'),
+    pilesForScenario('firstTimer'),
+    STANDARD_MANSION_DECK,
+  );
+  const cardIdOf = (instanceId: string): string | undefined => s.cards[instanceId]?.cardId;
+  for (const seat of s.seats) {
+    const deck = [...seat.hand, ...seat.inventory].map(id => cardIdOf(id));
+    expect(deck.filter(id => id === 'am-001')).toHaveLength(7);
+    expect(deck.filter(id => id === 'we-009')).toHaveLength(1);
+    expect(deck.filter(id => id === 'we-004')).toHaveLength(2);
+    expect(deck).toHaveLength(10);
+  }
 });
 
 test('setup never deals the same character twice (random picks draw without replacement)', () => {

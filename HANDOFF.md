@@ -1,5 +1,38 @@
 # HANDOFF — resume here
 
+**MERCENARIES BASIC RESOURCES LOBBY OPTION (2026-11-14):** Manny: "Add a check box under
+skill in the lobby/room; when checked it replaces the basic resources in the selected
+scenario — ammo cards, pistols, knives — with the ammo, pistol and knives piles from the
+Mercenaries set." Done as a room option (`mercenariesBasicResources`) exactly like
+`skillSystem`, with a checkbox under the Skill toggle in all three surfaces (create-room,
+pass-&-play, room lobby).
+- **Engine:** `MERCENARIES_BASIC_RESOURCES` maps the five basic-resource PILE IDS to the
+  Mercenaries printings — `am10`/`am20`/`am30` → `am-005`/`am-006`/`am-007`, `hg` → `we-049`
+  (Custom Standard Sidearm), `kn` → `we-050` (Reliable Blade). `pilesForScenario(id,
+  { mercenariesBasicResources })` replaces the CONTENTS of those piles (the pileId, and so
+  the board slot, is preserved — only the cards change); `cardsForScenario` pulls the five
+  defs in so a BASE scenario can resolve them (an expansion scenario already has them via
+  `ALL_CARDS`). Both helpers take the new opt alongside `customCards`/`skillSystem`, and the
+  option COMPOSES with custom cards (a custom weapon still merges into the replaced pile by
+  its tag).
+- **Plumbing:** `RoomSnapshot.mercenariesBasicResources`, the `createRoom` field, and a new
+  `setMercenariesBasicResources` host message (protocol + rooms setter + ws case); `host.ts`
+  and `hotseat.ts` pass it to BOTH `cardsForScenario` and `pilesForScenario` (forgetting
+  either leaves the piles referencing unknown card ids, which `setup` silently skips).
+- **Note:** the starting deck is DERIVED BY STAT MATCHING, so it stays the standard
+  7×Ammo x10 / 1×Handgun / 2×Combat Knife — the Mercenaries basic printings are
+  stat-identical, so only the Resource Area changes. **Updated 2026-11-14 (Manny: "Have it
+  change the starting decks too"):** `GameSetup.mercenariesBasicResources` now makes `setup`
+  PREFER the Mercenaries printings when deriving the opening deck (`pickBasic(pileId, byStats)`
+  in game.ts), so the opening 10 cards are am-005 / we-049 / we-050. The option is threaded
+  into the `setup()` call in `host.ts` and `hotseat.ts` as well — forgetting that link leaves
+  the market swapped but the deck Premier.
+- **Tests:** `cards.test.ts` +5 (mapping, pile swap, defs, custom-card compose),
+  `game.test.ts` +1 (a real First Timer game's market holds the Mercenaries instances),
+  `rooms.test.ts` +1, `protocol.test.ts` +1, `ui.test.tsx` +1 (all three toggles),
+  `hotseat.test.ts` +1. Live-verified: the pass-&-play board shows Custom Standard Sidearm /
+  Reliable Blade.
+
 **ABILITY/EFFECT REVEAL OVERLAY (2026-11-14):** Manny: "when an ability or effect reveal a card
 from any pile, the game is paused and the card is briefly shown to the player. Leave the mansion
 reveal screen untouched." Before this, only the EXPLORE reveal paused the table (the mansion-door
@@ -1793,3 +1826,4 @@ engine are unused union members in `types.ts`
 23. DUPLICATE CARD IDS + DUPLICATE PROMPTS (this change): a repeated `id` in `data/*.ts` is silent — `cardDefs` keeps the LAST definition, so the other card is unreachable (`ma-000` was both the Rachael ooze and the Martial Arts action; the ooze resolved as an action and was never defeated). Scan `grep -c "id: '<id>'" game-core/src/data/*.ts` after adding a card, and check the printed code against `CARD-ART/<ID>.png`. Likewise, two turn-start prompts with the same id destroy each other (`chooseOption` removes every prompt with that id): `turnStartAbilityPrompts` pushes 19 prompts, most with the generic `ability-<seat>-v<version>` id, safe only while each ability has one prompt — give a new prompt its own prefix. When two commits add the same card, remove BOTH the duplicate def and its duplicate prompt/handler, and carry over anything the deleted block did that the kept one lacks (here: the `usedStartOfTurnAbilities` flag write).
 24. ZOMBICIDE FAN WEAPONS CW-025..CW-033 (this change): nine custom weapons. Per-card effect kinds are listed in the `WeaponEffect` union. Two rules of thumb: (a) a bonus that scales with the number of Infected Battled goes in `computeDamage` (which the reducer now feeds `infectedBattledThisTurn: exploreCount`) — adding it to the per-weapon `damage` expression too double-counts, because that value is summed into `computeDamage`; (b) a "you can / once per turn" weapon effect is a `useWeaponAbility` manual trigger (validate's `manual` filter + enumerate's `hasManual` must both list the kind, or no button appears). CW-025's recall branch is currently unreachable — a weapon only reaches the play area by being explored with, and `playWeapon` has no reducer case.
 25. ABILITY/EFFECT REVEAL OVERLAY (this change): a NON-explore reveal must pause the table and show the card. The engine records `LoggedAction.reveals` via `recordCardReveals()` (same `seq`-matched log rewrite as `recordExploreReveals`) — and because that helper REASSIGNS `nextBase.log`, always call it before building a state object that spreads `...nextBase`. The client's `detectCardReveals(prev, next, mySeat)` + `CardRevealOverlay` render it, gated to the INVOLVED seat (actor, or a seat whose own card was revealed) so a bot's private peek does not leak to the human; the overlay is suppressed while a mansion-door reveal is active. When adding a new reveal effect/ability, wire `recordCardReveals` at its site — a peek has no zone diff, so the client cannot discover it any other way.
+26. MERCENARIES BASIC RESOURCES (this change): a room option that swaps the scenario's basic piles for the Mercenaries printings. `MERCENARIES_BASIC_RESOURCES` is keyed by PILE ID (am10/am20/am30/hg/kn) and `pilesForScenario` replaces only the CONTENTS, so the board slot is stable. Any new option that changes which cards a scenario uses must be passed to BOTH `cardsForScenario` and `pilesForScenario` — `setup` silently skips pile card ids with no def, so a missing def reads as "the pile is empty", not an error. The starting deck is stat-derived (`pickBasic` in game.ts) and also honours the option via `GameSetup.mercenariesBasicResources`, which must be set at the `setup()` call sites in host.ts and hotseat.ts.

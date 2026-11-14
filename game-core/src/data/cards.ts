@@ -588,12 +588,44 @@ export function expandCustomCards(ids: readonly string[]): readonly string[] {
   return [...out];
 }
 
-export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[] }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
+/**
+ * Lobby option: swap a scenario's BASIC RESOURCES for the Mercenaries set's.
+ *
+ * Every scenario defines the same three basic-resource roles — Ammo x10/x20/x30
+ * (`am10`/`am20`/`am30`), the Handgun pile (`hg`) and the Knife pile (`kn`) —
+ * but the Mercenaries set prints its own versions (Ammo x10/x20/x30 am-005..007,
+ * Custom Standard Sidearm we-049, Reliable Blade we-050). The pile ID (and so
+ * the board slot) is PRESERVED; only the CONTENTS are replaced.
+ */
+export const MERCENARIES_BASIC_RESOURCES: Readonly<Record<string, readonly string[]>> = {
+  am10: ['am-005'],
+  am20: ['am-006'],
+  am30: ['am-007'],
+  hg: ['we-049'],
+  kn: ['we-050'],
+};
+
+/** The Mercenaries cards the replacement pulls in (for `cardsForScenario`). */
+export const MERCENARIES_BASIC_RESOURCE_CARDS: readonly string[] = [
+  'am-005',
+  'am-006',
+  'am-007',
+  'we-049',
+  'we-050',
+];
+
+export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
   const found = SCENARIOS.find(s => s.id === id);
   if (found === undefined) {
     throw new Error(`unknown scenario: ${String(id)}`);
   }
-  const base = found.piles;
+  let base = found.piles;
+  if (opts?.mercenariesBasicResources === true) {
+    base = base.map(p => {
+      const replacement = MERCENARIES_BASIC_RESOURCES[p.pileId];
+      return replacement === undefined ? p : { pileId: p.pileId, cardIds: replacement };
+    });
+  }
   if (opts?.customCards === undefined) {
     return base;
   }
@@ -744,9 +776,9 @@ export function isExpansionScenario(id: ScenarioId): boolean {
  * to live as a duplicated inline copy in both the server and the client.
  * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
  */
-export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[] }): ReadonlyArray<CardDef> {
+export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean }): ReadonlyArray<CardDef> {
   const base = isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
-  if (opts?.skillSystem !== true && opts?.customCards === undefined) {
+  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true) {
     return base;
   }
   const known = new Set(base.map(c => c.id));
@@ -787,6 +819,15 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
     // the modification. Ids already present (an expansion scenario) are skipped.
     for (const c of MERCENARIES_CARDS) {
       if (c.type === 'skill' && !known.has(c.id)) extras.push(c);
+    }
+  }
+  if (opts?.mercenariesBasicResources === true) {
+    // The Mercenaries Basic Resources option swaps the scenario's basic piles
+    // for the Mercenaries printings, so those defs must exist even on a base
+    // scenario. Ids already present (an expansion scenario) are skipped.
+    for (const cardId of MERCENARIES_BASIC_RESOURCE_CARDS) {
+      const def = MERCENARIES_CARDS.find(c => c.id === cardId);
+      if (def !== undefined && !known.has(def.id)) extras.push(def);
     }
   }
   return [...base, ...extras];

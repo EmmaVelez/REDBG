@@ -85,7 +85,7 @@ export function createHost(room: Room): GameHost {
         throw new Error('no seated players');
       }
       const scenarioDef = SCENARIOS.find(s => s.id === room.scenario);
-      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak', skillSystem: room.skillSystem, mansionAttachmentMode: room.mansionAttachmentMode }, cardsForScenario(room.scenario, { skillSystem: room.skillSystem, customCards: room.customCards }), pilesForScenario(room.scenario, { customCards: room.customCards }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+      state = setup({ seed, players, partnerMode: room.partnerMode, outbreakMode: room.scenario === 'outbreak', skillSystem: room.skillSystem, mansionAttachmentMode: room.mansionAttachmentMode, mercenariesBasicResources: room.mercenariesBasicResources }, cardsForScenario(room.scenario, { skillSystem: room.skillSystem, customCards: room.customCards, mercenariesBasicResources: room.mercenariesBasicResources }), pilesForScenario(room.scenario, { customCards: room.customCards, mercenariesBasicResources: room.mercenariesBasicResources }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
       return state;
     },
 

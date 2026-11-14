@@ -1061,6 +1061,9 @@ export interface GameSetup {
   readonly skillSystem?: boolean;
   /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed. */
   readonly mansionAttachmentMode?: 1 | 2;
+  /** Mercenaries Basic Resources: the starting deck uses the Mercenaries printings
+   *  (am-005 / we-049 / we-050), matching the swapped Resource Area. */
+  readonly mercenariesBasicResources?: boolean;
 }
 
 /**

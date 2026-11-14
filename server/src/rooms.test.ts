@@ -190,6 +190,7 @@ describe('createRoomStore', () => {
       skillSystem: false,
       customCards: [],
       mansionAttachmentMode: 1,
+      mercenariesBasicResources: false,
     });
   });
 
@@ -205,6 +206,21 @@ describe('createRoomStore', () => {
     expect(() => store.setCustomCards(room.roomCode, 'stranger', ['mx-001'])).toThrow('not the host');
     store.startGame(room.roomCode, 'c1');
     expect(() => store.setCustomCards(room.roomCode, 'c1', ['mx-001'])).toThrow('game already started');
+  });
+
+  it('setMercenariesBasicResources records the flag; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, [], 1, true);
+    expect(room.mercenariesBasicResources).toBe(true);
+    expect(store.toSnapshot(room).mercenariesBasicResources).toBe(true);
+
+    const changed = store.setMercenariesBasicResources(room.roomCode, 'c1', false);
+    expect(changed.mercenariesBasicResources).toBe(false);
+    expect(store.toSnapshot(changed).mercenariesBasicResources).toBe(false);
+
+    expect(() => store.setMercenariesBasicResources(room.roomCode, 'stranger', true)).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setMercenariesBasicResources(room.roomCode, 'c1', true)).toThrow('game already started');
   });
 
   it('rejects a main-only character (ch-008) as a partner', () => {

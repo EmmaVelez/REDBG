@@ -42,6 +42,8 @@ export interface HotseatOptions {
   readonly customCards?: readonly string[];
   /** Mansion attachment mode: 1 = single (new replaces old), 2 = multiple allowed. */
   readonly mansionAttachmentMode?: 1 | 2;
+  /** Swap the scenario's basic resources for the Mercenaries set's (ammo/pistol/knife). */
+  readonly mercenariesBasicResources?: boolean;
 }
 
 export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
@@ -54,7 +56,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards }), pilesForScenario(scenario, { customCards: opts.customCards }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode, mercenariesBasicResources: opts.mercenariesBasicResources }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), pilesForScenario(scenario, { customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

@@ -1,5 +1,6 @@
 import type { CardDef } from '../types';
-import { PREMIER_CARDS, FIRST_TIMER_PILES, STARTING_DECK, MANSION_EXTRA_ITEM_IDS, FIRST_TIMER_SCENARIO_ID } from './cards';
+import { PREMIER_CARDS, FIRST_TIMER_PILES, STARTING_DECK, MANSION_EXTRA_ITEM_IDS, FIRST_TIMER_SCENARIO_ID, pilesForScenario, cardsForScenario, MERCENARIES_BASIC_RESOURCES, MERCENARIES_BASIC_RESOURCE_CARDS } from './cards';
+import { MERCENARIES_CARDS } from './mercenaries';
 
 const byId = new Map(PREMIER_CARDS.map(c => [c.id, c]));
 const card = (id: string): CardDef => {
@@ -200,4 +201,62 @@ test('starting deck matches the rulebook', () => {
 test('weapon tags for character synergies', () => {
   expect(card('we-001').weaponTags).toEqual(expect.arrayContaining(['explosive']));
   expect(card('we-008').weaponTags).toEqual(expect.arrayContaining(['explosive']));
+});
+
+test('Mercenaries Basic Resources: the mapping is the five basic-resource roles', () => {
+  expect(MERCENARIES_BASIC_RESOURCES).toEqual({
+    am10: ['am-005'],
+    am20: ['am-006'],
+    am30: ['am-007'],
+    hg: ['we-049'],
+    kn: ['we-050'],
+  });
+  expect([...MERCENARIES_BASIC_RESOURCE_CARDS].sort()).toEqual(
+    ['am-005', 'am-006', 'am-007', 'we-049', 'we-050'].sort(),
+  );
+  // every mapped card really is a Mercenaries card
+  for (const id of MERCENARIES_BASIC_RESOURCE_CARDS) {
+    expect(MERCENARIES_CARDS.some(c => c.id === id)).toBe(true);
+  }
+});
+
+test('Mercenaries Basic Resources: replaces the scenario basic piles, keeps their ids', () => {
+  const on = pilesForScenario('firstTimer', { mercenariesBasicResources: true });
+  const at = (pileId: string) => on.find(p => p.pileId === pileId)?.cardIds;
+  expect(at('am10')).toEqual(['am-005']);
+  expect(at('am20')).toEqual(['am-006']);
+  expect(at('am30')).toEqual(['am-007']);
+  expect(at('hg')).toEqual(['we-049']);
+  expect(at('kn')).toEqual(['we-050']);
+  // non-basic piles are untouched
+  expect(at('herb')).toEqual(['it-001']);
+  expect(at('merc')).toEqual(['ac-006']);
+  // the same scenario without the option keeps the Premier printings
+  const off = pilesForScenario('firstTimer');
+  expect(off.find(p => p.pileId === 'hg')?.cardIds).toEqual(['we-009', 'we-010']);
+  expect(off.find(p => p.pileId === 'kn')?.cardIds).toEqual(['we-004', 'we-005']);
+});
+
+test('Mercenaries Basic Resources: pulls the Mercenaries defs into a base scenario', () => {
+  const on = cardsForScenario('firstTimer', { mercenariesBasicResources: true });
+  const ids = new Set(on.map(c => c.id));
+  for (const id of MERCENARIES_BASIC_RESOURCE_CARDS) expect(ids.has(id)).toBe(true);
+  // without the option a base scenario does NOT carry them
+  const off = new Set(cardsForScenario('firstTimer').map(c => c.id));
+  for (const id of MERCENARIES_BASIC_RESOURCE_CARDS) expect(off.has(id)).toBe(false);
+  // an expansion scenario already had them
+  const mercenaries = new Set(cardsForScenario('mercenaries').map(c => c.id));
+  for (const id of MERCENARIES_BASIC_RESOURCE_CARDS) expect(mercenaries.has(id)).toBe(true);
+});
+
+test('Mercenaries Basic Resources: composes with custom cards', () => {
+  const piles = pilesForScenario('firstTimer', { mercenariesBasicResources: true, customCards: ['cw-005'] });
+  // the custom knife still merges into the basic knife pile, which now holds
+  // the Mercenaries printing plus the custom card
+  const kn = piles.find(p => p.pileId === 'kn');
+  expect(kn?.cardIds).toContain('we-050');
+  expect(kn?.cardIds).toContain('cw-005');
+  const ids = new Set(cardsForScenario('firstTimer', { mercenariesBasicResources: true, customCards: ['cw-005'] }).map(c => c.id));
+  expect(ids.has('am-005')).toBe(true);
+  expect(ids.has('cw-005')).toBe(true);
 });

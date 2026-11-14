@@ -1433,6 +1433,7 @@ describe('Lobby (T08)', () => {
     onSetSkillSystem: () => {},
     onSetCustomCards: () => {},
     onSetMansionAttachmentMode: () => {},
+    onSetMercenariesBasicResources: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -1467,6 +1468,7 @@ describe('Lobby (T08)', () => {
       skillSystem: false,
       customCards: [],
       mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -1474,6 +1476,30 @@ describe('Lobby (T08)', () => {
     expect(html).toContain('Bot');
     expect(html).toContain('Start game');
     expect(html).toContain('Spy Games');
+  });
+
+  it('offers the Mercenaries Basic Resources toggle in every lobby surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(noRoom).toContain('data-testid="create-mercenaries-basic-resources-toggle"');
+    expect(noRoom).toContain('data-testid="hotseat-mercenaries-basic-resources-toggle"');
+    expect(noRoom).toContain('Mercenaries Basic Resources');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: true,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="mercenaries-basic-resources-toggle"');
+    // the host toggle reflects the room's value
+    expect(inRoom).toContain('checked=""');
   });
 
   it('lists the custom card line in an expandable picker (create-room form)', () => {
@@ -1552,6 +1578,7 @@ describe('Lobby (T08)', () => {
       skillSystem: false,
       customCards: ['mx-001'],
       mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
@@ -1569,6 +1596,7 @@ describe('Lobby (T08)', () => {
       skillSystem: false,
       customCards: [] as string[],
       mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
     };
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
@@ -1595,6 +1623,7 @@ describe('Lobby (T08)', () => {
       skillSystem: false,
       customCards: [] as string[],
       mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Chris
@@ -1618,6 +1647,7 @@ describe('Lobby (T08)', () => {
       skillSystem: false,
       customCards: ['fch-008'],
       mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Sherry
