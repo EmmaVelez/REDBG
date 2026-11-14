@@ -970,9 +970,36 @@ export interface GameState {
   readonly skillDraft?: SkillDraftState;
 }
 
+/** Where an ability/effect revealed a card from, for the client's reveal overlay. */
+export type CardRevealPile =
+  | 'mansion'
+  | 'inventory'
+  | 'hand'
+  | 'discard'
+  | 'market'
+  | 'deck';
+
+/**
+ * ENGINE-FILLED: one card an ability or effect revealed during an action.
+ *
+ * Attached to the action's log entry so the client can pause and show the
+ * card. A peek (Ada's Mansion look, the PDA, Master of Unlocking, …) leaves
+ * the card in its pile, so there is NO zone diff for the client to observe —
+ * the engine has to hand the reveal over explicitly.
+ */
+export interface CardReveal {
+  readonly instanceId: string;
+  readonly pile: CardRevealPile;
+  /** Seat whose pile the card came from (defaults to the acting seat). */
+  readonly ownerSeat?: number;
+}
+
 export interface LoggedAction {
   readonly seq: number;
   readonly action: Action;
+  /** ENGINE-FILLED, never client-sent: cards this action revealed through an
+   *  ability or effect. Absent on logs written before this field existed. */
+  readonly reveals?: readonly CardReveal[];
 }
 
 // ---------------------------------------------------------------------------

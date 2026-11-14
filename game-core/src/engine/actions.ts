@@ -1,4 +1,4 @@
-import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt } from '../types';
+import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt, CardReveal } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
@@ -60,6 +60,7 @@ import {
   partnerAbilities,
   characterSource,
     buyCostAfterReduction,
+  isPistolWeapon,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -563,6 +564,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
     );
   };
 
+  // Non-explore ability/effect reveals (Ada's peek, the PDA, Master of
+  // Unlocking, …). A peek leaves the card in its pile, so the client cannot
+  // recover it from a zone diff — the engine hands the revealed set over on
+  // the action's log entry. The client pauses and shows the card.
+  const recordCardReveals = (reveals: readonly CardReveal[]): void => {
+    if (reveals.length === 0) return;
+    const seq = state.log.length + 1;
+    nextBase.log = nextBase.log.map(entry =>
+      entry.seq === seq ? { ...entry, reveals: [...(entry.reveals ?? []), ...reveals] } : entry,
+    );
+  };
+
   switch (action.type) {
     case 'playActionCard': {
       const { seat, instanceId } = action;
@@ -664,6 +677,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       let promptOptions: readonly string[] | undefined;
       let promptInstanceId: string | undefined;
       let promptExtra: Readonly<Record<string, string | number>> | undefined;
+      // Cards this action reveals through an ability/effect (Mansion peek,
+      // PDA, Master of Unlocking, …) — handed to the client's reveal overlay.
+      const cardReveals: CardReveal[] = [];
       for (const e of def.actionEffects ?? []) {
         if (e.kind === 'recoverWeaponFromDiscardToHand') {
           const weaponsInDiscard = player.discard.filter(id => cardDef(state, id)?.type === 'weapon');
@@ -690,6 +706,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (e.kind === 'lookAtMansionTop') {
                   promptKind = 'lookAtMansionTop';
                   promptOptions = ['OK'];
+                  cardReveals.push(
+                    ...state.mansionDeck.slice(0, e.count).map(instanceId => ({ instanceId, pile: 'mansion' as const })),
+                  );
                   break;
                 }
         if (e.kind === 'weskersSecret') {
@@ -697,6 +716,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (top4.length > 0) {
             promptKind = 'weskersSecretMansion';
             promptOptions = [...top4, 'Decline'];
+            cardReveals.push(...top4.map(instanceId => ({ instanceId, pile: 'mansion' as const })));
           }
           break;
         }
@@ -725,6 +745,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                     const top = other.inventory[0];
                                     if (top !== undefined && cardDef(state, top)?.type === 'weapon') {
                                       revealed.push(top);
+                                      cardReveals.push({ instanceId: top, pile: 'inventory', ownerSeat: other.seat });
                                     }
                                   }
                                   if (revealed.length > 0) {
@@ -752,6 +773,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                   promptKind = 'pdaLook';
                                   promptOptions = [...top, 'None'];
                                   promptExtra = { looked: top.join(',') };
+                                  cardReveals.push(...top.map(instanceId => ({ instanceId, pile: 'inventory' as const })));
                                 }
                                 break;
                               }                              if (e.kind === 'higherPriorities') {
@@ -1083,6 +1105,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 if (top3.length > 0) {
                   promptKind = 'lookAtMansionTop3AndReorder';
                   promptOptions = top3;
+                  cardReveals.push(...top3.map(instanceId => ({ instanceId, pile: 'mansion' as const })));
                 }
               }
               if (e.kind === 'rollD6ForDamageEffect') {
@@ -1133,6 +1156,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ];
       }
 
+      recordCardReveals(cardReveals);
       return {
               ...state,
               ...nextBase,
@@ -1570,6 +1594,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
             return sum;
           }, 0);
+          // WE-015 Bolt-Action Rifle: the top of the Inventory is revealed as
+          // part of the explore; hand it to the client's reveal overlay too.
+          if (topInvCard !== undefined && weaponDefs.some(w => w?.weaponEffects?.some(e => e.kind === 'revealTopOfInventoryCostGate') === true)) {
+            recordCardReveals([{ instanceId: topInvCard, pile: 'inventory' }]);
+          }
           // plusDamagePerActionPlayedThisTurn
           // plusDamageWhenUsingMultipleWeapons: +amount when using >1 weapon.
           const multiWeaponBonus = weaponDefs.reduce((sum, w) => {
@@ -4224,6 +4253,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               // Ada L1: look at the Mansion top without engaging; it stays put.
               const topId = state.mansionDeck[0];
               const topDef = topId === undefined ? undefined : cardDef(state, topId);
+              recordCardReveals(topId === undefined ? [] : [{ instanceId: topId, pile: 'mansion' }]);
               return {
                 ...state,
                 ...nextBase,
@@ -4245,6 +4275,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               const invTopId = player.inventory[0];
               const invTopDef = invTopId === undefined ? undefined : cardDef(state, invTopId);
               const movedId = invTopDef?.type === 'action' ? invTopId : undefined;
+              recordCardReveals(invTopId === undefined ? [] : [{ instanceId: invTopId, pile: 'inventory' }]);
               return {
                 ...state,
                 ...nextBase,
@@ -5600,6 +5631,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (kind === 'skillRevealPistolsForExplore' && chosenId !== undefined) {
         // SK-029 Handgun Technique LV.2: reveal N Pistols from hand -> +1 Explore.
         if (chosenId !== 'Reveal') return { ...state, ...nextBase, prompts: newPrompts };
+        const count = Number(prompt.payload?.count ?? '0');
+        const pistols = player.hand.filter(hid => {
+          const hDef = cardDef(state, hid);
+          return hDef?.type === 'weapon' && isPistolWeapon(state, seat, hid);
+        }).slice(0, count);
+        recordCardReveals(pistols.map(instanceId => ({ instanceId, pile: 'hand' as const })));
         return {
           ...state,
           ...nextBase,
@@ -6147,6 +6184,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           };
         }
         const isAction = cardDef(state, chosenId)?.type === 'action';
+        if (isAction && chosenId !== undefined) {
+          recordCardReveals([{ instanceId: chosenId, pile: 'hand' }]);
+        }
         return {
           ...state,
           ...nextBase,
@@ -7028,6 +7068,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           player.hand.map(id => cardDef(state, id)?.type ?? 'unknown')
         );
         const bonus = types.size >= 2 ? 10 : 0;
+        recordCardReveals(player.hand.map(instanceId => ({ instanceId, pile: 'hand' as const })));
         return {
           ...state,
           ...nextBase,
@@ -8359,6 +8400,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
         const target = state.seats[targetSeat];
+        if (target !== undefined) {
+          recordCardReveals(target.hand.map(instanceId => ({ instanceId, pile: 'hand', ownerSeat: targetSeat })));
+        }
         const maxCost = Number(prompt.payload?.maxCost ?? '70');
         const candidates = (target?.hand ?? []).filter(id => {
           const c = cardDef(state, id);
@@ -8636,6 +8680,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         const topId = state.mansionDeck[0];
         const topDef = topId === undefined ? undefined : cardDef(state, topId);
+        // Record BEFORE building `afterTrash`: the helper reassigns
+        // `nextBase.log`, and a state built earlier would keep the old array.
+        recordCardReveals(topId === undefined ? [] : [{ instanceId: topId, pile: 'mansion' }]);
         const afterTrash: GameState = {
           ...state,
           ...nextBase,

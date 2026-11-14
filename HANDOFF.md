@@ -1,5 +1,40 @@
 # HANDOFF — resume here
 
+**ABILITY/EFFECT REVEAL OVERLAY (2026-11-14):** Manny: "when an ability or effect reveal a card
+from any pile, the game is paused and the card is briefly shown to the player. Leave the mansion
+reveal screen untouched." Before this, only the EXPLORE reveal paused the table (the mansion-door
+overlay). Every other reveal — Ada/Carlos's Mansion peek, Ricardo's Inventory top, the PDA, Master
+of Unlocking, Hunk's hand, SK-029's pistols, Ada (Outbreak) L2, Cover-up, Wesker's Secret, the
+Ecliptic Express, Mind Control, the Bolt-Action Rifle's Inventory peek — surfaced only as a text
+prompt ("You peek at the Mansion: X"), and a peek leaves the card in its pile so there is NO zone
+diff for the client to observe. Now:
+- **Engine:** `LoggedAction.reveals?: readonly CardReveal[]` (`{instanceId, pile, ownerSeat?}`,
+  `CardRevealPile` = mansion/inventory/hand/discard/market/deck) is filled by the new
+  `recordCardReveals()` in `applyActionInternal`, which rewrites the action's log entry matched by
+  `seq` exactly like `recordExploreReveals`. Wired at EVERY non-explore reveal site: the
+  `playActionCard` effect loop (`lookAtMansionTop`, `weskersSecret`, `stealRevealedWeapons…` with
+  `ownerSeat`, `lookAtTopInventory`, `lookAtMansionTop3AndReorder`), `useCharacterAbility`
+  (`revealMansionTopNoEffect`, `revealInventoryTopForAction`), the `chooseOption` resolvers
+  (`revealHandTwoTypes`, `skillRevealPistolsForExplore`, `turnStartRevealActionsForCards`,
+  `chooseOtherPlayerRevealHand`, `coverUpTrash`) and the explore-path WE-015 cost gate. Explore
+  reveals are deliberately NOT recorded here — they belong to the mansion-door overlay.
+- **Gotcha:** `recordCardReveals` REASSIGNS `nextBase.log` (`.map` returns a new array), so it must
+  run BEFORE any state object that spreads `...nextBase` is built. The Cover-up site built
+  `afterTrash` first and silently dropped the reveal until the call was moved above it.
+- **Client:** `detectCardReveals(prev, next, mySeat)` (`ui/anims.ts`) walks the log backwards past
+  supplementary entries and returns the newest batch newer than `prev`, but ONLY for a seat that is
+  INVOLVED — the actor, or a seat whose own card was revealed (Master of Unlocking / Mind Control
+  carry `ownerSeat`), so a bot's private peek never pops the overlay on the human's screen (the same
+  rule `detectReveals` uses). `App.tsx` holds it in `cardReveal` state, adds it to
+  `disabled`/`cardHidden`, and renders the new `ui/CardRevealOverlay.tsx` (title, source label, one
+  card per reveal with its pile caption, "Tap to continue") — but only while no mansion-door reveal
+  is active, so a same-step explore + WE-015 reveal plays the mansion panel first. A `view === null`
+  effect clears it on the way to the lobby.
+- **Tests:** `game-core/src/engine/cardReveal.test.ts` (12 — one per site; 11 go red when the
+  helper is stubbed to a no-op), `anims.test.ts` +7, `ui.test.tsx` +3. Verified live in a hotseat
+  game: the overlay renders centred at desktop and 400x800 (no overflow), and injecting a reveal
+  into the store's view drove the real App effect → overlay → tap-to-dismiss.
+
 **ZOMBICIDE FAN WEAPON SHEET (CW-025..CW-033) IMPLEMENTED (2026-11-13):** Manny sent a photo of nine
 printed weapon cards and asked for them as custom cards. All nine are in `data/custom.ts` with the
 printed stats and rules text verbatim; two titles repeat on the sheet (Machine Gun w/ Launcher, Akimbo
@@ -1757,3 +1792,4 @@ engine are unused union members in `types.ts`
 22. BARRY L1 ONCE-PER-TURN (this change): `usedStartOfTurnAbilities` is ONLY for abilities that FIRE FROM A TURN-START PROMPT (PR-009, AC-017, ...). Never record a manual `useCharacterAbility` there — the flag is cleared only in `startTurn`, so it outlives the seat's `endTurn` and blocks the ability for every later turn. Manual once-per-turn abilities are covered by validate's log scan, which walks back to the seat's last `endTurn` (`plusDamageThisTurn` is in that switch list). The `plusDamageThisTurn`-specific check this replaced was dead code: the general `[ability.kind]` check directly above it already fired first.
 23. DUPLICATE CARD IDS + DUPLICATE PROMPTS (this change): a repeated `id` in `data/*.ts` is silent — `cardDefs` keeps the LAST definition, so the other card is unreachable (`ma-000` was both the Rachael ooze and the Martial Arts action; the ooze resolved as an action and was never defeated). Scan `grep -c "id: '<id>'" game-core/src/data/*.ts` after adding a card, and check the printed code against `CARD-ART/<ID>.png`. Likewise, two turn-start prompts with the same id destroy each other (`chooseOption` removes every prompt with that id): `turnStartAbilityPrompts` pushes 19 prompts, most with the generic `ability-<seat>-v<version>` id, safe only while each ability has one prompt — give a new prompt its own prefix. When two commits add the same card, remove BOTH the duplicate def and its duplicate prompt/handler, and carry over anything the deleted block did that the kept one lacks (here: the `usedStartOfTurnAbilities` flag write).
 24. ZOMBICIDE FAN WEAPONS CW-025..CW-033 (this change): nine custom weapons. Per-card effect kinds are listed in the `WeaponEffect` union. Two rules of thumb: (a) a bonus that scales with the number of Infected Battled goes in `computeDamage` (which the reducer now feeds `infectedBattledThisTurn: exploreCount`) — adding it to the per-weapon `damage` expression too double-counts, because that value is summed into `computeDamage`; (b) a "you can / once per turn" weapon effect is a `useWeaponAbility` manual trigger (validate's `manual` filter + enumerate's `hasManual` must both list the kind, or no button appears). CW-025's recall branch is currently unreachable — a weapon only reaches the play area by being explored with, and `playWeapon` has no reducer case.
+25. ABILITY/EFFECT REVEAL OVERLAY (this change): a NON-explore reveal must pause the table and show the card. The engine records `LoggedAction.reveals` via `recordCardReveals()` (same `seq`-matched log rewrite as `recordExploreReveals`) — and because that helper REASSIGNS `nextBase.log`, always call it before building a state object that spreads `...nextBase`. The client's `detectCardReveals(prev, next, mySeat)` + `CardRevealOverlay` render it, gated to the INVOLVED seat (actor, or a seat whose own card was revealed) so a bot's private peek does not leak to the human; the overlay is suppressed while a mansion-door reveal is active. When adding a new reveal effect/ability, wire `recordCardReveals` at its site — a peek has no zone diff, so the client cannot discover it any other way.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GameState } from '@re/game-core';
-import { detectPlayerDowned, detectReveal, detectReveals, diffCardMoves } from './anims';
+import type { CardReveal, GameState } from '@re/game-core';
+import { detectCardReveals, detectPlayerDowned, detectReveal, detectReveals, diffCardMoves } from './anims';
 import { flightPath, splitFlightPhases } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
@@ -20,7 +20,7 @@ function makeState(over: {
   mansionDeck?: readonly string[];
   removed?: readonly string[];
   version?: number;
-  log?: ReadonlyArray<{ seq: number; action: Record<string, unknown> }>;
+  log?: ReadonlyArray<{ seq: number; action: Record<string, unknown>; reveals?: readonly CardReveal[] }>;
   prompts?: ReadonlyArray<{ id: string; seat: number; text: string; options: readonly string[]; payload?: Readonly<Record<string, string>> }>;
 }): GameState {
   return {
@@ -60,7 +60,11 @@ function makeState(over: {
     cardDefs: {},
     prompts: (over.prompts ?? []) as never,
     winners: [],
-    log: (over.log ?? []).map(e => ({ seq: e.seq, action: e.action as never })),
+    log: (over.log ?? []).map(e => ({
+      seq: e.seq,
+      action: e.action as never,
+      ...(e.reveals !== undefined ? { reveals: e.reveals } : {}),
+    })),
   };
 }
 
@@ -441,5 +445,110 @@ describe('detectPlayerDowned', () => {
     const prev = makeState({ seats: [{ seat: 0, hp: 0, downed: true }] });
     const next = makeState({ version: 2, seats: [{ seat: 0, hp: 0, downed: true }] });
     expect(detectPlayerDowned(prev, next, 0)).toBeNull();
+  });
+});
+
+describe('detectCardReveals', () => {
+  it('returns the newest ability/effect reveal batch on the log', () => {
+    const prev = makeState({ version: 1, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      log: [
+        { seq: 1, action: { type: 'endTurn', seat: 0 } },
+        { seq: 2, action: { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }, reveals: [{ instanceId: 'ma-001#1', pile: 'mansion' as const }] },
+      ],
+    });
+    expect(detectCardReveals(prev, next, 0)).toEqual({
+      seq: 2,
+      action: { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 },
+      reveals: [{ instanceId: 'ma-001#1', pile: 'mansion' }],
+    });
+  });
+
+  it('returns null when the reveal batch is not new (same log as prev)', () => {
+    const log: ReadonlyArray<{ seq: number; action: Record<string, unknown>; reveals?: readonly CardReveal[] }> = [
+      { seq: 1, action: { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 }, reveals: [{ instanceId: 'ma-001#1', pile: 'mansion' }] },
+    ];
+    const prev = makeState({ version: 1, log });
+    const next = makeState({ version: 2, log });
+    expect(detectCardReveals(prev, next, 0)).toBeNull();
+  });
+
+  it('returns null for a log with no reveals', () => {
+    const prev = makeState({ version: 1, log: [] });
+    const next = makeState({ version: 2, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    expect(detectCardReveals(prev, next, 0)).toBeNull();
+  });
+
+  it('skips supplementary entries after the reveal-carrying action', () => {
+    const prev = makeState({ version: 1, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      log: [
+        { seq: 1, action: { type: 'endTurn', seat: 0 } },
+        { seq: 2, action: { type: 'explore', seat: 0 }, reveals: [{ instanceId: 'inv1#1', pile: 'inventory' }] },
+        { seq: 3, action: { type: 'exploreReveal', seat: 0, instanceId: 'ma-001#1', name: 'Majini' } },
+      ],
+    });
+    expect(detectCardReveals(prev, next, 0)?.seq).toBe(2);
+    expect(detectCardReveals(prev, next, 0)?.reveals).toEqual([{ instanceId: 'inv1#1', pile: 'inventory' }]);
+  });
+
+  it('prefers the newest batch when an action reveals several cards', () => {
+    const prev = makeState({ version: 1, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      log: [
+        { seq: 1, action: { type: 'endTurn', seat: 0 } },
+        {
+          seq: 2,
+          action: { type: 'playActionCard', seat: 0, instanceId: 'ac-011#1' },
+          reveals: [
+            { instanceId: 'we-001#1', pile: 'inventory', ownerSeat: 1 },
+            { instanceId: 'we-001#2', pile: 'inventory', ownerSeat: 2 },
+          ],
+        },
+      ],
+    });
+    expect(detectCardReveals(prev, next, 0)?.reveals).toHaveLength(2);
+    expect(detectCardReveals(prev, next, 0)?.reveals[1]).toEqual({ instanceId: 'we-001#2', pile: 'inventory', ownerSeat: 2 });
+  });
+
+  it('hides another seat\'s private peek from an uninvolved viewer', () => {
+    const prev = makeState({ version: 1, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      log: [
+        { seq: 1, action: { type: 'endTurn', seat: 0 } },
+        { seq: 2, action: { type: 'useCharacterAbility', seat: 1, abilityIndex: 0 }, reveals: [{ instanceId: 'ma-001#1', pile: 'mansion' }] },
+      ],
+    });
+    expect(detectCardReveals(prev, next, 0)).toBeNull();
+    // the seat that did it still sees it
+    expect(detectCardReveals(prev, next, 1)?.seq).toBe(2);
+  });
+
+  it('shows an opponent reveal to the seat whose own card was revealed', () => {
+    const prev = makeState({ version: 1, log: [{ seq: 1, action: { type: 'endTurn', seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      log: [
+        { seq: 1, action: { type: 'endTurn', seat: 0 } },
+        {
+          seq: 2,
+          action: { type: 'playActionCard', seat: 1, instanceId: 'ac-011#1' },
+          reveals: [
+            { instanceId: 'we-001#1', pile: 'inventory', ownerSeat: 0 },
+            { instanceId: 'we-001#2', pile: 'inventory', ownerSeat: 2 },
+          ],
+        },
+      ],
+    });
+    // seat 0 is not the actor but its own card was revealed
+    expect(detectCardReveals(prev, next, 0)?.seq).toBe(2);
+    // seat 2's own card was revealed too
+    expect(detectCardReveals(prev, next, 2)?.seq).toBe(2);
+    // a seat that is neither the actor nor an owner sees nothing
+    expect(detectCardReveals(prev, next, 3)).toBeNull();
   });
 });

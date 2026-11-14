@@ -1,4 +1,4 @@
-import type { GameState } from '@re/game-core';
+import type { Action, CardReveal, GameState } from '@re/game-core';
 import { exploreDamage } from '@re/game-core';
 
 /**
@@ -195,6 +195,44 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
 /** The first revealed card — the single-card view of `detectReveals`. */
 export function detectReveal(prev: GameState, next: GameState, mySeat: number): Reveal | null {
   return detectReveals(prev, next, mySeat)[0] ?? null;
+}
+
+/** One batch of non-explore ability/effect reveals, as recorded by the engine. */
+export interface CardRevealBatch {
+  readonly seq: number;
+  readonly action: Action;
+  readonly reveals: readonly CardReveal[];
+}
+
+/**
+ * The newest NON-explore ability/effect reveal batch present in `next` but not
+ * in `prev`, or null.
+ *
+ * The engine fills `LoggedAction.reveals` at every peek/reveal site (Ada's
+ * Mansion look, the PDA, Master of Unlocking, Ricardo's Inventory reveal,
+ * Hunk's hand, SK-029's pistols, Cover-up, Wesker's Secret, the Bolt-Action
+ * Rifle, …). A peek leaves the card in its pile, so there is no zone diff to
+ * observe — the log field is the only signal. Explore reveals are NOT included
+ * here; those belong to the mansion-door overlay.
+ *
+ * Like `detectReveals`, the batch is reported only to a seat that is INVOLVED:
+ * the seat that caused it, or a seat whose own card was revealed (Master of
+ * Unlocking / Mind Control expose an opponent's card to the actor, and the
+ * opponent sees their own card being revealed). A bot's private peek must not
+ * pop the overlay on the human's screen.
+ */
+export function detectCardReveals(prev: GameState, next: GameState, mySeat: number): CardRevealBatch | null {
+  const prevMaxSeq = prev.log.length === 0 ? 0 : (prev.log[prev.log.length - 1]?.seq ?? 0);
+  for (let i = next.log.length - 1; i >= 0; i--) {
+    const entry = next.log[i];
+    if (entry === undefined || entry.seq <= prevMaxSeq) break;
+    if (entry.reveals !== undefined && entry.reveals.length > 0) {
+      const actorSeat = 'seat' in entry.action ? entry.action.seat : -1;
+      const involved = actorSeat === mySeat || entry.reveals.some(r => r.ownerSeat === mySeat);
+      return involved ? { seq: entry.seq, action: entry.action, reveals: entry.reveals } : null;
+    }
+  }
+  return null;
 }
 
 /**

@@ -12,7 +12,9 @@ import { Lobby } from './ui/Lobby';
 import { MansionReveal } from './ui/MansionReveal';
 import { SeatSwap } from './ui/SeatSwap';
 import { YouDiedOverlay } from './ui/YouDiedOverlay';
-import { detectPlayerDowned, detectReveals } from './ui/anims';
+import { detectCardReveals, detectPlayerDowned, detectReveals } from './ui/anims';
+import type { CardRevealBatch } from './ui/anims';
+import { CardRevealOverlay } from './ui/CardRevealOverlay';
 import { defForInstance } from './ui/cards';
 import type { RevealPartyMember } from './ui/MansionReveal';
 
@@ -98,6 +100,9 @@ export function App(): JSX.Element {
   // the panel steps through one at a time (the index is the current card).
   const [revealQueue, setRevealQueue] = useState<RevealEntry[] | null>(null);
   const [revealIndex, setRevealIndex] = useState(0);
+  // Non-explore ability/effect reveal (Ada's peek, the PDA, Master of
+  // Unlocking, …): a separate, lighter overlay than the mansion-door reveal.
+  const [cardReveal, setCardReveal] = useState<CardRevealBatch | null>(null);
   const [youDied, setYouDied] = useState<boolean | null>(null);
   /** Log sidebar visibility — closed frees the whole sidebar width for the board.
    *  On a narrow screen the log is an off-canvas slide-over, so it starts CLOSED
@@ -123,6 +128,10 @@ export function App(): JSX.Element {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+  // A reveal overlay must never survive into a different game or the lobby.
+  useEffect(() => {
+    if (view === null) setCardReveal(null);
+  }, [view]);
   // The action dock is a FIXED overlay, so it is out of flow and the flex
   // column cannot reserve its height. Measure it and publish that as a CSS
   // variable; `.app` pads itself by exactly that much so the board's content
@@ -171,6 +180,10 @@ export function App(): JSX.Element {
     if (prev === null || state === null || prev.version === state.version) return;
     const downed = detectPlayerDowned(prev, state, mySeat);
     const detected = detectReveals(prev, state, mySeat);
+    // Ability/effect reveal (separate overlay): show it once, and keep it
+    // queued behind a mansion-door reveal if both landed on the same step.
+    const revealBatch = detectCardReveals(prev, state, mySeat);
+    if (revealBatch !== null) setCardReveal(revealBatch);
     if (downed !== null && detected.length > 0) {
       // Both on the same step: show the reveal first, then YOU DIED.
       pendingDeathRef.current = downed;
@@ -292,6 +305,7 @@ export function App(): JSX.Element {
     gameState.activeSeat !== mySeat ||
     gameState.prompts.some(p => p.seat === mySeat) ||
     revealCurrent !== null ||
+    cardReveal !== null ||
     youDied !== null ||
     passPending;
 
@@ -326,7 +340,7 @@ export function App(): JSX.Element {
           logOpen={logOpen}
           status={status}
           roomCode={room?.roomCode ?? null}
-          cardHidden={revealCurrent !== null || youDied !== null}
+          cardHidden={revealCurrent !== null || youDied !== null || cardReveal !== null}
         />
       </footer>
       {revealCurrent !== null && (
@@ -360,6 +374,15 @@ export function App(): JSX.Element {
               setYouDied(queued === 'dead');
             }
           }}
+        />
+      )}
+      {cardReveal !== null && revealCurrent === null && (
+        <CardRevealOverlay
+          state={gameState}
+          reveals={cardReveal.reveals}
+          action={cardReveal.action}
+          mySeat={mySeat}
+          onDismiss={() => setCardReveal(null)}
         />
       )}
       {youDied !== null && (

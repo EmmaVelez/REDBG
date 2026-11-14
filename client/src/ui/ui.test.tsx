@@ -5,6 +5,7 @@ import type { Action, CardDef, GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
+import { CardRevealOverlay } from './CardRevealOverlay';
 import { YouDiedOverlay } from './YouDiedOverlay';
 import { SeatSwap } from './SeatSwap';
 import { CardView } from './CardView';
@@ -1737,5 +1738,75 @@ describe('Mercenaries Skill draft UI', () => {
     const next = applyAction(s, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
     expect(next.skillDraft?.kept[0]).toHaveLength(1);
     expect(next.prompts.some(p => p.payload?.kind === 'skillDraftPick')).toBe(true);
+  });
+});
+
+describe('CardRevealOverlay', () => {
+  it('renders every revealed card with its pile and the tap-to-continue hint', () => {
+    const state = twoPlayerState(11);
+    const mansionId = state.mansionDeck[0];
+    const opponentId = state.seats[1]?.inventory[0];
+    expect(mansionId).toBeDefined();
+    expect(opponentId).toBeDefined();
+    if (mansionId === undefined || opponentId === undefined) return;
+    const action: Action = { type: 'playActionCard', seat: 0, instanceId: state.seats[0]?.hand[0] ?? '' };
+    const html = renderToStaticMarkup(
+      <CardRevealOverlay
+        state={state}
+        reveals={[
+          { instanceId: mansionId, pile: 'mansion' },
+          { instanceId: opponentId, pile: 'inventory', ownerSeat: 1 },
+        ]}
+        action={action}
+        mySeat={0}
+        onDismiss={() => {}}
+      />,
+    );
+    expect(html).toContain('data-card-reveal');
+    expect(html).toContain('data-card-reveal-panel');
+    expect(html).toContain('Revealed');
+    expect(html).toContain('Tap to continue');
+    expect(html).toContain(`data-card-reveal-card="${mansionId}"`);
+    expect(html).toContain(`data-card-reveal-card="${opponentId}"`);
+    // the opponent's card is labelled with its owner and the Inventory pile
+    expect(html).toContain('Bot');
+    expect(html).toContain('the Inventory');
+    expect(html).toContain(defForInstance(state, mansionId)?.name ?? '');
+  });
+
+  it('labels a character ability reveal from the character that owns it', () => {
+    const state = twoPlayerState(11);
+    const mansionId = state.mansionDeck[0];
+    if (mansionId === undefined) return;
+    const charId = state.seats[0]?.characterInstanceId;
+    const charDef = defForInstance(state, charId);
+    const action: Action = { type: 'useCharacterAbility', seat: 0, abilityIndex: 0 };
+    const html = renderToStaticMarkup(
+      <CardRevealOverlay
+        state={state}
+        reveals={[{ instanceId: mansionId, pile: 'mansion' }]}
+        action={action}
+        mySeat={0}
+        onDismiss={() => {}}
+      />,
+    );
+    expect(html).toContain('data-card-reveal-source');
+    expect(html).toContain(charDef?.name.split(' ')[0] ?? '');
+  });
+
+  it('renders nothing for a revealed card the state cannot resolve', () => {
+    const state = twoPlayerState(11);
+    const action: Action = { type: 'chooseOption', seat: 0, promptId: 'p1', option: 0 };
+    const html = renderToStaticMarkup(
+      <CardRevealOverlay
+        state={state}
+        reveals={[{ instanceId: 'missing#1', pile: 'hand' }]}
+        action={action}
+        mySeat={0}
+        onDismiss={() => {}}
+      />,
+    );
+    expect(html).toContain('data-card-reveal-panel');
+    expect(html).not.toContain('data-card-reveal-card');
   });
 });
