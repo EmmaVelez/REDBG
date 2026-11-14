@@ -4163,7 +4163,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           switch (ability.kind) {
             case 'plusDamageThisTurn': {
               // Barry L1: one of Barry's weapons gets +amount damage this turn
-              // (once per turn — enforced by validate's log scan).
+              // (once per turn — enforced by validate's log scan, which stops
+              // at this seat's last endTurn). Do NOT record this in
+              // `usedStartOfTurnAbilities`: that flag is for abilities fired by
+              // a TURN-START prompt, and it is only cleared in `startTurn`, so
+              // flagging a manual ability here blocked it forever after an
+              // endTurn (the "usable again next turn" regression).
               return {
                 ...state,
                 ...nextBase,
@@ -4172,7 +4177,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     ? { ...player, weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.amount }
                     : s,
                 ),
-                usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), plusDamageThisTurn: true },
               };
             }
             case 'exchangeHandWithInventoryTop': {
@@ -6841,50 +6845,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
 
-      if (kind === 'rebeccaDrawDiscard') {
-        // RC-001 Rebecca Chambers L1: draw +1 card, then discard a card.
-        if (option !== 0) {
-          // Decline
-          return { ...state, ...nextBase, prompts: newPrompts };
-        }
-        const d = drawWithReshuffle({
-          deck: player.inventory,
-          discard: player.discard,
-          count: 1,
-          rngState: state.rngState,
-        });
-        const drewState: GameState = {
-          ...state,
-          ...nextBase,
-          rngState: d.rngState,
-          seats: state.seats.map(s =>
-            s.seat === seat
-              ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
-              : s,
-          ),
-          prompts: newPrompts,
-          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
-        };
-        // Now prompt to discard a card from hand.
-        const drewPlayer = drewState.seats[seat];
-        if (drewPlayer === undefined || drewPlayer.hand.length === 0) {
-          return drewState;
-        }
-        return {
-          ...drewState,
-          prompts: [
-            ...drewState.prompts,
-            {
-              id: `rebecca-discard-${seat}-v${nextBase.version}`,
-              seat,
-              text: 'Rebecca Chambers: discard a card.',
-              options: [...drewPlayer.hand],
-              payload: { kind: 'rebeccaDiscard' },
-            },
-          ],
-        };
-      }
-
       if (kind === 'rebeccaDiscard') {
         // RC-001 Rebecca Chambers L1: discard the chosen card.
         // L2: if discarding due to card effect during turn, gain +20 gold.
@@ -8190,6 +8150,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             rngState: d.rngState,
             seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
             prompts: newPrompts,
+            usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
           };
         }
         const handCards = drawnPlayer.hand;
@@ -8203,6 +8164,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...nextBase,
           rngState: d.rngState,
           seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
           prompts: [...newPrompts, {
             id: `${prompt.id}:discard`,
             seat,

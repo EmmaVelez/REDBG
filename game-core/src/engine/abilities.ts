@@ -841,25 +841,46 @@ export function plusBuyBonus(abilities: readonly CharacterAbility[]): number {
 
 /** LK-001 Leon L2 (RAPID FIRE): every card in the seat's play area counts
  *  as a Pistol, so any "is this a pistol" check must read the effective
- *  tags rather than the printed weaponTags. */
+ *  tags rather than the printed weaponTags. Seat-wide — the Alliance shares
+ *  one play area, so a Partner Leon's L2 covers it too (matching
+ *  `maxWeaponUses`, which also reads the seat's abilities). */
 export function playAreaCardsArePistols(state: GameState, seat: number): boolean {
-  return characterAbilities(state, seat).some(a => a.kind === 'playAreaCardsArePistols');
+  return seatAbilities(state, seat).some(a => a.kind === 'playAreaCardsArePistols');
 }
 
-export function effectiveWeaponTags(state: GameState, seat: number, instanceId: string): readonly string[] {
+export function effectiveWeaponTags(
+  state: GameState,
+  seat: number,
+  instanceId: string,
+  /**
+   * Instance ids being played right now — an explore's weapon set. Playing a
+   * weapon puts it in the play area, so L2 "all cards in your play area"
+   * covers it. Without this, a weapon still in hand is not a Pistol even
+   * though the explore is about to move it there, and Leon's L1 Dual Wield
+   * never sees the two weapons he just played.
+   */
+  playedIds?: readonly string[],
+): readonly string[] {
   const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
   const tags = [...(def?.weaponTags ?? [])];
   if (!tags.includes('pistol')) {
     const player = state.seats[seat];
-    if ((player?.playArea ?? []).includes(instanceId) && playAreaCardsArePistols(state, seat)) {
+    const inPlayArea = (player?.playArea ?? []).includes(instanceId)
+      || (playedIds !== undefined && playedIds.includes(instanceId));
+    if (inPlayArea && playAreaCardsArePistols(state, seat)) {
       tags.push('pistol');
     }
   }
   return tags;
 }
 
-export function isPistolWeapon(state: GameState, seat: number, instanceId: string): boolean {
-  return effectiveWeaponTags(state, seat, instanceId).includes('pistol');
+export function isPistolWeapon(
+  state: GameState,
+  seat: number,
+  instanceId: string,
+  playedIds?: readonly string[],
+): boolean {
+  return effectiveWeaponTags(state, seat, instanceId, playedIds).includes('pistol');
 }
 
 /** LK-001 Leon L1 (DUAL WIELD): +amount per pistol when using threshold+
@@ -873,7 +894,7 @@ export function dualWieldBonus(
   let bonus = 0;
   for (const a of abilities) {
     if (a.kind !== 'plusDamagePerPistolUsed') continue;
-    const pistols = weaponIds.filter(id => isPistolWeapon(state, seat, id)).length;
+    const pistols = weaponIds.filter(id => isPistolWeapon(state, seat, id, weaponIds)).length;
     if (pistols >= a.threshold) bonus += a.amount * pistols;
   }
   return bonus;
@@ -890,7 +911,7 @@ export function healOnDefeatWithWeaponTag(
   let heal = 0;
   for (const a of abilities) {
     if (a.kind !== 'healOnDefeatWithWeaponTag') continue;
-    if (weaponIds.some(id => effectiveWeaponTags(state, seat, id).includes(a.tag))) heal += a.heal;
+    if (weaponIds.some(id => effectiveWeaponTags(state, seat, id, weaponIds).includes(a.tag))) heal += a.heal;
   }
   return heal;
 }

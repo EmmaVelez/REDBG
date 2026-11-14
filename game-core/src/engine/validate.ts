@@ -534,13 +534,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             }
           }
           // Check if this start-of-turn ability was already used via the turn-start prompt.
+          // Only abilities that can FIRE from a turn-start prompt belong in that
+          // flag; a manual ability is already covered by the log scan above.
           if (state.usedStartOfTurnAbilities?.[ability.kind]) {
             return { ok: false, reason: 'useCharacterAbility: start-of-turn ability already used this turn' };
-          }
-          // plusDamageThisTurn (Barry L1) is a once-per-turn ability that may
-          // be triggered automatically; check the flag to prevent double use.
-          if (ability.kind === 'plusDamageThisTurn' && state.usedStartOfTurnAbilities?.plusDamageThisTurn) {
-            return { ok: false, reason: 'useCharacterAbility: plusDamageThisTurn already used this turn' };
           }
           if (ability.kind === 'forceAllyExploreWithSupport') {
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);

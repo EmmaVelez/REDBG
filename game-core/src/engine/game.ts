@@ -287,17 +287,6 @@ function turnStartAbilityPrompts(
     }
   }
 
-  // RC-001 Rebecca Chambers L1: at turn start, may get +1 card and discard a card.
-  if (abilities.some(a => a.kind === 'turnStartDrawThenDiscardCard')) {
-    prompts.push({
-      id: `ability-${player.seat}-v${newVersion}`,
-      seat: player.seat,
-      text: abilityText('turnStartDrawThenDiscardCard'),
-      options: ['Draw +1 card', 'Decline'],
-      payload: { kind: 'rebeccaDrawDiscard' },
-    });
-  }
-
   // FCH-001 Carlos Oliveira L2: at turn start, search discard for an Ammo card.
   if (abilities.some(a => a.kind === 'searchDiscardForAmmoAtTurnStart')) {
     const ammoInDiscard = player.discard.filter(id => {
@@ -1148,7 +1137,7 @@ function startTurnInternal(state: GameState): GameState {
   const maAttached = attachedAfterCq.filter(id => {
     const ci = state.cards[id];
     const cd = ci ? state.cardDefs[ci.cardId] : undefined;
-    return cd?.id === 'ma-000';
+    return cd?.id === 'ac-000';
   });
   const maDiscard = maAttached.length > 0 ? maAttached : [];
   const attachedAfterMa = attachedAfterCq.filter(id => !maDiscard.includes(id));

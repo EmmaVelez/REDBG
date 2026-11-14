@@ -1,5 +1,54 @@
 # HANDOFF — resume here
 
+**RACHAEL FAILURES FIXED — DUPLICATE CARD IDs + A DUPLICATE PROMPT (2026-11-13):** the last 4
+pre-existing red tests. Two root causes, both "the same thing added twice":
+1. **`ma-000` was defined twice** in `data/custom.ts` — the Rachael Foley ooze (its printed code,
+   see `CARD-ART/MA-000.png`, which CI-009 shuffles in by that id) and the "Martial Arts" action
+   card. `cardDefs` keeps the LAST def, so every ooze instance resolved to the ACTION card:
+   revealed as a non-Infected, never defeated, no Decoration, never attached, and it vanished
+   from the deck. Martial Arts is now `ac-000` (the code the engine comments already used for it)
+   and `game.ts`'s attach check follows. `rc-001` (Rebecca Chambers — one copy had a literal
+   `\\n` in its text) and `ah-001` were duplicated the same way and are de-duplicated too.
+   **Scan for duplicate ids after adding ANY card**: `grep -c "id: '<id>'" game-core/src/data/*.ts`.
+2. **Two identical turn-start prompt blocks for Rebecca L1** (`turnStartDrawThenDiscardCard`):
+   `rebeccaDrawDiscard` (commit 5a56101) and `rebeccaTurnStartDrawAndDiscard` (commit 2458f38),
+   both pushing `ability-<seat>-v<version>`. Two prompts sharing one id means `chooseOption`
+   removes BOTH, so the player can answer neither. Kept `rebeccaTurnStartDrawAndDiscard` (what
+   the test expects) and moved its `usedStartOfTurnAbilities.turnStartDrawThenDiscardCard` flag
+   write over from the deleted block, so the manual ability button is still blocked after the
+   prompt fires. Every `prompts.push` in `turnStartAbilityPrompts` must have a UNIQUE id — most
+   still use the generic `ability-<seat>-v<version>` and are safe only because they are the sole
+   prompt for that ability; give any new one a distinct prefix (`rachael-explore-...`).
+
+**BARRY L1 "usable again next turn" FIXED (2026-11-13):** the last of the 5 documented
+pre-existing red tests. `validate.ts` rejected a second `useCharacterAbility` for
+`plusDamageThisTurn` with "start-of-turn ability already used this turn" because
+`actions.ts` recorded `usedStartOfTurnAbilities.plusDamageThisTurn = true` when the button
+was pressed (commit e328e00). That flag is for abilities fired by a TURN-START PROMPT and is
+only cleared in `startTurn`, so it survived the seat's `endTurn` and blocked the ability for
+every later turn. The once-per-turn rule was ALREADY enforced by the log scan at the top of
+the same block (it walks back to the seat's last `endTurn`), so the flag was redundant within
+a turn and wrong across one. Removed the flag write and the dead `plusDamageThisTurn`-specific
+check it had spawned (the general check above it already fired first, so that branch was
+unreachable). Real games were unaffected — `startTurn` clears the flag before the next turn —
+which is why only the test's hand-built fixture (endTurn without startTurn) caught it. A/B:
+reversing the hunk turns exactly that one test red.
+
+**LK-001 LEON L2 (RAPID FIRE) NOW COVERS THE WEAPONS HE PLAYS (2026-11-13):** Manny:
+"Lk-001's second ability should mean that all weapons he plays count as pistols ... any two
+weapons trigger his level 1 ability while his level 2 is active." It did not. The explore
+reducer resolves `dualWieldBonus` from the PRE-explore state, where the two weapons are still
+in HAND, and `effectiveWeaponTags` only added 'pistol' to cards already in the PLAY AREA — so
+L2 was nearly dead (a play-area weapon is only explorable with a reuse ability, which LK-001
+does not have). `effectiveWeaponTags`/`isPistolWeapon` now take an optional `playedIds` (an
+explore's weapon set) and treat those as in the play area; `dualWieldBonus` and
+`healOnDefeatWithWeaponTag` pass their `weaponIds`. `playAreaCardsArePistols` also reads
+`seatAbilities` instead of `characterAbilities`, so a Partner Leon's L2 covers the seat's
+shared play area — matching `maxWeaponUses`, which already reads the seat. Verified: L2 +
+shotgun(25) + knife(10) from hand = 45 damage (was 35), and the reducer now defeats a 40 HP
+Bui Kichwa that 35 could not. The client needs no change — its picker prices combos with the
+same `exploreDamage` helper.
+
 **HEALTH GAUGE: OPAQUE + KEPT INSIDE THE CARD (2026-11-13):** Manny: "Double the size of the
 health gauge, make them not transparent and adjust the centering so that it doesn't leave
 the card." Both gauges are now 2x their ORIGINAL size, and the centering was reworked so
@@ -1678,3 +1727,6 @@ engine are unused union members in `types.ts`
 18. CI-002 CROW CHAIN REVEAL (this change): the client reveal overlay steps through `detectReveals`, which needs the EXACT revealed set — and the deck diff cannot supply it, because a revealed card that is returned (bottomed / shuffled back) looks like an unrevealed deck card and `shuffleBack` reshuffles the whole deck. The engine now writes `action.revealedInstanceIds` (reveal order) onto the logged explore via `recordExploreReveals(ids)`, which rewrites the explore log entry matched by `seq`. Wire it at EVERY site that reveals more than `exploreCount` cards: the plain single reveal, the MULTI block's full `revealedIds`, and the single-path MA-039 / MA-072 branches. The client falls back to the top-`exploreCount` prefix when the field is absent (old logs). Do NOT re-derive the Crow/MA-039/MA-072 expansion rules on the client — that duplicates the reducer.
 19. POISON GAUGE + COUNTER VISIBILITY (superseded by 20 on the gauge geometry): (a) The viewing player's OWN counters were never rendered — `Board.tsx` only renders `PlayerPanel` for other seats, so a Poison counter was invisible except as a transient card-shake. `CharacterCards` now draws them on the character card (`.cc-counters`, `data-player-counters`); if a future surface hides the own panel again, the counter disappears with it. (b) The pulse animation (`hp-pulse` / `.cc-hp-ring-flash` / `CardView.flash`) is gone by request. A counter turns the gauge purple via `HealthRing`'s `poisoned` prop -> `data-poisoned`.
 20. GAUGE ANCHOR + OPACITY (this change): the 36% character gauge could not stay centred on the printed badge (89.7%, 7.7%) and fit inside the card, so the anchor moved inboard to (78%, 17%) — promo (78%, 27%) — and the art-only card went back to `overflow: hidden`. The Infected gauge WAS doubled (27 -> 54) and is absolutely positioned (`.card-top .health-ring`) so it cannot grow the card header. `HealthRing` gained an opaque backing disc (`.health-disc`, `#12151c`). When resizing either gauge, check `fullyInside` against the card rect at desktop (80x114) and phone (44x63) — the phone card is only 44px wide, so a 36% gauge is 15px.
+21. LK-001 LEON L2 (this change): "all weapons he plays count as pistols". `effectiveWeaponTags`/`isPistolWeapon` take an optional `playedIds` — an explore's weapon set counts as being in the play area, because playing a weapon puts it there. `dualWieldBonus` and `healOnDefeatWithWeaponTag` pass their `weaponIds`; the ammo path (`exploreAmmoReq`) does NOT, so a pistol-tagged ammo discount still only applies to real/play-area pistols. `playAreaCardsArePistols` reads `seatAbilities` (Main OR Partner Leon), not `characterAbilities`. When adding a new "is this a pistol" consumer, decide explicitly whether it should see `playedIds` — L1's Dual Wield does, ammo does not.
+22. BARRY L1 ONCE-PER-TURN (this change): `usedStartOfTurnAbilities` is ONLY for abilities that FIRE FROM A TURN-START PROMPT (PR-009, AC-017, ...). Never record a manual `useCharacterAbility` there — the flag is cleared only in `startTurn`, so it outlives the seat's `endTurn` and blocks the ability for every later turn. Manual once-per-turn abilities are covered by validate's log scan, which walks back to the seat's last `endTurn` (`plusDamageThisTurn` is in that switch list). The `plusDamageThisTurn`-specific check this replaced was dead code: the general `[ability.kind]` check directly above it already fired first.
+23. DUPLICATE CARD IDS + DUPLICATE PROMPTS (this change): a repeated `id` in `data/*.ts` is silent — `cardDefs` keeps the LAST definition, so the other card is unreachable (`ma-000` was both the Rachael ooze and the Martial Arts action; the ooze resolved as an action and was never defeated). Scan `grep -c "id: '<id>'" game-core/src/data/*.ts` after adding a card, and check the printed code against `CARD-ART/<ID>.png`. Likewise, two turn-start prompts with the same id destroy each other (`chooseOption` removes every prompt with that id): `turnStartAbilityPrompts` pushes 19 prompts, most with the generic `ability-<seat>-v<version>` id, safe only while each ability has one prompt — give a new prompt its own prefix. When two commits add the same card, remove BOTH the duplicate def and its duplicate prompt/handler, and carry over anything the deleted block did that the kept one lacks (here: the `usedStartOfTurnAbilities` flag write).

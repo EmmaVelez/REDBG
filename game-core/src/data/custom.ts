@@ -223,25 +223,6 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
-    id: 'rc-001',
-    name: 'Rebecca Chambers',
-    type: 'character',
-    set: 'custom',
-    text: 'Level 1: At the beginning of your turn, you can get +1 card, and if you do, discard a card.\\nLevel 2: When you discard a card because of a card effect during your turn, you gain +20 gold.',
-    copies: 1,
-    maxHp: 70,
-    level1At: 2,
-    level2At: 7,
-    levels: [
-      { level: 1, text: 'At the beginning of your turn, you can get +1 card, and if you do, discard a card.' },
-      { level: 2, text: 'When you discard a card because of a card effect during your turn, you gain +20 gold.' },
-    ],
-    abilities: [
-      { kind: 'turnStartDrawThenDiscardCard', level: 1 },
-      { kind: 'goldWhenDiscardingAtTurnStart', amount: 20, level: 2 },
-    ],
-  },
-  {
     id: 'rc-002',
     name: 'Rebecca Chambers',
     type: 'character',
@@ -800,21 +781,6 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     infectedEffects: [{ kind: 'onRevealRollD6ForEffect' }],
   },
   {
-    // Fan card. "Abandon All Hope..." — Story Mode action.
-    // During this turn, if the Boss (endInfectedCardId) is revealed while
-    // Exploring and not Defeated, player can shuffle it into top 10 of Mansion.
-    // Requires engine support: new ActionEffect + GameState flag + prompt.
-    id: 'ah-001',
-    name: 'Abandon All Hope...',
-    type: 'action',
-    set: 'custom',
-    text: 'STORY MODE: During this turn, if the Boss is revealed while Exploring and it is not Defeated, you can shuffle it into the top 10 cards of the Mansion instead.',
-    copies: 1,
-    cost: 100,
-    bonuses: { ammo: 20, cards: 2, actions: 2 },
-    actionEffects: [{ kind: 'storyModeBossShuffleToTop10' }],
-  },
-  {
     // Fan card. Manny's ruling: "when selected add a resource pile of 5 of
     // them to the game" — copies: 5 creates the supply pile. "Trash once used"
     // maps to the existing trashAfterUse weapon effect.
@@ -935,7 +901,11 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     actionEffects: [{ kind: 'otherPlayersDrawCard' }],
   },
   {
-    id: 'ma-000',
+    // AC-000 Martial Arts. NOT `ma-000` — that is the printed code of the
+    // Rachael Foley ooze (see CARD-ART/MA-000.png) and CI-009 shuffles it in by
+    // that id. Sharing the id made `cardDefs['ma-000']` resolve to this action
+    // card, so the ooze was revealed as a non-Infected and never defeated.
+    id: 'ac-000',
     name: 'Martial Arts',
     type: 'action',
     set: 'custom',

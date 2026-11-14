@@ -163,6 +163,40 @@ describe('LK-001 L2 — Rapid Fire', () => {
     expect(ammoReqForWeapon(abilities, shotgun, ['pistol'])).toBe(30);
   });
 
+  it('labels the weapons PLAYED in an explore as pistols, so L1 triggers with any two', () => {
+    const { state, ids } = withWeapons(fanGame('lk-001', { level: 2, turnAmmo: 100 }), 0, ['we-013', 'we-005']);
+    // Pump-Action Shotgun (25) + Survival Knife (10) = 35, +5 x 2 "pistols" = 45.
+    expect(exploreDamage(state, 0, ids)).toBe(45);
+  });
+
+  it('still needs the L1 threshold: one played weapon is not enough', () => {
+    const { state, ids } = withWeapons(fanGame('lk-001', { level: 2, turnAmmo: 100 }), 0, ['we-013']);
+    expect(exploreDamage(state, 0, ids)).toBe(25);
+  });
+
+  it('does not apply below level 2', () => {
+    const { state, ids } = withWeapons(fanGame('lk-001', { level: 1, turnAmmo: 100 }), 0, ['we-013', 'we-005']);
+    expect(exploreDamage(state, 0, ids)).toBe(35);
+  });
+
+  it('reaches the explore reducer: the bonus is real damage, not just a preview', () => {
+    const s = fanGame('lk-001', { level: 2, hp: 80, turnAmmo: 100 });
+    const withInf = mansionTop(s, 'ma-006'); // Bui Kichwa: 40 HP
+    const { state, ids } = withWeapons(withInf, 0, ['we-013', 'we-005']);
+    const next = applyAction(state, { type: 'explore', seat: 0, weapons: ids, exploreCount: 1 });
+    // 45 damage defeats the 40 HP Infected, so Leon takes nothing.
+    expect(next.seats[0]?.hp).toBe(80);
+  });
+
+  it('without L2 the same explore cannot defeat that Infected', () => {
+    const s = fanGame('lk-001', { level: 1, hp: 80, turnAmmo: 100 });
+    const withInf = mansionTop(s, 'ma-006'); // 40 HP, 30 attack
+    const { state, ids } = withWeapons(withInf, 0, ['we-013', 'we-005']);
+    const next = applyAction(state, { type: 'explore', seat: 0, weapons: ids, exploreCount: 1 });
+    // 35 damage leaves it standing: Leon takes the 30 attack.
+    expect(next.seats[0]?.hp).toBe(50);
+  });
+
   it('reaches Skill damage (SK-030 counts a play-area shotgun as a pistol)', () => {
     const { state, id } = addWeapon(fanGame('lk-001', { level: 2 }), 0, 'we-013', 'playArea');
     const defs = [state.cardDefs['we-013']];
