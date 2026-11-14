@@ -1,5 +1,31 @@
 # HANDOFF — resume here
 
+**ZOMBICIDE FAN WEAPON SHEET (CW-025..CW-033) IMPLEMENTED (2026-11-13):** Manny sent a photo of nine
+printed weapon cards and asked for them as custom cards. All nine are in `data/custom.ts` with the
+printed stats and rules text verbatim; two titles repeat on the sheet (Machine Gun w/ Launcher, Akimbo
+Flintlock Pistols), so they got sequential ids (cw-027/028 and cw-030/031). Nine new `WeaponEffect`
+kinds — the `types.ts` comment block maps each to its card. Gotchas hit while wiring:
+- **A multi-Infected bonus belongs in `computeDamage`, NOT in the per-weapon damage expression.** The
+  reducer's per-weapon `damage` value is summed INTO `computeDamage`, so adding "+5 per additional
+  Infected" in both places double-counts (45 read as 50). `plusDamagePerInfectedBattled` already lived
+  in `computeDamage` alone — follow that precedent.
+- **`computeDamage` now receives `infectedBattledThisTurn: exploreCount`** from the explore reducer
+  (it was previously unset there, so `plusDamagePerInfectedBattled` never fired in the reducer), and
+  `exploreDamage` takes an optional `exploreCount` (6th param) plus the armed-launcher handling so the
+  picker preview agrees with the resolve.
+- **CW-028's "can deal 15 to all Revealed Infected" is a manual per-turn trigger**
+  (`useWeaponAbility` → `armedLauncherInstanceId`, cleared in `endTurn`). While armed the weapon's own
+  damage is zeroed and the 15 is a per-Infected splash merged into `resolveMultiExplore`'s splash term.
+- **CW-025's recall is implemented as printed but its branch is DORMANT:** a weapon reaches the play
+  area only by being used in an explore (`playWeapon` is validated but has NO reducer case, and
+  `explore` rejects a play-area weapon unless a reuse ability applies), so "in your Play Area and was
+  not used while Exploring" cannot occur in normal play. Dispatching `playWeapon` THROWS
+  (`unknown action type`).
+- **Art:** cropped the 3x3 photo (828x1159) into `CARD-ART/CW-025.png`..`CW-033.png` at
+  320px wide, P-mode 256 colours (~108 KB each, matching the catalogue; RGB runs ~280 KB
+  apiece). Verified in `client/dist/assets/` after `npm run build -w client`. The printed
+  CW-029 text really is "+1 card" — a low-res crop makes the word look like an action icon.
+
 **RACHAEL FAILURES FIXED — DUPLICATE CARD IDs + A DUPLICATE PROMPT (2026-11-13):** the last 4
 pre-existing red tests. Two root causes, both "the same thing added twice":
 1. **`ma-000` was defined twice** in `data/custom.ts` — the Rachael Foley ooze (its printed code,
@@ -1730,3 +1756,4 @@ engine are unused union members in `types.ts`
 21. LK-001 LEON L2 (this change): "all weapons he plays count as pistols". `effectiveWeaponTags`/`isPistolWeapon` take an optional `playedIds` — an explore's weapon set counts as being in the play area, because playing a weapon puts it there. `dualWieldBonus` and `healOnDefeatWithWeaponTag` pass their `weaponIds`; the ammo path (`exploreAmmoReq`) does NOT, so a pistol-tagged ammo discount still only applies to real/play-area pistols. `playAreaCardsArePistols` reads `seatAbilities` (Main OR Partner Leon), not `characterAbilities`. When adding a new "is this a pistol" consumer, decide explicitly whether it should see `playedIds` — L1's Dual Wield does, ammo does not.
 22. BARRY L1 ONCE-PER-TURN (this change): `usedStartOfTurnAbilities` is ONLY for abilities that FIRE FROM A TURN-START PROMPT (PR-009, AC-017, ...). Never record a manual `useCharacterAbility` there — the flag is cleared only in `startTurn`, so it outlives the seat's `endTurn` and blocks the ability for every later turn. Manual once-per-turn abilities are covered by validate's log scan, which walks back to the seat's last `endTurn` (`plusDamageThisTurn` is in that switch list). The `plusDamageThisTurn`-specific check this replaced was dead code: the general `[ability.kind]` check directly above it already fired first.
 23. DUPLICATE CARD IDS + DUPLICATE PROMPTS (this change): a repeated `id` in `data/*.ts` is silent — `cardDefs` keeps the LAST definition, so the other card is unreachable (`ma-000` was both the Rachael ooze and the Martial Arts action; the ooze resolved as an action and was never defeated). Scan `grep -c "id: '<id>'" game-core/src/data/*.ts` after adding a card, and check the printed code against `CARD-ART/<ID>.png`. Likewise, two turn-start prompts with the same id destroy each other (`chooseOption` removes every prompt with that id): `turnStartAbilityPrompts` pushes 19 prompts, most with the generic `ability-<seat>-v<version>` id, safe only while each ability has one prompt — give a new prompt its own prefix. When two commits add the same card, remove BOTH the duplicate def and its duplicate prompt/handler, and carry over anything the deleted block did that the kept one lacks (here: the `usedStartOfTurnAbilities` flag write).
+24. ZOMBICIDE FAN WEAPONS CW-025..CW-033 (this change): nine custom weapons. Per-card effect kinds are listed in the `WeaponEffect` union. Two rules of thumb: (a) a bonus that scales with the number of Infected Battled goes in `computeDamage` (which the reducer now feeds `infectedBattledThisTurn: exploreCount`) — adding it to the per-weapon `damage` expression too double-counts, because that value is summed into `computeDamage`; (b) a "you can / once per turn" weapon effect is a `useWeaponAbility` manual trigger (validate's `manual` filter + enumerate's `hasManual` must both list the kind, or no button appears). CW-025's recall branch is currently unreachable — a weapon only reaches the play area by being explored with, and `playWeapon` has no reducer case.

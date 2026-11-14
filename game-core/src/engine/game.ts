@@ -1178,11 +1178,21 @@ function startTurnInternal(state: GameState): GameState {
       (player.mustExplore === true ? 2 : 1) +
       (seatAbils.some(a => a.kind === 'extraExploreAtTurnStart') ? 1 : 0) + skillTurn.explores + infectedHordeBonus(state).explores);
 
+  // CW-032 Combat Knife w/ Chain: a copy sitting in the Discard Pile at the
+  // beginning of your turn moves straight to your Hand.
+  const chainedFromDiscard = player.discard.filter(id => {
+    const ci = state.cards[id];
+    const cd = ci === undefined ? undefined : state.cardDefs[ci.cardId];
+    return cd?.type === 'weapon'
+      && (cd.weaponEffects ?? []).some(e => e.kind === 'moveFromDiscardToHandAtTurnStart');
+  });
+  const chainedSet = new Set(chainedFromDiscard);
   const newPlayer: PlayerState = {
     ...player,
     partnerAttached,
     attached: attachedAfterMa,
-    discard: [...player.discard, ...cqDiscard, ...maDiscard],
+    hand: [...player.hand, ...chainedFromDiscard],
+    discard: [...player.discard.filter(id => !chainedSet.has(id)), ...cqDiscard, ...maDiscard],
     hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal + attBonuses.heal, player.maxHp),
     // AC-000 Martial Arts (option 2): Knife and Melee Weapons deal double Damage this turn.
     ...(maDoubleDamage ? { damageMultiplierThisTurn: 2 } : {}),

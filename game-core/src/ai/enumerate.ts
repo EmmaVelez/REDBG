@@ -269,7 +269,8 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     if (!cardData) continue;
     const def = state.cardDefs[cardData.cardId];
     const hasManual = (def?.weaponEffects ?? []).some(e =>
-      e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd');
+      e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd'
+      || e.kind === 'armLauncherForAllRevealed' || e.kind === 'trashAmmoFromPlayForDamage');
     if (hasManual) {
       generatedActions.push({ type: 'useWeaponAbility', seat, instanceId });
     }

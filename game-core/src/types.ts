@@ -215,6 +215,16 @@ export type WeaponEffect =
   | { readonly kind: "plusDamagePerOtherMeleeUsedThisTurn"; readonly amount: number } // CW-024 Haymaker: +N damage per other Melee weapon used this turn
   | { readonly kind: "discardInventoryUntilMeleeWeapon" } // CW-023 Combo Punch: discard from inventory top until a Melee weapon is discarded, move it to hand
   | { readonly kind: "gainCardsThisTurn"; readonly amount: number } // CW-022 High Kick: +N cards this turn when used
+  // --- Zombicide-style fan weapon set (CW-025..CW-033) ---
+  | { readonly kind: "recallToInventoryTopAtTurnEnd" } // CW-025 Elephant Killer: unused at end of turn -> top of Inventory
+  | { readonly kind: "usableTwicePerTurn" } // CW-026 Low Recoil Revolver: this Weapon can be used twice
+  | { readonly kind: "plusDamagePerAdditionalInfectedBattled"; readonly amount: number } // CW-027: +N per Infected beyond the first
+  | { readonly kind: "armLauncherForAllRevealed"; readonly amount: number } // CW-028: mode - deal N to all Revealed, no weapon Damage
+  | { readonly kind: "trashAmmoFromPlayForDamage" } // CW-029 Sawed-Off Double Barrel: trash 1 Ammo from play -> +X damage
+  | { readonly kind: "dealDamageToTwoInfected" } // CW-030 Akimbo Flintlock Pistols: its Damage to two different Infected
+  | { readonly kind: "plusDamageIfInfectedBattledAtLeast"; readonly threshold: number; readonly amount: number } // CW-031: +N when Battling `threshold`+ Infected
+  | { readonly kind: "moveFromDiscardToHandAtTurnStart" } // CW-032 Combat Knife w/ Chain: recycle from Discard at turn start
+  | { readonly kind: "cannotUseWithNonExplosiveWeapons" } // CW-033 Semi-Auto Sniper Rifle: no other non-Explosive weapon
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -759,6 +769,10 @@ export interface PlayerState {
   readonly trashAtEndOfTurn?: readonly string[];
   /** Weapon instances whose manual ("can") effect already fired this turn. */
   readonly usedWeaponEffectsThisTurn?: readonly string[];
+  /** CW-028 Machine Gun w/ Launcher: the instance armed this turn for the
+   *  "deal N to all Revealed Infected, no weapon Damage" mode. Cleared at the
+   *  start of the next turn. */
+  readonly armedLauncherInstanceId?: string;
   /** MA-093 Los Ganados (Handscythe): extra cards drawn at end of turn. */
   readonly pendingEndOfTurnDraws?: number;
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */

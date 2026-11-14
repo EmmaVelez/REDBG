@@ -60,6 +60,8 @@ export function weaponUsesThisTurn(state: GameState, seat: number, weaponId: str
 export function maxWeaponUses(state: GameState, seat: number, weaponId: string): number {
   const def = weaponDef(state, weaponId);
   const tags = effectiveWeaponTags(state, seat, weaponId);
+  // CW-026 Low Recoil Revolver: "This Weapon can be used twice."
+  if ((def?.weaponEffects ?? []).some(e => e.kind === 'usableTwicePerTurn')) return 2;
   const pistolReuse = hasAbilityKind(state, seat, 'pistolsTwicePerTurn') && tags.includes('pistol');
   const shotgunReuse = hasShotgunTwicePerTurn(state) && tags.includes('shotgun');
   if (pistolReuse || shotgunReuse) return 2;

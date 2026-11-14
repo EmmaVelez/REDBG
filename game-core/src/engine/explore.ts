@@ -101,6 +101,23 @@ export function computeDamage(params: DamageParams): number {
         if (effect.kind === 'plusDamagePerInfectedBattled') {
           damage += effect.amount * (params.infectedBattledThisTurn ?? 0);
         }
+        // CW-027 Machine Gun w/ Launcher: "+N for each ADDITIONAL Infected" —
+        // the first Infected is the baseline, so the count is battled - 1.
+        if (effect.kind === 'plusDamagePerAdditionalInfectedBattled') {
+          damage += effect.amount * Math.max(0, (params.infectedBattledThisTurn ?? 0) - 1);
+        }
+        // CW-031 Akimbo Flintlock Pistols: +N when Battling `threshold`+ Infected.
+        if (effect.kind === 'plusDamageIfInfectedBattledAtLeast'
+            && (params.infectedBattledThisTurn ?? 0) >= effect.threshold) {
+          damage += effect.amount;
+        }
+        // CW-030 Akimbo Flintlock Pistols: "deals its Damage to two different
+        // Infected" — against 2+ Revealed Infected its Damage lands twice, which
+        // against the combined Health pool is the same as counting it twice.
+        if (effect.kind === 'dealDamageToTwoInfected'
+            && (params.infectedBattledThisTurn ?? 0) >= 2) {
+          damage += weapon.damage;
+        }
       }
     }
   }
@@ -129,9 +146,25 @@ export function exploreDamage(
    * that weapon's damage and cost in the preview.
    */
   ammoByWeapon?: Readonly<Record<string, number>>,
+  /** Number of Infected this explore battles (a multi-explore). Defaults to 1. */
+  exploreCount?: number,
 ): number {
   const player = state.seats[seat];
   if (player === undefined) return 0;
+  const battledCount = exploreCount ?? 1;
+  // CW-028 Machine Gun w/ Launcher: while armed, the weapon deals no weapon
+  // Damage and its `amount` is dealt to every Revealed Infected instead.
+  const armedLauncherAmount = (() => {
+    for (let i = 0; i < (weaponIds ?? []).length; i++) {
+      const id = weaponIds[i];
+      if (id !== undefined && player.armedLauncherInstanceId === id) {
+        const eff = (state.cardDefs[state.cards[id]?.cardId ?? '']?.weaponEffects ?? [])
+          .find(e => e.kind === 'armLauncherForAllRevealed');
+        if (eff !== undefined && eff.kind === 'armLauncherForAllRevealed') return eff.amount;
+      }
+    }
+    return 0;
+  })();
   const abilities = leaderAbilities(state, seat, leader ?? 'main');
   const defs = (weaponIds ?? []).map(id => {
     const inst = state.cards[id];
@@ -157,7 +190,7 @@ export function exploreDamage(
     const bowBonus = bowEff !== undefined && bowEff.kind === 'plusDamageIfNoActionsInPlayArea' && noActions ? bowEff.amount : 0;
     const xpBonus = xpEff !== undefined && xpEff.kind === 'plusDamageIfCharacterXpAtLeast' && (player.xp ?? 0) >= xpEff.threshold ? xpEff.amount : 0;
     return {
-      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (def?.damage ?? 0)) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
+      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
       ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,
@@ -217,8 +250,9 @@ export function exploreDamage(
     ammoCardsInPlayArea,
     inventoryCount: player.inventory.length,
     discardWeaponTagCounts,
-    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus,
+    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus + (armedLauncherAmount * battledCount),
     damageMultiplier: player.damageMultiplierThisTurn ?? 1,
+    infectedBattledThisTurn: battledCount,
   });
 }
 
@@ -366,6 +400,11 @@ export function resolveMultiExplore(params: {
    * individually instead of only being pooled into `damage`.
    */
   readonly explosiveDamage?: number;
+  /**
+   * CW-028 Machine Gun w/ Launcher (armed mode): damage dealt to EACH revealed
+   * Infected. Merged with `explosiveDamage` — both are per-Infected splashes.
+   */
+  readonly splashDamageToEachRevealed?: number;
 }): {
   readonly defeated: boolean;
   readonly combinedHp: number;
@@ -449,7 +488,7 @@ export function resolveMultiExplore(params: {
   // Infected at the same time. The Explosive damage is applied to EACH
   // revealed Infected individually, so a weaker one can be defeated while a
   // stronger one survives the splash.
-  const explosiveDamage = params.explosiveDamage ?? 0;
+  const explosiveDamage = (params.explosiveDamage ?? 0) + (params.splashDamageToEachRevealed ?? 0);
   const splashActive = !blockedByCannotDefeat && explosiveDamage > 0;
   const splashDefeated: boolean[] = revealed.map((_, i) =>
     defeated || (splashActive && (effectiveHps[i] ?? 0) <= explosiveDamage));

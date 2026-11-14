@@ -305,6 +305,19 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                 return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
               }
             }
+            // CW-033 Semi-Auto Sniper Rifle: "cannot be used with other
+            // 'non-Explosive' weapons while Exploring" — when it is in the
+            // selection every OTHER weapon must carry the Explosive tag.
+            const sniperIds = action.weapons.filter(id =>
+              cardDef(state, id)?.weaponEffects?.some(e => e.kind === 'cannotUseWithNonExplosiveWeapons') === true);
+            if (sniperIds.length > 0) {
+              const illegalCompanion = action.weapons.some(id =>
+                !sniperIds.includes(id)
+                && (cardDef(state, id)?.weaponTags ?? []).includes('explosive') === false);
+              if (illegalCompanion) {
+                return { ok: false, reason: 'explore: Semi-Auto Sniper Rifle cannot be used with other non-Explosive weapons' };
+              }
+            }
             // X-ammo weapons (Gatling Gun et al.): the player allocates how much
             // Ammo to spend, and that amount IS the weapon's cost and damage.
             // Only an x-ammo weapon IN the selection may be allocated, and never
@@ -683,7 +696,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'useWeaponAbility: weapon not in hand or play area' };
       }
       const manual = (weaponDef.weaponEffects ?? []).filter(e =>
-        e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd');
+        e.kind === 'payAmmoForDamage' || e.kind === 'removeXpForDamage' || e.kind === 'selfPlusDamageTrashAtTurnEnd'
+        || e.kind === 'armLauncherForAllRevealed' || e.kind === 'trashAmmoFromPlayForDamage');
       if (manual.length === 0) {
         return { ok: false, reason: 'useWeaponAbility: no manual effect' };
       }
@@ -696,6 +710,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         }
         if (e.kind === 'removeXpForDamage' && (player.xp ?? 0) < 1) {
           return { ok: false, reason: 'useWeaponAbility: no XP on the Character' };
+        }
+        if (e.kind === 'trashAmmoFromPlayForDamage'
+            && !player.playArea.some(id => cardDef(state, id)?.type === 'ammunition')) {
+          return { ok: false, reason: 'useWeaponAbility: no Ammunition in play' };
         }
       }
       return { ok: true };

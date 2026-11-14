@@ -1620,6 +1620,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               (player.xp ?? 0) >= (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast') as { threshold: number }).threshold)
               ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast') as { amount: number }).amount
               : 0;
+            // CW-028 Machine Gun w/ Launcher: while the launcher mode is armed the
+            // weapon deals NO weapon Damage (the 15 splash is added separately).
+            const launcherArmed = player.armedLauncherInstanceId === instId;
+            // NOTE: the CW-027 / CW-030 / CW-031 multi-Infected bonuses are NOT
+            // added here — `computeDamage` already applies them from the weapon's
+            // `weaponEffects`, and this per-weapon value is summed into it, so
+            // adding them twice would double-count.
             // CW-024 Haymaker: +N damage per other Melee weapon used this turn.
             const haymakerBonus = (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerOtherMeleeUsedThisTurn') !== undefined)
               ? (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerOtherMeleeUsedThisTurn') as { amount: number }).amount
@@ -1630,7 +1637,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((w?.damage ?? 0) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -2044,14 +2051,30 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const sameNameAttachedCount = infectedEntries.length > 0
           ? state.seats.reduce((sum, s) => sum + (s.dead ? 0 : s.attached.filter(aid => state.cards[aid]?.cardId === infectedEntries[0]?.def.id).length), 0)
           : 0;
+        // CW-028 Machine Gun w/ Launcher: armed mode deals `amount` to every
+        // Revealed Infected and NO weapon Damage. In a single battle that is
+        // simply +amount to the pooled hit; in a multi-explore it is a per-
+        // Infected splash (passed to resolveMultiExplore below).
+        const armedLauncherEffect = (() => {
+          for (let i = 0; i < weapons.length; i++) {
+            const id = weapons[i];
+            const w = weaponDefs[i];
+            if (id !== undefined && player.armedLauncherInstanceId === id) {
+              const eff = (w?.weaponEffects ?? []).find(e => e.kind === 'armLauncherForAllRevealed');
+              if (eff !== undefined && eff.kind === 'armLauncherForAllRevealed') return eff.amount;
+            }
+          }
+          return 0;
+        })();
         const damage = computeDamage({
           weapons: exploreWeapons,
           ammo: ammoForEffects,
-          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
           knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
           ammoCardsInPlayArea,
           inventoryCount: player.inventory.length,
           damageMultiplier: player.damageMultiplierThisTurn ?? 1,
+          infectedBattledThisTurn: exploreCount,
         });
 
         // SK-036 Bomber LV.3: the "Explosive" weapons deal their damage to EACH
@@ -2067,6 +2090,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           : resolveMultiExplore({
               damage,
               explosiveDamage,
+              splashDamageToEachRevealed: armedLauncherEffect,
               revealed: targets,
               attachedInfectedCount: player.attached.length,
               ammo: ammoForEffects,
@@ -4995,8 +5019,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const { seat } = action;
           const player = state.seats[seat] as PlayerState;
 
+          // CW-025 Elephant Killer: an unused weapon in the Play Area moves to
+          // the top of the Inventory instead of being discarded. The printed
+          // "you can" is resolved automatically — taking it is never worse than
+          // discarding it, and the play area is emptied either way.
+          const recalledIds = player.playArea.filter(id => {
+            const d = cardDef(state, id);
+            return d?.type === 'weapon'
+              && (d.weaponEffects ?? []).some(e => e.kind === 'recallToInventoryTopAtTurnEnd')
+              && weaponUsesThisTurn(state, seat, id) === 0;
+          });
+          const recalledSet = new Set(recalledIds);
+
           const dh = discardHand({ hand: player.hand, discard: player.discard });
-          const dh2 = discardHand({ hand: player.playArea, discard: dh.discard });
+          const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledSet.has(id)), discard: dh.discard });
 
           // Mercenaries: weapons that were given "+X damage, Trash at the end of
           // this turn" (Custom Standard Sidearm, Reliable Blade) leave the game.
@@ -5009,7 +5045,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           // Mansion attachment effects at end of turn (e.g., Rampage trashing
           // inventory cards). Applied to the active player's inventory.
-          let currentInventory = player.inventory;
+          let currentInventory = [...recalledIds, ...player.inventory];
           let currentRemoved = removedAfterTrash;
           let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
           let currentAttachments = [...(state.mansionAttachments ?? [])];
@@ -5152,6 +5188,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             discard: d.discard,
             playArea: [],
             infectionCards: infectionCardsOut,
+            // CW-028 Machine Gun w/ Launcher: the armed mode lasts one turn.
+            armedLauncherInstanceId: undefined,
           };
 
           return {
@@ -5228,6 +5266,39 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               trashAtEndOfTurn: [...(s.trashAtEndOfTurn ?? []), instanceId],
               usedWeaponEffectsThisTurn: [...(s.usedWeaponEffectsThisTurn ?? []), instanceId],
             } : s)),
+          };
+        }
+        // CW-028 Machine Gun w/ Launcher: arm the launcher for this turn. While
+        // armed the weapon deals NO weapon Damage and its `amount` is dealt to
+        // every Revealed Infected instead.
+        if (e.kind === 'armLauncherForAllRevealed') {
+          if (used.has(instanceId)) return { ...state, ...nextBase };
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => (s.seat === seat ? {
+              ...s,
+              armedLauncherInstanceId: instanceId,
+              usedWeaponEffectsThisTurn: [...(s.usedWeaponEffectsThisTurn ?? []), instanceId],
+            } : s)),
+          };
+        }
+        // CW-029 Sawed-Off Double Barrel: once per turn, trash 1 Ammunition card
+        // from the play area for +X Damage (X = the Ammo on the trashed card).
+        if (e.kind === 'trashAmmoFromPlayForDamage') {
+          if (used.has(instanceId)) return { ...state, ...nextBase };
+          const ammoInPlay = player.playArea.filter(id => cardDef(state, id)?.type === 'ammunition');
+          if (ammoInPlay.length === 0) return { ...state, ...nextBase };
+          return {
+            ...state,
+            ...nextBase,
+            prompts: [...state.prompts, {
+              id: pid,
+              seat,
+              text: `${def.name}: trash 1 Ammunition card from your play area. This weapon gets +X Damage this turn, equal to the Ammo trashed.`,
+              options: [...ammoInPlay, 'Decline'],
+              payload: { kind: 'cw029TrashAmmo', weaponInstanceId: instanceId },
+            }],
           };
         }
       }
@@ -6863,6 +6934,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: state.seats.map(s =>
             s.seat === seat ? { ...p, hand: p.hand.filter(id => id !== chosenId), discard: [...p.discard, chosenId], turnGold: p.turnGold + goldBonus } : s,
           ),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'cw029TrashAmmo') {
+        // CW-029 Sawed-Off Double Barrel: trash the chosen Ammunition card from
+        // the play area; the weapon gains +X Damage this turn (X = its Ammo).
+        const weaponInstanceId = String(prompt.payload?.weaponInstanceId ?? '');
+        const chosenId = prompt.options[option];
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const amount = cardDef(state, chosenId)?.bonuses?.ammo ?? 0;
+        const p = state.seats[seat];
+        if (p === undefined || amount <= 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? {
+            ...s,
+            playArea: s.playArea.filter(id => id !== chosenId),
+            weaponDamageBonusById: { ...(s.weaponDamageBonusById ?? {}), [weaponInstanceId]: (s.weaponDamageBonusById?.[weaponInstanceId] ?? 0) + amount },
+            usedWeaponEffectsThisTurn: [...(s.usedWeaponEffectsThisTurn ?? []), weaponInstanceId],
+          } : s)),
+          removed: [...state.removed, chosenId],
           prompts: newPrompts,
         };
       }
