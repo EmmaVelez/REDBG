@@ -34,11 +34,11 @@ geometry (89.7%, 7.7%) is used; the fan render's printed "90 Health" badge measu
 (84-90%, 8.9-12%) across repeated vision reads, so the live HP ring may sit a few px off. VERIFY ON A
 RENDERED CARD before adding a per-card `--cc-badge-x/y` override.
 
-Tests: `engine/customB4mcChris.test.ts` (20). Gates: game-core 1018 passed / the same 7 documented
-pre-existing failures; server 105; client 207. `npm run typecheck` still reports 21 errors, ALL in the
-UNTRACKED `game-core/src/ai/*.ts` debug scripts that predate this change (big_test.ts, debug_decision.ts,
-trace_*.ts, boss_*.ts, ...) - they are not committed and are the reason the typecheck gate is red at
-baseline. Also still uncommitted and NOT mine: `client/src/ui/anims.ts` (a counter-animation WIP) and
+Tests: `engine/customB4mcChris.test.ts` (20). Gates after rebasing onto origin/master: game-core 1162
+passed / 0 failed (the 7 pre-existing failures were fixed upstream), server 108, client 244, and
+`npm run typecheck` is CLEAN (0 errors, all three workspaces) after Manny had the 20 untracked
+`game-core/src/ai/*.ts` debug scripts deleted - they were the whole reason the typecheck gate was red.
+Still uncommitted and NOT part of this task: `client/src/ui/anims.ts` (a counter-animation WIP) and
 `game-core/src/data/CARD-ART/MA-000.png`.
 
 
