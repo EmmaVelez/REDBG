@@ -411,6 +411,64 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 
+  {
+    // Fan card (printed code CH-007). B4MC Chris Redfield. Gates 3 / 6.
+    id: 'b4mc-ch-007',
+    name: 'Chris Redfield',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Once per round, when an Infected would deal any Damage, you can lower that Damage\'s number by 10. In that case, Gain 1 "Ammo x10".\nLevel 2: Once during your turn, when you Trash a card, get +1 card.',
+    copies: 1,
+    maxHp: 90,
+    level1At: 3,
+    level2At: 6,
+    levels: [
+      { level: 1, text: 'Once per round, when an Infected would deal any Damage, you can lower that Damage\'s number by 10. In that case, Gain 1 "Ammo x10".' },
+      { level: 2, text: 'Once during your turn, when you Trash a card, get +1 card.' },
+    ],
+    abilities: [
+      { kind: 'infectedDamageReductionOncePerRoundGainAmmo', amount: 10, level: 1 },
+      { kind: 'drawCardOnTrashOncePerTurn', level: 2 },
+    ],
+  },
+  {
+    // Fan card (printed code CH-008). B4MC Chris Redfield. Gates 2 / 7.
+    id: 'b4mc-ch-008',
+    name: 'Chris Redfield',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: If an Infected dealt Damage this round, Chris does +10 Damage this turn. If a Character is face down, Chris does +20 Damage instead.\nLevel 2: Once per round, when an Infected is not Defeated, you can put it on top of the Mansion (even if it\'s the BOSS).',
+    copies: 1,
+    maxHp: 90,
+    level1At: 2,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'If an Infected dealt Damage this round, Chris does +10 Damage this turn. If a Character is face down, Chris does +20 Damage instead.' },
+      { level: 2, text: 'Once per round, when an Infected is not Defeated, you can put it on top of the Mansion (even if it\'s the BOSS).' },
+    ],
+    abilities: [
+      { kind: 'turnDamageIfInfectedDealtDamageThisRound', amount: 10, downedAmount: 20, level: 1 },
+      { kind: 'notDefeatedInfectedToMansionTopOncePerRound', level: 2 },
+    ],
+  },
+  {
+    // Fan card (printed code CH-009). B4MC Chris Redfield. Single level, gate 3.
+    id: 'b4mc-ch-009',
+    name: 'Chris Redfield',
+    type: 'character',
+    set: 'custom',
+    text: 'At the start of your turn, you can get +1 Explore and Chris does +10 Damage this turn. In that case, you must Explore at least twice this turn.',
+    copies: 1,
+    maxHp: 90,
+    level1At: 3,
+    levels: [
+      { level: 1, text: 'At the start of your turn, you can get +1 Explore and Chris does +10 Damage this turn. In that case, you must Explore at least twice this turn.' },
+    ],
+    abilities: [
+      { kind: 'turnStartPlusExploreRequiresTwoExploresAndDamage', amount: 10, level: 1 },
+    ],
+  },
+
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
   // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).

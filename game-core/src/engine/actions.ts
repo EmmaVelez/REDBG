@@ -61,6 +61,11 @@ import {
   characterSource,
     buyCostAfterReduction,
   isPistolWeapon,
+  chrisL1DamageReduction,
+  markChrisL1ReductionUsed,
+  chrisL2TopOfMansion,
+  markChrisL2TopUsed,
+  chrisL2CanDrawOnTrash,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -350,11 +355,36 @@ function applyDownedHooks(next: GameState): GameState {
  * was that seat's turn. One choke point covers every source and cannot drift
  * out of sync when a new damage source is added.
  */
+/**
+ * B4MC-CH-007 Chris L2 - "Once during your turn, when you Trash a card, get
+ * +1 card." A post-action pass: any action that grew the removed-from-game
+ * list while it was his turn qualifies (once per turn). One choke point covers
+ * every trash source (weapons trashed after use, effects that trash, explores).
+ */
+function applyTrashDrawHook(prev: GameState, next: GameState, action: Action): GameState {
+  if (!('seat' in action)) return next;
+  const seat = action.seat;
+  if (!chrisL2CanDrawOnTrash(next, seat)) return next;
+  if (next.removed.length <= prev.removed.length) return next;
+  const player = next.seats[seat] as PlayerState | undefined;
+  if (player === undefined) return next;
+  const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: next.rngState });
+  return {
+    ...next,
+    rngState: d.rngState,
+    usedStartOfTurnAbilities: { ...(next.usedStartOfTurnAbilities ?? {}), drawCardOnTrashOncePerTurn: true },
+    seats: next.seats.map(s => (s.seat === seat
+      ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+      : s)),
+  };
+}
+
 export function applyAction(state: GameState, action: Action): GameState {
   const next = applyDownedHooks(applyDamageTakenHooks(state, applyActionInternal(state, action)));
+  const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, next, action)));
+  return applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, afterTrash, action)));
 }
 
 /**
@@ -2215,6 +2245,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let downed = false;
         let resuscitatePending = false;
         const resuscitatePrompts: Prompt[] = [];
+        // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he
+        // takes on his own turn is lowered by 10.
+        const chrisL1Reduction = chrisL1DamageReduction(state, seat);
         if (defeated || defeatedEntries.length > 0) {
           for (const { id, def } of defeatedEntries) {
             if (!negatedIds.has(id)) {
@@ -2368,7 +2401,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
             ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
             : 0;
-          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction + allDamageReduction(abilities);
+          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction + allDamageReduction(abilities) + chrisL1Reduction;
           const damageSkillEffects = activeSkillEffects(state, seat);
           const negateConsumption = consumeNegateDamage(state, seat);
           state = negateConsumption.state;
@@ -2476,6 +2509,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         for (const id of undefeatedEntries.map(e => e.id)) {
           const def = cardDef(state, id);
           const effects = def?.infectedEffects ?? [];
+          // B4MC-CH-008 Chris L2: once per round, the first not-defeated
+          // Infected on his own turn goes on TOP of the Mansion.
+          if (chrisL2TopOfMansion(state, seat)) {
+            state = markChrisL2TopUsed(state, seat);
+            const topInserted = insertAt({ deck: mDeck }, id, 1);
+            mDeck = topInserted.deck;
+            continue;
+          }
           // MA-078 shuffles ITSELF back inside applyMercenariesNotDefeatedEffects
           // (it sets infectedShuffledBack), so the disposition pass must leave it
           // alone — otherwise the same instance is added to the deck twice.
@@ -2692,6 +2733,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seats: fxState.seats.map(s => (s.seat === seat ? finalPlayer : { ...s, infectionCards: infectionBySeat.get(s.seat) ?? s.infectionCards ?? [] })),
           mansionDeck: mDeck,
           rngState: fxState.rngState,
+          ...(!defeated && multi.combinedAttack > 0 ? { infectedDamageThisRound: true } : {}),
           prompts: [...fxState.prompts, ...outcomePrompts, ...defeatFxPrompts, ...nonInfectedPrompts, ...zombieGrabPrompts, ...resuscitatePrompts, ...zombieBPromptsOut],
           ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
@@ -2705,6 +2747,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
         }
         if (oscarTrample) out = trashHighestDamageUsedWeapons(out, weapons);
+        // B4MC-CH-007 Chris L1: the first Infected hit he takes on his own turn
+        // each round is lowered by 10 and grants him one "Ammo x10". Applied to
+        // the FINAL seat: the explore rebuilds the seat from a pre-effect
+        // snapshot, so a mid-branch gain would be dropped.
+        if (!defeated && chrisL1Reduction > 0 && multi.combinedAttack > 0) {
+          out = markChrisL1ReductionUsed(out, seat);
+          out = gainAmmoX10(out, seat, 1);
+        }
         return out;
       }
 
@@ -3445,6 +3495,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
         ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
         : 0;
+      // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he takes
+      // on his own turn is lowered by 10.
+      const chrisL1Reduction = chrisL1DamageReduction(state, seat);
 
       const outcome = rocketAutoDefeat
         ? { kind: 'defeated' as const, decorations: revealedDef?.decorations ?? 0, damage: 0, hp: revealedDef?.hp ?? 0 }
@@ -3459,7 +3512,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
                 attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
               },
-              damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction,
+              damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction + chrisL1Reduction,
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
               damageMultiplier: player.damageMultiplierThisTurn ?? 1,
               attachedInfectedCount: player.attached.length,
@@ -4086,6 +4139,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       }
 
+      // B4MC-CH-007 Chris L1: the first Infected hit he takes on his own turn
+      // each round is lowered by 10 and grants him one "Ammo x10".
+      if (chrisL1Reduction > 0 && (revealedDef?.attack ?? 0) > 0) {
+        state = markChrisL1ReductionUsed(state, seat);
+        state = gainAmmoX10(state, seat, 1);
+      }
+
       // Nightmare: on-not-defeated infected effects (MA-054 Osmund Saddler).
       const nightmareNotDefeatedFx = applyNightmareNotDefeatedEffects(state, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
       state = nightmareNotDefeatedFx.state;
@@ -4099,7 +4159,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // AH-001 Abandon All Hope: if active and this is the Boss, insert at top 10
       const isBoss = state.endInfectedCardId !== undefined && revealedDef?.id === state.endInfectedCardId;
       const bossShuffleToTop10 = state.storyModeBossShuffleActive === true && isBoss && outcome.kind === 'notDefeated';
-      if (bossShuffleToTop10) {
+      // B4MC-CH-008 Chris L2: once per round, the first not-defeated Infected
+      // on his own turn goes on TOP of the Mansion (even the BOSS).
+      const chrisL2Top = outcome.kind === 'notDefeated' && chrisL2TopOfMansion(state, seat);
+      if (chrisL2Top) state = markChrisL2TopUsed(state, seat);
+      if (chrisL2Top) {
+        const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 1);
+        mansionDeck = inserted.deck;
+      } else if (bossShuffleToTop10) {
         const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 10);
         mansionDeck = inserted.deck;
       } else if (insertPosition !== undefined) {
@@ -4126,6 +4193,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         )),
         mansionDeck,
         rngState: state.rngState,
+        ...(outcome.kind === 'notDefeated' && (revealedDef?.attack ?? 0) > 0 ? { infectedDamageThisRound: true } : {}),
         prompts: [...state.prompts, ...resuscitatePrompts, ...zombieBNotDefeatedPrompts],
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
@@ -6161,6 +6229,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : s)),
           prompts: newPrompts,
           usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartPlusExploreRequiresTwoExplores: true },
+        };
+      }
+
+      if (kind === 'chris009ExploreDamage') {
+        // B4MC-CH-009 Chris: take +1 Explore and +amount Damage this turn, and
+        // he then owes two Explores this turn (the same debt as Rachael Foley
+        // L1, paid down by every explore path).
+        if (chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const amount = Number(prompt.payload?.amount ?? '10');
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, exploresLeft: s.exploresLeft + 1, exploresRequiredThisTurn: 2, weaponDamageBonusThisTurn: s.weaponDamageBonusThisTurn + amount }
+            : s)),
+          prompts: newPrompts,
+          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartPlusExploreRequiresTwoExploresAndDamage: true },
         };
       }
 

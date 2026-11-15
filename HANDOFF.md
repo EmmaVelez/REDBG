@@ -1,5 +1,47 @@
 # HANDOFF — resume here
 
+**B4MC CHRIS REDFIELD FAN PRINTS (2026-11-15):** three custom characters added from Manny's scans
+(`b4mc-ch-007/008/009`, all 90 Health). CH-007 gates 3/6 (L1 once-per-round -10 Infected Damage + an
+Ammo x10; L2 once-per-turn Trash -> +1 card). CH-008 gates 2/7 (L1 +10 Damage this turn once an
+Infected has dealt Damage this round, +20 instead while a Character is face down; L2 once per round a
+not-defeated Infected goes on TOP of the Mansion). CH-009 single level, gate 3 (turn-start +1 Explore
+and +10 Damage, owing two Explores - reuses Rachael Foley's `exploresRequiredThisTurn` debt).
+FIVE new `CharacterAbility` kinds + two new state fields: `PlayerState.roundUsedAbilities` and
+`GameState.infectedDamageThisRound`.
+
+**ROUND = Manny's definition (2026-11-15):** "one complete turn for all players that can take a turn
+before it circles back to the first player". Implemented WITHOUT a round counter: `startTurnInternal`
+(game.ts) treats `activeSeat === lowest living seat` as the round start and clears every seat's
+`roundUsedAbilities` plus the global `infectedDamageThisRound`. So a 1-seat game resets every turn.
+
+**"YOU CAN" SCOPE RULING (Manny, 2026-11-15):** CH-007 L1 and CH-008 L2 were designed for play modes
+this game does not have, so they are AUTOMATIC (no choice prompt) and apply ONLY during that
+character's OWN turn (`state.activeSeat === seat`). CH-009 keeps its Yes/No prompt (it is a choice by
+design, like Rachael Foley L1).
+
+Wiring notes: CH-007 L1's reduction is added to BOTH the single-explore `damageReduction` and the
+multi-explore combined `damageReduction`; the Ammo grant + `markChrisL1ReductionUsed` are applied to the
+FINAL seat on the multi path (the explore rebuilds the seat from a pre-effect snapshot - a mid-branch
+gain is dropped). CH-007 L2 is a post-action hook (`applyTrashDrawHook`) that fires when any action
+grows `removed` during his turn, once per turn. CH-008 L1's bonus is computed at turn start into
+`weaponDamageBonusThisTurn`. CH-008 L2 inserts at Mansion position 1 in BOTH the single-explore
+disposition and the multi-explore `undefeatedEntries` loop. Known gaps: the CH-008 L1 round flag is set
+only at the explore not-defeated sites (reveal-time AoE infected damage and NYX are NOT covered), and
+the AC-042 deferred-explore path does not apply CH-007 L1 / CH-008 L2.
+
+Art: `CARD-ART/B4MC-CH-007/008/009.png` (320x448, P-mode, ~100 KB). The default character badge
+geometry (89.7%, 7.7%) is used; the fan render's printed "90 Health" badge measured anywhere from
+(84-90%, 8.9-12%) across repeated vision reads, so the live HP ring may sit a few px off. VERIFY ON A
+RENDERED CARD before adding a per-card `--cc-badge-x/y` override.
+
+Tests: `engine/customB4mcChris.test.ts` (20). Gates: game-core 1018 passed / the same 7 documented
+pre-existing failures; server 105; client 207. `npm run typecheck` still reports 21 errors, ALL in the
+UNTRACKED `game-core/src/ai/*.ts` debug scripts that predate this change (big_test.ts, debug_decision.ts,
+trace_*.ts, boss_*.ts, ...) - they are not committed and are the reason the typecheck gate is red at
+baseline. Also still uncommitted and NOT mine: `client/src/ui/anims.ts` (a counter-animation WIP) and
+`game-core/src/data/CARD-ART/MA-000.png`.
+
+
 **END-SCREEN PLAYER RANKING (2026-11-14):** Manny: "Add a ranked list of players and
 their decorations at the end of the game to the end screen." Done.
 - `rankStandings(players, winners)` in `client/src/ui/standings.ts` — PURE (no React /

@@ -608,6 +608,12 @@ export type CharacterAbility =
   // --- Fan characters (CH-000..) ---
   | { readonly kind: "turnStartPlusExploreRequiresTwoExplores"; readonly level: 1 | 2 } // CH-000 Rachael Foley L1: turn-start choice of +1 Explore, owing 2 Explores this turn
   | { readonly kind: "exploreDamageIfNoPartnerLowHp"; readonly amount: number; readonly hpThreshold: number; readonly level: 1 | 2 } // CH-000 Rachael Foley L2: on Explore, +amount damage this turn when she has no Partner and Health <= hpThreshold
+  // --- Fan characters (B4MC-CH-007..009: Chris Redfield prints) ---
+  | { readonly kind: "infectedDamageReductionOncePerRoundGainAmmo"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he takes on his turn is lowered by amount; he gains one "Ammo x10"
+  | { readonly kind: "drawCardOnTrashOncePerTurn"; readonly level: 1 | 2 } // B4MC-CH-007 Chris L2: once during your turn, when you Trash a card, get +1 card
+  | { readonly kind: "turnDamageIfInfectedDealtDamageThisRound"; readonly amount: number; readonly downedAmount: number; readonly level: 1 | 2 } // B4MC-CH-008 Chris L1: +amount Damage this turn once an Infected has dealt Damage this round; +downedAmount instead while a Character is face down
+  | { readonly kind: "notDefeatedInfectedToMansionTopOncePerRound"; readonly level: 1 | 2 } // B4MC-CH-008 Chris L2: once per round, an Infected that is not Defeated on his turn goes on top of the Mansion
+  | { readonly kind: "turnStartPlusExploreRequiresTwoExploresAndDamage"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-009 Chris: turn-start choice of +1 Explore and +amount Damage, owing 2 Explores this turn
 
 
 // ---------------------------------------------------------------------------
@@ -695,6 +701,10 @@ export interface PlayerState {
    *  their WHOLE Explore pool on their next turn. Consumed at that turn's
    *  start, where it becomes `exploresRequiredThisTurn = exploresLeft`. */
   readonly mustUseAllExploresNextTurn?: boolean;
+  /** B4MC Chris cards: once-per-round ability keys already used this
+   *  round. Cleared for every seat when the turn circles back to the
+   *  first living player (a new round). */
+  readonly roundUsedAbilities?: Readonly<Record<string, boolean>>;
   /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
    *  NEXT real turn (fallen from a herb attached via Explore gain). */
   readonly pendingHerbHeal?: number;
@@ -908,6 +918,11 @@ export interface GameState {
    *  Prevents the same ability from being used again via the action button.
    *  Cleared at turn start. */
   readonly usedStartOfTurnAbilities?: Readonly<Record<string, boolean>>;
+
+  /** B4MC CH-008 Chris L1: an Infected has dealt Damage since the round
+   *  began (the turn circled back to the first living player). Cleared at
+   *  each new round. */
+  readonly infectedDamageThisRound?: boolean;
 
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when

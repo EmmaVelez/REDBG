@@ -4,7 +4,7 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities, chrisL1TurnDamageBonus } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
@@ -483,6 +483,19 @@ function turnStartAbilityPrompts(
     });
   }
 
+  // B4MC-CH-009 Chris: at turn start, may get +1 Explore and +amount Damage
+  // this turn - and if he does, he must Explore at least twice this turn.
+  const chris009 = abilities.find(a => a.kind === 'turnStartPlusExploreRequiresTwoExploresAndDamage');
+  if (chris009 !== undefined && chris009.kind === 'turnStartPlusExploreRequiresTwoExploresAndDamage') {
+    prompts.push({
+      id: `chris009-explore-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: abilityText('turnStartPlusExploreRequiresTwoExploresAndDamage'),
+      options: ['Gain +1 Explore', 'Decline'],
+      payload: { kind: 'chris009ExploreDamage', amount: String(chris009.amount) },
+    });
+  }
+
   return prompts;
 }
 
@@ -863,6 +876,20 @@ export function startTurn(state: GameState): GameState {
 function startTurnInternal(state: GameState): GameState {
   if (state.phase !== 'main') {
     return state;
+  }
+
+  // A round = one turn for every living player; it ends when the turn circles
+  // back to the first living seat (Manny's definition, 2026-11-15). The B4MC
+  // Chris cards gate some abilities on the round, so their once-per-round
+  // flags are cleared here for EVERY seat.
+  const aliveSeatsNow = state.seats.filter(s => !s.dead).map(s => s.seat);
+  const firstAliveSeat = aliveSeatsNow.length > 0 ? Math.min(...aliveSeatsNow) : state.activeSeat;
+  if (state.activeSeat === firstAliveSeat) {
+    state = {
+      ...state,
+      infectedDamageThisRound: undefined,
+      seats: state.seats.map(s => (s.roundUsedAbilities === undefined ? s : { ...s, roundUsedAbilities: undefined })),
+    };
   }
 
   // EV-002 Nemesis Pursuit's infected buff lasts "this turn" only — a new turn
@@ -1248,7 +1275,9 @@ function startTurnInternal(state: GameState): GameState {
     // Explore if able. Set the flag so validate blocks endTurn until explored.
     // Infected Horde: must explore or take damage.
     mustExplore: player.mustExplore === true || hasMansionAttachmentEffect(state, 'mustExploreIfAble') || infectedHordeBonus(state).damage > 0,
-    weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus,
+    // B4MC-CH-008 Chris L1: +10 Damage this turn once an Infected has dealt
+    // Damage this round (+20 instead while a Character is face down).
+    weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus + chrisL1TurnDamageBonus(state, player.seat),
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
       ? {

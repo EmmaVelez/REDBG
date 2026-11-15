@@ -1006,3 +1006,92 @@ export function jakeDefeatDecorationBonus(
   }
   return bonus;
 }
+// ---------------------------------------------------------------------------
+// B4MC Chris Redfield prints (b4mc-ch-007..009)
+// ---------------------------------------------------------------------------
+
+/** The fan cards' reactive abilities apply only during that character's OWN
+ *  turn (Manny, 2026-11-15: they were designed for play modes this game does
+ *  not have yet). */
+function isOwnTurn(state: GameState, seat: number): boolean {
+  return state.activeSeat === seat;
+}
+
+/**
+ * B4MC-CH-007 Chris L1 - "Once per round, when an Infected would deal any
+ * Damage, you can lower that Damage's number by 10. In that case, Gain 1
+ * 'Ammo x10'."
+ *
+ * Implemented as an automatic once-per-round reduction: the first time an
+ * Infected deals Damage to him on his own turn in a round, that Damage is
+ * lowered by `amount`. Returns the reduction to add to the explore damage
+ * reduction (0 when it does not apply).
+ */
+export function chrisL1DamageReduction(state: GameState, seat: number): number {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return 0;
+  if (!isOwnTurn(state, seat)) return 0;
+  const ability = characterAbilities(state, seat).find(a => a.kind === 'infectedDamageReductionOncePerRoundGainAmmo');
+  if (ability === undefined || ability.kind !== 'infectedDamageReductionOncePerRoundGainAmmo') return 0;
+  if (player.roundUsedAbilities?.infectedDamageReductionOncePerRoundGainAmmo === true) return 0;
+  return ability.amount;
+}
+
+/** Mark B4MC-CH-007 L1 as used for the rest of the round. */
+export function markChrisL1ReductionUsed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, roundUsedAbilities: { ...(s.roundUsedAbilities ?? {}), infectedDamageReductionOncePerRoundGainAmmo: true } }
+      : s)),
+  };
+}
+
+/**
+ * B4MC-CH-008 Chris L1 - "If an Infected dealt Damage this round, Chris does
+ * +10 Damage this turn. If a Character is face down, Chris does +20 Damage
+ * instead." Computed at the start of his turn from the round flag.
+ */
+export function chrisL1TurnDamageBonus(state: GameState, seat: number): number {
+  const player = state.seats[seat];
+  if (player === undefined) return 0;
+  const ability = characterAbilities(state, seat).find(a => a.kind === 'turnDamageIfInfectedDealtDamageThisRound');
+  if (ability === undefined || ability.kind !== 'turnDamageIfInfectedDealtDamageThisRound') return 0;
+  if (state.infectedDamageThisRound !== true) return 0;
+  return state.seats.some(s => s.downed) ? ability.downedAmount : ability.amount;
+}
+
+/**
+ * B4MC-CH-008 Chris L2 - "Once per round, when an Infected is not Defeated,
+ * you can put it on top of the Mansion (even if it's the BOSS)." Automatic:
+ * the first not-defeated Infected on his own turn in a round goes on top.
+ */
+export function chrisL2TopOfMansion(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (!isOwnTurn(state, seat)) return false;
+  if (!characterAbilities(state, seat).some(a => a.kind === 'notDefeatedInfectedToMansionTopOncePerRound')) return false;
+  return player.roundUsedAbilities?.notDefeatedInfectedToMansionTopOncePerRound !== true;
+}
+
+/** Mark B4MC-CH-008 L2 as used for the rest of the round. */
+export function markChrisL2TopUsed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, roundUsedAbilities: { ...(s.roundUsedAbilities ?? {}), notDefeatedInfectedToMansionTopOncePerRound: true } }
+      : s)),
+  };
+}
+
+/**
+ * B4MC-CH-007 Chris L2 - "Once during your turn, when you Trash a card, get
+ * +1 card." True while the seat could still draw from a Trash this turn.
+ */
+export function chrisL2CanDrawOnTrash(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (!isOwnTurn(state, seat)) return false;
+  if (!characterAbilities(state, seat).some(a => a.kind === 'drawCardOnTrashOncePerTurn')) return false;
+  return state.usedStartOfTurnAbilities?.drawCardOnTrashOncePerTurn !== true;
+}
