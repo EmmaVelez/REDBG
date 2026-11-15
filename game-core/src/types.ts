@@ -85,6 +85,9 @@ export interface CardDef {
 
   /** Bonus icons (ammunition, some actions/weapons). */
   readonly bonuses?: CardBonuses;
+  /** Extra printed abilities for Ammunition cards (Mercenaries AM-005..007).
+   *  Distinct from `bonuses`, which fire on PLAY. */
+  readonly ammoEffects?: readonly AmmoEffect[];
 
   // -- weapon --
   /** Ammo required to use this weapon when Exploring. 0 = free (knives). */
@@ -394,6 +397,20 @@ export type TokenEffect =
   // --- Unofficial Expansion (EX-001/003/004) ---
   | { readonly kind: "gainCardAndRemoveToken"; readonly cardId: string } // EX-001 -> ex-002, EX-004 -> ex-005
   | { readonly kind: "gainAnyWeaponAndRemoveToken" }; // EX-003: choose any weapon from the Resource Area
+
+/** Ammunition card effects (Mercenaries AM-005..AM-007). The basic ammo bonus
+ *  icons still fire on PLAY (`bonuses`); these are the extra printed abilities. */
+export type AmmoEffect =
+  /** AM-005: "When you Trash this card, you get +10 Gold during this turn." */
+  | { readonly kind: "gainGoldWhenTrashed"; readonly amount: number }
+  /** AM-006: "When you Defeat an Infected, if this Ammunition is in your Play
+   *  Area, you can Trash it and gain 1 'Ammo x10'. This type of effect can only
+   *  be applied once during your turn." */
+  | { readonly kind: "onDefeatTrashForAmmoX10" }
+  /** AM-007: "At the end of your turn, if this card is in your Play Area and
+   *  you did not Explore during this turn, you can move this Ammunition to the
+   *  top of your Inventory." */
+  | { readonly kind: "recycleToInventoryTopAtTurnEndIfDidNotExplore" };
 
 /** Unofficial Expansion counters — cards kept in the shared board supply and
  *  attached to a Character (Poison). Max one of each counter per Character. */
@@ -779,6 +796,10 @@ export interface PlayerState {
   readonly pendingBackstab?: { readonly targetSeat: number };
   /** AC-045 Coup de Grâce: the chosen weapon + bonus for this turn's explores. */
   readonly pendingCoupDeGrace?: { readonly weaponInstanceId: string; readonly amount: number };
+  /** AM-006: the "Trash this Ammunition to gain 1 Ammo x10" on-defeat effect
+   *  has already been used this turn ("this type of effect can only be applied
+   *  once during your turn"). Cleared at the start of the player's next turn. */
+  readonly ammoX10UpgradeUsedThisTurn?: boolean;
 }
 
 // ---------------------------------------------------------------------------

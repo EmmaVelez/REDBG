@@ -1,5 +1,32 @@
 # HANDOFF — resume here
 
+**MERCENARIES AMMO ABILITIES AM-005..AM-007 (2026-11-14):** Manny: "Am-005's card
+text reads 'when you trash this card, you get +10 gold during this turn'" — the card ART
+agrees, but the DATA did not: all three Mercenaries ammo cards were plain
+`+Ammo/+Gold` cards with no printed ability. Fixed (option 2 + 3: the trash trigger is
+ADDED ON TOP of the play bonus, and all three cards got their text + effect).
+- **Data:** new `AmmoEffect` union + `CardDef.ammoEffects`. `am-005` →
+  `gainGoldWhenTrashed` 10; `am-006` → `onDefeatTrashForAmmoX10`; `am-007` →
+  `recycleToInventoryTopAtTurnEndIfDidNotExplore`. `text` corrected to the printed
+  wording on all three. `bonuses` UNCHANGED — the +Ammo/+Gold icons still fire on PLAY.
+- **AM-005:** `applyTrashAmmoGoldHooks` (actions.ts) is a DIFF OF `removed` run after the
+  action. Trash has 45 reducer sites and no choke point, so a per-site hook would drift;
+  the diff covers every source (Item Management, WE-030, CW-029, SK-016, AC-044/047,
+  Rebecca L2, Cover-up, infected effects). The Gold goes to the card's OWNER
+  (`ownerSeatOf(prev, id)`) — "YOU trash this card".
+- **AM-006:** `ammoX10UpgradePrompt` (mercenaries.ts) is raised ONCE PER EXPLORE, in BOTH
+  the single- and the multi-explore defeat path (the multi path does NOT call
+  `applyMercenariesOnDefeatAbilities`, so it needed its own call). The prompt id keys on
+  the Ammunition instance — one per defeated Infected would collide. `am006Choose`
+  resolution trashes it, `gainAmmoX10`, and sets `ammoX10UpgradeUsedThisTurn`
+  ("once during your turn"), cleared in `startTurn`.
+- **AM-007:** `recycleAmmoIds` in `endTurn`, resolved AUTOMATICALLY (same ruling as
+  CW-025: keeping the Ammunition is never worse). It lands on top of the Inventory and
+  the end-of-turn draw then takes it into the new Hand.
+- **Tests:** `mercenaries.test.ts` +8. AC-047 Anticipation's expectation moved 20 → 40 —
+  it trashes two am-005, so both trash abilities now fire. Verified red without each
+  hunk.
+
 **MERCENARIES BASIC RESOURCES LOBBY OPTION (2026-11-14):** Manny: "Add a check box under
 skill in the lobby/room; when checked it replaces the basic resources in the selected
 scenario — ammo cards, pistols, knives — with the ammo, pistol and knives piles from the
@@ -1827,3 +1854,4 @@ engine are unused union members in `types.ts`
 24. ZOMBICIDE FAN WEAPONS CW-025..CW-033 (this change): nine custom weapons. Per-card effect kinds are listed in the `WeaponEffect` union. Two rules of thumb: (a) a bonus that scales with the number of Infected Battled goes in `computeDamage` (which the reducer now feeds `infectedBattledThisTurn: exploreCount`) — adding it to the per-weapon `damage` expression too double-counts, because that value is summed into `computeDamage`; (b) a "you can / once per turn" weapon effect is a `useWeaponAbility` manual trigger (validate's `manual` filter + enumerate's `hasManual` must both list the kind, or no button appears). CW-025's recall branch is currently unreachable — a weapon only reaches the play area by being explored with, and `playWeapon` has no reducer case.
 25. ABILITY/EFFECT REVEAL OVERLAY (this change): a NON-explore reveal must pause the table and show the card. The engine records `LoggedAction.reveals` via `recordCardReveals()` (same `seq`-matched log rewrite as `recordExploreReveals`) — and because that helper REASSIGNS `nextBase.log`, always call it before building a state object that spreads `...nextBase`. The client's `detectCardReveals(prev, next, mySeat)` + `CardRevealOverlay` render it, gated to the INVOLVED seat (actor, or a seat whose own card was revealed) so a bot's private peek does not leak to the human; the overlay is suppressed while a mansion-door reveal is active. When adding a new reveal effect/ability, wire `recordCardReveals` at its site — a peek has no zone diff, so the client cannot discover it any other way.
 26. MERCENARIES BASIC RESOURCES (this change): a room option that swaps the scenario's basic piles for the Mercenaries printings. `MERCENARIES_BASIC_RESOURCES` is keyed by PILE ID (am10/am20/am30/hg/kn) and `pilesForScenario` replaces only the CONTENTS, so the board slot is stable. Any new option that changes which cards a scenario uses must be passed to BOTH `cardsForScenario` and `pilesForScenario` — `setup` silently skips pile card ids with no def, so a missing def reads as "the pile is empty", not an error. The starting deck is stat-derived (`pickBasic` in game.ts) and also honours the option via `GameSetup.mercenariesBasicResources`, which must be set at the `setup()` call sites in host.ts and hotseat.ts.
+27. MERCENARIES AMMO ABILITIES (this change): the card ART is the source of truth when a def's `text` disagrees with it — AM-005's art reads "When you Trash this card, you get +10 Gold during this turn" and the data had a plain +10/+10. `CardDef.bonuses` fire on PLAY ONLY; an extra printed ability needs its own effect kind (`ammoEffects` here). A "when this card is trashed" trigger has NO choke point (45 sites push to `removed`) — diff `removed` before/after the action in a post-action hook instead of patching each site, and pay the OWNER (`ownerSeatOf(prev, id)`), not `action.seat`. A per-card on-defeat trigger must be raised in BOTH explore paths: the multi-explore reducer does NOT call `applyMercenariesOnDefeatAbilities`. An end-of-turn "you can move it to the top of your Inventory" is resolved automatically (the CW-025 ruling) — and the end-of-turn draw then takes it into the new Hand, so assert on the hand, not `inventory[0]`.

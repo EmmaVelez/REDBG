@@ -384,7 +384,9 @@ describe('Mercenaries actions', () => {
     next = choose(next, 0, p1, 0);
     const p2 = findPrompt(next, 'ac047ChooseSecond');
     next = choose(next, 0, p2, 0);
-    expect(next.seats[0]?.turnGold).toBe(20);
+    // +20 from Anticipation itself, plus 2 x +10 because both trashed cards
+    // are AM-005 and each one's "When you Trash this card" ability also fires.
+    expect(next.seats[0]?.turnGold).toBe(40);
   });
 
   it('AC-048 Backstab: on explore, the target moves 1 XP and discards', () => {
@@ -817,5 +819,110 @@ describe('Mercenaries enumeration', () => {
     const tuned = tune(s, { level: 1 });
     const legal = enumerateLegalActions(tuned, 0);
     expect(legal.some(a => a.type === 'useCharacterAbility' && a.abilityIndex === 0)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ammunition (AM-005..AM-007) — the bonus icons PLUS each card's printed ability
+// ---------------------------------------------------------------------------
+
+describe('Mercenaries ammunition', () => {
+  it('the printed text matches the card art', () => {
+    const byId = new Map(MERCENARIES_CARDS.map(c => [c.id, c]));
+    expect(byId.get('am-005')?.text).toBe('When you Trash this card, you get +10 Gold during this turn.');
+    expect(byId.get('am-006')?.text).toBe('When you Defeat an Infected, if this Ammunition is in your Play Area, you can Trash it and gain 1 "Ammo x10". This type of effect can only be applied once during your turn.');
+    expect(byId.get('am-007')?.text).toBe('At the end of your turn, if this card is in your Play Area and you did not Explore during this turn, you can move this Ammunition to the top of your Inventory.');
+  });
+
+  it('AM-005: the +10 Ammo / +10 Gold bonus icons still fire on PLAY', () => {
+    const s = addCard(mercGame('ch-044'), 0, 'am-005');
+    const ammo = findHand(s, 'am-005');
+    const next = applyAction(tune(s, { turnAmmo: 0, turnGold: 0 }), { type: 'playAmmo', seat: 0, instanceId: ammo });
+    expect(next.seats[0]?.turnAmmo).toBe(10);
+    expect(next.seats[0]?.turnGold).toBe(10);
+  });
+
+  it('AM-005: trashing it pays +10 Gold to the owner', () => {
+    const s = addCard(mercGame('ch-044'), 0, 'am-005');
+    const ammo = findHand(s, 'am-005');
+    const withPrompt: GameState = {
+      ...s,
+      prompts: [{ id: 'probe-trash', seat: 0, text: 'Trash a card.', options: [ammo], payload: { kind: 'trashHandCard' } }],
+    };
+    const next = choose(withPrompt, 0, 'probe-trash', 0);
+    expect(next.removed).toContain(ammo);
+    expect(next.seats[0]?.turnGold).toBe(10);
+  });
+
+  it('AM-005: a card without the effect pays nothing when trashed', () => {
+    const s = addCard(mercGame('ch-044'), 0, 'we-050');
+    const blade = findHand(s, 'we-050');
+    const withPrompt: GameState = {
+      ...s,
+      prompts: [{ id: 'probe-trash', seat: 0, text: 'Trash a card.', options: [blade], payload: { kind: 'trashHandCard' } }],
+    };
+    const next = choose(withPrompt, 0, 'probe-trash', 0);
+    expect(next.removed).toContain(blade);
+    expect(next.seats[0]?.turnGold).toBe(0);
+  });
+  it('AM-006: on defeating an Infected, may trash it to gain 1 Ammo x10', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-006', 'playArea');
+    const withInfected = mansionTop(s, 'ma-077'); // hp 5
+    const weapon = findHand(withInfected, 'we-050'); // damage 5
+    let next = explore(withInfected, 0, weapon);
+    next = choose(next, 0, findPrompt(next, 'we050Choose'), 1); // decline the blade
+    const p = findPrompt(next, 'am006Choose');
+    next = choose(next, 0, p, 0); // Yes
+    expect(next.seats[0]?.playArea.some(id => next.cards[id]?.cardId === 'am-006')).toBe(false);
+    expect(next.removed.some(id => next.cards[id]?.cardId === 'am-006')).toBe(true);
+    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-005')).toBe(true);
+    expect(next.seats[0]?.ammoX10UpgradeUsedThisTurn).toBe(true);
+  });
+
+  it('AM-006: no prompt when the Ammunition is not in the Play Area', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-006'); // hand, not play area
+    const withInfected = mansionTop(s, 'ma-077');
+    const weapon = findHand(withInfected, 'we-050');
+    const next = explore(withInfected, 0, weapon);
+    expect(next.prompts.some(x => x.payload?.kind === 'am006Choose')).toBe(false);
+  });
+
+  it('AM-006: the effect is once per turn', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-006', 'playArea');
+    let st = mansionTop(s, 'ma-077');
+    const weapon = findHand(st, 'we-050');
+    let next = explore(st, 0, weapon);
+    next = choose(next, 0, findPrompt(next, 'we050Choose'), 1);
+    next = choose(next, 0, findPrompt(next, 'am006Choose'), 0);
+    // A second defeat in the SAME turn must not re-offer the effect.
+    next = tune(mansionTop(next, 'ma-077'), { exploresLeft: 2 });
+    const weapon2 = findHand(next, 'we-049'); // damage 10
+    const after = explore(next, 0, weapon2);
+    expect(after.prompts.some(x => x.payload?.kind === 'am006Choose')).toBe(false);
+  });
+
+  it('AM-007: unused at end of turn, it is kept instead of discarded', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-007', 'playArea');
+    const ammo = s.seats[0]?.playArea.find(id => s.cards[id]?.cardId === 'am-007');
+    expect(ammo).toBeDefined();
+    const next = applyAction(tune(s, { exploredOrAttackedThisTurn: false }), { type: 'endTurn', seat: 0 });
+    // It goes to the TOP of the Inventory, which the end-of-turn draw then
+    // takes straight into the new Hand — either way it is not discarded.
+    expect(next.seats[0]?.discard).not.toContain(ammo);
+    expect(next.seats[0]?.playArea).not.toContain(ammo);
+    expect(next.seats[0]?.hand).toContain(ammo);
+  });
+
+  it('AM-007: after an Explore it is discarded instead', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-007', 'playArea');
+    const ammo = s.seats[0]?.playArea.find(id => s.cards[id]?.cardId === 'am-007');
+    const next = applyAction(tune(s, { exploredOrAttackedThisTurn: true }), { type: 'endTurn', seat: 0 });
+    expect(next.seats[0]?.discard).toContain(ammo);
+    expect(next.seats[0]?.inventory[0]).not.toBe(ammo);
   });
 });

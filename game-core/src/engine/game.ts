@@ -1281,6 +1281,8 @@ function startTurnInternal(state: GameState): GameState {
     weaponDamageBonusById: undefined,
     trashAtEndOfTurn: undefined,
     usedWeaponEffectsThisTurn: undefined,
+    // AM-006: "this type of effect can only be applied once during your turn".
+    ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,
     pendingBackstab: undefined,
     pendingCoupDeGrace: undefined,

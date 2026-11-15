@@ -677,6 +677,51 @@ export function applyMercenariesOnDefeatAbilities(state: GameState, ctx: Mercena
   return { state: s, prompts };
 }
 
+/**
+ * AM-006 "Ammo x20": "When you Defeat an Infected, if this Ammunition is in your
+ * Play Area, you can Trash it and gain 1 'Ammo x10'. This type of effect can
+ * only be applied once during your turn."
+ *
+ * Returns the yes/no prompt to raise after an Infected was defeated, or
+ * undefined when the seat has no such Ammunition in its Play Area or has
+ * already used the effect this turn. Raise it ONCE per explore, not once per
+ * defeated Infected — the prompt id is keyed on the Ammunition instance, so a
+ * second copy would collide with the first.
+ */
+export function ammoX10UpgradePrompt(state: GameState, seat: number): Prompt | undefined {
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  if (player.ammoX10UpgradeUsedThisTurn === true) return undefined;
+  const ammoId = player.playArea.find(id => {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    return (def?.ammoEffects ?? []).some(e => e.kind === 'onDefeatTrashForAmmoX10');
+  });
+  if (ammoId === undefined) return undefined;
+  const inst = state.cards[ammoId];
+  const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+  return {
+    id: `am006-${seat}-${ammoId}-v${state.version}`,
+    seat,
+    text: `${def?.name ?? 'Ammo x20'}: Trash this Ammunition to gain 1 "Ammo x10"?`,
+    options: ['Yes', 'No'],
+    payload: { kind: 'am006Choose', ammoInstanceId: ammoId },
+  };
+}
+
+/** True when the seat has an AM-007 in the Play Area and did not Explore this
+ *  turn — the card's end-of-turn "move to the top of the Inventory" condition. */
+export function recycleAmmoIds(state: GameState, seat: number): readonly string[] {
+  const player = state.seats[seat];
+  if (player === undefined) return [];
+  if (player.exploredOrAttackedThisTurn === true) return [];
+  return player.playArea.filter(id => {
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    return (def?.ammoEffects ?? []).some(e => e.kind === 'recycleToInventoryTopAtTurnEndIfDidNotExplore');
+  });
+}
+
 /** True when the seat's character has the Barry Burton chain ability. */
 export function hasBarryChain(abilities: ReadonlyArray<{ readonly kind: string }>): boolean {
   return abilities.some(a => a.kind === 'onDefeatChainLowerHp');

@@ -71,7 +71,7 @@ import { makeRng, shuffle, nextInt } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, exploreExplosiveDamage, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
-import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
+import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
@@ -354,7 +354,41 @@ export function applyAction(state: GameState, action: Action): GameState {
   const next = applyDownedHooks(applyDamageTakenHooks(state, applyActionInternal(state, action)));
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return dropEmptyPrompts(applyOutbreakHooks(state, next, action));
+  return applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, next, action)));
+}
+
+/**
+ * AM-005 "When you Trash this card, you get +10 Gold during this turn."
+ *
+ * Trashing has no single choke point — 45 reducer sites push an instance onto
+ * `removed` — so the trigger is a diff of `removed` after the action resolves.
+ * That covers every trash source (Item Management, WE-030, CW-029, SK-016,
+ * AC-044/047, Rebecca L2, Cover-up, infected effects, …) and cannot drift when
+ * a new one is added. The Gold goes to the seat that OWNED the card: "you trash
+ * this card" is the owner's action, and an opponent's effect trashing your ammo
+ * is still your card being trashed.
+ */
+function applyTrashAmmoGoldHooks(prev: GameState, next: GameState): GameState {
+  if (next.removed.length === prev.removed.length) return next;
+  const already = new Set(prev.removed);
+  const gold = new Map<number, number>();
+  for (const id of next.removed) {
+    if (already.has(id)) continue;
+    const inst = prev.cards[id];
+    const def = inst === undefined ? undefined : next.cardDefs[inst.cardId];
+    const amount = (def?.ammoEffects ?? []).find(e => e.kind === 'gainGoldWhenTrashed')?.amount ?? 0;
+    if (amount <= 0) continue;
+    const seat = ownerSeatOf(prev, id);
+    if (seat === undefined) continue;
+    gold.set(seat, (gold.get(seat) ?? 0) + amount);
+  }
+  if (gold.size === 0) return next;
+  return {
+    ...next,
+    seats: next.seats.map(s => (gold.has(s.seat)
+      ? { ...s, turnGold: s.turnGold + (gold.get(s.seat) ?? 0) }
+      : s)),
+  };
 }
 
 /** Outbreak: all Characters have a Maximum Infection Level of 10. */
@@ -2516,6 +2550,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             defeatFxPrompts.push(...rn.prompts);
           }
         }
+        // AM-006 Ammo x20: at least one Infected was defeated by this explore.
+        // Raised once, after the per-card loop — the prompt id keys on the
+        // Ammunition instance, so one per defeated Infected would collide.
+        if (defeatedEntries.length > 0) {
+          const am006Prompt = ammoX10UpgradePrompt(state, seat);
+          if (am006Prompt !== undefined) defeatFxPrompts.push(am006Prompt);
+        }
         // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
         // shuffled back into the Mansion instead of attached (its Decoration is
         // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
@@ -3769,6 +3810,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const onDefeatFx = applyMercenariesOnDefeatAbilities(defeatFxState, mercCtx);
         defeatFxState = onDefeatFx.state;
         defeatFxPrompts.push(...onDefeatFx.prompts);
+        // AM-006 Ammo x20: raised ONCE per explore (the prompt id keys on the
+        // Ammunition instance, so one per defeated Infected would collide).
+        const am006Prompt = ammoX10UpgradePrompt(state, seat);
+        if (am006Prompt !== undefined) defeatFxPrompts.push(am006Prompt);
 
         // Nightmare: on-defeat infected effects (MA-055 Bitores Mendez,
         // MA-057 Jack Krauser, MA-063 Zombie Security Guard, MA-066 Ivy).
@@ -5062,8 +5107,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           });
           const recalledSet = new Set(recalledIds);
 
+          // AM-007 Ammo x30: an Ammunition that was not used to Explore moves
+          // to the top of the Inventory instead of being discarded. The printed
+          // "you can" is resolved automatically, the same ruling as CW-025
+          // above — keeping the Ammunition is never worse than discarding it.
+          const recycledAmmoIds = recycleAmmoIds(state, seat);
+          const recalledOrRecycled = new Set([...recalledSet, ...recycledAmmoIds]);
+
           const dh = discardHand({ hand: player.hand, discard: player.discard });
-          const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledSet.has(id)), discard: dh.discard });
+          const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
 
           // Mercenaries: weapons that were given "+X damage, Trash at the end of
           // this turn" (Custom Standard Sidearm, Reliable Blade) leave the game.
@@ -5076,7 +5128,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
           // Mansion attachment effects at end of turn (e.g., Rampage trashing
           // inventory cards). Applied to the active player's inventory.
-          let currentInventory = [...recalledIds, ...player.inventory];
+          let currentInventory = [...recalledIds, ...recycledAmmoIds, ...player.inventory];
           let currentRemoved = removedAfterTrash;
           let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
           let currentAttachments = [...(state.mansionAttachments ?? [])];
@@ -8040,6 +8092,26 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : s)),
           prompts: newPrompts,
         };
+      }
+
+      if (kind === 'am006Choose') {
+        const chosen = prompt.options[option];
+        const ammoId = String(prompt.payload?.ammoInstanceId ?? '');
+        const seatPlayer = state.seats[seat] as PlayerState;
+        if (chosen !== 'Yes' || ammoId === '' || !seatPlayer.playArea.includes(ammoId)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let s: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, playArea: x.playArea.filter(id => id !== ammoId), ammoX10UpgradeUsedThisTurn: true }
+            : x)),
+          removed: [...state.removed, ammoId],
+          prompts: newPrompts,
+        };
+        s = gainAmmoX10(s, seat, 1);
+        return s;
       }
 
       if (kind === 'ac043ChoosePlayer') {
