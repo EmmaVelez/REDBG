@@ -469,6 +469,31 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 
+  {
+    // Official card (printed code CH-005). Jill Valentine (Pirate, Revelations
+    // alternate costume). Gates 4 / 7. The code is ALSO taken by the PREMIER
+    // ch-005 (Barry Burton) and by the B4MC fan print b4mc-ch-005 (Sherry
+    // Birkin), so this official custom print gets ch-005p (ch-000 Rachael is
+    // the other custom official character).
+    id: 'ch-005p',
+    name: 'Jill Valentine',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: All your "Pistol" and "Machine Gun" Weapons get +10 Damage.\nLevel 2: When Jill would take any Damage, you can Trash 1 card to negate the Damage.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 4,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'All your "Pistol" and "Machine Gun" Weapons get +10 Damage.' },
+      { level: 2, text: 'When Jill would take any Damage, you can Trash 1 card to negate the Damage.' },
+    ],
+    abilities: [
+      { kind: 'plusDamageForWeaponTags', tags: ['pistol', 'machineGun'], amount: 10, level: 1 },
+      { kind: 'trashCardToNegateDamage', level: 2 },
+    ],
+  },
+
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
   // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).

@@ -1,5 +1,56 @@
 # HANDOFF — resume here
 
+**CUSTOM JILL VALENTINE (PIRATE) PRINT CH-005 (2026-11-15):** Manny sent a scan of the Jill
+Valentine pirate costume card (70 Health, gates 4 / 7) and asked to add it to the custom line.
+The printed code CH-005 is taken TWICE in this codebase: by the PREMIER ch-005 (Barry Burton)
+AND — added in a parallel push while this was in flight — by the B4MC Sherry fan print
+`b4mc-ch-005` (stun-rod Sherry, commit 033261c). This card is the OFFICIAL Capcom/Bandai print
+(defaults to the same `ch-` prefix as the other official custom card, ch-000 Rachael), so its id
+is **`ch-005p`** ("p" = pirate). Note the B4MC series and the official product both print
+"CH-005" for DIFFERENT characters — always grep `id: '` after touching custom.ts.
+
+This commit was REBASED onto origin/master after the parallel Sherry push; the merge combined
+my plusTagDamage wiring with the Sherry commit's exploreBonusIfFullHp / stunRodCharge terms in
+explore.ts and allyExplore.ts, and keeps BOTH types.ts union blocks.
+- **L1 (gate 4): "All your 'Pistol' and 'Machine Gun' Weapons get +10 Damage."** New kind
+  `plusDamageForWeaponTags { tags, amount, level }` (types.ts) + pure helper `plusTagDamage`
+  (abilities.ts, mirrors `plusTagDamageIfAmmoAbove`). Wired into the SHARED explore
+  `abilityDamage` term (actions.ts — covers single AND multi), the picker preview
+  (`exploreDamage`, explore.ts) and the Sherry ally-explore (`allyExplore.ts`) — the same three
+  sites HUNK's tag bonus uses, so the preview matches the resolve.
+- **L2 (gate 7): "When Jill would take any Damage, you can Trash 1 card to negate the Damage."**
+  New kind `trashCardToNegateDamage` — implemented the RESUSCITATE way: the explore holds the
+  Character at her PRE-damage Health and queues `jillNegateDamage` (options = hand cards +
+  Decline, loss in the payload). Accept → the chosen card is trashed (hand → removed), the held
+  HP stands (fully negated — a lethal hit does NOT down her). Decline → the loss is applied to
+  the CURRENT Health in the resolver (the seat may have changed while the prompt was open), with
+  flipDown when the hit was lethal (mirrors the resuscitate decline). Queue helper
+  `queueJillNegatePrompt` in abilities.ts; resolver next to the resuscitate handler.
+- **Wired:** single-explore (after the kevlar/reduce math, before the down logic) and
+  multi-explore (inside the `undefeatedEntries` block — NOTE: it closes BEFORE the barrel/trap
+  loop, and `baseLeadingHp` is block-scoped to it, so the hold MUST live inside that block).
+  Gated `!leadingIsPartner` (the partner-led explore applies damage to partnerHp and is skipped)
+  + non-empty hand + loss > 0. **Documented gaps (same class as CH-008 L1's):** partner-led
+  explores, poison at turn start, barrel/trap damage, off-turn AoE, the Sherry ally-explore and
+  the AC-042 deferred path. A Jill + Resuscitate player gets NO second resuscitate window if she
+  declines (the explore never downs her, so resuscitate never triggers) — corner case, recorded
+  not fixed. Kevlar Jacket order: negation covers only the post-jacket remainder; the jacket has
+  already moved by prompt time (player-favorable).
+- **PITFALL:** the multi hold was first inserted after the barrel/trap loop — TDZ
+  (`Cannot access 'baseLeadingHp' before initialization`) because `baseLeadingHp` is a block-scoped
+  const inside `if (undefeatedEntries.length > 0)`. Read the brace structure before placing code
+  that touches those locals.
+- **Tests:** `engine/customB4mcJill.test.ts` (13 — data shape, not in ALL_CARDS, plusTagDamage
+  unit (pistol/MG/both-tags/knife-0), picker preview 10→20 at L1, two-Handguns vs 25 HP defeated
+  at L1 not L0, prompt + hold, Accept trashes + keeps HP, Decline applies, lethal Accept keeps
+  standing, lethal Decline downs, no prompt with empty hand, no prompt below L2, multi hold).
+  Verified red without the wiring for the L2 prompt and the L1 damage (behavioral tests).
+- **Art:** `CARD-ART/CH-005P.png` (320x448, P-mode, ~109 KB) from the scan — tight card scan
+  at 514x700, scaled to 320x436 and letterboxed 6px top/bottom to match the B4MC family.
+  `client/dist/assets/CH-005P-<hash>.png` confirmed emitted by `vite build`.
+- **Gates:** game-core **1175 + Sherry's parallel tests** (was 1162; +13 mine), server 108, client 244, typecheck clean ×3,
+  soak 29/30 natural. LEDGER entry appended.
+
 **B4MC CHRIS REDFIELD FAN PRINTS (2026-11-15):** three custom characters added from Manny's scans
 (`b4mc-ch-007/008/009`, all 90 Health). CH-007 gates 3/6 (L1 once-per-round -10 Infected Damage + an
 Ammo x10; L2 once-per-turn Trash -> +1 card). CH-008 gates 2/7 (L1 +10 Damage this turn once an

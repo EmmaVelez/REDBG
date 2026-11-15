@@ -1102,6 +1102,61 @@ function isOwnTurn(state: GameState, seat: number): boolean {
  * lowered by `amount`. Returns the reduction to add to the explore damage
  * reduction (0 when it does not apply).
  */
+/**
+ * B4MC-CH-005 Jill Valentine L1 / "All your 'Pistol' and 'Machine Gun' Weapons
+ * get +10 Damage" - +amount damage to every weapon carrying any of the listed
+ * tags. Per weapon, so it stacks with each matching weapon used in the explore.
+ */
+export function plusTagDamage(
+  abilities: readonly CharacterAbility[],
+  weaponDefs: readonly (CardDef | undefined)[],
+): number {
+  let bonus = 0;
+  for (const ability of abilities) {
+    if (ability.kind !== 'plusDamageForWeaponTags') continue;
+    for (const def of weaponDefs) {
+      if (def === undefined) continue;
+      for (const tag of def.weaponTags ?? []) {
+        if (ability.tags.includes(tag)) {
+          bonus += ability.amount;
+          break;
+        }
+      }
+    }
+  }
+  return bonus;
+}
+
+/**
+ * B4MC-CH-005 Jill Valentine L2 - "When Jill would take any Damage, you can
+ * Trash 1 card to negate the Damage."
+ *
+ * The explore holds the Character at her pre-damage Health and queues this
+ * prompt (both single- and multi-explore, Main-leading explore damage only -
+ * the partner-led, poison, trap, AoE and off-turn damage sites are not wired,
+ * the same gap the other B4MC prints document). The resolver trashes the
+ * chosen hand card (the damage stays negated) or applies the loss (Decline).
+ * The caller must check the ability is active (level-gated abilities list),
+ * the hand is non-empty and `loss > 0` before calling.
+ */
+export function queueJillNegatePrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  hand: readonly string[],
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `jill-negate-${seat}-v${state.version}`,
+      seat,
+      text: `Jill would take ${loss} Damage. Trash 1 card to negate the Damage?`,
+      options: [...hand, 'Decline'],
+      payload: { kind: 'jillNegateDamage', loss: String(loss) },
+    }],
+  };
+}
+
 export function chrisL1DamageReduction(state: GameState, seat: number): number {
   const player = state.seats[seat];
   if (player === undefined || player.dead || player.downed) return 0;

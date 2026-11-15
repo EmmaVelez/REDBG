@@ -623,6 +623,9 @@ export type CharacterAbility =
   | { readonly kind: "stunRodCharge"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L1: pay 1 Action; this turn her Stun Rod explores get +amount Damage
   | { readonly kind: "exploreBonusIfFullHp"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L2: on Explore, +amount Damage this turn while she is at full Health
   | { readonly kind: "healAtTurnStartOrElseDamageThisTurn"; readonly heal: number; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-006 L1: heal at turn start, or +amount Damage if already full
+  // --- Custom official print (ch-005p, Jill Valentine Pirate) ---
+  | { readonly kind: "plusDamageForWeaponTags"; readonly tags: readonly WeaponTag[]; readonly amount: number; readonly level: 1 | 2 } // ch-005p Jill Valentine L1: all "Pistol" and "Machine Gun" Weapons get +N Damage
+  | { readonly kind: "trashCardToNegateDamage"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2: when she would take any Damage, may Trash 1 card to negate the Damage
 
 
 // ---------------------------------------------------------------------------

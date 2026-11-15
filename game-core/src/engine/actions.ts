@@ -26,6 +26,8 @@ import {
   healOnDefeatWithWeaponTag,
   exploreBonusIfAmmoAbove,
   plusTagDamageIfAmmoAbove,
+  plusTagDamage,
+  queueJillNegatePrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -1788,6 +1790,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             dualWieldBonus(state, seat, abilities, weapons) +
             exploreBonusIfAmmoAbove(abilities, player.turnAmmo) +
             plusTagDamageIfAmmoAbove(abilities, weaponDefs, player.turnAmmo) +
+            plusTagDamage(abilities, weaponDefs) +
             exploreDamageIfNoPartnerLowHp(abilities, player.partnerInstanceId, player.hp) +
             exploreDamageIfHpAtMost(abilities, player.hp) +
             exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
@@ -2445,6 +2448,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
             newLeadingHp = baseLeadingHp - Math.max(kevlar.damage - reduce, 0);
             if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+          }
+          // B4MC-CH-005 Jill Valentine L2: the multi-explore equivalent of the
+          // single-explore hold - the leading Character stays at her
+          // pre-damage Health and the Trash-1-card-to-negate prompt is queued.
+          // The barrel/trap damage that follows applies independently.
+          if (!leadingIsPartner && handAfter.length > 0 && abilities.some(a => a.kind === 'trashCardToNegateDamage')) {
+            const appliedLoss = baseLeadingHp - newLeadingHp;
+            if (appliedLoss > 0) {
+              newLeadingHp = baseLeadingHp;
+              state = queueJillNegatePrompt(state, seat, appliedLoss, handAfter);
+            }
           }
           for (const { id, def } of undefeatedEntries) {
             if (negatedIds.has(id)) continue;
@@ -3981,6 +3995,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
         newLeadingHp = Math.max(baseLeadingHp - Math.max(kevlar.damage - reduce, 0), 0);
         if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+      }
+      // B4MC-CH-005 Jill Valentine L2: when she would take explore Damage
+      // (Main leading), hold the Character at her pre-damage Health and offer
+      // to Trash 1 card to negate the Damage. Accept keeps the held HP (the
+      // resolver trashes the card); Decline applies the loss to the CURRENT
+      // Health at resolution. Not offered for partner-led explores, and not
+      // wired for the poison / trap / AoE / off-turn damage sites.
+      if (!leadingIsPartner && handAfter.length > 0 && abilities.some(a => a.kind === 'trashCardToNegateDamage')) {
+        const appliedLoss = baseLeadingHp - newLeadingHp;
+        if (appliedLoss > 0) {
+          newLeadingHp = baseLeadingHp;
+          state = queueJillNegatePrompt(state, seat, appliedLoss, handAfter);
+        }
       }
       const newHp = leadingIsPartner ? player.hp : newLeadingHp;
       let downed = false;
@@ -7731,6 +7758,62 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // -------------------------------------------------------------------
       // Mercenaries expansion prompt resolutions
       // -------------------------------------------------------------------
+
+      if (kind === 'jillNegateDamage') {
+        // B4MC-CH-005 Jill Valentine L2: Accept -> Trash the chosen hand card
+        // (the Damage was never applied - the explore held the Character at
+        // its pre-damage Health); Decline -> apply the held loss to the
+        // CURRENT Health (the seat may have changed while the prompt was
+        // open), with flipDown when the hit was lethal.
+        const chosen = prompt.options[option];
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        const cur = cleared.seats[seat];
+        if (cur === undefined) return cleared;
+        if (chosen === undefined || chosen === 'Decline') {
+          if (cur.downed || cur.dead || cur.hp <= 0 || loss <= 0) return cleared;
+          const nextHp = Math.max(cur.hp - loss, 0);
+          if (nextHp > 0) {
+            return {
+              ...cleared,
+              seats: cleared.seats.map(s => (s.seat === seat ? { ...s, hp: nextHp } : s)),
+            };
+          }
+          let rng = makeRng(cleared.rngState);
+          const rngShuffle = (items: readonly string[]): string[] => {
+            const r = shuffle(rng, items);
+            rng = r.rng;
+            return [...r.value];
+          };
+          const flip = flipDown(
+            {
+              hp: 0,
+              maxHp: cur.maxHp,
+              decorations: cur.decorations,
+              level: cur.level,
+              downed: false,
+              dead: false,
+              hand: cur.hand,
+              discard: cur.discard,
+              inventory: cur.inventory,
+            },
+            rngShuffle,
+          );
+          return {
+            ...cleared,
+            rngState: rng.s,
+            seats: cleared.seats.map(s => (s.seat === seat
+              ? { ...s, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
+              : s)),
+          };
+        }
+        if (!cur.hand.includes(chosen)) return cleared;
+        return {
+          ...cleared,
+          seats: cleared.seats.map(s => (s.seat === seat ? { ...s, hand: s.hand.filter(id => id !== chosen) } : s)),
+          removed: [...cleared.removed, chosen],
+        };
+      }
 
       if (kind === 'resuscitate') {
         // AC-050: trash the card to keep the Character at 10 HP; otherwise the
