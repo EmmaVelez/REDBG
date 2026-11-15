@@ -348,6 +348,81 @@ export function exploreDamageIfHpAtMost(
   return 0;
 }
 
+/** B4MC-CH-005 L2: +amount damage when exploring while at FULL Health. */
+export function exploreBonusIfFullHp(
+  abilities: readonly CharacterAbility[],
+  hp: number,
+  maxHp: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'exploreBonusIfFullHp' && hp >= maxHp) bonus += a.amount;
+  }
+  return bonus;
+}
+
+/** B4MC-CH-004 L2: +amount damage per Character healed this turn. */
+export function exploreDamagePerHealedCharacter(
+  abilities: readonly CharacterAbility[],
+  healedCount: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind === 'damagePerCharacterHealedThisTurn') bonus += a.amount * Math.max(healedCount, 0);
+  }
+  return bonus;
+}
+
+/** B4MC-CH-005 L1: the Action cost of charging the Stun Rod (1 Action). */
+export function stunRodChargeCost(abilities: readonly CharacterAbility[]): number {
+  return abilities.some(a => a.kind === 'stunRodCharge') ? 1 : 0;
+}
+
+/** B4MC-CH-005 L1: the +Damage a charged Stun Rod explore gets. */
+export function stunRodChargeAmount(abilities: readonly CharacterAbility[]): number {
+  let amount = 0;
+  for (const a of abilities) {
+    if (a.kind === 'stunRodCharge') amount += a.amount;
+  }
+  return amount;
+}
+
+/** Key identifying one CHARACTER (a Main and its Partner are two). */
+export function healedCharacterKey(seat: number, character: 'main' | 'partner'): string {
+  return `${seat}:${character}`;
+}
+
+/**
+ * Record every Character whose Health ROSE between two states, for
+ * B4MC-CH-004 L2 ("+5 Damage for each Character that has been Healed this
+ * turn"). A Character healed twice still counts once; a heal that was capped
+ * at max Health (no actual rise) does not count.
+ *
+ * Called at the two turn boundaries: after every action, and at turn start
+ * (which is where most heals land). Cleared by `startTurn`.
+ */
+export function applyHealTracking(prev: GameState, next: GameState): GameState {
+  let healed: Set<string> | undefined;
+  for (const seat of next.seats) {
+    const before = prev.seats[seat.seat];
+    if (before === undefined) continue;
+    if (seat.hp > before.hp) {
+      healed = healed ?? new Set(prev.healedCharactersThisTurn ?? []);
+      healed.add(healedCharacterKey(seat.seat, 'main'));
+    }
+    if (seat.partnerInstanceId !== undefined) {
+      const beforePartner = before.partnerHp ?? before.hp;
+      const afterPartner = seat.partnerHp ?? seat.hp;
+      if (afterPartner > beforePartner) {
+        healed = healed ?? new Set(prev.healedCharactersThisTurn ?? []);
+        healed.add(healedCharacterKey(seat.seat, 'partner'));
+      }
+    }
+  }
+  if (healed === undefined) return next;
+  return { ...next, healedCharactersThisTurn: [...healed] };
+}
+
 /**
  * Damage reduction vs Weapon attacks for this seat (PR-001 Chris L2: -10).
  * No PvP weapon-attack action exists in the engine yet, so this is encoded

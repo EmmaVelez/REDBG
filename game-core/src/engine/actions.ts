@@ -41,6 +41,11 @@ import {
   infectedDamageReduction,
   allDamageReduction,
   exploreDamageIfHpAtMost,
+  exploreBonusIfFullHp,
+  exploreDamagePerHealedCharacter,
+  stunRodChargeCost,
+  stunRodChargeAmount,
+  applyHealTracking,
   exploreBigHandBonus,
   exploreActionsBonus,
   exploreDamageIfNoPartnerLowHp,
@@ -384,7 +389,7 @@ export function applyAction(state: GameState, action: Action): GameState {
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, afterTrash, action)));
+  return applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, afterTrash, action))));
 }
 
 /**
@@ -1536,6 +1541,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // a partner-led explore uses the Partner's (level derived from the
           // Main character's Decorations), not the Main character's.
           const abilities = leaderAbilities(state, seat, exploreLeader);
+          // B4MC-CH-005 L1: while the seat's Stun Rod is charged, a Stun Rod
+          // used in this explore gets +amount Damage this turn.
+          const stunRodBonus = player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0;
           // Chris Redfield (Alliance): L1 -20 ammo when using exactly one
           // weapon; L2 -20 ammo for the weapon types he chose this turn.
           const chrisSingleDiscount = weapons.length === 1 ? singleWeaponAmmoDiscount(abilities) : 0;
@@ -1730,7 +1738,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -1782,6 +1790,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             plusTagDamageIfAmmoAbove(abilities, weaponDefs, player.turnAmmo) +
             exploreDamageIfNoPartnerLowHp(abilities, player.partnerInstanceId, player.hp) +
             exploreDamageIfHpAtMost(abilities, player.hp) +
+            exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
+            exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
@@ -4343,6 +4353,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     ? { ...player, weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.amount }
                     : s,
                 ),
+              };
+            }
+            case 'stunRodCharge': {
+              // B4MC-CH-005 L1: pay 1 Action to charge; for the rest of this turn
+              // her Stun Rod explores get +amount Damage. Once per turn is
+              // enforced by validate's log scan.
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...s, actionsLeft: s.actionsLeft - 1, stunRodCharged: true }
+                  : s)),
               };
             }
             case 'exchangeHandWithInventoryTop': {

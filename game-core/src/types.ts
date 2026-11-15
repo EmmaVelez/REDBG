@@ -88,6 +88,10 @@ export interface CardDef {
   /** Extra printed abilities for Ammunition cards (Mercenaries AM-005..007).
    *  Distinct from `bonuses`, which fire on PLAY. */
   readonly ammoEffects?: readonly AmmoEffect[];
+  /** Other cards this one needs in the def pool to function. `cardsForScenario`
+   *  pulls these in even when the room only ticked this card. A fan card may
+   *  name an OFFICIAL card here (B4MC-CH-005 -> we-028 Stun Rod). */
+  readonly dependencies?: readonly string[];
 
   // -- weapon --
   /** Ammo required to use this weapon when Exploring. 0 = free (knives). */
@@ -614,6 +618,11 @@ export type CharacterAbility =
   | { readonly kind: "turnDamageIfInfectedDealtDamageThisRound"; readonly amount: number; readonly downedAmount: number; readonly level: 1 | 2 } // B4MC-CH-008 Chris L1: +amount Damage this turn once an Infected has dealt Damage this round; +downedAmount instead while a Character is face down
   | { readonly kind: "notDefeatedInfectedToMansionTopOncePerRound"; readonly level: 1 | 2 } // B4MC-CH-008 Chris L2: once per round, an Infected that is not Defeated on his turn goes on top of the Mansion
   | { readonly kind: "turnStartPlusExploreRequiresTwoExploresAndDamage"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-009 Chris: turn-start choice of +1 Explore and +amount Damage, owing 2 Explores this turn
+  // --- Fan characters (B4MC-CH-004..006, Sherry Birkin) ---
+  | { readonly kind: "damagePerCharacterHealedThisTurn"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-004 L2: +amount Damage per Character healed this turn
+  | { readonly kind: "stunRodCharge"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L1: pay 1 Action; this turn her Stun Rod explores get +amount Damage
+  | { readonly kind: "exploreBonusIfFullHp"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L2: on Explore, +amount Damage this turn while she is at full Health
+  | { readonly kind: "healAtTurnStartOrElseDamageThisTurn"; readonly heal: number; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-006 L1: heal at turn start, or +amount Damage if already full
 
 
 // ---------------------------------------------------------------------------
@@ -810,6 +819,9 @@ export interface PlayerState {
    *  has already been used this turn ("this type of effect can only be applied
    *  once during your turn"). Cleared at the start of the player's next turn. */
   readonly ammoX10UpgradeUsedThisTurn?: boolean;
+  /** B4MC-CH-005 L1: the "pay 1 Action to charge" Stun Rod effect is active for
+   *  the rest of this turn (her Stun Rod explores get +10 Damage). */
+  readonly stunRodCharged?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -919,10 +931,18 @@ export interface GameState {
    *  Cleared at turn start. */
   readonly usedStartOfTurnAbilities?: Readonly<Record<string, boolean>>;
 
+<<<<<<< HEAD
   /** B4MC CH-008 Chris L1: an Infected has dealt Damage since the round
    *  began (the turn circled back to the first living player). Cleared at
    *  each new round. */
   readonly infectedDamageThisRound?: boolean;
+=======
+  /** B4MC-CH-004 L2: the Characters healed so far THIS turn, keyed
+   *  `<seat>:<main|partner>` so a Character healed twice still counts once.
+   *  Tracked by diffing Health before/after an action and at turn start.
+   *  Cleared at turn start. */
+  readonly healedCharactersThisTurn?: readonly string[];
+>>>>>>> 9b5c648 (feat(cards): add B4MC Sherry Birkin fan prints CH-004/005/006)
 
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when

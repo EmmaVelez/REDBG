@@ -4,7 +4,7 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { advanceTurn } from './turn';
-import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities, chrisL1TurnDamageBonus } from './abilities';
+import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities, chrisL1TurnDamageBonus, applyHealTracking } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
@@ -559,9 +559,10 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     // Partner (Alliance): assign a partner character to this seat when
     // partnerMode is on or an explicit partnerCharacterId is provided.
     let partnerInstanceId: string | undefined;
+    let partnerCardId: string | undefined;
     const wantPartner = setup.partnerMode === true || !!p.partnerCharacterId;
     if (wantPartner) {
-      let partnerCardId = p.partnerCharacterId || undefined;
+      partnerCardId = p.partnerCharacterId || undefined;
       // A character that cannot receive attachments (Chris L1) can only ever
       // be a Main character — never a Partner.
       if (partnerCardId !== undefined && !canBePartner(defsById.get(partnerCardId))) {
@@ -639,6 +640,20 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
 
     const inventory = rngShuffle(deckCards);
 
+    // B4MC-CH-005 L1: "At the start of the game, shuffle 1 'Stun Rod' into your
+    // Inventory." She only has to be IN the game — Main or Partner.
+    const wantsStunRod = characterCardId === 'b4mc-ch-005' || partnerCardId === 'b4mc-ch-005';
+    let stunRodInstanceId: string | undefined;
+    if (wantsStunRod && defsById.get('we-028') !== undefined) {
+      stunRodInstanceId = 'we-028#b4mc';
+      let suffix = 1;
+      while (instances[stunRodInstanceId] !== undefined) stunRodInstanceId = `we-028#b4mc${suffix++}`;
+      register(stunRodInstanceId, 'we-028', 'inventory');
+    }
+    const inventoryWithStunRod = stunRodInstanceId === undefined
+      ? inventory
+      : rngShuffle([...inventory, stunRodInstanceId]);
+
     return {
       seat: i,
       name: p.name,
@@ -664,7 +679,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       attached: [],
-      inventory,
+      inventory: inventoryWithStunRod,
       hand: [],
       discard: [],
       playArea: [],
@@ -870,7 +885,9 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
  * list would deadlock the seat behind the prompt gate.
  */
 export function startTurn(state: GameState): GameState {
-  return dropEmptyPrompts(startTurnInternal(state));
+  // B4MC-CH-004 L2: record the Characters healed by the turn-start recovery
+  // (most heals land here), on top of whatever the actions tracked.
+  return applyHealTracking(state, dropEmptyPrompts(startTurnInternal(state)));
 }
 
 function startTurnInternal(state: GameState): GameState {
@@ -911,6 +928,11 @@ function startTurnInternal(state: GameState): GameState {
   // Clear the start-of-turn abilities used flag so they can fire next turn.
   if (state.usedStartOfTurnAbilities !== undefined) {
     state = { ...state, usedStartOfTurnAbilities: undefined };
+  }
+
+  // B4MC-CH-004 L2: the "healed this turn" list is turn-scoped.
+  if (state.healedCharactersThisTurn !== undefined) {
+    state = { ...state, healedCharactersThisTurn: undefined };
   }
 
   // TUA-001 Tyrant Ultimate Abyss: clear disabled weapon types so they reset next turn.
@@ -1206,6 +1228,16 @@ function startTurnInternal(state: GameState): GameState {
   // Mansion attachment turn-start bonuses (Save Room: heal 10, +10 ammo)
   const attBonuses = mansionAttachmentTurnStartBonuses(state);
 
+  // B4MC-CH-006 L1: heal at turn start, but if she is already at FULL Health
+  // she gets +amount Damage this turn INSTEAD (no heal).
+  const healOrElseAbility = mainAbils.find(a => a.kind === 'healAtTurnStartOrElseDamageThisTurn');
+  const healOrElse: { heal: number; bonus: number } =
+    healOrElseAbility !== undefined && healOrElseAbility.kind === 'healAtTurnStartOrElseDamageThisTurn'
+      ? (player.hp >= player.maxHp
+        ? { heal: 0, bonus: healOrElseAbility.amount }
+        : { heal: healOrElseAbility.heal, bonus: 0 })
+      : { heal: 0, bonus: 0 };
+
   // CI-010 James Marcus: a player nominated on reveal must spend their WHOLE
   // Explore pool this turn, so the debt is seeded from the pool granted here.
   const exploresLeftAtTurnStart = player.isInfectedCharacter === true
@@ -1229,7 +1261,7 @@ function startTurnInternal(state: GameState): GameState {
     attached: attachedAfterMa,
     hand: [...player.hand, ...chainedFromDiscard],
     discard: [...player.discard.filter(id => !chainedSet.has(id)), ...cqDiscard, ...maDiscard],
-    hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + skillTurn.heal + attBonuses.heal, player.maxHp),
+    hp: Math.min(player.hp + herbHeal + healAtTurnStart(mainAbils) + healOrElse.heal + skillTurn.heal + attBonuses.heal, player.maxHp),
     // AC-000 Martial Arts (option 2): Knife and Melee Weapons deal double Damage this turn.
     ...(maDoubleDamage ? { damageMultiplierThisTurn: 2 } : {}),
     // The Partner's own recovery (Steve Burnside L1 and the like) restores the
@@ -1277,7 +1309,9 @@ function startTurnInternal(state: GameState): GameState {
     mustExplore: player.mustExplore === true || hasMansionAttachmentEffect(state, 'mustExploreIfAble') || infectedHordeBonus(state).damage > 0,
     // B4MC-CH-008 Chris L1: +10 Damage this turn once an Infected has dealt
     // Damage this round (+20 instead while a Character is face down).
-    weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus + chrisL1TurnDamageBonus(state, player.seat),
+    // B4MC-CH-006 Sherry L1: +10 Damage this turn instead when she was already
+    // at full Health at the beginning of the turn.
+    weaponDamageBonusThisTurn: skillTurn.damageThisTurn + krauserBonus + chrisL1TurnDamageBonus(state, player.seat) + healOrElse.bonus,
     damageMultiplierThisTurn: undefined,
     ...(player.isInfectedCharacter === true
       ? {
@@ -1310,6 +1344,8 @@ function startTurnInternal(state: GameState): GameState {
     weaponDamageBonusById: undefined,
     trashAtEndOfTurn: undefined,
     usedWeaponEffectsThisTurn: undefined,
+    // B4MC-CH-005 L1: the Stun Rod charge lasts "this turn" only.
+    stunRodCharged: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,

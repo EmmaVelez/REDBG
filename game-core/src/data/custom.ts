@@ -1144,6 +1144,66 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     actionEffects: [{ kind: 'mysteriousFindRoll' }],
   },
 
+  // ── Fan characters (B4MC-CH-004..006, Sherry Birkin) ─────────────────────
+  // Three JP-2025 promo prints. The printed code collides with official
+  // CH-004..CH-006, so the family prefix keeps them distinct.
+  {
+    id: 'b4mc-ch-004',
+    name: 'Sherry Birkin',
+    type: 'character',
+    set: 'custom',
+    text: "Level 1: At the beginning of your turn, Heal Sherry's Health by 10.\nLevel 2: Sherry does +5 Damage for each Character that has been Healed this turn.",
+    copies: 1,
+    maxHp: 100,
+    level1At: 2,
+    level2At: 5,
+    levels: [
+      { level: 1, text: "At the beginning of your turn, Heal Sherry's Health by 10." },
+      { level: 2, text: 'Sherry does +5 Damage for each Character that has been Healed this turn.' },
+    ],
+    abilities: [
+      { kind: 'healAtTurnStart', amount: 10, level: 1 },
+      { kind: 'damagePerCharacterHealedThisTurn', amount: 5, level: 2 },
+    ],
+  },
+  {
+    id: 'b4mc-ch-005',
+    name: 'Sherry Birkin',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: At the start of the game, shuffle 1 "Stun Rod" into your Inventory. During your turn, you can get -1 Action. In that case, when Sherry Explores with a "Stun Rod", it does +10 Damage this turn.\nLevel 2: When you Explore, if Sherry is at full Health, Sherry does +10 Damage this turn.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 0,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'At the start of the game, shuffle 1 "Stun Rod" into your Inventory. During your turn, you can get -1 Action. In that case, when Sherry Explores with a "Stun Rod", it does +10 Damage this turn.' },
+      { level: 2, text: 'When you Explore, if Sherry is at full Health, Sherry does +10 Damage this turn.' },
+    ],
+    abilities: [
+      { kind: 'stunRodCharge', amount: 10, level: 1 },
+      { kind: 'exploreBonusIfFullHp', amount: 10, level: 2 },
+    ],
+    // The Stun Rod is the official Outbreak weapon, pulled into the def pool.
+    dependencies: ['we-028'],
+  },
+  {
+    id: 'b4mc-ch-006',
+    name: 'Sherry Birkin',
+    type: 'character',
+    set: 'custom',
+    text: "Level 1: At the beginning of your turn, Heal Sherry's Health by 10. If Sherry's Health is full, she does +10 Damage this turn instead.",
+    copies: 1,
+    maxHp: 90,
+    level1At: 4,
+    levels: [
+      { level: 1, text: "At the beginning of your turn, Heal Sherry's Health by 10. If Sherry's Health is full, she does +10 Damage this turn instead." },
+    ],
+    abilities: [
+      { kind: 'healAtTurnStartOrElseDamageThisTurn', heal: 10, amount: 10, level: 1 },
+    ],
+  },
+
   // ── Custom Mercenaries Skills (SK-034..SK-036, Bomber line) ──────────────
   // Fan-designed Skill cards. Selecting them in the room's Custom Cards adds
   // them to the Mercenaries Skill deck when the Skill System modification is on

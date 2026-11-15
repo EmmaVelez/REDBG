@@ -1,5 +1,6 @@
 # HANDOFF — resume here
 
+<<<<<<< HEAD
 **B4MC CHRIS REDFIELD FAN PRINTS (2026-11-15):** three custom characters added from Manny's scans
 (`b4mc-ch-007/008/009`, all 90 Health). CH-007 gates 3/6 (L1 once-per-round -10 Infected Damage + an
 Ammo x10; L2 once-per-turn Trash -> +1 card). CH-008 gates 2/7 (L1 +10 Damage this turn once an
@@ -41,6 +42,41 @@ passed / 0 failed (the 7 pre-existing failures were fixed upstream), server 108,
 Still uncommitted and NOT part of this task: `client/src/ui/anims.ts` (a counter-animation WIP) and
 `game-core/src/data/CARD-ART/MA-000.png`.
 
+=======
+**B4MC SHERRY BIRKIN PROMOS (2026-11-15):** Manny sent three JP-2025 card scans (printed
+codes CH-004/005/006 — all of which COLLIDE with official cards) and said "prefix their
+card id with b4mc". Implemented as `b4mc-ch-004` / `b4mc-ch-005` / `b4mc-ch-006`.
+- **Data** (`custom.ts`): ch-004 100 HP, `level1At: 2` / `level2At: 5`; ch-005 100 HP,
+  `level1At: 0` / `level2At: 7`; ch-006 90 HP, `level1At: 4` and NO level 2. (The boxed
+  number beside "Level N" on these prints is the Decorations requirement, matching
+  `level1At`/`level2At` — verified against official ch-002 whose 2/6 match its data.)
+- **New CharacterAbility kinds:** `damagePerCharacterHealedThisTurn` (ch-004 L2),
+  `stunRodCharge` (ch-005 L1), `exploreBonusIfFullHp` (ch-005 L2),
+  `healAtTurnStartOrElseDamageThisTurn` (ch-006 L1).
+- **"Healed this turn" needs a tracker.** `applyHealTracking(prev, next)` (abilities.ts)
+  DIFFS Health per seat (main `hp`, and `partnerHp` only when `partnerInstanceId` is set)
+  and records the key `<seat>:main|partner`; a Character healed twice counts once, and a
+  heal capped at max Health does not count. It runs at the TWO turn boundaries — after
+  every `applyAction` and inside the `startTurn` wrapper (most heals land there) — and the
+  list is cleared in `startTurnInternal`. Keying by character, not by event, is what makes
+  "+5 per Character" right.
+- **ch-005's "Stun Rod" is the OFFICIAL `we-028`** (Outbreak). New `CardDef.dependencies`
+  feeds the `cardsForScenario` `wanted` loop, so the def is present even on a base
+  scenario. `setup` shuffles one instance into the seat's Inventory when she is the Main
+  OR the Partner (ruling).
+- **ch-005 L1 is a manual ability**: pay 1 Action (validate rejects with
+  `no Action to spend`), once per turn via validate's log scan; sets
+  `PlayerState.stunRodCharged`, cleared in `startTurn`. The +10 is applied PER WEAPON in
+  the explore damage expression (`w?.id === 'we-028'`), so it covers single-, multi- and
+  ally-explore and needs no state mutation; `exploreDamage` (the picker preview) mirrors it.
+- **Rulings taken** (asked, because each had two readings): "each Character that has been
+  Healed" = ANY character, opponents included; the -1 Action is a once-per-turn manual
+  cost; the Stun Rod shuffle happens whether she is Main or Partner.
+- **Tests:** `customB4mcSherry.test.ts` (14) — data shape, the we-028 dependency pull, the
+  setup shuffle (Main and Partner), the heal / heal-or-damage branches, the heal tracker,
+  the charge cost + once-per-turn + per-weapon bonus, and both L2 bonuses through
+  `exploreDamage`. Art: 3 PNGs converted from the JPEGs (320x448, P-mode, ~95-104 KB).
+>>>>>>> 9b5c648 (feat(cards): add B4MC Sherry Birkin fan prints CH-004/005/006)
 
 **END-SCREEN PLAYER RANKING (2026-11-14):** Manny: "Add a ranked list of players and
 their decorations at the end of the game to the end screen." Done.
@@ -1937,3 +1973,4 @@ engine are unused union members in `types.ts`
 27. MERCENARIES AMMO ABILITIES (this change): the card ART is the source of truth when a def's `text` disagrees with it — AM-005's art reads "When you Trash this card, you get +10 Gold during this turn" and the data had a plain +10/+10. `CardDef.bonuses` fire on PLAY ONLY; an extra printed ability needs its own effect kind (`ammoEffects` here). A "when this card is trashed" trigger has NO choke point (45 sites push to `removed`) — diff `removed` before/after the action in a post-action hook instead of patching each site, and pay the OWNER (`ownerSeatOf(prev, id)`), not `action.seat`. A per-card on-defeat trigger must be raised in BOTH explore paths: the multi-explore reducer does NOT call `applyMercenariesOnDefeatAbilities`. An end-of-turn "you can move it to the top of your Inventory" is resolved automatically (the CW-025 ruling) — and the end-of-turn draw then takes it into the new Hand, so assert on the hand, not `inventory[0]`.
 28. BOSS REVEAL vs GAME-OVER OVERLAY (this change): the explore that defeats the boss is the same action that ends the game, so the end screen and the reveal land on the same render. `.seat-swap-backdrop` (640) covered `.mansion-door-backdrop` (600). Two guards, because either can be undone alone: raise the reveal's z-index above the seat-swap (660), AND gate the overlay with `shouldShowGameOverOverlay` so it is not in the DOM while a reveal/death overlay is pending. The z-index is what prevents the FIRST-frame flash — the reveal queue is populated in a `useEffect`, i.e. after paint. When two full-screen overlays can coexist, decide the precedence ONCE (a helper + a CSS-ordering test) rather than per call site.
 29. END-SCREEN PLAYER RANKING (this change): the game-over screen lists every player ranked by Decorations then Health — the same order `checkWin` uses, so the list agrees with the CHAMPION line. The ranking is a PURE helper (`client/src/ui/standings.ts rankStandings`) because the client test env is `node` with no DOM and App cannot be rendered in tests; `SeatSwap` takes an optional `standings` prop (`<ol data-standings>`, one `<li data-standing>` per seat, winners get `is-winner`). `viewForSeat` does NOT sanitize Decorations/Health (only hand and inventory), so `view.state.seats` is enough — no new server field.
+30. B4MC SHERRY BIRKIN PROMOS (this change): three JP-2025 prints whose codes collide with official CH-004..006, ids `b4mc-ch-004/005/006`. The boxed number beside "Level N" is the DECORATIONS requirement (`level1At`/`level2At`), not a cost. A "+N per Character that has been Healed this turn" ability needs an explicit TRACKER — diff Health before/after (`applyHealTracking`) at both turn boundaries (after `applyAction`, and in the `startTurn` wrapper), keyed `<seat>:main|partner` so a Character counts once; clear it in `startTurnInternal`. A custom card may name an OFFICIAL card it needs via the new `CardDef.dependencies`, which feeds the `cardsForScenario` `wanted` loop (ch-005 -> we-028 Stun Rod). A "pay 1 Action" manual ability goes in validate's manual list with an `actionsLeft >= 1` check, and its once-per-turn comes from the log scan — do NOT use `usedStartOfTurnAbilities`. When the bonus is per-WEAPON, add it in the shared per-weapon damage expression (covers single + multi + ally) and mirror it in `exploreDamage`.

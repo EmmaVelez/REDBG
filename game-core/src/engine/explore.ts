@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, dualWieldBonus, leaderAbilities } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
@@ -190,7 +190,7 @@ export function exploreDamage(
     const bowBonus = bowEff !== undefined && bowEff.kind === 'plusDamageIfNoActionsInPlayArea' && noActions ? bowEff.amount : 0;
     const xpBonus = xpEff !== undefined && xpEff.kind === 'plusDamageIfCharacterXpAtLeast' && (player.xp ?? 0) >= xpEff.threshold ? xpEff.amount : 0;
     return {
-      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus,
+      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
       ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,
@@ -223,7 +223,9 @@ export function exploreDamage(
     plusTagDamageIfAmmoAbove(abilities, defs, player.turnAmmo) +
     // Mercenaries Skill damage bonuses (SK-030, SK-034, ...) — the picker's
     // preview must match what the explore reducer resolves.
-    exploreSkillDamageBonus(activeSkillEffects(state, seat), defs, state, seat, weaponIds ?? []);
+    exploreSkillDamageBonus(activeSkillEffects(state, seat), defs, state, seat, weaponIds ?? []) +
+    exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
+    exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;

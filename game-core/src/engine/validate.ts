@@ -527,7 +527,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'discardWeaponToCopyEffects':
         case 'choosePlayerIncreaseAmmoReqNextTurn':
         case 'discardActionCardFromHandForPlusTwoCards':
-        case 'forceAllyExploreWithSupport': {
+        case 'forceAllyExploreWithSupport':
+        case 'stunRodCharge': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -564,6 +565,12 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             // also DISAGREE between the server (full state) and the client
             // (other seats' hands are sanitized to hidden-*), offering an
             // ability button the server then rejects.
+          }
+          if (ability.kind === 'stunRodCharge') {
+            // B4MC-CH-005 L1: costs 1 Action, so it needs one to spend.
+            if (player.actionsLeft < 1) {
+              return { ok: false, reason: 'useCharacterAbility: no Action to spend' };
+            }
           }
           if (ability.kind === 'exchangeHandWithInventoryTop') {
             if (player.hand.length === 0 || player.inventory.length === 0) {

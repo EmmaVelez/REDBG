@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState } from '../types';
 import { revealTop, sendToBottom } from './mansion';
 import { drawWithReshuffle } from './deck';
-import { characterAbilities, passiveDamageBonus, plusTagDamageIfAmmoAbove, infectedDamageReduction, applyRicardoDamage } from './abilities';
+import { characterAbilities, passiveDamageBonus, plusTagDamageIfAmmoAbove, infectedDamageReduction, applyRicardoDamage, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
@@ -97,13 +97,15 @@ export function resolveAllyExplore(
   const usedWeaponIds = allyExploreUsedWeaponIds(state, sherrySeat, targetSeat);
   const weaponDefs = usedWeaponIds.map(id => cardDef(state, id));
   const weapons: ExploreWeapon[] = usedWeaponIds.map((id, i) => ({
-    damage: weaponDefs[i]?.damage ?? 0,
+    damage: (weaponDefs[i]?.id === 'we-028' && target.stunRodCharged === true ? stunRodChargeAmount(targetAbilities) : 0) + (weaponDefs[i]?.damage ?? 0),
     ammoReq: exploreAmmoReq(state, targetSeat, id, usedWeaponIds.length),
     weaponEffects: weaponDefs[i]?.weaponEffects,
     tags: weaponDefs[i]?.weaponTags,
   }));
   const abilityDamage = passiveDamageBonus(targetAbilities, weaponDefs, 1, target.hand.length) +
-    plusTagDamageIfAmmoAbove(targetAbilities, weaponDefs, target.turnAmmo);
+    plusTagDamageIfAmmoAbove(targetAbilities, weaponDefs, target.turnAmmo) +
+    exploreBonusIfFullHp(targetAbilities, target.hp, target.maxHp) +
+    exploreDamagePerHealedCharacter(targetAbilities, (state.healedCharactersThisTurn ?? []).length);
   const bonusDamage = target.weaponDamageBonusThisTurn + abilityDamage;
 
   const outcome: ExploreOutcome = resolveExplore({

@@ -794,6 +794,9 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
     // not tick it explicitly.
     const wanted = new Set(selected);
     for (const cardId of selected) {
+      // A fan card may name another card it needs (an OFFICIAL one included):
+      // B4MC-CH-005's Stun Rod is the real we-028.
+      for (const dep of CUSTOM_CARDS.find(c => c.id === cardId)?.dependencies ?? []) wanted.add(dep);
       const def = CUSTOM_CARDS.find(c => c.id === cardId);
       if (def === undefined) continue;
       for (const e of def.infectedEffects ?? []) {
