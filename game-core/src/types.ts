@@ -931,18 +931,16 @@ export interface GameState {
    *  Cleared at turn start. */
   readonly usedStartOfTurnAbilities?: Readonly<Record<string, boolean>>;
 
-<<<<<<< HEAD
   /** B4MC CH-008 Chris L1: an Infected has dealt Damage since the round
    *  began (the turn circled back to the first living player). Cleared at
    *  each new round. */
   readonly infectedDamageThisRound?: boolean;
-=======
+
   /** B4MC-CH-004 L2: the Characters healed so far THIS turn, keyed
    *  `<seat>:<main|partner>` so a Character healed twice still counts once.
    *  Tracked by diffing Health before/after an action and at turn start.
    *  Cleared at turn start. */
   readonly healedCharactersThisTurn?: readonly string[];
->>>>>>> 9b5c648 (feat(cards): add B4MC Sherry Birkin fan prints CH-004/005/006)
 
   /** Unofficial Expansion: the shared counter supply by the board (instance
    *  ids). A counter cycles between here and a Character's `counters`; when

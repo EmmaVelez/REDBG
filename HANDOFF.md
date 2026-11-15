@@ -1,6 +1,5 @@
 # HANDOFF — resume here
 
-<<<<<<< HEAD
 **B4MC CHRIS REDFIELD FAN PRINTS (2026-11-15):** three custom characters added from Manny's scans
 (`b4mc-ch-007/008/009`, all 90 Health). CH-007 gates 3/6 (L1 once-per-round -10 Infected Damage + an
 Ammo x10; L2 once-per-turn Trash -> +1 card). CH-008 gates 2/7 (L1 +10 Damage this turn once an
@@ -42,7 +41,6 @@ passed / 0 failed (the 7 pre-existing failures were fixed upstream), server 108,
 Still uncommitted and NOT part of this task: `client/src/ui/anims.ts` (a counter-animation WIP) and
 `game-core/src/data/CARD-ART/MA-000.png`.
 
-=======
 **B4MC SHERRY BIRKIN PROMOS (2026-11-15):** Manny sent three JP-2025 card scans (printed
 codes CH-004/005/006 — all of which COLLIDE with official cards) and said "prefix their
 card id with b4mc". Implemented as `b4mc-ch-004` / `b4mc-ch-005` / `b4mc-ch-006`.
@@ -76,7 +74,6 @@ card id with b4mc". Implemented as `b4mc-ch-004` / `b4mc-ch-005` / `b4mc-ch-006`
   setup shuffle (Main and Partner), the heal / heal-or-damage branches, the heal tracker,
   the charge cost + once-per-turn + per-weapon bonus, and both L2 bonuses through
   `exploreDamage`. Art: 3 PNGs converted from the JPEGs (320x448, P-mode, ~95-104 KB).
->>>>>>> 9b5c648 (feat(cards): add B4MC Sherry Birkin fan prints CH-004/005/006)
 
 **END-SCREEN PLAYER RANKING (2026-11-14):** Manny: "Add a ranked list of players and
 their decorations at the end of the game to the end screen." Done.
