@@ -15,6 +15,8 @@ import { YouDiedOverlay } from './ui/YouDiedOverlay';
 import { detectCardReveals, detectPlayerDowned, detectReveals } from './ui/anims';
 import type { CardRevealBatch } from './ui/anims';
 import { CardRevealOverlay } from './ui/CardRevealOverlay';
+import { shouldShowGameOverOverlay } from './ui/overlayOrder';
+import { rankStandings } from './ui/standings';
 import { defForInstance } from './ui/cards';
 import type { RevealPartyMember } from './ui/MansionReveal';
 
@@ -264,9 +266,20 @@ export function App(): JSX.Element {
   const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
 
   const passPending = hotseat !== null && hotseat.passPending && gameOver === null;
+  // Anything the player must look at before the end screen: the explore/mansion
+  // reveal (a boss reveal is an explore reveal), an ability/effect reveal, or
+  // the YOU DIED screen.
+  const revealPending = revealCurrent !== null || cardReveal !== null || youDied !== null;
   // Game over overlay: hotseat OR server room (before, a server-room game over
-  // left everyone staring at 'Waiting for Bot N…' forever).
-  const showGameOverOverlay = (hotseat !== null || room !== null) && gameOver !== null;
+  // left everyone staring at 'Waiting for Bot N…' forever). It WAITS for a
+  // pending reveal/death overlay — the seat-swap backdrop is z-index 640, above
+  // the mansion-door reveal's old 600, so without this the boss that just ended
+  // the game is covered up before the player ever sees it.
+  const showGameOverOverlay = shouldShowGameOverOverlay({
+    inGame: hotseat !== null || room !== null,
+    gameOver: gameOver !== null,
+    revealPending,
+  });
 
   if (view === null || (room === null && hotseat === null)) {
     prevStateRef.current = null; // reset across lobby/game switches
@@ -296,6 +309,17 @@ export function App(): JSX.Element {
   void inLobby;
 
   const gameState = view.state;
+  // End-of-game ranking: Decorations first, then Health — the same order
+  // `checkWin` ranks winners, so the list always agrees with the CHAMPION line.
+  const standings = rankStandings(
+    gameState.seats.map((s, i) => ({
+      seat: i,
+      name: seatNames[i] ?? `Player ${i + 1}`,
+      decorations: s.decorations,
+      hp: s.hp,
+    })),
+    gameOver?.winners ?? [],
+  );
   // Pass-and-play hand-off follows the seat the game is waiting on — the draft's
   // pick/keep seat during the opening Skill Draft, the active seat afterwards.
   // Read it from the authoritative hotseat game (the view is frozen while the
@@ -402,6 +426,7 @@ export function App(): JSX.Element {
           winners={gameOver?.winners}
           endReason={gameOver?.endReason}
           playerNames={seatNames}
+          standings={standings}
           onContinue={() =>
             hotseat !== null
               ? useGameStore.getState().quitHotseat()

@@ -1,4 +1,7 @@
 import type { JSX } from 'react';
+import type { GameStanding } from './standings';
+
+export type { GameStanding } from './standings';
 
 /**
  * M4-T10 seat-swap screen. Two modes:
@@ -18,10 +21,13 @@ export interface SeatSwapProps {
    */
   readonly endReason?: string;
   readonly playerNames?: readonly string[];
+  /** Ranked players, best first (game over). Optional so the old winner line
+   *  still renders when the caller has no standings to hand. */
+  readonly standings?: readonly GameStanding[];
   readonly onContinue: () => void;
 }
 
-export function SeatSwap({ mode, nextName, winners, endReason, playerNames, onContinue }: SeatSwapProps): JSX.Element {
+export function SeatSwap({ mode, nextName, winners, endReason, playerNames, standings, onContinue }: SeatSwapProps): JSX.Element {
   if (mode === 'gameOver') {
     const names = (winners ?? [])
       .map(s => playerNames?.[s] ?? `Player ${s + 1}`)
@@ -37,6 +43,21 @@ export function SeatSwap({ mode, nextName, winners, endReason, playerNames, onCo
           <h1 className="seat-swap-title">{title}</h1>
           <p className="seat-swap-winner">{names.join(' & ') || 'No one'}</p>
           <p className="seat-swap-sub">{sub}</p>
+          {standings !== undefined && standings.length > 0 && (
+            <ol className="seat-swap-standings" data-standings>
+              {standings.map((s, i) => (
+                <li
+                  key={s.seat}
+                  className={s.winner ? 'seat-swap-standing is-winner' : 'seat-swap-standing'}
+                  data-standing={s.seat}
+                >
+                  <span className="seat-swap-rank">{i + 1}</span>
+                  <span className="seat-swap-name">{s.name}</span>
+                  <span className="seat-swap-decorations">{s.decorations} ★</span>
+                </li>
+              ))}
+            </ol>
+          )}
           <button type="button" className="btn-primary" onClick={onContinue}>
             Back to lobby
           </button>

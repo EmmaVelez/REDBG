@@ -1317,7 +1317,10 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-door-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 600;
+  /* Above the seat-swap (pass-device / game-over) backdrop at 640: when the
+     explore that ends the game reveals the boss, the reveal must be SEEN, not
+     covered by the end screen. */
+  z-index: 660;
   background: rgba(4, 5, 8, 0.78);
   backdrop-filter: blur(2px);
   display: flex;
@@ -1750,6 +1753,44 @@ h1, h2 { margin: 0 0 8px; }
 }
 .seat-swap-winner { color: #e6ffe6; font-size: 26px; font-weight: 800; margin: 0; }
 .seat-swap-sub { color: var(--muted); font-size: 14px; margin: 0; }
+/* End-of-game ranking: rank, name, Decorations. The winner row is highlighted
+   so the list agrees with the CHAMPION / SHARED VICTORY line above it. */
+.seat-swap-standings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.seat-swap-standing {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 14px;
+}
+.seat-swap-standing.is-winner {
+  border-color: #7dd87d;
+  background: rgba(125, 216, 125, 0.12);
+  box-shadow: 0 0 10px rgba(125, 216, 125, 0.25);
+}
+.seat-swap-rank { color: var(--muted); font-weight: 700; }
+.seat-swap-name {
+  font-weight: 700;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat-swap-decorations { color: #ffd76a; font-weight: 800; }
 
 /* ---- scenario picker ---- */
 .scenario-picker { display: flex; flex-direction: column; gap: 4px; }

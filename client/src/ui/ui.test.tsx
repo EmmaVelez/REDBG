@@ -927,6 +927,27 @@ describe('SeatSwap (M4-T10)', () => {
     expect(html).toContain('SHARED VICTORY');
     expect(html).toContain('A &amp; C');
   });
+
+  it('gameOver shows the ranked standings with each player\'s Decorations', () => {
+    const html = renderToStaticMarkup(
+      <SeatSwap
+        mode="gameOver"
+        winners={[1]}
+        playerNames={['Chris', 'Jill']}
+        standings={[
+          { seat: 1, name: 'Jill', decorations: 12, winner: true },
+          { seat: 0, name: 'Chris', decorations: 7, winner: false },
+        ]}
+        onContinue={() => {}}
+      />
+    );
+    expect(html).toContain('data-standings');
+    // Best first: Jill's row (seat 1) renders ahead of Chris's (seat 0).
+    expect(html.indexOf('data-standing="1"')).toBeLessThan(html.indexOf('data-standing="0"'));
+    expect(html).toContain('12 ★');
+    expect(html).toContain('7 ★');
+    expect(html).toContain('is-winner');
+  });
 });
 
 describe('ActionBar (T07)', () => {

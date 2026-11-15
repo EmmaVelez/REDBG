@@ -1,5 +1,43 @@
 # HANDOFF — resume here
 
+**END-SCREEN PLAYER RANKING (2026-11-14):** Manny: "Add a ranked list of players and
+their decorations at the end of the game to the end screen." Done.
+- `rankStandings(players, winners)` in `client/src/ui/standings.ts` — PURE (no React /
+  store) so it is unit-testable in the `node` test env: Decorations desc, then Health,
+  i.e. the SAME order `checkWin` ranks winners, so the list can never disagree with the
+  CHAMPION / SHARED VICTORY line. It also strips `hp` from the rendered rows.
+- `SeatSwap` gameOver renders `<ol className="seat-swap-standings" data-standings>` with
+  one `<li data-standing={seat}>` per player (rank / name / `N ★`); winner rows get
+  `is-winner`. `standings` is optional so the old winner-only path still renders.
+- `App.tsx` builds the rows from `view.state.seats` (Decorations + Health are NOT
+  sanitized away by `viewForSeat` — only hand/inventory are) plus `seatNames`.
+- **Live-verified**: SHARED VICTORY with rows `1 Jill 9 ★`, `2 Ada 9 ★`, `3 Chris 3 ★`
+  — the 9-9 tie broken on Health (Jill 80 > Ada 55).
+- **Tests**: `standings.test.ts` (4 — order, tie-break, winner flagging, hp stripped),
+  `ui.test.tsx` +1 (the ranked rows render, best first).
+
+**BOSS REVEAL vs GAME-OVER OVERLAY (2026-11-14):** Manny: "When the boss is revealed and
+defeated, the game end screen pops up immediately and the player doesn't actually get to
+see the boss revealed." The explore that DEFEATS the boss is also the explore that ends
+the game, and `.seat-swap-backdrop` (pass-device + game over) is z-index 640 while
+`.mansion-door-backdrop` (the explore reveal) was 600 — the end screen painted straight
+over the boss.
+- **Two independent guards** (either alone can be undone, so both are worth having):
+  `.mansion-door-backdrop` z-index 600 → **660**, and `shouldShowGameOverOverlay()`
+  (`client/src/ui/overlayOrder.ts`) keeps the end screen OUT OF THE DOM while a
+  mansion-door reveal, an ability/effect reveal, or YOU DIED is pending. The z-index is
+  what stops the FIRST-frame flash (the reveal queue is set in a `useEffect`, after
+  paint); the gate is the semantic "you must see it first".
+- **Only the Nightmare scenario has a scenario boss** (`winInfectedCardId: 'ma-054'`,
+  Osmund Saddler); Outbreak uses `endInfectedCardId: 'ma-041'`. `checkWin` fires the moment
+  the boss is ATTACHED, i.e. in the same action as the reveal.
+- **Live-verified**: Nightmare hotseat, boss forced to the Mansion top → the reveal shows
+  "Defeated! Osmund Saddler is attached to your character (+8 ★)." with NO end screen, and
+  the CHAMPION screen appears only after Continue.
+- **Tests**: `client/src/ui/overlayOrder.test.ts` — the gate truth table, plus a test that
+  PARSES `styles.css` and asserts `.mansion-door-backdrop`'s z-index beats
+  `.seat-swap-backdrop`'s (goes red at 600).
+
 **MERCENARIES AMMO ABILITIES AM-005..AM-007 (2026-11-14):** Manny: "Am-005's card
 text reads 'when you trash this card, you get +10 gold during this turn'" — the card ART
 agrees, but the DATA did not: all three Mercenaries ammo cards were plain
@@ -1855,3 +1893,5 @@ engine are unused union members in `types.ts`
 25. ABILITY/EFFECT REVEAL OVERLAY (this change): a NON-explore reveal must pause the table and show the card. The engine records `LoggedAction.reveals` via `recordCardReveals()` (same `seq`-matched log rewrite as `recordExploreReveals`) — and because that helper REASSIGNS `nextBase.log`, always call it before building a state object that spreads `...nextBase`. The client's `detectCardReveals(prev, next, mySeat)` + `CardRevealOverlay` render it, gated to the INVOLVED seat (actor, or a seat whose own card was revealed) so a bot's private peek does not leak to the human; the overlay is suppressed while a mansion-door reveal is active. When adding a new reveal effect/ability, wire `recordCardReveals` at its site — a peek has no zone diff, so the client cannot discover it any other way.
 26. MERCENARIES BASIC RESOURCES (this change): a room option that swaps the scenario's basic piles for the Mercenaries printings. `MERCENARIES_BASIC_RESOURCES` is keyed by PILE ID (am10/am20/am30/hg/kn) and `pilesForScenario` replaces only the CONTENTS, so the board slot is stable. Any new option that changes which cards a scenario uses must be passed to BOTH `cardsForScenario` and `pilesForScenario` — `setup` silently skips pile card ids with no def, so a missing def reads as "the pile is empty", not an error. The starting deck is stat-derived (`pickBasic` in game.ts) and also honours the option via `GameSetup.mercenariesBasicResources`, which must be set at the `setup()` call sites in host.ts and hotseat.ts.
 27. MERCENARIES AMMO ABILITIES (this change): the card ART is the source of truth when a def's `text` disagrees with it — AM-005's art reads "When you Trash this card, you get +10 Gold during this turn" and the data had a plain +10/+10. `CardDef.bonuses` fire on PLAY ONLY; an extra printed ability needs its own effect kind (`ammoEffects` here). A "when this card is trashed" trigger has NO choke point (45 sites push to `removed`) — diff `removed` before/after the action in a post-action hook instead of patching each site, and pay the OWNER (`ownerSeatOf(prev, id)`), not `action.seat`. A per-card on-defeat trigger must be raised in BOTH explore paths: the multi-explore reducer does NOT call `applyMercenariesOnDefeatAbilities`. An end-of-turn "you can move it to the top of your Inventory" is resolved automatically (the CW-025 ruling) — and the end-of-turn draw then takes it into the new Hand, so assert on the hand, not `inventory[0]`.
+28. BOSS REVEAL vs GAME-OVER OVERLAY (this change): the explore that defeats the boss is the same action that ends the game, so the end screen and the reveal land on the same render. `.seat-swap-backdrop` (640) covered `.mansion-door-backdrop` (600). Two guards, because either can be undone alone: raise the reveal's z-index above the seat-swap (660), AND gate the overlay with `shouldShowGameOverOverlay` so it is not in the DOM while a reveal/death overlay is pending. The z-index is what prevents the FIRST-frame flash — the reveal queue is populated in a `useEffect`, i.e. after paint. When two full-screen overlays can coexist, decide the precedence ONCE (a helper + a CSS-ordering test) rather than per call site.
+29. END-SCREEN PLAYER RANKING (this change): the game-over screen lists every player ranked by Decorations then Health — the same order `checkWin` uses, so the list agrees with the CHAMPION line. The ranking is a PURE helper (`client/src/ui/standings.ts rankStandings`) because the client test env is `node` with no DOM and App cannot be rendered in tests; `SeatSwap` takes an optional `standings` prop (`<ol data-standings>`, one `<li data-standing>` per seat, winners get `is-winner`). `viewForSeat` does NOT sanitize Decorations/Health (only hand and inventory), so `view.state.seats` is enough — no new server field.
