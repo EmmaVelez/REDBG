@@ -2,7 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost } from './locations';
+import { nextCubeCost, locationBuyCostReduction } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -463,7 +463,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       // Discounts (Mikhail L1, Billy Coen L1 melee) apply to the
       // affordability check too, or the buy is rejected unless the player
       // holds the RAW cost even though applyAction would charge less.
-      if (player.turnGold < buyCostAfterReduction(seatAbilities(state, action.seat), topCardDef)) {
+      if (player.turnGold < Math.max(0, buyCostAfterReduction(seatAbilities(state, action.seat), topCardDef)
+        - locationBuyCostReduction(state, action.seat))) {
         return { ok: false, reason: 'buy: insufficient gold' };
       }
       return { ok: true };

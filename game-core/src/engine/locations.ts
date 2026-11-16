@@ -347,6 +347,34 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'revealInfectedHpReductionThisTurn':
         s = { ...s, infectedHpReductionThisTurn: { amount: effect.amount, min: effect.min } };
         break;
+      case 'revealEachPlayerMayGainItem': {
+        // Terrace: every living player may take one item from the Resource Area.
+        for (const other of s.seats.filter(x => !x.dead && !x.downed)) {
+          const itemIds = itemMarketIds(s);
+          if (itemIds.length === 0) continue;
+          prompts = [...prompts, {
+            id: `loc-item-${other.seat}-${s.version}`,
+            seat: other.seat,
+            text: `${def.name}: gain an item from the Resource Area?`,
+            options: [...itemIds, 'Decline'],
+            payload: { kind: 'locGainItemChoice' },
+          }];
+        }
+        break;
+      }
+      case 'revealEachPlayerMayDiscardForXp': {
+        // Tiger Statue Room: every living player may discard a card for XP.
+        for (const other of s.seats.filter(x => !x.dead && !x.downed && x.hand.length > 0)) {
+          prompts = [...prompts, {
+            id: `loc-discardxp-${other.seat}-${s.version}`,
+            seat: other.seat,
+            text: `${def.name}: discard a card for ${effect.xp} XP?`,
+            options: [...other.hand, 'Decline'],
+            payload: { kind: 'locDiscardForXpChoice', xp: String(effect.xp) },
+          }];
+        }
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'onexGainAmmoAndDamagePerCardGained':
@@ -396,6 +424,35 @@ export function locationXpOnTrash(state: GameState, seat: number): number {
     if (effect.kind === 'ongoingGainXpOnTrash') total += effect.amount;
   }
   return total;
+}
+
+/** Instance ids of every ITEM card on top of a Resource Area pile. */
+function itemMarketIds(state: GameState): string[] {
+  const out: string[] = [];
+  for (const pile of Object.values(state.marketPiles)) {
+    const top = pile.cards[0];
+    if (top === undefined) continue;
+    if (state.cardDefs[state.cards[top]?.cardId ?? '']?.type === 'item') out.push(top);
+  }
+  return out;
+}
+
+/** Tiger Statue Room: gold the seat's locations knock off every buy this turn. */
+export function locationBuyCostReduction(state: GameState, seat: number): number {
+  let total = 0;
+  for (const effect of investEffectsFor(state, seat)) {
+    if (effect.kind === 'ongoingBuyCostReduction') total += effect.amount;
+  }
+  return total;
+}
+
+/** Terrace: the investor may still free-play the first action gained this turn.
+ *  The flag is only "consumed" once it has been spent (undefined = not armed). */
+export function hasFreeActionPlay(state: GameState, seat: number): boolean {
+  const p = state.seats[seat];
+  if (p === undefined) return false;
+  if (p.freeActionPlayAvailable === false) return false;
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingFreePlayFirstActionGained');
 }
 
 /** True when the seat's location lets them trash on their 2nd gain of a turn. */

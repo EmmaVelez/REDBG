@@ -450,11 +450,20 @@ export type LocationEffect =
   | { readonly kind: 'revealRemoveInfectionAndCounters' }
   /** Mirror Corridor: Infected revealed THIS turn get −amount Health, min 5. */
   | { readonly kind: 'revealInfectedHpReductionThisTurn'; readonly amount: number; readonly min: number }
+  /** Terrace: every living player may take one item from the Resource Area. */
+  | { readonly kind: 'revealEachPlayerMayGainItem' }
+  /** Tiger Statue Room: every living player may discard a card for 1 XP. */
+  | { readonly kind: 'revealEachPlayerMayDiscardForXp'; readonly xp: number }
   // --- ongoing / investment ---
   | { readonly kind: 'ongoingGainHealthOnReveal'; readonly amount: number }
   | { readonly kind: 'ongoingTrashOnSecondCardGain' }
   /** Lord Spencer's Study: the investor gains 1 XP whenever they trash a card. */
   | { readonly kind: 'ongoingGainXpOnTrash'; readonly amount: number }
+  /** Terrace: the first action card the investor gains from a market pile each
+   *  turn may be played straight away (spends 1 Action). */
+  | { readonly kind: 'ongoingFreePlayFirstActionGained' }
+  /** Tiger Statue Room: cards cost `amount` less gold on the investor's turn. */
+  | { readonly kind: 'ongoingBuyCostReduction'; readonly amount: number }
   | { readonly kind: 'ongoingDrawAtTurnEnd'; readonly count: number; /** GLOBAL cards: 'revealer' limits this to the seat that revealed it. */
     readonly scope?: 'all' | 'revealer' }
   // --- 1X (paid use) ---
@@ -967,6 +976,12 @@ export interface PlayerState {
   /** Fan Locations (1X): which location instances this seat has already paid
    *  for this turn — enforces a card's "Max: once per turn". */
   readonly locationUsesThisTurn?: readonly string[];
+  /** Fan Location (Terrace): the free play of the first action card gained
+   *  from a market pile is still unused this turn. */
+  readonly freeActionPlayAvailable?: boolean;
+  /** Fan Location (Terrace): an action card just bought that should be
+   *  played immediately and for free. Consumed by applyAction. */
+  readonly pendingFreeActionInstanceId?: string;
 }
 
 // ---------------------------------------------------------------------------

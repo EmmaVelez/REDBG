@@ -9,7 +9,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
-import { scoreTotal } from './locations';
+import { scoreTotal, revealedLocations } from './locations';
 
 /** Check if any active mansion attachment has the given effect kind. */
 export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
@@ -1146,6 +1146,8 @@ function startTurnInternal(state: GameState): GameState {
       scopedMagnumXp: undefined,
     arklayArmed: undefined,
     locationUsesThisTurn: [],
+      ...(terraceInvested(state, 0) ? { freeActionPlayAvailable: true } : { freeActionPlayAvailable: undefined }),
+      pendingFreeActionInstanceId: undefined,
       mustExplore: false,
       actionsDiscardedThisTurn: 0,
       pendingKeepEndOfTurn: undefined,
@@ -1391,6 +1393,7 @@ function startTurnInternal(state: GameState): GameState {
     scopedMagnumXp: undefined,
     arklayArmed: undefined,
     locationUsesThisTurn: [],
+    pendingFreeActionInstanceId: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,
@@ -1530,12 +1533,28 @@ function startTurnInternal(state: GameState): GameState {
       ...state,
       version: newVersion,
       rngState: nextRng,
-      seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
+      seats: turnSeats.map((s, i) => {
+        // The Terrace free play refreshes for EVERY investor at the turn boundary.
+        const refresh = terraceInvested(state, s.seat)
+          ? { freeActionPlayAvailable: true }
+          : { freeActionPlayAvailable: undefined };
+        return i === state.activeSeat ? { ...turnPlayer, ...refresh } : { ...s, ...refresh };
+      }),
       prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
       // Fan Location (Mirror Corridor): the Health reduction lasts one turn.
       infectedHpReductionThisTurn: undefined,
       ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
     };
+}
+
+/** Fan Location (Terrace): the investor's free play of the first action card
+ *  gained from a market pile refreshes at the start of each of their turns. */
+function terraceInvested(state: GameState, seat: number): boolean {
+  for (const loc of revealedLocations(state)) {
+    if ((loc.cubes[seat] ?? 0) <= 0) continue;
+    if ((loc.def.locationInvestEffects ?? []).some(e => e.kind === 'ongoingFreePlayFirstActionGained')) return true;
+  }
+  return false;
 }
 
 export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' } {
