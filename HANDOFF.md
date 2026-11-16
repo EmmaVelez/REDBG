@@ -1,5 +1,17 @@
 # HANDOFF — resume here
 
+**EX-004 SILENT-FAILURE FIX (2026-11-15):** Manny: ex-004 causes the same kind of silent
+failure as ex-001 had — fix it the same way.
+- `custom.ts`: EX-004 declares `dependencies: ['ex-005']` — selecting the Ammunition Box auto-
+  includes the Ammo x50's card def (so the granted card's bonuses apply and it renders).
+- EX-005 deliberately keeps its OWN market pile when ticked alone — the Box does NOT claim
+  exclusivity (unlike EX-001/EX-002). The pile key is EX-005's own selection.
+- Test: 'EX-004 pulls EX-005 in automatically; EX-005 alone is still buyable' (def pull-in +
+  pile + end-to-end Take flow: Box removed, Ammo x50 instance resolves to a real def).
+  NOTE: an earlier bad patch had clobbered the 'shuffles the custom mansion cards' test —
+  restored from HEAD before re-adding (suite counts: unofficialExpansion 25, full 1197).
+- Gates: game-core 1197/1197, typecheck clean.
+
 **TARGETING ALERT FIX FOR BOT GAMES (2026-11-15):** Manny: "the viewing player in online games
 still doesn't get any alert that a bot has targeted him." ROOT CAUSE identified: in a 1-human + bots
 room the server broadcasts ONE snapshot AFTER the whole bot stretch — which ALWAYS ends at the

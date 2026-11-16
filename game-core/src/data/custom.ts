@@ -547,6 +547,10 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     set: 'custom',
     text: 'Gain 1 "Ammo x50" card. Remove this card from the game afterward.',
     copies: 1,
+    // The Box grants the Ammo x50: selecting it pulls EX-005's card def in
+    // automatically (the same dependency rule as EX-001 -> EX-002). EX-005
+    // remains a normal buyable market card when ticked on its own.
+    dependencies: ['ex-005'],
     tokenEffects: [{ kind: 'gainCardAndRemoveToken', cardId: 'ex-005' }],
   },
   {

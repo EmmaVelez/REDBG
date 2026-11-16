@@ -144,6 +144,31 @@ describe('Unofficial Expansion data', () => {
     expect(pilesSolo.find(p => p.pileId === 'grn')?.cardIds).toContain('ex-002');
   });
 
+  it('EX-004 pulls EX-005 in automatically; EX-005 alone is still buyable', () => {
+    // The Ammunition Box grants the Ammo x50, so its def must be in the game
+    // when only the Box is selected (the silent-failure fix, mirroring EX-001).
+    const defs = cardsForScenario('firstTimer', { customCards: ['ex-004'] });
+    expect(defs.some(c => c.id === 'ex-005')).toBe(true);
+    // The Box does NOT claim exclusivity: tick EX-005 on its own and it stays
+    // a normal market card (its pile key is its own selection, not the Box's).
+    const piles = pilesForScenario('firstTimer', { customCards: ['ex-005'] });
+    const pileIds = piles.map(p => p.pileId);
+    expect(pileIds).toContain('custom-ex-005');
+    // And the grant flow works end to end: Take removes the Box and the gained
+    // Ammo x50 resolves to a REAL card def in the resulting state (the silent
+    // failure this dependency fixes).
+    const { state: g, ids } = setMansionTop(game(), ['ex-004']);
+    const { state: armed, id: knife } = addCard(g, 0, 'we-004');
+    const revealed = exploreWith(armed, knife);
+    const taken = answer(revealed, 'takeOrBottom', 0);
+    expect(taken.removed).toContain(ids[0]);
+    const ammoId = taken.seats[0]?.discard.find(a => taken.cards[a]?.cardId === 'ex-005');
+    expect(ammoId).toBeDefined();
+    if (ammoId !== undefined) {
+      expect(taken.cardDefs[taken.cards[ammoId]?.cardId ?? '']).toBeDefined();
+    }
+  });
+
   it('shuffles the custom mansion cards in and seeds the shared counter supply', () => {
     const s = game();
     const mansion = [...s.mansionDeck];
