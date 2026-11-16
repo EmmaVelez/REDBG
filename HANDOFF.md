@@ -1,5 +1,18 @@
 # HANDOFF — resume here
 
+**EX-001 OWNS EX-002 (2026-11-15):** Manny: when EX-001 (Special Rocket Launcher Case) is
+selected, EX-002 must join the game automatically — and in that case EX-002 gets NO Resource
+Area pile (the Case is its only source).
+- `custom.ts`: EX-001 declares `dependencies: ['ex-002']` — selecting the Case auto-includes the
+  Launcher's card def (the existing dependency-pull in cardsForScenario). This also fixes a latent
+  half-bug: selecting EX-001 ALONE previously gained an ex-002 instance with no cardDef
+  (no attach-on-gain, unrenderable card).
+- `cards.ts` pilesForScenario: when the expanded selection contains ex-001, ex-002 is skipped
+  (no market pile, no grn merge). EX-002 ticked alone still gets its grn pile.
+- Tests: new 'EX-001 pulls EX-002 into the game automatically; EX-002 alone is still buyable';
+  updated the IDS pile test (grn no longer holds ex-002 when the Case is present). game-core
+  1196/1196, typecheck clean.
+
 **BOT-REVEAL BATCHING FIX (2026-11-15):** Manny reported on the LIVE Render deploy:
 "there are no messages alerting players they were targeted and the view player can't watch
 bots mansion reveal".

@@ -122,11 +122,26 @@ describe('Unofficial Expansion data', () => {
     // own pile. EX-005 (ammunition) and EX-007 (item) are not weapons, so they
     // do get one.
     expect(pileIds).not.toContain('custom-ex-002');
-    expect(piles.find(p => p.pileId === 'grn')?.cardIds).toContain('ex-002');
+    // EX-001 is in IDS, and the Case is the Launcher's only source: the def is
+    // in the game (dependency pull) but the Launcher never sits in the market.
+    expect(piles.find(p => p.pileId === 'grn')?.cardIds).not.toContain('ex-002');
     expect(pileIds).toContain('custom-ex-005');
     expect(pileIds).toContain('custom-ex-007');
     expect(pileIds).not.toContain('custom-ex-009');
     expect(pileIds).not.toContain('custom-ex-001');
+  });
+
+  it('EX-001 pulls EX-002 into the game automatically; EX-002 alone is still buyable', () => {
+    // The Case is the Launcher's only source: selecting EX-001 brings EX-002's
+    // card def along (so the token's grant attaches properly) and keeps the
+    // Launcher OUT of the Resource Area.
+    const defs = cardsForScenario('firstTimer', { customCards: ['ex-001'] });
+    expect(defs.some(c => c.id === 'ex-002')).toBe(true);
+    const pilesWithCase = pilesForScenario('firstTimer', { customCards: ['ex-001'] });
+    expect(pilesWithCase.find(p => p.pileId === 'grn')?.cardIds).not.toContain('ex-002');
+    // Tick EX-002 on its own and the behavior stays as before: grn holds it.
+    const pilesSolo = pilesForScenario('firstTimer', { customCards: ['ex-002'] });
+    expect(pilesSolo.find(p => p.pileId === 'grn')?.cardIds).toContain('ex-002');
   });
 
   it('shuffles the custom mansion cards in and seeds the shared counter supply', () => {

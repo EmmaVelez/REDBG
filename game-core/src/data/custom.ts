@@ -512,6 +512,10 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     set: 'custom',
     text: 'Gain 1 "Special Rocket Launcher." Remove this card from the game afterward.',
     copies: 1,
+    // The Case is the Launcher's only source: selecting EX-001 pulls EX-002's
+    // card def into the game automatically (and pilesForScenario then keeps
+    // EX-002 OUT of the Resource Area). Tick EX-002 alone for the buyable pile.
+    dependencies: ['ex-002'],
     tokenEffects: [{ kind: 'gainCardAndRemoveToken', cardId: 'ex-002' }],
   },
   {

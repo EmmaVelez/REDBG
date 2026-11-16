@@ -658,9 +658,16 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
       }
     }
   }
-  for (const cardId of expandCustomCards(opts.customCards)) {
+  const expandedCustomCards = expandCustomCards(opts.customCards);
+  // EX-001 Special Rocket Launcher Case is the sole source of EX-002: when the
+  // Case is in the game the Launcher never sits in the Resource Area (the Case
+  // holds its method; a market copy would double the supply). EX-002 ticked on
+  // its OWN still gets its pile.
+  const ex001Selected = expandedCustomCards.includes('ex-001');
+  for (const cardId of expandedCustomCards) {
     const def = CUSTOM_CARDS.find(c => c.id === cardId);
     if (def === undefined) continue;
+    if (cardId === 'ex-002' && ex001Selected) continue;
     if (def.mansion === true) continue;
     if (def.type === 'counter' || def.type === 'infected' || def.type === 'token' || def.type === 'event') continue;
     if (def.type === 'character' || def.type === 'skill') continue;
