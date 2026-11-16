@@ -2937,3 +2937,126 @@ h1, h2 { margin: 0 0 8px; }
   letter-spacing: 0.4px;
   margin: -2px 0 8px;
 }
+
+/* Fan "Locations" — revealed room cards on the table. */
+.board-locations-row {
+  margin: 10px 0 4px;
+}
+
+.locations-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.location-card {
+  position: relative;
+  width: 118px;
+  padding: 6px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #241a12, #17100b);
+  border: 1px solid #5a4632;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #e8dcc8;
+}
+
+.location-kind-global { border-color: #b8860b; }
+.location-kind-onex { border-color: #2f6f8f; }
+.location-kind-invest { border-color: #4f7a3a; }
+
+.location-kind-badge {
+  position: absolute;
+  top: -7px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #1a120b;
+  background: #d9b26a;
+}
+
+.location-kind-onex .location-kind-badge { background: #7fc4e0; }
+.location-kind-invest .location-kind-badge { background: #a6d98a; }
+
+.location-card img {
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.location-name {
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.location-costs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.location-cost {
+  padding: 0 5px;
+  border-radius: 7px;
+  background: #3a2c1e;
+  color: #c9b79a;
+  font-size: 10px;
+}
+
+.location-cost-paid {
+  background: #6b5320;
+  color: #ffe6a8;
+  text-decoration: line-through;
+}
+
+.location-cubes {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  min-height: 16px;
+}
+
+.location-cube {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #101010;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+.location-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.location-global-note {
+  font-size: 9px;
+  color: #a5947a;
+  text-align: center;
+  font-style: italic;
+}
+
+.location-card-facedown {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  color: #a5947a;
+}
+
+.location-badge { background: #6b4f1d; }

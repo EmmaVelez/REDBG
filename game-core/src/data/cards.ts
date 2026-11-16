@@ -670,6 +670,9 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
     if (cardId === 'ex-002' && ex001Selected) continue;
     if (def.mansion === true) continue;
     if (def.type === 'counter' || def.type === 'infected' || def.type === 'token' || def.type === 'event') continue;
+    // Fan Locations live on the board (revealed by an Explore) and print no
+    // market cost, so they never get a Resource Area pile.
+    if (def.type === 'location') continue;
     if (def.type === 'character' || def.type === 'skill') continue;
     if (def.cost === undefined) continue;
     if (known.has(def.id)) continue;

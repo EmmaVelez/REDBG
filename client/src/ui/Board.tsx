@@ -7,6 +7,7 @@ import { Zones } from './Zones';
 import { ZonePile } from './ZonePile';
 import { CardFlightLayer } from './CardFlightLayer';
 import { defForInstance, costText } from './cards';
+import { LocationsRow } from './LocationsRow';
 
 /**
  * M4-T05: Board — the table. Market resource piles (click to buy), Mansion
@@ -91,6 +92,9 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
                   </div>
                 </div>
               )}
+              {(state.locationDeck ?? []).length > 0 && (
+                <span className="mansion-attachment-badge location-badge" title="Face-down locations">{(state.locationDeck ?? []).length}</span>
+              )}
             </div>
             <div className="mansion-counts">
               <span>Removed: {state.removed.length}</span>
@@ -111,6 +115,8 @@ export function Board({ state, mySeat, onAction, disabled = false }: BoardProps)
           ))}
         </div>
       </div>
+
+      <LocationsRow state={state} mySeat={mySeat} onAction={onAction} disabled={disabled} />
 
       <div className="board-self">
         <h2 className="board-section-title">Your table</h2>

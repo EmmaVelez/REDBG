@@ -6,6 +6,7 @@ import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../e
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
+import { canInvest } from '../engine/locations';
 import { exploreAmmoReq } from '../engine/ammo';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
@@ -297,6 +298,21 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     const xp = player.xp ?? 0;
     for (let amount = 1; amount <= xp; amount++) {
       generatedActions.push({ type: 'usePreExploreXpAbility', seat, instanceId, amount });
+    }
+  }
+
+  // --- 6a-iii. Locations: invest / 1X use ---
+  for (const loc of state.locations ?? []) {
+    const def = state.cardDefs[state.cards[loc.instanceId]?.cardId ?? ''];
+    if (def === undefined) continue;
+    if (def.locationKind === 'invest' && canInvest(state, loc.instanceId, seat)) {
+      generatedActions.push({ type: 'investLocation', seat, instanceId: loc.instanceId });
+    }
+    if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1) {
+      const used = (player.locationUsesThisTurn ?? []).filter(x => x === loc.instanceId).length;
+      if (def.locationMaxPerTurn === undefined || used < def.locationMaxPerTurn) {
+        generatedActions.push({ type: 'useLocation', seat, instanceId: loc.instanceId });
+      }
     }
   }
 

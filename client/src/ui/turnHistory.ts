@@ -38,6 +38,8 @@ const VERBS: Record<Action['type'], string> = {
   useWeaponAbility: 'activated a weapon effect',
   useActionAbility: 'used an action effect',
   usePreExploreXpAbility: 'paid XP to empower a weapon',
+  investLocation: 'invested in a location',
+  useLocation: 'used a location',
   removeAttachedItem: 'removed an attached item',
   exploreReveal: '', // supplementary — no verb of its own, text comes from describe() below
 };

@@ -86,6 +86,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
+import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -577,7 +578,7 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       // "End of turn: discard Play Area (non-attached) + hand, draw 5
       // (reshuffle discard into inventory if needed)" — rulebook.
       // MA-093 Los Ganados (Handscythe): draw 1 additional card.
-      const extraDraws = player.pendingEndOfTurnDraws ?? 0;
+      const extraDraws = (player.pendingEndOfTurnDraws ?? 0) + locationEndOfTurnDraws(state, seat);
       const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
 
       const newPlayer: PlayerState = {
@@ -1800,6 +1801,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
 
     case 'explore': {
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
+          // LOC-002: the armed bonus applies to the FIRST explore only. Every
+          // return of this case is wrapped below so the flag is always cleared.
+          const arklayWasArmed = (state.seats[seat] as PlayerState | undefined)?.arklayArmed === true;
+          const exploreResult: GameState = (() => {
           let player = state.seats[seat] as PlayerState;
 
           // Survival Horror: before exploring, roll a d6 and apply the result.
@@ -1818,6 +1823,30 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 text: `Survival Horror: rolled a ${roll}. Apply the effect.`,
                 options: ['Continue'],
                 payload: { kind: 'survivalHorrorRoll', roll: String(roll), seat: String(seat) },
+              }],
+            };
+          }
+
+          // Fan Locations: a location on top of the location deck is REVEALED by
+          // this Explore (it consumes the Explore; its On Reveal effect fires
+          // now, then the player explores again to reach the Mansion).
+          const pendingLocationId = topLocationId(state);
+          if (pendingLocationId !== undefined) {
+            const revealed = revealLocation(state, pendingLocationId, seat);
+            const locDef = revealed.cardDefs[revealed.cards[pendingLocationId]?.cardId ?? ''];
+            return {
+              ...revealed,
+              ...nextBase,
+              rngState: revealed.rngState,
+              seats: revealed.seats.map(s => (s.seat === seat
+                ? { ...s, exploresLeft: Math.max(s.exploresLeft - exploreCount, 0) }
+                : s)),
+              prompts: [...revealed.prompts, {
+                id: `loc-reveal-${pendingLocationId}-v${nextBase.version}`,
+                seat,
+                text: `${locDef?.name ?? 'Location'} revealed.${locDef?.locationKind === 'global' ? ' It is GLOBAL: active for everyone.' : ''}`,
+                options: ['OK'],
+                payload: { kind: 'locRevealAck', instanceId: pendingLocationId },
               }],
             };
           }
@@ -2035,6 +2064,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const cac015Bonus = (player.firstWeaponToPlayAreaInstanceId === instId)
               ? (player.firstWeaponToPlayAreaBonus ?? 0)
               : 0;
+            // LOC-002 Arklay Laboratory: while armed, the FIRST explore this
+            // turn gets +damage per card gained this turn.
+            const arklayBonus = arklayWasArmed ? 10 * (player.gainedThisTurn?.length ?? 0) : 0;
             // NOTE: the CW-027 / CW-030 / CW-031 multi-Infected bonuses are NOT
             // added here — `computeDamage` already applies them from the weapon's
             // `weaponEffects`, and this per-weapon value is summed into it, so
@@ -2049,7 +2081,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + arklayBonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -4597,7 +4629,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
-    }
+
+          })();
+          return arklayWasArmed
+            ? { ...exploreResult, seats: exploreResult.seats.map(s => (s.seat === seat ? { ...s, arklayArmed: undefined } : s)) }
+            : exploreResult;
+        }
 
     case 'removeAttachedItem': {
       const { seat, instanceId } = action;
@@ -5737,6 +5774,67 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ? { ...s, xp: xp - amount, scopedMagnumXp: (s.scopedMagnumXp ?? 0) + amount }
           : s)),
       };
+    }
+
+    case 'investLocation': {
+      // Fan Locations: spend 1 Buy + the printed gold to place an investment
+      // cube on a revealed location. Each cube is a separate buy.
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      const loc = (state.locations ?? []).find(l => l.instanceId === instanceId);
+      if (loc === undefined) return { ...state, ...nextBase };
+      const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
+      if (def === undefined || def.locationKind !== 'invest') return { ...state, ...nextBase };
+      const cost = nextCubeCost(state, instanceId, seat);
+      if (cost === undefined) return { ...state, ...nextBase };
+      if (player.buysLeft < 1 || player.turnGold < cost) return { ...state, ...nextBase };
+      let s: GameState = {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, buysLeft: x.buysLeft - 1, turnGold: x.turnGold - cost }
+          : x)),
+      };
+      return addCube(s, instanceId, seat);
+    }
+
+    case 'useLocation': {
+      // Fan Locations (1X): pay the printed gold + 1 Buy for a one-shot effect.
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      const loc = (state.locations ?? []).find(l => l.instanceId === instanceId);
+      if (loc === undefined) return { ...state, ...nextBase };
+      const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
+      if (def === undefined || def.locationKind !== 'onex') return { ...state, ...nextBase };
+      const cost = def.locationCost ?? 0;
+      if (player.buysLeft < 1 || player.turnGold < cost) return { ...state, ...nextBase };
+      const used = player.locationUsesThisTurn ?? [];
+      if (def.locationMaxPerTurn !== undefined && used.filter(x => x === instanceId).length >= def.locationMaxPerTurn) {
+        return { ...state, ...nextBase };
+      }
+      let s: GameState = {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? {
+            ...x,
+            buysLeft: x.buysLeft - 1,
+            turnGold: x.turnGold - cost,
+            locationUsesThisTurn: [...(x.locationUsesThisTurn ?? []), instanceId],
+          }
+          : x)),
+      };
+      for (const effect of def.locationRevealEffects ?? []) {
+        if (effect.kind === 'onexGainAmmoAndDamagePerCardGained') {
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, turnAmmo: x.turnAmmo + effect.ammo, buysLeft: x.buysLeft + 1, arklayArmed: true }
+              : x)),
+          };
+        }
+      }
+      return s;
     }
 
     case 'chooseOption': {
@@ -7456,6 +7554,80 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           prompts: newPrompts,
         };
         return applyEndOfTurn(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
+      }
+
+      if (kind === 'locTrashSecondGain') {
+        // Kitchen: trash a discard card as the 2nd-gain reward.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const movedCards = { ...state.cards };
+        const inst = movedCards[chosen];
+        if (inst !== undefined) {
+          movedCards[chosen] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          cards: movedCards,
+          removed: [...state.removed, chosen],
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, discard: x.discard.filter(id => id !== chosen) }
+            : x)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'locDrawChoice') {
+        // Large Gallery: each other player may draw; the revealing player gets
+        // 1 XP for each who does.
+        const fromSeat = Number(prompt.payload?.fromSeat);
+        const choice = prompt.options[option];
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (choice === 'Draw') {
+          const d = drawWithReshuffle({ deck: s.seats[seat]?.inventory ?? [], discard: s.seats[seat]?.discard ?? [], count: 1, rngState: s.rngState });
+          s = {
+            ...s,
+            rngState: d.rngState,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+              : x)),
+          };
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === fromSeat ? { ...x, xp: (x.xp ?? 0) + 1 } : x)),
+          };
+        }
+        return s;
+      }
+
+      if (kind === 'locDiscardChoice') {
+        // Kitchen: the revealing player may discard a card from each other
+        // player's hand.
+        const targetSeat = Number(prompt.payload?.targetSeat);
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const target = state.seats[targetSeat];
+        if (target === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const movedCards = { ...state.cards };
+        const inst = movedCards[chosen];
+        if (inst !== undefined) {
+          movedCards[chosen] = { ...inst, location: { zone: 'discard', index: 0, seat: targetSeat } };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          cards: movedCards,
+          seats: state.seats.map(x => (x.seat === targetSeat
+            ? { ...x, hand: x.hand.filter(id => id !== chosen), discard: [...x.discard, chosen] }
+            : x)),
+          prompts: newPrompts,
+        };
       }
 
       if (kind === 'cac003ChooseHand') {

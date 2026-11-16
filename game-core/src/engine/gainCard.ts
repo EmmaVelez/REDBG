@@ -2,6 +2,7 @@ import type { GameState, PlayerState, CardZone } from '../types';
 import { abilitiesForLevel } from './characters';
 import { drawWithReshuffle } from './deck';
 import { makeRng, shuffle } from '../util/rng';
+import { hasTrashOnSecondGain } from './locations';
 
 export type GainDestination = 'discard' | 'hand' | 'playArea' | 'topInventory' | 'bottomInventory';
 
@@ -97,6 +98,21 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
   }
 
   newPlayer = { ...newPlayer, gainedThisTurn: [...(newPlayer.gainedThisTurn ?? []), ...gainedIds] };
+
+  // Fan Locations (Kitchen): "When you gain a 2nd card in one of your turns,
+  // you may trash a card in your discard pile." Raise the offer on the 2nd gain.
+  if ((newPlayer.gainedThisTurn?.length ?? 0) === 2 && newPlayer.discard.length > 0 && hasTrashOnSecondGain(s, seat)) {
+    s = {
+      ...s,
+      prompts: [...s.prompts, {
+        id: `loc-trash-${seat}-v${s.version}`,
+        seat,
+        text: 'Kitchen: you gained a 2nd card this turn — trash a card from your discard pile?',
+        options: [...newPlayer.discard, 'Decline'],
+        payload: { kind: 'locTrashSecondGain' },
+      }],
+    };
+  }
 
   // Kevin Ryman L1: the gained weapon is shuffled into the Inventory.
   let rngState = s.rngState;

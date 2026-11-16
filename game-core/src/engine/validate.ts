@@ -2,6 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
+import { nextCubeCost } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -802,6 +803,78 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         if (logged.type === 'endTurn' && logged.seat === action.seat) break;
         if (logged.type === 'usePreExploreXpAbility' && logged.seat === action.seat && logged.instanceId === action.instanceId) {
           return { ok: false, reason: 'usePreExploreXpAbility: already used this turn' };
+        }
+      }
+      return { ok: true };
+    }
+
+    case 'investLocation': {
+      // Fan Locations: invest in a revealed location (1 Buy + printed gold).
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'investLocation: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `investLocation: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'investLocation: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'investLocation: not your turn' };
+      }
+      const loc = (state.locations ?? []).find(l => l.instanceId === action.instanceId);
+      if (loc === undefined) {
+        return { ok: false, reason: 'investLocation: location is not revealed' };
+      }
+      const def = cardDef(state, action.instanceId);
+      if (def === undefined || def.locationKind !== 'invest') {
+        return { ok: false, reason: 'investLocation: not an investment location' };
+      }
+      const cost = nextCubeCost(state, action.instanceId, action.seat);
+      if (cost === undefined) {
+        return { ok: false, reason: 'investLocation: no more investment slots' };
+      }
+      if (player.buysLeft < 1) {
+        return { ok: false, reason: 'investLocation: no Buy left' };
+      }
+      if (player.turnGold < cost) {
+        return { ok: false, reason: 'investLocation: not enough gold' };
+      }
+      return { ok: true };
+    }
+
+    case 'useLocation': {
+      // Fan Locations (1X): pay the printed gold + 1 Buy.
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'useLocation: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `useLocation: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'useLocation: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'useLocation: not your turn' };
+      }
+      const loc = (state.locations ?? []).find(l => l.instanceId === action.instanceId);
+      if (loc === undefined) {
+        return { ok: false, reason: 'useLocation: location is not revealed' };
+      }
+      const def = cardDef(state, action.instanceId);
+      if (def === undefined || def.locationKind !== 'onex') {
+        return { ok: false, reason: 'useLocation: not a 1X location' };
+      }
+      if (player.buysLeft < 1) {
+        return { ok: false, reason: 'useLocation: no Buy left' };
+      }
+      if (player.turnGold < (def.locationCost ?? 0)) {
+        return { ok: false, reason: 'useLocation: not enough gold' };
+      }
+      if (def.locationMaxPerTurn !== undefined) {
+        const used = (player.locationUsesThisTurn ?? []).filter(x => x === action.instanceId).length;
+        if (used >= def.locationMaxPerTurn) {
+          return { ok: false, reason: 'useLocation: already used the maximum times this turn' };
         }
       }
       return { ok: true };

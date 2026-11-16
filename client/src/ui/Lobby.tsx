@@ -39,7 +39,7 @@ export interface LobbyProps {
   readonly onSetMercenariesBasicResources: (mercenariesBasicResources: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, locationsMode: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -107,6 +107,9 @@ function CustomCardsPicker(props: {
   );
   // Mercenaries Skill cards join the Skill deck when the Skill System is on.
   const skills = CUSTOM_CARDS.filter(c => c.type === 'skill' && !bundled.has(c.id));
+  // Fan Locations live on the board (revealed by an Explore), not in a
+  // market pile, so they get their own section.
+  const locations = CUSTOM_CARDS.filter(c => c.type === 'location' && !bundled.has(c.id));
   const allCustomCardIds = CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => c.id);
 
   const allSelected = allCustomCardIds.every(id => props.selected.includes(id));
@@ -279,6 +282,25 @@ function CustomCardsPicker(props: {
         ))}
       </details>
 
+      {/* Locations */}
+      {locations.length > 0 && (
+        <details className="custom-card-section">
+          <summary className="custom-card-section-title">🏠 Locations</summary>
+          {locations.map(c => (
+            <label key={c.id} className="custom-card-row">
+              <input
+                type="checkbox"
+                checked={props.selected.includes(c.id)}
+                disabled={props.disabled === true}
+                onChange={e => toggle(c.id, e.target.checked)}
+                data-testid={`custom-card-${c.id}`}
+              />
+              <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
+            </label>
+          ))}
+        </details>
+      )}
+
       {/* Poison Bundle */}
       <label className="custom-card-row custom-card-row-bundle">
         <input
@@ -295,7 +317,7 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, locationsMode: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
@@ -304,6 +326,11 @@ function PassAndPlay(props: {
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
   const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
+  const [locationsMode, setLocationsMode] = useState(false);
+  // A location card can only matter when the mode is on, so selecting one
+  // switches it on (and the toggle selects/clears the whole set).
+  const locationCardIds = CUSTOM_CARDS.filter(c => c.type === 'location').map(c => c.id);
+  const locationsOn = locationsMode || locationCardIds.some(id => customCards.includes(id));
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -338,6 +365,20 @@ function PassAndPlay(props: {
           data-testid="hotseat-mercenaries-basic-resources-toggle"
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Mercenaries Basic Resources</span>
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={locationsOn}
+          onChange={e => {
+            setLocationsMode(e.target.checked);
+            setCustomCards(e.target.checked
+              ? [...new Set([...customCards, ...locationCardIds])]
+              : customCards.filter(id => !locationCardIds.includes(id)));
+          }}
+          data-testid="hotseat-locations-toggle"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Locations (fan room cards)</span>
       </label>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {hasAttachmentCards && (
@@ -383,7 +424,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsOn)}
       >
         Start pass &amp; play
       </button>

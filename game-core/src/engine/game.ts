@@ -9,6 +9,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
+import { scoreTotal } from './locations';
 
 /** Check if any active mansion attachment has the given effect kind. */
 export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
@@ -805,6 +806,19 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     }
   }
 
+  // Fan Locations: every location def in the pool is shuffled into the
+  // face-down location deck (custom line only, and OPT-IN via locationsMode).
+  const locationDefs = setup.locationsMode === true ? cards.filter(c => c.type === 'location') : [];
+  const locationIds: string[] = [];
+  for (const def of locationDefs) {
+    for (let j = 0; j < (def.copies ?? 1); j++) {
+      const id = `${def.id}#loc${j + 1}`;
+      locationIds.push(id);
+      register(id, def.id, 'supply');
+    }
+  }
+  const shuffledLocations = locationIds.length > 0 ? rngShuffle(locationIds) : [];
+
   const baseState: GameState = {
     version: 1,
     seed: setup.seed,
@@ -815,6 +829,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     seats: drawnHands,
     marketPiles,
     mansionDeck,
+    ...(shuffledLocations.length > 0 ? { locationDeck: shuffledLocations, locations: [] } : {}),
     removed: [],
     cards: instances,
     cardDefs,
@@ -1125,6 +1140,8 @@ function startTurnInternal(state: GameState): GameState {
       firstWeaponToPlayAreaBonus: undefined,
       armedCrossbowInstanceId: undefined,
       scopedMagnumXp: undefined,
+    arklayArmed: undefined,
+    locationUsesThisTurn: [],
       mustExplore: false,
       // Off-turn targeting notices are consumed: the seat's own turn has begun.
       targetedBy: undefined,
@@ -1364,6 +1381,8 @@ function startTurnInternal(state: GameState): GameState {
     firstWeaponToPlayAreaBonus: undefined,
     armedCrossbowInstanceId: undefined,
     scopedMagnumXp: undefined,
+    arklayArmed: undefined,
+    locationUsesThisTurn: [],
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,
@@ -1518,7 +1537,7 @@ export function checkWin(state: GameState): { gameOver: boolean; winners: readon
     );
     if (defeated) {
       const ranked = state.seats
-        .map((seat, i) => ({ index: i, decorations: seat.decorations, hp: seat.hp }))
+        .map((seat, i) => ({ index: i, decorations: scoreTotal(state, seat.seat), hp: seat.hp }))
         .sort((a, b) => b.decorations - a.decorations || b.hp - a.hp);
       const top = ranked[0];
       const winners = (top === undefined ? [] : ranked
@@ -1539,7 +1558,7 @@ export function checkWin(state: GameState): { gameOver: boolean; winners: readon
 
   if (uroborosDefeated) {
     const ranked = state.seats
-      .map((seat, i) => ({ index: i, decorations: seat.decorations, hp: seat.hp }))
+      .map((seat, i) => ({ index: i, decorations: scoreTotal(state, seat.seat), hp: seat.hp }))
       .sort((a, b) => b.decorations - a.decorations || b.hp - a.hp);
     const top = ranked[0];
     const winners = (top === undefined ? [] : ranked

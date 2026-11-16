@@ -65,6 +65,12 @@ export function sanitize(state: GameState, viewerSeat: number): GameState {
     // public once done (the card leaves their hand), exactly as across a real
     // table. Only the two face-down zones above differ between viewers.
     ...(hiddenDraft !== undefined ? { skillDraft: hiddenDraft } : {}),
+    // Fan Locations: the face-down location deck is secret — revealing its ids
+    // would hand every client the exact order the rooms come out in. Length is
+    // preserved so the board can still show the count.
+    ...(state.locationDeck !== undefined
+      ? { locationDeck: state.locationDeck.map((_, i) => `${HIDDEN_ID}-loc-${i}`) }
+      : {}),
   };
 }
 

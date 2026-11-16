@@ -336,7 +336,7 @@ export function App(): JSX.Element {
         onSetMansionAttachmentMode={mansionAttachmentMode => dispatchClient({ kind: 'setMansionAttachmentMode', mansionAttachmentMode })}
         onSetCharacterSelection={(main?: string, partner?: string) => dispatchClient({ kind: 'setCharacterSelection', mainCharacterId: main, partnerCharacterId: partner })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
-        onStartHotseat={(names, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources })}
+        onStartHotseat={(names, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsMode) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsMode })}
       />
     );
   }

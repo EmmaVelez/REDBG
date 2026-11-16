@@ -27,6 +27,7 @@ export type CardType =
   | "infected"  // Mansion-only creatures
   | "event"     // Mansion-only events
   | "skill"     // Mercenaries Skill System (SK-001..SK-030)
+  | "location"  // Fan "Locations" line: GLOBAL / 1X / investment room cards
   | "counter";  // Unofficial Expansion: shared-supply counters (Poison)
 
 /** Zones a card instance can live in. */
@@ -142,6 +143,27 @@ export interface CardDef {
   readonly itemEffects?: readonly ItemEffect[];
   readonly actionEffects?: readonly ActionEffect[];
   readonly tokenEffects?: readonly TokenEffect[];
+
+  // -- location (fan "Locations" line) --
+  /** GLOBAL = active for everyone on reveal; 1X = a one-shot buy; otherwise
+   *  INVEST: a player spends a Buy + gold to place an investment cube. */
+  readonly locationKind?: 'global' | 'onex' | 'invest';
+  /** Investment price(s), left to right: the 1st cube costs costs[0], the 2nd
+   *  costs costs[1]. Absent on GLOBAL and 1X cards. */
+  readonly locationCosts?: readonly number[];
+  /** 1X: the gold cost of one use. */
+  readonly locationCost?: number;
+  /** 1X locations: how many times per turn this seat may pay for it. */
+  readonly locationMaxPerTurn?: number;
+  /** Machine-readable "On Reveal" effect (fires when the card is revealed). */
+  readonly locationRevealEffects?: readonly LocationEffect[];
+  /** Machine-readable "When scoring" effect (feeds the end-game ranking). */
+  readonly locationScoreEffects?: readonly LocationScoreEffect[];
+  /** Ongoing investment effects, unlocked per cube (GLOBAL cards use these
+   *  with no cubes). */
+  readonly locationInvestEffects?: readonly LocationEffect[];
+  /** A location may carry several investment levels (one per price). */
+  readonly locationLevels?: ReadonlyArray<{ readonly cubes: number; readonly text: string }>;
 
   // -- skill (Mercenaries Skill System) --
   /** XP that must sit on this Skill before its effect is usable. */
@@ -404,6 +426,41 @@ export type ActionEffect =
   | { readonly kind: "discardSelfFromPlayForWeaponFromDiscard" } // CAC-016 Take Them Down!: discard this Action from the Play Area -> move 1 Weapon from Discard to Hand
   | { readonly kind: "endOfTurnPeekAndGiveHand" } // CAC-013 From Bad to Worse: at end of turn, look at another Player's Hand, they Discard 1, this card goes into their Hand
   | { readonly kind: "trashHandAndDiscardForMarketCard" } // CAC-003 Change of Outfit: trash 1 from hand + 1 from discard, gain a Resource Area card up to the combined cost
+
+/**
+ * Fan "Locations" line effects.
+ *
+ * Three card kinds share these:
+ *  - GLOBAL: `reveal` fires for everyone when the card is revealed; `score`
+ *    feeds the end-game ranking; `ongoing` is always active while revealed.
+ *  - 1X: `once` fires on each paid use (a Buy + gold, repeatable while gold and
+ *    Buys last, unless `oncePerTurn`).
+ *  - INVEST: `ongoing` is active while the seat has at least one cube; the
+ *    effect may declare `cubes` to require a deeper investment.
+ */
+export type LocationEffect =
+  // --- reveal ---
+  | { readonly kind: 'revealGainHealth'; readonly amount: number }
+  | { readonly kind: 'revealTurnTopMansionCardFaceUp' }
+  | { readonly kind: 'revealEachOtherPlayerRevealsHandAndDiscard' }
+  | { readonly kind: 'revealEachOtherPlayerMayDrawAndGainXp' }
+  | { readonly kind: 'revealLoseHealth'; readonly amount: number }
+  // --- ongoing / investment ---
+  | { readonly kind: 'ongoingGainHealthOnReveal'; readonly amount: number }
+  | { readonly kind: 'ongoingTrashOnSecondCardGain' }
+  | { readonly kind: 'ongoingDrawAtTurnEnd'; readonly count: number; /** GLOBAL cards: 'revealer' limits this to the seat that revealed it. */
+    readonly scope?: 'all' | 'revealer' }
+  // --- 1X (paid use) ---
+  | { readonly kind: 'onexGainAmmoAndDamagePerCardGained'; readonly ammo: number; readonly damage: number };
+
+/** "When scoring" effects: converted into Decorations at game end. */
+export type LocationScoreEffect =
+  | { readonly kind: 'scorePerAmmoSet'; readonly perSet: number }
+  | { readonly kind: 'scorePerWeaponTypeMajority'; readonly perType: number }
+  | { readonly kind: 'scorePerXp'; readonly perXp: number }
+  | { readonly kind: 'scorePerDistinctInventoryName'; readonly perName: number }
+  | { readonly kind: 'scorePerDuplicateActionName'; readonly perName: number }
+  | { readonly kind: 'scoreLowHpInfectedWorth'; readonly hpThreshold: number; readonly decorations: number };
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -875,6 +932,13 @@ export interface PlayerState {
    *  Resource Area gain. `handId` comes from the hand, `discardId` from the
    *  Discard Pile. */
   readonly pendingChangeOfOutfit?: { readonly handId: string; readonly discardId: string };
+  /** LOC-002 Arklay Laboratory: its "+10 damage per card gained this turn on
+   *  the first explore" is armed once the ammo is actually gained. Cleared at
+   *  turn start and after the explore that consumes it. */
+  readonly arklayArmed?: boolean;
+  /** Fan Locations (1X): which location instances this seat has already paid
+   *  for this turn — enforces a card's "Max: once per turn". */
+  readonly locationUsesThisTurn?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -952,6 +1016,20 @@ export interface GameState {
   /** Mansion deck, top = index 0 (Infected + tokens + Yellow Herbs). Cards
    *  sent to the bottom are appended to the END of this same list. */
   readonly mansionDeck: readonly string[];
+
+  /** Fan "Locations": face-down location deck, top = index 0. A location on
+   *  top is revealed (flipped face-up) the next time the Mansion is explored;
+   *  its On Reveal effect fires at that moment. */
+  readonly locationDeck?: readonly string[];
+
+  /** Revealed locations, in reveal order. `cubes` maps seat -> number of
+   *  investment cubes on that card (GLOBAL / 1X cards carry none). */
+  readonly locations?: ReadonlyArray<{
+    readonly instanceId: string;
+    readonly cubes: Readonly<Record<number, number>>;
+    /** Seat that revealed it — GLOBAL cards may scope an effect to this seat. */
+    readonly revealedBy?: number;
+  }>;
 
   /** Removed-from-game cards. */
   readonly removed: readonly string[];
@@ -1142,6 +1220,11 @@ export type Action =
   /** Fan weapon CW-035 Scoped Colt Anaconda: pay N XP before Exploring to buff
    *  the first Infected Revealed this turn (free action). */
   | { readonly type: "usePreExploreXpAbility"; readonly seat: number; readonly instanceId: string; readonly amount: number }
+  /** Fan Locations: invest in a GLOBAL-less location (spend 1 Buy + gold, place
+   *  an investment cube). */
+  | { readonly type: "investLocation"; readonly seat: number; readonly instanceId: string }
+  /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
+  | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */
@@ -1177,6 +1260,9 @@ export interface GameSetup {
   /** Mercenaries Basic Resources: the starting deck uses the Mercenaries printings
    *  (am-005 / we-049 / we-050), matching the swapped Resource Area. */
   readonly mercenariesBasicResources?: boolean;
+  /** Fan Locations: deal the location cards into the face-down location deck
+   *  on top of the Mansion. Opt-in — the user introduces the rule separately. */
+  readonly locationsMode?: boolean;
 }
 
 /**
