@@ -271,7 +271,7 @@ export function App(): JSX.Element {
 
   // Every viewer sees EVERY player's mansion-door reveal (the zone diff is
   // public), and the overlay pauses the table as before — but it now AUTO-
-  // CLOSES after three seconds, so a spectator is not stuck watching other
+  // CLOSES after two seconds, so a spectator is not stuck watching other
   // players' explores. The one exception: the exploring viewer with a pending
   // prompt rendered inside the panel (Take / Send-to-bottom etc.) keeps it
   // open until the choice is resolved — that panel lock predates this.
@@ -292,7 +292,7 @@ export function App(): JSX.Element {
       const queued = pendingDeathRef.current;
       pendingDeathRef.current = null;
       if (queued !== null) setYouDied(queued === 'dead');
-    }, 3000);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [revealQueue, revealIndex, revealLocked]);
 
@@ -363,6 +363,7 @@ export function App(): JSX.Element {
   // the alert arrives exactly when activeSeat === mySeat. The engine keeps the
   // notices until the target's TURN END (endTurn clears them), which is why the
   // banner can ride through the player's own turn.
+  const isBotGame = gameState.seats.some(s => s.controller === 'bot');
   const targetedByMe = (gameState.seats[mySeat]?.targetedBy ?? []).map(t => ({
     key: `${t.seat}-${t.reason}`,
     label: `${seatNames[t.seat] ?? `Player ${t.seat + 1}`} ${TARGET_REASON_LABEL[t.reason]}`,
@@ -406,7 +407,10 @@ export function App(): JSX.Element {
 
   return (
     <div className={`app app-board${logOpen ? ' app-log-open' : ''}`}>
-      <TargetedNotice items={targetedByMe} />
+      {/* In bot games the targeted-by banner waits until every queued reveal
+          screen has closed (revealQueue drained) — it never fights the overlay
+          for attention. Human games show it immediately. */}
+      <TargetedNotice items={isBotGame && revealQueue !== null ? [] : targetedByMe} />
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         {logOpen && (

@@ -1,5 +1,15 @@
 # HANDOFF — resume here
 
+**REVEAL TIMING POLISH (2026-11-15):** Manny: (1) reduce the opponent reveal auto-close timer
+to 2 seconds; (2) when playing with bots, show the targeted-by banners AFTER all opponent reveal
+screens have closed.
+- App.tsx: auto-close setTimeout 3000 -> 2000 (all non-locked reveals; the exploring viewer's
+  pending-prompt lock still holds).
+- Bot-game banner ordering: `isBotGame` (any seat controller === 'bot'); the TargetedNotice
+  banner renders [] while revealQueue !== null in bot games — it appears only once every queued
+  reveal screen has drained. Human games show the banner immediately (unchanged).
+- Client-only change. client 252/252, tsc clean.
+
 **WE-016 PREVIEW FIX (2026-11-15):** Manny: used the Semi-Auto Rifle after two Action cards,
 no bonus damage shown. DIAGNOSIS: the RESOLVED explore always applied the +10/Action bonus
 (verified: 30 fails vs 50 defeats a 40-HP Dr. Salvador) — but the picker PREVIEW
