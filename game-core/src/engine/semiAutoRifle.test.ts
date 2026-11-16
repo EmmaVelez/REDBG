@@ -23,7 +23,7 @@ function build(actionsInPlay: number): GameState {
   const t = startTurn(s);
   const weId = 'we-016#w1';
   const bossId = 'ma-011#b1';
-  const cards: Record<string, CardInstance> = {
+  const cards: Record<string, GameState['cards'][string]> = {
     ...t.cards,
     [weId]: { instanceId: weId, cardId: 'we-016', location: { zone: 'hand' as const, index: 0 } },
     [bossId]: { instanceId: bossId, cardId: 'ma-011', location: { zone: 'mansionDeck' as const, index: 0 } },

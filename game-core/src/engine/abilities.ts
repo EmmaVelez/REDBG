@@ -1191,6 +1191,13 @@ export function chrisL1TurnDamageBonus(state: GameState, seat: number): number {
   return state.seats.some(s => s.downed) ? ability.downedAmount : ability.amount;
 }
 
+/** ch-005q Jill L1: +amount Damage per Action card she discarded this turn
+ *  (played Action cards never count — they sit in the play area). */
+export function actionDiscardDamage(abilities: readonly CharacterAbility[], count: number): number {
+  const a = abilities.find(x => x.kind === 'plusDamagePerActionDiscardedThisTurn');
+  return a !== undefined && a.kind === 'plusDamagePerActionDiscardedThisTurn' ? a.amount * count : 0;
+}
+
 /**
  * B4MC-CH-008 Chris L2 - "Once per round, when an Infected is not Defeated,
  * you can put it on top of the Mansion (even if it's the BOSS)." Automatic:

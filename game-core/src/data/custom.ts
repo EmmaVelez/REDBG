@@ -494,6 +494,33 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 
+  {
+    // Official card (printed code CH-005 variant). Jill Valentine (tactical
+    // costume). Gates 5 / 9. The third custom print to carry the CH-005 code
+    // (premier Barry ch-005, B4MC Sherry b4mc-ch-005, pirate Jill ch-005p) —
+    // this one is ch-005q. L1: +5 Damage per Action card SHE discards this
+    // turn (played Action cards don't count — they sit in the play area and
+    // the discard-diff hook only sees the pile). L2: end of turn keep up to 3
+    // cards, draw back to 5.
+    id: 'ch-005q',
+    name: 'Jill Valentine',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Jill deals an additional +5 Damage for every Action Card she discards this turn. (Action Cards played do not count)\nLevel 2: At the end of a turn, Jill can choose up to 3 cards to keep and draws till she has 5.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 5,
+    level2At: 9,
+    levels: [
+      { level: 1, text: 'Jill deals an additional +5 Damage for every Action Card she discards this turn. (Action Cards played do not count)' },
+      { level: 2, text: 'At the end of a turn, Jill can choose up to 3 cards to keep and draws till she has 5.' },
+    ],
+    abilities: [
+      { kind: 'plusDamagePerActionDiscardedThisTurn', amount: 5, level: 1 },
+      { kind: 'endOfTurnKeepUpToAndDrawTo', keep: 3, handSize: 5, level: 2 },
+    ],
+  },
+
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
   // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).

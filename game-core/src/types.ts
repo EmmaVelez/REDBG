@@ -689,6 +689,9 @@ export type CharacterAbility =
   | { readonly kind: "stunRodCharge"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L1: pay 1 Action; this turn her Stun Rod explores get +amount Damage
   | { readonly kind: "exploreBonusIfFullHp"; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-005 L2: on Explore, +amount Damage this turn while she is at full Health
   | { readonly kind: "healAtTurnStartOrElseDamageThisTurn"; readonly heal: number; readonly amount: number; readonly level: 1 | 2 } // B4MC-CH-006 L1: heal at turn start, or +amount Damage if already full
+  // --- Official custom print ch-005q (Jill Valentine, tactical costume) ---
+  | { readonly kind: "plusDamagePerActionDiscardedThisTurn"; readonly amount: number; readonly level: 1 | 2 } // ch-005q L1: +amount Damage per Action card SHE discards this turn (played ones don't count)
+  | { readonly kind: "endOfTurnKeepUpToAndDrawTo"; readonly keep: number; readonly handSize: number; readonly level: 1 | 2 } // ch-005q L2: end of turn keep up to N hand cards, draw back to hand size
   // --- Custom official print (ch-005p, Jill Valentine Pirate) ---
   | { readonly kind: "plusDamageForWeaponTags"; readonly tags: readonly WeaponTag[]; readonly amount: number; readonly level: 1 | 2 } // ch-005p Jill Valentine L1: all "Pistol" and "Machine Gun" Weapons get +N Damage
   | { readonly kind: "trashCardToNegateDamage"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2: when she would take any Damage, may Trash 1 card to negate the Damage
@@ -887,6 +890,13 @@ export interface PlayerState {
   /** Jill Valentine (Mercenaries) L1: the increase in force for THIS turn
    *  (derived from ammoReqIncreaseNextTurn at turn start, then cleared). */
   readonly ammoReqIncreaseThisTurn?: number;
+  /** ch-005q Jill L1: Action cards THIS seat discarded this turn (diff-counted
+   *  per action; played cards go to the play area and never count). Reset at
+   *  turn start. Damage = ability amount x this count. */
+  readonly actionsDiscardedThisTurn?: number;
+  /** ch-005q Jill L2: the card instances she chose to keep while the end-of-
+   *  turn retention prompt is open; undefined = prompt not raised yet. */
+  readonly pendingKeepEndOfTurn?: readonly string[];
   /** Per-weapon damage bonuses this turn (Ibex Standard, Lightning Hawk,
    *  Custom Standard Sidearm, Coup de Grâce, ...). Keyed by instance id. */
   readonly weaponDamageBonusById?: Readonly<Record<string, number>>;

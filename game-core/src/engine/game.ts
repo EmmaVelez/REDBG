@@ -1143,6 +1143,8 @@ function startTurnInternal(state: GameState): GameState {
     arklayArmed: undefined,
     locationUsesThisTurn: [],
       mustExplore: false,
+      actionsDiscardedThisTurn: 0,
+      pendingKeepEndOfTurn: undefined,
       // Off-turn targeting notices are consumed: the seat's own turn has begun.
       targetedBy: undefined,
       // Rachael Foley L1: a downed (skipped) turn clears the Explore debt.
@@ -1365,6 +1367,8 @@ function startTurnInternal(state: GameState): GameState {
     // +amount Ammo THIS turn (the "next turn" the ability named).
     ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,
     ammoReqIncreaseNextTurn: undefined,
+    actionsDiscardedThisTurn: 0,
+    pendingKeepEndOfTurn: undefined,
     // Off-turn targeting notices live through the seat's own turn (they clear
     // at TURN END in the endTurn action) — in bot games the client only sees a
     // snapshot after the bot stretch ends at this seat's turn start, so a here

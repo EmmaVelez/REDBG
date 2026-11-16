@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
@@ -229,7 +229,8 @@ export function exploreDamage(
     // preview must match what the explore reducer resolves.
     exploreSkillDamageBonus(activeSkillEffects(state, seat), defs, state, seat, weaponIds ?? []) +
     exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
-    exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length);
+    exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
+    actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;

@@ -27,6 +27,7 @@ import {
   exploreBonusIfAmmoAbove,
   plusTagDamageIfAmmoAbove,
   plusTagDamage,
+  actionDiscardDamage,
   queueJillNegatePrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
@@ -414,6 +415,39 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       void action;
       const player = state.seats[seat] as PlayerState;
 
+      // ch-005q Jill L2: "At the end of a turn, Jill can choose up to 3 cards
+      // to keep and draws till she has 5." First pass raises the retention
+      // prompt and returns WITHOUT advancing the turn (the host gates
+      // auto-startTurn on pending prompts); the resolver then re-enters this
+      // function with `pendingKeepEndOfTurn` set and the discard/draw below
+      // keep those cards and refill to the hand size.
+      const keepAbility = characterAbilities(state, seat).find(a => a.kind === 'endOfTurnKeepUpToAndDrawTo');
+      const keep = keepAbility !== undefined && keepAbility.kind === 'endOfTurnKeepUpToAndDrawTo' ? keepAbility : undefined;
+      let keptIds: readonly string[] = [];
+      if (keep !== undefined && !player.downed && !player.dead) {
+        if (player.hand.length > keep.keep) {
+          const pending = player.pendingKeepEndOfTurn;
+          if (pending === undefined) {
+              return {
+              ...state,
+              ...nextBase,
+              prompts: [...state.prompts, {
+                id: `eotKeep-${seat}-v${state.version + 1}`,
+                seat,
+                text: `Keep up to ${keep.keep} cards from your hand — the rest are discarded, then you draw back up to ${keep.handSize}.`,
+                options: [...player.hand, 'None'],
+                payload: { kind: 'jillEndOfTurnKeep', keepLimit: String(keep.keep), handSize: String(keep.handSize) },
+              }],
+            };
+          }
+          keptIds = pending;
+        } else {
+          // At/under the keep limit: keep the whole hand automatically — no
+          // prompt — then draw up to the hand size.
+          keptIds = player.hand;
+        }
+      }
+
       // CW-025 Elephant Killer: an unused weapon in the Play Area moves to
       // the top of the Inventory instead of being discarded. The printed
       // "you can" is resolved automatically — taking it is never worse than
@@ -433,7 +467,7 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       const recycledAmmoIds = recycleAmmoIds(state, seat);
       const recalledOrRecycled = new Set([...recalledSet, ...recycledAmmoIds]);
 
-      const dh = discardHand({ hand: player.hand, discard: player.discard });
+      const dh = discardHand({ hand: player.hand.filter(id => !keptIds.includes(id)), discard: player.discard });
       const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
 
       // Mercenaries: weapons that were given "+X damage, Trash at the end of
@@ -579,16 +613,20 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       // (reshuffle discard into inventory if needed)" — rulebook.
       // MA-093 Los Ganados (Handscythe): draw 1 additional card.
       const extraDraws = (player.pendingEndOfTurnDraws ?? 0) + locationEndOfTurnDraws(state, seat);
-      const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
+      const drawCount = keep !== undefined
+        ? Math.max(keep.handSize - keptIds.length, 0)
+        : 5 + extraDraws;
+      const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: drawCount, rngState: state.rngState });
 
       const newPlayer: PlayerState = {
         ...player,
         hp: hordeHp,
         ...(partnerHpOut !== undefined ? { partnerHp: partnerHpOut } : {}),
-        hand: d.hand,
+        hand: [...keptIds, ...d.hand],
         inventory: d.deck,
         discard: d.discard,
         playArea: [],
+        pendingKeepEndOfTurn: undefined,
         infectionCards: infectionCardsOut,
         // CW-028 Machine Gun w/ Launcher: the armed mode lasts one turn.
         armedLauncherInstanceId: undefined,
@@ -619,7 +657,41 @@ export function applyAction(state: GameState, action: Action): GameState {
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, afterTrash, action))));
+  return applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action))));
+}
+
+/**
+ * ch-005q Jill L1: "+5 Damage for every Action Card she discards this turn
+ * (Action Cards played do not count)". Discarding has no single choke point
+ * (same problem AM-005's trash had), so the counter is a DIFF of each seat's
+ * discard pile across the action — any Action-type card that newly joins the
+ * pile counts, from every source, and played Action cards (which sit in the
+ * play area) can never count. The amount feeds explore damage via
+ * `actionDiscardDamage`.
+ */
+function applyActionDiscardedHooks(prev: GameState, next: GameState): GameState {
+  let out = next;
+  for (let seat = 0; seat < next.seats.length; seat++) {
+    const before = prev.seats[seat];
+    const seatNext = next.seats[seat];
+    if (before === undefined || seatNext === undefined) continue;
+    if (before.discard.length === seatNext.discard.length) continue;
+    const already = new Set(before.discard);
+    let added = 0;
+    for (const id of seatNext.discard) {
+      if (already.has(id)) continue;
+      const inst = next.cards[id];
+      const def = inst === undefined ? undefined : next.cardDefs[inst.cardId];
+      if (def?.type === 'action') added++;
+    }
+    if (added === 0) continue;
+    const total = (before.actionsDiscardedThisTurn ?? 0) + added;
+    out = {
+      ...out,
+      seats: out.seats.map(s => (s.seat === seat ? { ...s, actionsDiscardedThisTurn: total } : s)),
+    };
+  }
+  return out;
 }
 
 /**
@@ -2136,7 +2208,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             exploreDamageIfHpAtMost(abilities, player.hp) +
             exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
             exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
-            exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons);
+            exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons) +
+            actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
           const perDiscardCardBonus = player.playArea.reduce((sum, id) => {
@@ -8028,6 +8101,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, chosenId],
           prompts: newPrompts,
         };
+      }
+
+      if (kind === 'jillEndOfTurnKeep') {
+        // ch-005q Jill L2 retention: pick one keep card per prompt (up to the
+        // limit), 'None' (or limit / hand exhaustion) finalizes and re-enters
+        // the end-of-turn flow, which discards the rest and draws to size.
+        const keepLimit = Number(prompt.payload?.keepLimit ?? 3);
+        const keptNow = [...(player.pendingKeepEndOfTurn ?? [])];
+        const isNone = chosenId === 'None';
+        const keepThis = isNone ? undefined : chosenId;
+        const nextKept = keepThis !== undefined && !keptNow.includes(keepThis) ? [...keptNow, keepThis] : keptNow;
+        const unkeptHand = player.hand.filter(id => !nextKept.includes(id));
+        const carry = { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, pendingKeepEndOfTurn: nextKept } : s)) };
+        if (!isNone && nextKept.length < keepLimit && unkeptHand.length > 0) {
+          return {
+            ...carry,
+            ...nextBase,
+            prompts: [...newPrompts, {
+              id: `eotKeep-${seat}-v${state.version + 1}`,
+              seat,
+              text: `Keep up to ${keepLimit} cards from your hand — the rest are discarded, then you draw back up to ${prompt.payload?.handSize ?? 5}.`,
+              options: [...unkeptHand, 'None'],
+              payload: { kind: 'jillEndOfTurnKeep', keepLimit: String(keepLimit), handSize: String(prompt.payload?.handSize ?? 5) },
+            }],
+          };
+        }
+        return applyEndOfTurn({ ...carry, prompts: newPrompts }, seat, nextBase);
       }
 
       if (kind === 'takeOrBottom') {

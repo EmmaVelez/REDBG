@@ -1,5 +1,36 @@
 # HANDOFF — resume here
 
+**CH-005Q JILL VALENTINE (tactical) IMPLEMENTED (2026-11-16):** official custom print, printed
+code CH-005 variant (the THIRD custom carrier of CH-005 — premier Barry ch-005, B4MC Sherry
+b4mc-ch-005, pirate Jill ch-005p — so this one is ch-005q). 80 HP, gates 5 / 9. Card text read
+from the user's scan with the LOCAL Ollama vision model (SetneufPT/Gemma4-12B; the platform
+caption + two crop reads collated; vision_analyze was 429-rate-limited, qwen3.5:9b too slow).
+- **L1** (gate 5): "+5 Damage for every Action Card she discards this turn. (Action Cards played
+  do not count)". NEW ability kind `plusDamagePerActionDiscardedThisTurn`; per-seat counter
+  `actionsDiscardedThisTurn` (reset at turn start) maintained by the new hook
+  `applyActionDiscardedHooks` — a DIFF of each seat's discard pile across every action (the
+  AM-005 trash-hook pattern; discarding has no single choke point, and played Action cards sit
+  in the play area so they can never count). Damage feeds `abilityDamage` in the engine
+  (single+multi) AND the exploreDamage preview. RULING: the end-of-turn hand discard counts
+  toward the counter (harmless — no explore happens after it).
+- **L2** (gate 9): "At the end of a turn, Jill can choose up to 3 cards to keep and draws till
+  she has 5." NEW ability kind `endOfTurnKeepUpToAndDrawTo`; applyEndOfTurn raises a
+  `jillEndOfTurnKeep` prompt (hand cards + 'None') and returns WITHOUT advancing the turn (the
+  host already gates auto-startTurn on pending prompts); the chooseOption resolver picks one
+  card per prompt (loop up to the limit), and None / limit / hand-exhaustion finalizes by
+  re-entering applyEndOfTurn with `pendingKeepEndOfTurn` — she discards the rest and draws back
+  to 5. Hand <= 3 at turn end: auto-keep everything, no prompt. Bots answer via generic
+  chooseOption enumeration (no policy code needed).
+- Art: CARD-ART/CH-005Q.png (the user's scan). Client needs no changes (prompts/banners generic).
+- Tests: customJillDiscardKeep.test.ts 7/7 (L1 preview+resolve, played-doesn't-count, discard
+  diff hook, prompt raise + no-advance, keep-loop + draw-to-5, auto-keep small hand, limit
+  finalize). Also fixed a latent test-file type error in semiAutoRifle.test.ts (computed-key
+  object indexing). Gates: game-core 1230/1230, client 252/252, typecheck clean.
+- CARD TEXT VERIFICATION: L1 "Jill deals an additional +5 Damage for every Action Card she
+  discards this turn. (Action Cards played do not count)" / L2 "At the end of a turn, Jill can
+  choose up to 3 cards to keep and draws till she has 5." — collated from the scan; flag in
+  RULINGS if the physical card differs.
+
 **BANNER DISMISSES ON FIRST BOARD ACTION (2026-11-15):** Manny: the targeted-by banners should
 stay visible until the viewing player interacts with their decision bar.
 - Engine (actions.ts applyActionInternal): any non-chooseOption action by a seat clears that
