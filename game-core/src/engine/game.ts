@@ -1342,9 +1342,10 @@ function startTurnInternal(state: GameState): GameState {
     // +amount Ammo THIS turn (the "next turn" the ability named).
     ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,
     ammoReqIncreaseNextTurn: undefined,
-    // Off-turn targeting notices: the seat's own turn has begun, so the
-    // "you were targeted" banner clears.
-    targetedBy: undefined,
+    // Off-turn targeting notices live through the seat's own turn (they clear
+    // at TURN END in the endTurn action) — in bot games the client only sees a
+    // snapshot after the bot stretch ends at this seat's turn start, so a here
+    // clear would wipe the alert before it was ever rendered.
     allWeaponsAmmoDiscountThisTurn: undefined,
     weaponDamageBonusById: undefined,
     trashAtEndOfTurn: undefined,

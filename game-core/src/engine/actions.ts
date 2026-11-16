@@ -5414,6 +5414,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             infectionCards: infectionCardsOut,
             // CW-028 Machine Gun w/ Launcher: the armed mode lasts one turn.
             armedLauncherInstanceId: undefined,
+            // Off-turn targeting notices: consumed when THIS seat's own turn
+            // ENDS, not when it starts — in bot games the client only receives
+            // a snapshot AFTER the bot stretch (which ends at the human's turn
+            // start), so a turn-start clear wiped the alert before it could be
+            // shown. The banner stays up through the turn, then clears here.
+            targetedBy: undefined,
           };
 
           return {

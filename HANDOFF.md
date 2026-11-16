@@ -1,5 +1,23 @@
 # HANDOFF — resume here
 
+**TARGETING ALERT FIX FOR BOT GAMES (2026-11-15):** Manny: "the viewing player in online games
+still doesn't get any alert that a bot has targeted him." ROOT CAUSE identified: in a 1-human + bots
+room the server broadcasts ONE snapshot AFTER the whole bot stretch — which ALWAYS ends at the
+human's turn start. Two things killed the banner at that exact moment:
+  1. the engine cleared `targetedBy` at the target's turn START (game.ts), so the snapshot's seat
+     already had the notices wiped;
+  2. the client gate `activeSeat !== mySeat && phase === 'main'` was false exactly then
+     (activeSeat === me), so even intact data would not render.
+FIX: (a) engine — the clear moved from turn-start (game.ts, kept only for the downed-skip path) to
+the target's TURN END (endTurn newPlayer rebuild in actions.ts); (b) client — the App gate now
+renders the banner whenever targetedBy is non-empty, no activeSeat/phase condition. Result: the
+snapshot that lands at your turn start carries the notices, and the banner stays up through your
+turn until you end it. targeting.test.ts updated: notice survives the target's turn start, clears
+at the target's turn end (new 3-step assertion). game-core 1196/1196, client 252/252, typecheck
+clean. NOTE: the banner lingers through the player's whole turn by design (they need to know why
+they must explore / who forced / stole XP) — it clears at that turn's end.
+- 2-human rooms were unaffected (stretch ends at the OTHER human, activeSeat != me mid-game).
+
 **EX-001 OWNS EX-002 (2026-11-15):** Manny: when EX-001 (Special Rocket Launcher Case) is
 selected, EX-002 must join the game automatically — and in that case EX-002 gets NO Resource
 Area pile (the Case is its only source).

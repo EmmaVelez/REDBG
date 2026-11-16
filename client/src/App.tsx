@@ -358,12 +358,15 @@ export function App(): JSX.Element {
     ammoReqNextTurn: 'raised the Ammo requirement of your weapons next turn',
     revealHand: 'revealed your hand',
   };
-  const targetedByMe = gameState.activeSeat !== mySeat && gameState.phase === 'main'
-    ? (gameState.seats[mySeat]?.targetedBy ?? []).map(t => ({
-        key: `${t.seat}-${t.reason}`,
-        label: `${seatNames[t.seat] ?? `Player ${t.seat + 1}`} ${TARGET_REASON_LABEL[t.reason]}`,
-      }))
-    : [];
+  // NO activeSeat/phase gate: in bot games the server delivers one snapshot
+  // AFTER the whole bot stretch — which always ends at a human turn start — so
+  // the alert arrives exactly when activeSeat === mySeat. The engine keeps the
+  // notices until the target's TURN END (endTurn clears them), which is why the
+  // banner can ride through the player's own turn.
+  const targetedByMe = (gameState.seats[mySeat]?.targetedBy ?? []).map(t => ({
+    key: `${t.seat}-${t.reason}`,
+    label: `${seatNames[t.seat] ?? `Player ${t.seat + 1}`} ${TARGET_REASON_LABEL[t.reason]}`,
+  }));
 
   // The mansion-door reveal attributes a FORCED explore (FCH-008 Sherry) so
   // the involved players see who forced whom.

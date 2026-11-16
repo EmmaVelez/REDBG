@@ -89,7 +89,7 @@ describe('targetedBy — FCH-008 Sherry forced explore', () => {
     expect(after.seats[0]?.targetedBy ?? []).toHaveLength(0);
   });
 
-  it('clears the notice when the target\'s own turn begins', () => {
+  it('keeps the notice through the target\'s turn start and clears it at the target\'s turn end', () => {
     let s = startTurn(game2('fch-008'));
     s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, turnAmmo: 0 } : p)) };
     const { state: s1 } = setMansionTop(s, ['ma-005']);
@@ -99,9 +99,14 @@ describe('targetedBy — FCH-008 Sherry forced explore', () => {
     const after = applyAction(used, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
     expect(after.seats[1]?.targetedBy).toHaveLength(1);
 
-    const ended = applyAction(after, { type: 'endTurn', seat: 0 });
-    const foeTurn = startTurn(ended);
-    expect(foeTurn.seats[1]?.targetedBy ?? []).toHaveLength(0);
+    // A bot-game client only receives a snapshot AFTER the bot stretch, which
+    // always ends at the HUMAN's turn start — the notice MUST survive it.
+    const foeTurn = startTurn(applyAction(after, { type: 'endTurn', seat: 0 }));
+    expect(foeTurn.seats[1]?.targetedBy).toHaveLength(1);
+
+    // The target's own turn END consumes the notice (banner stays up all turn).
+    const foeEnded = applyAction(foeTurn, { type: 'endTurn', seat: 1 });
+    expect(foeEnded.seats[1]?.targetedBy ?? []).toHaveLength(0);
   });
 });
 
