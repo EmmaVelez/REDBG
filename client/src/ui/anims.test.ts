@@ -171,15 +171,17 @@ describe('detectReveal', () => {
     expect(reveal?.weapons).toEqual(['we-004#1', 'we-005#1']);
   });
 
-  it('ignores another player exploring', () => {
+  it('reports ANOTHER player exploring — every viewer sees the reveal', () => {
     const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }] });
     const next = makeState({
       version: 2,
       mansionDeck: [],
       seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
-      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1 } }],
+      log: [{ seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[] } }],
     });
-    expect(detectReveal(prev, next, 0)).toBeNull();
+    expect(detectReveal(prev, next, 0)).toEqual({
+      instanceId: 'ma-001#7', outcomeZone: 'attached', explorerSeat: 1, damage: 0, weapons: [],
+    });
   });
 
   it('ignores a non-explore action that moves a mansion card (reshuffle)', () => {
@@ -376,7 +378,7 @@ describe('detectReveal', () => {
     expect(detectReveal(prev, next, 0)?.instanceId).toBe('ma-001#7');
   });
 
-  it('does not report a forced explore to an unrelated seat', () => {
+  it('reports a forced explore to an unrelated (watching) seat too', () => {
     const prev = makeState({ mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }, { seat: 2 }] });
     const next = makeState({
       version: 2,
@@ -384,7 +386,8 @@ describe('detectReveal', () => {
       seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }, { seat: 2 }],
       log: [{ seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1, forcedBy: 0 } }],
     });
-    expect(detectReveal(prev, next, 2)).toBeNull();
+    expect(detectReveal(prev, next, 2)?.instanceId).toBe('ma-001#7');
+    expect(detectReveal(prev, next, 2)?.explorerSeat).toBe(1);
   });
 });
 

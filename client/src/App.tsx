@@ -263,6 +263,33 @@ export function App(): JSX.Element {
 
   const revealCurrent = revealQueue !== null ? revealQueue[revealIndex] ?? null : null;
 
+  // Every viewer sees EVERY player's mansion-door reveal (the zone diff is
+  // public), and the overlay pauses the table as before — but it now AUTO-
+  // CLOSES after three seconds, so a spectator is not stuck watching other
+  // players' explores. The one exception: the exploring viewer with a pending
+  // prompt rendered inside the panel (Take / Send-to-bottom etc.) keeps it
+  // open until the choice is resolved — that panel lock predates this.
+  // NOTE: this effect must stay ABOVE the Lobby early-return — a hook after
+  // a conditional return breaks the Rules of Hooks (React #310).
+  const revealLocked = revealCurrent !== null
+    && revealCurrent.explorerSeat === mySeat
+    && ((view?.state.prompts.some(p => p.seat === mySeat)) ?? false);
+  useEffect(() => {
+    if (revealQueue === null || revealLocked) return;
+    const timer = setTimeout(() => {
+      if (revealQueue !== null && revealIndex < revealQueue.length - 1) {
+        setRevealIndex(revealIndex + 1);
+        return;
+      }
+      setRevealQueue(null);
+      setRevealIndex(0);
+      const queued = pendingDeathRef.current;
+      pendingDeathRef.current = null;
+      if (queued !== null) setYouDied(queued === 'dead');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [revealQueue, revealIndex, revealLocked]);
+
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
   const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
 
@@ -366,6 +393,7 @@ export function App(): JSX.Element {
     cardReveal !== null ||
     youDied !== null ||
     passPending;
+
 
   return (
     <div className={`app app-board${logOpen ? ' app-log-open' : ''}`}>

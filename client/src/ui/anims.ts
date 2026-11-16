@@ -128,10 +128,12 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
   if (last === undefined) return [];
   const action = last.action;
   if (action.type !== 'explore') return [];
-  // A forced explore (FCH-008 Sherry) is shown to the exploring seat AND to the
-  // seat that forced it: in pass-and-play that is the device holder, and in a
-  // server room the target may be a bot with no client of its own.
-  if (action.seat !== mySeat && action.forcedBy !== mySeat) return [];
+  // EVERY viewer sees EVERY player's explore reveal (Manny, 2026-11-15): the
+  // table is public, so the mansion-door reveal pauses each connected client
+  // and auto-closes after three seconds (see App.tsx). The engine records the
+  // exact revealed set, the zones (attached / removed / deck / limbo) are all
+  // public, and a sanitized view carries the real instance ids - only hands
+  // and inventories are hidden.
 
   const damage = exploreDamage(prev, action.seat, action.weapons);
   const weapons = action.weapons;

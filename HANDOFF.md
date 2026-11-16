@@ -1,5 +1,35 @@
 # HANDOFF — resume here
 
+**REVEAL-FOR-ALL + 3-SECOND AUTO-CLOSE (2026-11-15):** Manny: "The view player should see all
+players complete mansion reveal screen, it should pause the game and automatically close after
+3 seconds."
+- **Reveal-for-all:** the involvement gate in `detectReveals` (anims.ts) is DELETED — every viewer
+  now sees EVERY player's explore reveal (the zones / log / revealed set are all public; only
+  hands+inventories are hidden). The two anims tests that asserted non-involvement were flipped
+  ('reports ANOTHER player exploring', 'reports a forced explore to an unrelated (watching) seat
+  too'). `detectCardReveals` (ability/effect PEEKS) stays involvement-gated — bots' private peeks
+  still don't spam the table; this ask was the mansion-door reveal only.
+- **Auto-close:** App.tsx useEffect — 3s after a reveal opens (per card in a multi-reveal it
+  advances then closes), it does exactly what Continue does: advance / dismiss + play the queued
+  YOU DIED screen. The ONE exception (`revealLocked`): the EXPLORING viewer with a pending prompt
+  rendered inside the panel (Take / Send-to-bottom etc.) keeps it open until the choice is
+  resolved — that panel lock predates this and the earlier "lock until answered" ruling still
+  holds. Third-party viewers have no prompts -> always auto-close.
+- **PITFALL (bit live):** the auto-close useEffect was first placed AFTER the Lobby early-return
+  (`if (view === null || ...) return <Lobby/>`) — a hook after a conditional return breaks the
+  Rules of Hooks (React #310: "Rendered more hooks than during the previous render"), which
+  CRASHED the app the moment any game view opened (lobby rendered fine; blank game). It must live
+  ABOVE the early return and read the state safely there (`view?.state...`). Live symptom: blank
+  page right after Start game / entering the board.
+- **Commit hygiene:** `client/src/ui/anims.ts` also carries the UNCOMMITTED counter-animation WIP
+  (supply/counters zones etc. — not this task). Only the reveal-gate hunk was staged (via
+  `git hash-object -w` + `git update-index --cacheinfo` with byte-exact content — `git apply
+  --cached` fails on this file's LF/CRLF mix); the WIP stays in the working tree.
+- **Live-verified** (pass & play on the fresh build): reveal opened on a Rocket Launcher Case
+  token (locked behind its Take/Send-to-bottom prompt — no auto-close while locked, correct);
+  after clicking Take, the panel closed BY ITSELF at ~3.0s with no Continue click.
+- **Gates:** client 249/249, typecheck clean, vite build OK. game-core/server untouched.
+
 **OFF-TURN TARGETING NOTICES — "the viewing player knows he's been targeted" (2026-11-15):**
 Manny: "add a way for the viewing player to know he's been targeted by a card or ability
 outside of his turn. I.e. when targeted by fch-008's ability". Generic engine + client feature:
