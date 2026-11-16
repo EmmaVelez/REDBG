@@ -47,6 +47,9 @@ export interface MansionRevealProps {
   /** "Your damage" for the exploring player; "Damage dealt" for someone
    *  watching a forced explore (FCH-008 Sherry). */
   readonly damageLabel?: string;
+  /** Attribution for a forced explore (FCH-008 Sherry): "X forced you to
+   *  Explore!" for the target, "You forced X to Explore!" for Sherry. */
+  readonly forcedByLabel?: string;
   /** The exploring player's character + Partner, LEFT of the weapons. */
   readonly party?: readonly RevealPartyMember[];
   /** 0-based position of this card in a multi-card reveal. */
@@ -68,6 +71,7 @@ export function MansionReveal({
   hp,
   weapons,
   damageLabel = 'Your damage',
+  forcedByLabel,
   party,
   index = 0,
   total = 1,
@@ -84,6 +88,9 @@ export function MansionReveal({
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
         <span className="mansion-door-title">{isInfected ? 'The door creaks open…' : 'You found something…'}</span>
+        {forcedByLabel !== undefined && forcedByLabel !== '' && (
+          <div className="mansion-door-forced" data-forced-by>{forcedByLabel}</div>
+        )}
         <div className="mansion-door-damage">{damageLabel}: <strong>{damage}</strong></div>
         <div className="mansion-door-battle">
           {party !== undefined && party.length > 0 && (

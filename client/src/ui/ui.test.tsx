@@ -5,6 +5,7 @@ import type { Action, CardDef, GameState } from '@re/game-core';
 import { setup, startTurn, applyAction, sanitize, PREMIER_CARDS, FIRST_TIMER_PILES, MERCENARIES_CARDS, CUSTOM_CARDS } from '@re/game-core';
 import { ZonePile } from './ZonePile';
 import { MansionReveal } from './MansionReveal';
+import { TargetedNotice } from './TargetedNotice';
 import { CardRevealOverlay } from './CardRevealOverlay';
 import { YouDiedOverlay } from './YouDiedOverlay';
 import { SeatSwap } from './SeatSwap';
@@ -842,6 +843,25 @@ describe('MansionReveal', () => {
     expect(html).toContain('3 / 3');
     expect(html).not.toContain('Next');
     expect(html).toContain('Continue');
+  });
+
+  it('attributes a forced explore (FCH-008 Sherry) when forcedByLabel is provided', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} forcedByLabel="Sherry Birkin forced you to Explore!" onContinue={() => {}} />
+    );
+    expect(html).toContain('data-forced-by');
+    expect(html).toContain('Sherry Birkin forced you to Explore!');
+  });
+
+  it('omits the forced-explore attribution when absent', () => {
+    const monster = PREMIER_CARDS.find(c => c.type === 'infected');
+    if (monster === undefined) return;
+    const html = renderToStaticMarkup(
+      <MansionReveal def={monster} resultText="Defeated!" damage={30} onContinue={() => {}} />
+    );
+    expect(html).not.toContain('data-forced-by');
   });
 
   it('renders a revealed non-Infected card with its prompt and locks Continue', () => {
@@ -1861,3 +1881,33 @@ describe('CardRevealOverlay', () => {
     expect(html).not.toContain('data-card-reveal-card');
   });
 });
+
+describe('TargetedNotice (off-turn targeting banner)', () => {
+  it('renders nothing with no items', () => {
+    const html = renderToStaticMarkup(<TargetedNotice items={[]} />);
+    expect(html).toBe('');
+  });
+
+  it('renders one row per targeting notice', () => {
+    const html = renderToStaticMarkup(
+      <TargetedNotice items={[{ key: '0-forcedExplore', label: 'Sherry Birkin is forcing you to Explore with them right now' }]} />
+    );
+    expect(html).toContain('data-targeted-notice="1"');
+    expect(html).toContain('app-targeted-notice-item');
+    expect(html).toContain('Sherry Birkin is forcing you to Explore with them right now');
+  });
+
+  it('renders several notices as separate rows', () => {
+    const html = renderToStaticMarkup(
+      <TargetedNotice
+        items={[
+          { key: '0-forcedExplore', label: 'Sherry Birkin is forcing you to Explore with them right now' },
+          { key: '3-mustExploreNextTurn', label: 'Bot 3 made you Explore on your next turn' },
+        ]}
+      />
+    );
+    expect(html).toContain('data-targeted-notice="2"');
+    expect(html).toContain('Bot 3 made you Explore on your next turn');
+  });
+});
+

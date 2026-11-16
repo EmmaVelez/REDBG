@@ -1,5 +1,45 @@
 # HANDOFF — resume here
 
+**OFF-TURN TARGETING NOTICES — "the viewing player knows he's been targeted" (2026-11-15):**
+Manny: "add a way for the viewing player to know he's been targeted by a card or ability
+outside of his turn. I.e. when targeted by fch-008's ability". Generic engine + client feature:
+- **Engine:** `PlayerState.targetedBy?: readonly TargetedNotice[]` where `TargetedNotice = { seat,
+  reason: TargetReason }` (types.ts). New exported helper `recordTargeted(state, target, bySeat,
+  reason)` (actions.ts — the resolvers shadow `targetSeat` as a local const, so the helper is
+  deliberately NOT named targetSeat; dedupes (by, reason) and keeps the newest 3). Wired at every
+  off-turn targeting resolver: `sherryForceExplore` -> 'forcedExplore'; Wesker L2
+  `forceExploreOtherPlayer` + Cephalo `cephaloChoosePlayer` -> 'mustExploreNextTurn';
+  `jamesMarcusChoosePlayer` -> 'mustUseAllExploresNextTurn'; `jillAmmoIncrease` (CH-048 Mercenaries)
+  -> 'ammoReqNextTurn'; `chooseOtherPlayerRevealHand` (Mind Control) -> 'revealHand';
+  `backstabChooseSkill` -> 'backstab' (only fires when the target has an XP'd Skill — untested
+  here, gated by the same condition as the prompt). Cleared at the START of the seat's own turn —
+  TWO clear sites in game.ts: the normal turn `newPlayer` (the per-turn reset block with
+  `ammoReqIncreaseNextTurn: undefined`) AND the downed-revive newPlayer. sanitize() passes the
+  field through untouched (it only hides hand/inventory), so server + hotseat clients get it free.
+- **Client:** `ui/TargetedNotice.tsx` component + `App.tsx` computes `targetedByMe` (shown only
+  when `activeSeat !== mySeat && phase === 'main'`; labels map each TargetReason to a phrase with
+  the actor's name) and floats a fixed top-center banner (`.app-targeted-notice`, z-index 500 —
+  BELOW the mansion-door reveal). `MansionReveal` gained a `forcedByLabel` prop: App derives it
+  from the last log action (`explore` + `forcedBy`) — "X forced you to Explore!" for the target,
+  "You forced X to Explore!" for Sherry — rendered as `.mansion-door-forced` under the title.
+- **PITFALLS hit:** (1) resolver locals named `targetSeat` shadowed my first helper name —
+  rename the helper, not the locals. (2) The downed-revive path in startTurnInternal is NOT the
+  normal turn build; the normal per-turn resets live further down (search `ammoReqIncreaseNextTurn:
+  undefined`). (3) In App.tsx `const gameState = view.state;` sits AFTER the Lobby early-return —
+  a code block using gameState must be inserted after it, not near seatNames. (4) In hotseat the
+  banner NEVER shows by design (the holder is always the active seat); the feature is for server
+  rooms. The live check above used the forcedByLabel reveal path instead.
+- **Tests:** `engine/targeting.test.ts` (6 — Sherry write + sanitize pass-through + clear at
+  target's turn start, Wesker L2, Cephalo, Mercenaries Jill, record dedupe/cap). Client
+  `ui.test.tsx` +5 (TargetedNotice empty/single/multi, MansionReveal forcedByLabel present/absent).
+- **Live-verified** (vite preview build, pass & play): seat 1 (FCH-008 Sherry) force-explored
+  seat 0 -> the mansion-door reveal rendered `data-forced-by` "You forced Player 1 to Explore!"
+  (plus the party/damage as before). Bots/AoE/poison are NOT covered by `recordTargeted` (the
+  banner answers *who aimed at you*, not ambient effects) — Zombie A/B AoE damage etc. still only
+  show as an HP change, same as before.
+- **Gates:** game-core **1195** (was 1189; +6), server 108, client **249** (was 244; +5),
+  typecheck clean x3, soak green, vite build OK.
+
 **CUSTOM JILL VALENTINE (PIRATE) PRINT CH-005 (2026-11-15):** Manny sent a scan of the Jill
 Valentine pirate costume card (70 Health, gates 4 / 7) and asked to add it to the custom line.
 The printed code CH-005 is taken TWICE in this codebase: by the PREMIER ch-005 (Barry Burton)

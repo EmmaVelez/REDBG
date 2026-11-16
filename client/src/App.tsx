@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { ServerMessage, ClientMessage } from '@re/server';
-import type { CardDef, GameState } from '@re/game-core';
+import type { CardDef, GameState, TargetReason } from '@re/game-core';
 import { seatAwaitingAction } from '@re/game-core';
 import { useGameStore } from './store';
 import { createGameSocket } from './net/ws';
@@ -18,6 +18,7 @@ import { CardRevealOverlay } from './ui/CardRevealOverlay';
 import { shouldShowGameOverOverlay } from './ui/overlayOrder';
 import { rankStandings } from './ui/standings';
 import { defForInstance } from './ui/cards';
+import { TargetedNotice } from './ui/TargetedNotice';
 import type { RevealPartyMember } from './ui/MansionReveal';
 
 /** One step of the mansion-door reveal: a revealed card plus its outcome. */
@@ -309,6 +310,38 @@ export function App(): JSX.Element {
   void inLobby;
 
   const gameState = view.state;
+
+  // ---- Off-turn targeting notices --------------------------------------
+  // The viewing player was targeted by a card / ability while it was NOT
+  // their turn (Sherry's forced explore, Wesker L2, Cephalo, Mercenaries
+  // Jill's ammo raise, Mind Control, Backstab). The engine records them on
+  // the target's seat; the board floats a banner so the player never wonders
+  // "why is my hand changing / why must I explore next turn".
+  const TARGET_REASON_LABEL: Record<TargetReason, string> = {
+    forcedExplore: 'is forcing you to Explore with them right now',
+    mustExploreNextTurn: 'made you Explore on your next turn',
+    mustUseAllExploresNextTurn: 'made you spend your whole Explore pool next turn',
+    backstab: 'is stealing 1 XP from one of your Skills',
+    ammoReqNextTurn: 'raised the Ammo requirement of your weapons next turn',
+    revealHand: 'revealed your hand',
+  };
+  const targetedByMe = gameState.activeSeat !== mySeat && gameState.phase === 'main'
+    ? (gameState.seats[mySeat]?.targetedBy ?? []).map(t => ({
+        key: `${t.seat}-${t.reason}`,
+        label: `${seatNames[t.seat] ?? `Player ${t.seat + 1}`} ${TARGET_REASON_LABEL[t.reason]}`,
+      }))
+    : [];
+
+  // The mansion-door reveal attributes a FORCED explore (FCH-008 Sherry) so
+  // the involved players see who forced whom.
+  const lastLogged = gameState.log[gameState.log.length - 1]?.action;
+  const forcedByLabel = lastLogged?.type === 'explore' && lastLogged.forcedBy !== undefined
+    ? (mySeat === lastLogged.seat
+        ? `${seatNames[lastLogged.forcedBy] ?? `Player ${lastLogged.forcedBy + 1}`} forced you to Explore!`
+        : mySeat === lastLogged.forcedBy
+          ? `You forced ${seatNames[lastLogged.seat] ?? `Player ${lastLogged.seat + 1}`} to Explore!`
+          : undefined)
+    : undefined;
   // End-of-game ranking: Decorations first, then Health — the same order
   // `checkWin` ranks winners, so the list always agrees with the CHAMPION line.
   const standings = rankStandings(
@@ -336,6 +369,7 @@ export function App(): JSX.Element {
 
   return (
     <div className={`app app-board${logOpen ? ' app-log-open' : ''}`}>
+      <TargetedNotice items={targetedByMe} />
       <main className="app-main">
         <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
         {logOpen && (
@@ -376,6 +410,7 @@ export function App(): JSX.Element {
           hp={revealCurrent.hp}
           weapons={revealCurrent.weapons}
           damageLabel={revealCurrent.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
+          forcedByLabel={forcedByLabel}
           party={revealCurrent.party}
           index={revealIndex}
           total={revealQueue?.length ?? 1}

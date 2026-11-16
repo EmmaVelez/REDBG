@@ -1,4 +1,4 @@
-import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt, CardReveal } from '../types';
+import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt, CardReveal, TargetReason } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
@@ -602,6 +602,30 @@ function attachToPartnerSeats(
     discard: newDiscard,
   };
   return state.seats.map(s => (s.seat === seat ? newPlayer : s));
+}
+
+/**
+ * Records an off-turn targeting event on `target` (a card or ability
+ * aimed at that Player while it is NOT their turn). The client shows a board
+ * banner from this list so the viewing player knows they were targeted;
+ * `startTurn` clears it when the seat's own turn begins. Dedupes the same
+ * (by, reason) pair and keeps the newest 3 so a flood of effects cannot
+ * spam the banner.
+ */
+export function recordTargeted(
+  state: GameState,
+  target: number,
+  bySeat: number,
+  reason: TargetReason,
+): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => {
+      if (s.seat !== target) return s;
+      const cur = (s.targetedBy ?? []).filter(n => !(n.seat === bySeat && n.reason === reason));
+      return { ...s, targetedBy: [...cur, { seat: bySeat, reason }].slice(-3) };
+    }),
+  };
 }
 
 function applyActionInternal(state: GameState, action: Action): GameState {
@@ -6842,6 +6866,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // CH-000 Rachael Foley L1: a forced ally Explore is still an Explore,
         // so it pays down the target's Explore debt too.
         const afterDebt = payExploreDebt(resolved, targetSeat, 1);
+        const noticed = recordTargeted(afterDebt, targetSeat, seat, 'forcedExplore');
         // Record the forced explore in the log. It is not a player-submitted
         // explore action, so without this entry the client's reveal overlay
         // never fires for it and the turn history omits what the target did.
@@ -6855,7 +6880,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           forcedBy: seat,
         };
         return {
-          ...afterDebt,
+          ...noticed,
           ...nextBase,
           log: [...nextBase.log, { seq: nextBase.log.length + 1, action: forcedExplore }],
           prompts: [...newPrompts, ...afterDebt.prompts.filter(p => p.id !== prompt.id)],
@@ -6870,10 +6895,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (Number.isNaN(targetSeat)) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
+        const wNoticed = recordTargeted(state, targetSeat, seat, 'mustExploreNextTurn');
         return {
-          ...state,
+          ...wNoticed,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
+          seats: wNoticed.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
           prompts: newPrompts,
         };
       }
@@ -6934,10 +6960,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (Number.isNaN(targetSeat)) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
+        const cNoticed = recordTargeted(state, targetSeat, seat, 'mustExploreNextTurn');
         return {
-          ...state,
+          ...cNoticed,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
+          seats: cNoticed.seats.map(s => (s.seat === targetSeat ? { ...s, mustExplore: true } : s)),
           prompts: newPrompts,
         };
       }
@@ -6951,10 +6978,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (Number.isNaN(targetSeat)) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
+        const jNoticed = recordTargeted(state, targetSeat, seat, 'mustUseAllExploresNextTurn');
         return {
-          ...state,
+          ...jNoticed,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, mustUseAllExploresNextTurn: true } : s)),
+          seats: jNoticed.seats.map(s => (s.seat === targetSeat ? { ...s, mustUseAllExploresNextTurn: true } : s)),
           prompts: newPrompts,
         };
       }
@@ -7910,10 +7938,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const amount = Number(prompt.payload?.amount ?? '10');
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
+        const jillNoticed = recordTargeted(state, targetSeat, seat, 'ammoReqNextTurn');
         return {
-          ...state,
+          ...jillNoticed,
           ...nextBase,
-          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, ammoReqIncreaseNextTurn: amount } : s)),
+          seats: jillNoticed.seats.map(s => (s.seat === targetSeat ? { ...s, ammoReqIncreaseNextTurn: amount } : s)),
           prompts: newPrompts,
         };
       }
@@ -8663,6 +8692,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const chosen = prompt.options[option];
         if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
         const targetSeat = Number(chosen);
+        state = recordTargeted(state, targetSeat, seat, 'revealHand');
         const target = state.seats[targetSeat];
         if (target !== undefined) {
           recordCardReveals(target.hand.map(instanceId => ({ instanceId, pile: 'hand', ownerSeat: targetSeat })));
@@ -8890,6 +8920,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const chosen = prompt.options[option];
         const fromSeat = Number(prompt.payload?.fromSeat ?? '');
         const toSeat = Number(prompt.payload?.toSeat ?? '');
+        state = recordTargeted(state, seat, toSeat, 'backstab');
         const inst = chosen === undefined ? undefined : state.cards[chosen];
         if (chosen === undefined || inst === undefined || (inst.xp ?? 0) < 1) {
           return { ...state, ...nextBase, prompts: newPrompts };

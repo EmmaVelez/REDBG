@@ -1120,6 +1120,8 @@ function startTurnInternal(state: GameState): GameState {
       gainedCardsGoToHand: false,
       damagePerAdditionalActionThisTurn: 0,
       mustExplore: false,
+      // Off-turn targeting notices are consumed: the seat's own turn has begun.
+      targetedBy: undefined,
       // Rachael Foley L1: a downed (skipped) turn clears the Explore debt.
       exploresRequiredThisTurn: undefined,
       skipRewardPending: false,
@@ -1340,6 +1342,9 @@ function startTurnInternal(state: GameState): GameState {
     // +amount Ammo THIS turn (the "next turn" the ability named).
     ammoReqIncreaseThisTurn: player.ammoReqIncreaseNextTurn,
     ammoReqIncreaseNextTurn: undefined,
+    // Off-turn targeting notices: the seat's own turn has begun, so the
+    // "you were targeted" banner clears.
+    targetedBy: undefined,
     allWeaponsAmmoDiscountThisTurn: undefined,
     weaponDamageBonusById: undefined,
     trashAtEndOfTurn: undefined,

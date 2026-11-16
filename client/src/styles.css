@@ -2896,3 +2896,44 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .ability-reveal-card .card { width: 84px; }
 }
 
+/* ---------------------------------------------------------------------------
+ * Off-turn targeting notice: floated banner telling the viewing player they
+ * were targeted by a card / ability while it is NOT their turn (FCH-008
+ * Sherry's forced explore, Wesker L2, Cephalo, Mercenaries Jill's ammo
+ * raise, Mind Control, Backstab). z-index sits above the board but BELOW the
+ * mansion-door reveal / game-over overlays, which carry their own context.
+ * --------------------------------------------------------------------------*/
+.app-targeted-notice {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  max-width: min(92vw, 640px);
+}
+.app-targeted-notice-item {
+  background: rgba(20, 22, 30, 0.94);
+  border: 1px solid #f59e0b;
+  color: #fcd34d;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* Forced-explore attribution inside the mansion-door reveal. */
+.mansion-door-forced {
+  text-align: center;
+  color: #fcd34d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  margin: -2px 0 8px;
+}

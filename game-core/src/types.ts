@@ -659,6 +659,22 @@ export interface MarketPile {
 // ---------------------------------------------------------------------------
 // Players & seats
 // ---------------------------------------------------------------------------
+export type TargetReason =
+  | 'forcedExplore'          // FCH-008 Sherry: forced the target to Explore with her right now
+  | 'mustExploreNextTurn'    // Wesker L2 / MA-030 Cephalo: the target must Explore on their next turn
+  | 'mustUseAllExploresNextTurn' // CI-010 James Marcus: the target must spend their WHOLE Explore pool next turn
+  | 'backstab'               // AC-048 Backstab: the target loses 1 XP from a Skill to the attacker
+  | 'ammoReqNextTurn'        // CH-048 Jill (Mercenaries): the target's weapons cost more Ammo next turn
+  | 'revealHand';            // Mind Control: the target's hand was revealed
+
+/** One off-turn targeting event, recorded on the TARGET's seat so their
+ *  client can announce it ("Sherry Birkin is forcing you to explore"). */
+export interface TargetedNotice {
+  /** Seat of the player / effect that targeted them. */
+  readonly seat: number;
+  readonly reason: TargetReason;
+}
+
 
 export interface PlayerState {
   readonly seat: number;
@@ -717,6 +733,11 @@ export interface PlayerState {
    *  round. Cleared for every seat when the turn circles back to the
    *  first living player (a new round). */
   readonly roundUsedAbilities?: Readonly<Record<string, boolean>>;
+  /** Off-turn targeting notices: who used a card or ability against this seat
+   *  while it was NOT their turn (now rendered as a board banner so the
+   *  viewing player knows they were targeted). Cleared at the start of the
+   *  seat's own turn. */
+  readonly targetedBy?: readonly TargetedNotice[];
   /** Yellow Herb: amount of max-HP-heal owed at the start of this player's
    *  NEXT real turn (fallen from a herb attached via Explore gain). */
   readonly pendingHerbHeal?: number;
