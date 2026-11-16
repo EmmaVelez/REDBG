@@ -361,8 +361,9 @@ export function App(): JSX.Element {
   // NO activeSeat/phase gate: in bot games the server delivers one snapshot
   // AFTER the whole bot stretch — which always ends at a human turn start — so
   // the alert arrives exactly when activeSeat === mySeat. The engine keeps the
-  // notices until the target's TURN END (endTurn clears them), which is why the
-  // banner can ride through the player's own turn.
+  // notices until the target takes their FIRST decision-bar action (explore /
+  // buy / play / end turn...), so the banner rides through the player's own
+  // turn until they actually interact.
   const isBotGame = gameState.seats.some(s => s.controller === 'bot');
   const targetedByMe = (gameState.seats[mySeat]?.targetedBy ?? []).map(t => ({
     key: `${t.seat}-${t.reason}`,

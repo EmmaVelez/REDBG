@@ -870,6 +870,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
     log: [...state.log, { seq: state.log.length + 1, action }],
   };
 
+  // Targeted-by notices (the banner): stay visible until the seat takes a real
+  // decision-bar action — explore / buy / play / end turn / ability... Prompt
+  // answers (chooseOption, e.g. a forced explore's Take / Send-to-bottom) are
+  // part of the reveal flow, NOT a decision-bar interaction, so they do not
+  // dismiss it. Engine-internal forced explores apply through resolvers, not
+  // this entry point, so the notice Sherry just recorded on the target is
+  // never wiped here.
+  if (action.seat !== undefined && action.type !== 'chooseOption') {
+    state = {
+      ...state,
+      seats: state.seats.map(s =>
+        s.seat === action.seat && (s.targetedBy ?? []).length > 0
+          ? { ...s, targetedBy: undefined }
+          : s,
+      ),
+    };
+  }
+
   // The explore case records the cards it revealed, so the client's reveal
   // overlay can step through ALL of them. A CI-002 Crow chain or a MA-039 /
   // MA-072 expansion reveals more cards than `exploreCount`, and the client

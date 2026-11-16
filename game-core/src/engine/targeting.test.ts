@@ -15,8 +15,9 @@ import { MERCENARIES_PILES, MERCENARIES_MANSION } from '../data/cards';
  * a card or ability while it was NOT their turn (Manny, 2026-11-15 — the
  * driver was FCH-008 Sherry's forced explore). Every off-turn targeting site
  * records { seat, reason } on the TARGET's seat via `recordTargeted`; the
- * client floats a banner from that list, and `startTurn` clears it when the
- * seat's own turn begins. Covered sites: Sherry's forced explore
+ * client floats a banner from that list, and the target's FIRST decision-bar
+ * action (explore / buy / play / end turn ... — NOT prompt answers) clears
+ * it. Covered sites: Sherry's forced explore
  * ('forcedExplore'), Wesker L2 / Cephalo ('mustExploreNextTurn'),
  * James Marcus ('mustUseAllExploresNextTurn'), Mercenaries Jill's ammo raise
  * ('ammoReqNextTurn'), Mind Control ('revealHand') and AC-048 Backstab
@@ -89,24 +90,38 @@ describe('targetedBy — FCH-008 Sherry forced explore', () => {
     expect(after.seats[0]?.targetedBy ?? []).toHaveLength(0);
   });
 
-  it('keeps the notice through the target\'s turn start and clears it at the target\'s turn end', () => {
+  it('keeps the notice through turn start and prompt answers; clears on the target\'s first board action', () => {
     let s = startTurn(game2('fch-008'));
     s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, turnAmmo: 0 } : p)) };
-    const { state: s1 } = setMansionTop(s, ['ma-005']);
+    // Non-Infected at the top: the forced explore parks it as a Take/bottom
+    // prompt on the TARGET — answering that is NOT a decision-bar interaction.
+    const { state: s1 } = setMansionTop(s, ['we-009']);
     const used = applyAction(s1, { type: 'useCharacterAbility', seat: 0, abilityIndex: 1 });
     const prompt = findPrompt(used, 'sherryForceExplore');
     if (prompt === undefined) throw new Error('no prompt');
     const after = applyAction(used, { type: 'chooseOption', seat: 0, promptId: prompt.id, option: 0 });
     expect(after.seats[1]?.targetedBy).toHaveLength(1);
 
+    // The forced reveal leaves a takeOrBottom prompt on seat 1: answering it
+    // keeps the notice (prompts do not dismiss the banner).
+    let current = after;
+    const tp = after.prompts.find(pr => pr.seat === 1 && pr.payload?.kind === 'takeOrBottom');
+    expect(tp).toBeDefined();
+    if (tp !== undefined) {
+      current = applyAction(after, { type: 'chooseOption', seat: 1, promptId: tp.id, option: 0 });
+      // Prompt answers do NOT dismiss the banner (not a decision-bar action).
+      expect(current.seats[1]?.targetedBy).toHaveLength(1);
+    }
+
     // A bot-game client only receives a snapshot AFTER the bot stretch, which
     // always ends at the HUMAN's turn start — the notice MUST survive it.
-    const foeTurn = startTurn(applyAction(after, { type: 'endTurn', seat: 0 }));
+    const foeTurn = startTurn(applyAction(current, { type: 'endTurn', seat: 0 }));
     expect(foeTurn.seats[1]?.targetedBy).toHaveLength(1);
 
-    // The target's own turn END consumes the notice (banner stays up all turn).
-    const foeEnded = applyAction(foeTurn, { type: 'endTurn', seat: 1 });
-    expect(foeEnded.seats[1]?.targetedBy ?? []).toHaveLength(0);
+    // The target's FIRST board action (an explore through the decision bar)
+    // dismisses the banner.
+    const acted = applyAction(foeTurn, { type: 'explore', seat: 1, weapons: [], exploreCount: 1, leader: 'main' });
+    expect(acted.seats[1]?.targetedBy ?? []).toHaveLength(0);
   });
 });
 

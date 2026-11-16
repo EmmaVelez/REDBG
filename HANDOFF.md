@@ -1,5 +1,18 @@
 # HANDOFF — resume here
 
+**BANNER DISMISSES ON FIRST BOARD ACTION (2026-11-15):** Manny: the targeted-by banners should
+stay visible until the viewing player interacts with their decision bar.
+- Engine (actions.ts applyActionInternal): any non-chooseOption action by a seat clears that
+  seat's targetedBy — the banner survives turn start AND prompt answers (Take/Send-to-bottom are
+  part of the reveal flow, not a decision-bar interaction) and dismisses on the player's FIRST
+  board action (explore / buy / play / end turn / ability). Engine-internal forced explores
+  (Sherry) apply through resolvers, never this entry point, so the just-recorded notice is safe.
+  The old endTurn-rebuild clear remains (harmless belt-and-braces; endTurn is itself a first
+  action).
+- targeting.test.ts: the lifecycle test now asserts prompt-answer-keeps (takeOrBottom) + clears
+  on the target's first explore; docstring updated. game-core 1223/1223, client 252/252,
+  typecheck clean.
+
 **REVEAL TIMING POLISH (2026-11-15):** Manny: (1) reduce the opponent reveal auto-close timer
 to 2 seconds; (2) when playing with bots, show the targeted-by banners AFTER all opponent reveal
 screens have closed.
