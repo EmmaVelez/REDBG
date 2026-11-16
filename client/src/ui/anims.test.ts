@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CardReveal, GameState } from '@re/game-core';
-import { detectCardReveals, detectPlayerDowned, detectReveal, detectReveals, diffCardMoves } from './anims';
+import { detectCardReveals, detectFreshExplores, detectPlayerDowned, detectReveal, detectReveals, diffCardMoves } from './anims';
 import { flightPath, splitFlightPhases } from './CardFlightLayer';
 
 /** Minimal GameState-shaped fixture with the zones animation cares about. */
@@ -351,6 +351,62 @@ describe('detectReveal', () => {
       seats: [{ seat: 0, attached: ['ma-001#7'] }],
       log: [],
     });
+    expect(detectReveal(prev, next, 0)).toBeNull();
+  });
+
+it('reports a bot explore buried under the stretch\'s trailing actions in one batched snapshot', () => {
+    // The server applies a whole bot stretch before broadcasting: the snapshot
+    // the viewer receives ends with endTurn, not the explore itself.
+    const prev = makeState({ version: 1, mansionDeck: ['ma-001#7'], seats: [{ seat: 0 }, { seat: 1 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
+      log: [
+        { seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1 } },
+        { seq: 2, action: { type: 'endTurn' as const, seat: 1 } },
+        { seq: 3, action: { type: 'startTurn' as const, seat: 0 } },
+      ],
+    });
+    expect(detectReveal(prev, next, 0)).toEqual({
+      instanceId: 'ma-001#7', outcomeZone: 'attached', explorerSeat: 1, damage: 0, weapons: [],
+    });
+  });
+
+  it('collects EVERY fresh explore of a multi-bot stretch in log order', () => {
+    const prev = makeState({ version: 1, mansionDeck: ['ma-001#7', 'ma-002#1'], seats: [{ seat: 0 }, { seat: 1 }, { seat: 2 }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }, { seat: 2, attached: ['ma-002#1'] }],
+      log: [
+        { seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1 } },
+        { seq: 2, action: { type: 'endTurn' as const, seat: 1 } },
+        { seq: 3, action: { type: 'explore' as const, seat: 2, weapons: [] as readonly string[], exploreCount: 1 } },
+        { seq: 4, action: { type: 'endTurn' as const, seat: 2 } },
+      ],
+    });
+    const fresh = detectFreshExplores(prev, next);
+    expect(fresh.map(f => f.action.seat)).toEqual([1, 2]);
+    // The single-card view still means "the reveal to show right now".
+    expect(detectReveal(prev, next, 0)?.explorerSeat).toBe(2);
+  });
+
+  it('ignores explores that are older than prev\'s last entry (no double-shows)', () => {
+    // prev ends at seq 1, so the seq-1 explore (long since seen) is not fresh
+    // even though the endTurn that followed it IS fresh in this snapshot.
+    const prev = makeState({ version: 1, mansionDeck: [], seats: [{ seat: 0 }, { seat: 1 }], log: [{ seq: 1, action: { type: 'endTurn' as const, seat: 0 } }] });
+    const next = makeState({
+      version: 2,
+      mansionDeck: [],
+      seats: [{ seat: 0 }, { seat: 1, attached: ['ma-001#7'] }],
+      log: [
+        // This explore happened in an EARLIER snapshot — prev already saw it.
+        { seq: 1, action: { type: 'explore' as const, seat: 1, weapons: [] as readonly string[], exploreCount: 1 } },
+        { seq: 2, action: { type: 'endTurn' as const, seat: 1 } },
+      ],
+    });
+    expect(detectFreshExplores(prev, next)).toEqual([]);
     expect(detectReveal(prev, next, 0)).toBeNull();
   });
 

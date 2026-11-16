@@ -111,30 +111,41 @@ function sameLoc(a: ZoneLoc, b: ZoneLoc): boolean {
 }
 
 /**
- * The cards revealed by the viewing player's most recent explore, if any, in
- * REVEAL ORDER (the order they came out of the Mansion — top card first).
- *
- * A single explore reveals one card, but a multi-explore (`exploreCount > 1`),
- * a CI-002 Crow chain or a MA-039/MA-072 event expansion reveals SEVERAL in one
- * action; the reveal panel steps through them one at a time.
- *
- * Requires the newest logged action to be an explore by `mySeat` (or a forced
- * explore by it) AND a revealed instance that is now somewhere other than the
- * top of the mansion. Returns null when there is no fresh reveal (bots
- * exploring, reshuffles, non-infected prompts).
+ * The explore actions that are NEW since `prev`, in log order. The server may
+ * deliver a WHOLE BOT STRETCH as one snapshot (every bot action applied before
+ * the clients are notified), so the newest log entry of a fresh snapshot is
+ * rarely the explore itself — it is usually the stretch's final action
+ * (endTurn, a play, ...). We walk the log BACKWARDS from the newest entry,
+ * collecting explore actions whose seq is newer than prev's last entry, and
+ * stop at the first non-fresh entry. Capped so a pathological stretch cannot
+ * flood the reveal queue.
  */
-export function detectReveals(prev: GameState, next: GameState, mySeat: number): readonly Reveal[] {
-  const last = next.log[next.log.length - 1];
-  if (last === undefined) return [];
-  const action = last.action;
-  if (action.type !== 'explore') return [];
-  // EVERY viewer sees EVERY player's explore reveal (Manny, 2026-11-15): the
-  // table is public, so the mansion-door reveal pauses each connected client
-  // and auto-closes after three seconds (see App.tsx). The engine records the
-  // exact revealed set, the zones (attached / removed / deck / limbo) are all
-  // public, and a sanitized view carries the real instance ids - only hands
-  // and inventories are hidden.
+export function detectFreshExplores(prev: GameState, next: GameState): readonly { seq: number; action: Action & { type: 'explore' } }[] {
+  const prevLastSeq = prev.log[prev.log.length - 1]?.seq ?? 0;
+  const out: { seq: number; action: Action & { type: 'explore' } }[] = [];
+  for (let i = next.log.length - 1; i >= 0; i--) {
+    const entry = next.log[i];
+    if (entry === undefined) break;
+    if (entry.seq <= prevLastSeq) break; // everything further back is older too
+    if (entry.action.type === 'explore' && entry.action.seat !== undefined) {
+      out.push({ seq: entry.seq, action: entry.action as Action & { type: 'explore' } });
+      if (out.length >= 8) break;
+    }
+  }
+  return out.reverse();
+}
 
+/**
+ * The cards a single explore action revealed, in REVEAL ORDER (the order they
+ * came out of the Mansion — top card first). A multi-explore
+ * (`exploreCount > 1`), a CI-002 Crow chain or a MA-039/MA-072 event expansion
+ * reveals SEVERAL in one action; the reveal panel steps through them one at a
+ * time. Works for ANY explorer: the table is public (zones, log, revealed set),
+ * so every viewer sees every player's reveal (Manny, 2026-11-15), and a
+ * sanitized view carries the real instance ids — only hands and inventories
+ * are hidden.
+ */
+export function revealsForExplore(prev: GameState, next: GameState, action: Action & { type: 'explore' }): readonly Reveal[] {
   const damage = exploreDamage(prev, action.seat, action.weapons);
   const weapons = action.weapons;
   const base = { explorerSeat: action.seat, damage, weapons };
@@ -192,6 +203,18 @@ export function detectReveals(prev: GameState, next: GameState, mySeat: number):
         (revealOrder.get(a.instanceId) ?? Number.MAX_SAFE_INTEGER) -
         (revealOrder.get(b.instanceId) ?? Number.MAX_SAFE_INTEGER),
     );
+}
+
+/**
+ * The cards revealed by the most recent FRESH explore (this snapshot's explore
+ * actions), in REVEAL ORDER — i.e. the reveal the viewing player should see
+ * right now. `mySeat` is kept for call-site compatibility; every viewer sees
+ * every player's reveals.
+ */
+export function detectReveals(prev: GameState, next: GameState, _mySeat: number): readonly Reveal[] {
+  const fresh = detectFreshExplores(prev, next);
+  if (fresh.length === 0) return [];
+  return revealsForExplore(prev, next, fresh[fresh.length - 1]!.action);
 }
 
 /** The first revealed card — the single-card view of `detectReveals`. */

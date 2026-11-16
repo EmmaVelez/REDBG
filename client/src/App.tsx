@@ -12,7 +12,7 @@ import { Lobby } from './ui/Lobby';
 import { MansionReveal } from './ui/MansionReveal';
 import { SeatSwap } from './ui/SeatSwap';
 import { YouDiedOverlay } from './ui/YouDiedOverlay';
-import { detectCardReveals, detectPlayerDowned, detectReveals } from './ui/anims';
+import { detectCardReveals, detectPlayerDowned, detectFreshExplores, revealsForExplore } from './ui/anims';
 import type { CardRevealBatch } from './ui/anims';
 import { CardRevealOverlay } from './ui/CardRevealOverlay';
 import { shouldShowGameOverOverlay } from './ui/overlayOrder';
@@ -182,7 +182,11 @@ export function App(): JSX.Element {
     prevStateRef.current = state;
     if (prev === null || state === null || prev.version === state.version) return;
     const downed = detectPlayerDowned(prev, state, mySeat);
-    const detected = detectReveals(prev, state, mySeat);
+    // The server may deliver a whole bot stretch as ONE snapshot, so collect
+    // EVERY fresh explore action (not just the newest log entry) and queue
+    // each one's cards — the viewing player watches every player's reveals.
+    const freshExplores = detectFreshExplores(prev, state);
+    const detected = freshExplores.flatMap(f => revealsForExplore(prev, state, f.action));
     // Ability/effect reveal (separate overlay): show it once, and keep it
     // queued behind a mansion-door reveal if both landed on the same step.
     const revealBatch = detectCardReveals(prev, state, mySeat);
@@ -195,18 +199,12 @@ export function App(): JSX.Element {
       pendingDeathRef.current = null;
       return;
     }
-    if (detected.length === 0) return;
-    const firstReveal = detected[0];
-    if (firstReveal === undefined) return;
+    if (freshExplores.length === 0) return;
 
-    // Who led the explore: the leading character is the one that took the hit,
-    // so the party cards name it for the reveal panel.
-    const lastAction = state.log[state.log.length - 1]?.action;
-    const leader: 'main' | 'partner' =
-      lastAction?.type === 'explore' ? (lastAction.leader ?? 'main') : 'main';
-    const explorer = state.seats[firstReveal.explorerSeat];
-    const party: RevealPartyMember[] = [];
-    if (explorer !== undefined) {
+    const partyFor = (explorerSeat: number, leader: 'main' | 'partner'): RevealPartyMember[] => {
+      const explorer = state.seats[explorerSeat];
+      const party: RevealPartyMember[] = [];
+      if (explorer === undefined) return party;
       const mainDef = defForInstance(state, explorer.characterInstanceId);
       const partnerDef = defForInstance(state, explorer.partnerInstanceId);
       // A carried counter (Poison) turns BOTH characters' gauges purple.
@@ -231,34 +229,42 @@ export function App(): JSX.Element {
           poisoned,
         });
       }
-    }
+      return party;
+    };
 
     const queue: RevealEntry[] = [];
-    for (const r of detected) {
-      const def = defForInstance(state, r.instanceId);
-      if (def === null) continue;
-      const resultText =
-        r.outcomeZone === 'attached'
-          ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
-          : r.outcomeZone === 'removed'
-            ? `${def.name} was removed from the Mansion.`
-            : r.outcomeZone === 'mansion'
-              ? `${def.name} was returned to the Mansion deck.`
-              : `${def.name} is revealed — answer the choice below to continue.`;
-      // Resolve the explore's weapon instances to defs for the reveal panel.
-      const weaponDefs = r.weapons
-        .map(id => defForInstance(state, id))
-        .filter((d): d is CardDef => d !== null);
-      // CI-011 Queen Leech: its Health is the leading exploring Character's
-      // Maximum Health, which is not the value printed on the card.
-      const revealedHp = (def.infectedEffects ?? []).some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')
-        ? party.find(m => m.leader)?.maxHp
-        : undefined;
-      queue.push({ def, resultText, damage: r.damage, hp: revealedHp, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
+    for (const { action } of freshExplores) {
+      const reveals = revealsForExplore(prev, state, action);
+      if (reveals.length === 0) continue;
+      const party = partyFor(action.seat, action.leader ?? 'main');
+      for (const r of reveals) {
+        const def = defForInstance(state, r.instanceId);
+        if (def === null) continue;
+        const resultText =
+          r.outcomeZone === 'attached'
+            ? `Defeated! ${def.name} is attached to your character (+${def.decorations ?? 0} ★).`
+            : r.outcomeZone === 'removed'
+              ? `${def.name} was removed from the Mansion.`
+              : r.outcomeZone === 'mansion'
+                ? `${def.name} was returned to the Mansion deck.`
+                : `${def.name} is revealed — answer the choice below to continue.`;
+        // Resolve the explore's weapon instances to defs for the reveal panel.
+        const weaponDefs = r.weapons
+          .map(id => defForInstance(state, id))
+          .filter((d): d is CardDef => d !== null);
+        // CI-011 Queen Leech: its Health is the leading exploring Character's
+        // Maximum Health, which is not the value printed on the card.
+        const revealedHp = (def.infectedEffects ?? []).some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')
+          ? party.find(m => m.leader)?.maxHp
+          : undefined;
+        queue.push({ def, resultText, damage: r.damage, hp: revealedHp, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
+      }
     }
     if (queue.length === 0) return;
-    setRevealQueue(queue);
-    setRevealIndex(0);
+    // APPEND to any queue already showing (a new bot explore that lands while
+    // the previous reveal is up joins the line instead of replacing it).
+    setRevealQueue(prevQueue => [...(prevQueue ?? []), ...queue]);
+    setRevealIndex(index => (revealQueue === null ? 0 : index));
   }, [state, mySeat]);
 
   const revealCurrent = revealQueue !== null ? revealQueue[revealIndex] ?? null : null;

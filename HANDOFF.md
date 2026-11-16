@@ -1,5 +1,29 @@
 # HANDOFF — resume here
 
+**BOT-REVEAL BATCHING FIX (2026-11-15):** Manny reported on the LIVE Render deploy:
+"there are no messages alerting players they were targeted and the view player can't watch
+bots mansion reveal".
+- **Root cause, bots' reveals:** the server applies a WHOLE BOT STRETCH before broadcasting
+  ONE snapshot, so the newest log entry a viewer sees is the stretch's trailing action
+  (endTurn/play), never the explore — `detectReveals` (which required the newest entry to BE
+  the explore) silently returned nothing for every bot move.
+  FIX (client-only): `detectFreshExplores` walks the log BACKWARDS from the newest entry past
+  the trailing actions, collects every explore whose seq > prev's last seq (cap 8), and
+  `revealsForExplore` computes each one's cards; App.tsx queues ALL of a stretch's explores
+  (per-explore party/leader) and APPENDS to a queue already on screen instead of replacing —
+  so a multi-bot stretch shows every reveal in order, and a new bot explore during a showing
+  reveal joins the line. Three new anims tests (batched explore, multi-explore stretch order,
+  no double-shows for already-seen seqs). Client 252/252, typecheck clean.
+- **Targeting notices:** engine/plumbing verified correct end-to-end (recordTargeted 6/6 tests,
+  sanitize spreads seats so targetedBy rides through, banner component tests) — the "no
+  messages" on the live instance was the old pre-targeting server process (PID 6788, started
+  Nov 10) seized port 1724 locally; on Render the previous commits carry the engine. If the
+  user still sees nothing: bots use abilities only when the greedy policy picks them, so a
+  targeting notice needs a Wesker/Sherry/Cephalo bot that actually triggers it.
+- **Deployment:** the live instance is Render at https://redbg-1.onrender.com/ (auto-deploy
+  on push to master). USER DIRECTIVE: verify on Render, not the local server. Local 1724
+  server was restarted then killed per that directive.
+
 **REVEAL-FOR-ALL + 3-SECOND AUTO-CLOSE (2026-11-15):** Manny: "The view player should see all
 players complete mansion reveal screen, it should pause the game and automatically close after
 3 seconds."
