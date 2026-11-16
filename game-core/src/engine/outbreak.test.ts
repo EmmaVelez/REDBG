@@ -624,8 +624,10 @@ describe('Outbreak mode', () => {
     })), ['ch-023#1', 'we-003#1']);
     // Combat Knife 5 + Survival Knife 10, plus its +5 for the other Knife.
     expect(exploreDamage(s, 0, ['we-004#1'])).toBe(5 + 10 + 5);
-    // Without a Knife in the explore, the discard pile is untouched.
-    expect(exploreDamage(s, 0, ['we-003#1'])).toBe(5);
+    // Without a Knife in the explore, the discard pile is untouched. The
+    // preview now matches the resolve: 5 base + 5 for Submission's own
+    // +5-if-80+HP bonus (that term used to be missing from the preview).
+    expect(exploreDamage(s, 0, ['we-003#1'])).toBe(5 + 5);
   });
   test('CH-029 Rebecca Chambers L1: discard cards at turn start to lower her Infection Level', () => {
     const s = withCards(outbreakState(st => ({

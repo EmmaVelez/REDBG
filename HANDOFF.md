@@ -1,5 +1,21 @@
 # HANDOFF — resume here
 
+**WE-016 PREVIEW FIX (2026-11-15):** Manny: used the Semi-Auto Rifle after two Action cards,
+no bonus damage shown. DIAGNOSIS: the RESOLVED explore always applied the +10/Action bonus
+(verified: 30 fails vs 50 defeats a 40-HP Dr. Salvador) — but the picker PREVIEW
+(`exploreDamage` in explore.ts) omitted it, so the UI displayed no bonus.
+- FIX: exploreDamage now mirrors the engine's remaining weapon-effect bonus terms —
+  `plusDamagePerActionPlayedThisTurn` (×actions in play), `plusDamageIfSelfHpAtLeast`,
+  `revealTopOfInventoryCostGate`, `plusDamageWhenUsingMultipleWeapons`. `blowbackBonus`
+  (WE-025) intentionally NOT previewed (depends on discard-with-action choice, unknowable
+  up front).
+- Tests: new `semiAutoRifle.test.ts` (preview 30->50 with 2 actions AND resolve defeats
+  40-HP Salvador); updated one stale expectation in outbreak.test.ts (we-003 Submission's
+  own +5-@-80+HP is in the preview now -> 10, matching resolve). game-core 1198/1198,
+  client 252/252, typecheck clean.
+- NOTE: the preview still can't show the WE-025 blowback pistol discard damage or a few
+  prompt-gated effects — engine remains authoritative; preview now covers the static ones.
+
 **EX-004 SILENT-FAILURE FIX (2026-11-15):** Manny: ex-004 causes the same kind of silent
 failure as ex-001 had — fix it the same way.
 - `custom.ts`: EX-004 declares `dependencies: ['ex-005']` — selecting the Ammunition Box auto-

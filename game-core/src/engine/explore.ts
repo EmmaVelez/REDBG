@@ -241,6 +241,34 @@ export function exploreDamage(
       e.kind === 'onExploreWeaponDamagePerDiscardCard' ? a + e.amount * player.discard.length : a, 0);
   }, 0);
   const ammoCardsInPlayArea = player.playArea.map(id => state.cards[id]?.cardId).map(cid => state.cardDefs[cid ?? '']?.type ?? '').filter(t => t === 'ammunition').length;
+  // Mirror the explore reducer's remaining weapon-effect damage terms so the
+  // picker preview matches the resolved combat (we-016 Semi-Auto Rifle,
+  // we-015 Bolt-Action Rifle, Weapons-Locker-style per-weapon effects ...).
+  // `blowbackBonus` (WE-025) is intentionally not previewed: it depends on
+  // how many Pistols the player discards WITH the action, unknown up front.
+  const actionPlayedCount = player.playArea.filter(id => {
+    const ci = state.cards[id];
+    const cd = ci ? state.cardDefs[ci.cardId] : undefined;
+    return cd?.type === 'action';
+  }).length;
+  const perActionBonus = defs.reduce((sum, w) => {
+    const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamagePerActionPlayedThisTurn');
+    return sum + (eff !== undefined && eff.kind === 'plusDamagePerActionPlayedThisTurn' ? eff.amount * actionPlayedCount : 0);
+  }, 0);
+  const selfHpBonus = defs.reduce((sum, w) => {
+    const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamageIfSelfHpAtLeast');
+    return sum + (eff !== undefined && eff.kind === 'plusDamageIfSelfHpAtLeast' && player.hp >= eff.hp ? eff.amount : 0);
+  }, 0);
+  const topInvCard = player.inventory[0];
+  const topInvDef = topInvCard ? state.cardDefs[state.cards[topInvCard]?.cardId ?? ''] : undefined;
+  const costGateBonus = defs.reduce((sum, w) => {
+    const eff = w?.weaponEffects?.find(e => e.kind === 'revealTopOfInventoryCostGate');
+    return sum + (eff !== undefined && eff.kind === 'revealTopOfInventoryCostGate' && (topInvDef?.cost ?? 0) >= eff.threshold ? eff.amount : 0);
+  }, 0);
+  const multiWeaponBonus = defs.reduce((sum, w) => {
+    const eff = w?.weaponEffects?.find(e => e.kind === 'plusDamageWhenUsingMultipleWeapons');
+    return sum + (eff !== undefined && eff.kind === 'plusDamageWhenUsingMultipleWeapons' && weaponIds.length > 1 ? eff.amount : 0);
+  }, 0);
   const discardWeaponTagCounts: Partial<Record<WeaponTag, number>> = {};
   for (const id of player.discard) {
     const ci = state.cards[id];
@@ -256,7 +284,7 @@ export function exploreDamage(
     ammoCardsInPlayArea,
     inventoryCount: player.inventory.length,
     discardWeaponTagCounts,
-    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus + (armedLauncherAmount * battledCount),
+    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + (armedLauncherAmount * battledCount),
     damageMultiplier: player.damageMultiplierThisTurn ?? 1,
     infectedBattledThisTurn: battledCount,
   });
