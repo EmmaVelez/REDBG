@@ -1,5 +1,20 @@
 # HANDOFF — resume here
 
+**AW-001 LEVEL-0 TIER + AC-000 ART (2026-11-16):**
+- Manny: "Aw-001 actually has 3 character abilities starting at level 0." The type comments
+  already recorded the intended mapping (drawOncePerTurnIfDamaged = L0) but the DATA had drifted
+  to levels 1/1/2 and the ENGINE could not express level 0 (abilitiesForLevel returned [] at
+  character level 0). FIX: (a) characters.ts abilitiesForLevel now honors level-0 abilities at
+  level 0 (`level === 0` -> filter to level-0 kinds); (b) types.ts drawOncePerTurnIfDamaged
+  level union 1|2 -> 0|1|2; (c) custom.ts aw-001 -> draw L0, allDamageReduction L1 (unchanged
+  gate 2 / 7), exploreDamageIfHpAtMost L2, + a level-0 entry in levels[]/text. Also fixed a
+  PREVIEW gap found while testing: exploreDamage was missing the exploreDamageIfHpAtMost (aw-001
+  L2 / low-HP +damage) term — engine applied it, picker didn't (same family as the we-016 fix).
+  Tests: customWeskerLevel0.test.ts 3/3 (gating 0/1/2, the level-0 draw prompt fires and draws,
+  L2 passive off at 0 / on at 2).
+- Manny sent AC-000 (Martial Arts) art -> CARD-ART/AC-000.png (glob picks it up).
+- Gates: game-core 1256/1256, client 258/258, typecheck clean.
+
 **CH-005Q JILL VALENTINE (tactical) IMPLEMENTED (2026-11-16):** official custom print, printed
 code CH-005 variant (the THIRD custom carrier of CH-005 — premier Barry ch-005, B4MC Sherry
 b4mc-ch-005, pirate Jill ch-005p — so this one is ch-005q). 80 HP, gates 5 / 9. Card text read

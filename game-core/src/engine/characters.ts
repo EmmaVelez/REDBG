@@ -93,7 +93,9 @@ export function abilitiesForLevel(abilities: readonly CharacterAbility[] | undef
     return [];
   }
   if (level === 0) {
-    return [];
+    // Level-0 abilities (AW-001 Wesker's starting passive) are always on —
+    // they are the card's opening tier, not an unlocked upgrade.
+    return abilities.filter(ability => ability.level === 0);
   }
   return abilities.filter(ability => ability.level <= level);
 }

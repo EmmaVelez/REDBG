@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
@@ -228,6 +228,7 @@ export function exploreDamage(
     // Mercenaries Skill damage bonuses (SK-030, SK-034, ...) — the picker's
     // preview must match what the explore reducer resolves.
     exploreSkillDamageBonus(activeSkillEffects(state, seat), defs, state, seat, weaponIds ?? []) +
+    exploreDamageIfHpAtMost(abilities, player.hp) +
     exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
     exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
     actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0);
