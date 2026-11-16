@@ -1119,6 +1119,12 @@ function startTurnInternal(state: GameState): GameState {
       gainedThisTurn: [],
       gainedCardsGoToHand: false,
       damagePerAdditionalActionThisTurn: 0,
+      // CAC-015 / CW-034 / CW-035: per-turn weapon effects.
+      weaponsGainedGoToPlayArea: undefined,
+      firstWeaponToPlayAreaInstanceId: undefined,
+      firstWeaponToPlayAreaBonus: undefined,
+      armedCrossbowInstanceId: undefined,
+      scopedMagnumXp: undefined,
       mustExplore: false,
       // Off-turn targeting notices are consumed: the seat's own turn has begun.
       targetedBy: undefined,
@@ -1352,6 +1358,12 @@ function startTurnInternal(state: GameState): GameState {
     usedWeaponEffectsThisTurn: undefined,
     // B4MC-CH-005 L1: the Stun Rod charge lasts "this turn" only.
     stunRodCharged: undefined,
+    // CAC-015 / CW-034 / CW-035: per-turn weapon effects.
+    weaponsGainedGoToPlayArea: undefined,
+    firstWeaponToPlayAreaInstanceId: undefined,
+    firstWeaponToPlayAreaBonus: undefined,
+    armedCrossbowInstanceId: undefined,
+    scopedMagnumXp: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,

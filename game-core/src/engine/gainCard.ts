@@ -3,7 +3,7 @@ import { abilitiesForLevel } from './characters';
 import { drawWithReshuffle } from './deck';
 import { makeRng, shuffle } from '../util/rng';
 
-export type GainDestination = 'discard' | 'hand' | 'topInventory' | 'bottomInventory';
+export type GainDestination = 'discard' | 'hand' | 'playArea' | 'topInventory' | 'bottomInventory';
 
 export type GainReason =
   | 'buy'
@@ -36,7 +36,7 @@ function plusOneCardOnGain(abilities: readonly { kind: string }[]): boolean {
 }
 
 function zoneOf(dest: GainDestination): CardZone {
-  return dest === 'hand' ? 'hand' : dest === 'discard' ? 'discard' : 'inventory';
+  return dest === 'hand' ? 'hand' : dest === 'discard' ? 'discard' : dest === 'playArea' ? 'playArea' : 'inventory';
 }
 
 export function gainCard(state: GameState, req: GainCardRequest): GameState {
@@ -46,7 +46,12 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
   const baseDest = req.destination ?? 'discard';
   // AC-021 Gathering Forces: discard-destined gains route to hand this turn.
   const gatheringToHand = player.gainedCardsGoToHand === true;
-  const dest: GainDestination = gatheringToHand && baseDest === 'discard' ? 'hand' : baseDest;
+  // CAC-015 This Shit Ends Now!: Weapons GAINED this turn go into the Play Area.
+  const weaponsToPlayArea = player.weaponsGainedGoToPlayArea === true
+    && (state.cardDefs[req.cardId]?.type === 'weapon');
+  const dest: GainDestination = weaponsToPlayArea
+    ? 'playArea'
+    : (gatheringToHand && baseDest === 'discard' ? 'hand' : baseDest);
 
   const charInst = state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
@@ -70,6 +75,17 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
 
   if (dest === 'hand') {
     newPlayer = { ...newPlayer, hand: [...newPlayer.hand, ...gainedIds] };
+  } else if (dest === 'playArea') {
+    newPlayer = { ...newPlayer, playArea: [...newPlayer.playArea, ...gainedIds] };
+    // CAC-015: the FIRST Weapon routed to the Play Area this way gets +10
+    // Damage this turn. Only the first one is tracked.
+    if (newPlayer.firstWeaponToPlayAreaInstanceId === undefined) {
+      newPlayer = {
+        ...newPlayer,
+        firstWeaponToPlayAreaInstanceId: gainedIds[0],
+        firstWeaponToPlayAreaBonus: 10,
+      };
+    }
   } else if (dest === 'discard') {
     newPlayer = { ...newPlayer, discard: [...newPlayer.discard, ...gainedIds] };
   } else if (req.shuffleIntoInventory === true) {

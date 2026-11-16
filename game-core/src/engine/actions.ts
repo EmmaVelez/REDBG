@@ -138,6 +138,22 @@ function marketWeaponIds(state: GameState, maxCost?: number): string[] {
   return out;
 }
 
+/** CAC-003 Change of Outfit: every TOP card of a Resource Area pile (any type)
+ *  costing no more than `maxCost` — the gain is "a card from the resource area
+ *  up to the combined cost of the trashed cards", not a weapon-only gain. */
+function marketCardIds(state: GameState, maxCost: number): string[] {
+  const out: string[] = [];
+  for (const pile of Object.values(state.marketPiles)) {
+    const topId = pile.cards[0];
+    if (topId === undefined) continue;
+    const def = cardDef(state, topId);
+    if (def === undefined || def.cost === undefined) continue;
+    if (def.cost > maxCost) continue;
+    out.push(topId);
+  }
+  return out;
+}
+
 /**
  * Unofficial Expansion: EX-002 Special Rocket Launcher. While attached to the
  * exploring Character, the launcher auto-defeats the next Infected with `hp` or
@@ -384,6 +400,217 @@ function applyTrashDrawHook(prev: GameState, next: GameState, action: Action): G
       ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
       : s)),
   };
+}
+
+/**
+ * End-of-turn processing, shared by the `endTurn` action and the
+ * CAC-013 "From Bad to Worse" resolution (which must finish the turn
+ * AFTER the target has discarded). `nextBase` carries the version bump
+ * and the log entry to record.
+ */
+function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: number; log: GameState['log'] }): GameState {
+  const action = { type: 'endTurn' as const, seat };
+      void action;
+      const player = state.seats[seat] as PlayerState;
+
+      // CW-025 Elephant Killer: an unused weapon in the Play Area moves to
+      // the top of the Inventory instead of being discarded. The printed
+      // "you can" is resolved automatically — taking it is never worse than
+      // discarding it, and the play area is emptied either way.
+      const recalledIds = player.playArea.filter(id => {
+        const d = cardDef(state, id);
+        return d?.type === 'weapon'
+          && (d.weaponEffects ?? []).some(e => e.kind === 'recallToInventoryTopAtTurnEnd')
+          && weaponUsesThisTurn(state, seat, id) === 0;
+      });
+      const recalledSet = new Set(recalledIds);
+
+      // AM-007 Ammo x30: an Ammunition that was not used to Explore moves
+      // to the top of the Inventory instead of being discarded. The printed
+      // "you can" is resolved automatically, the same ruling as CW-025
+      // above — keeping the Ammunition is never worse than discarding it.
+      const recycledAmmoIds = recycleAmmoIds(state, seat);
+      const recalledOrRecycled = new Set([...recalledSet, ...recycledAmmoIds]);
+
+      const dh = discardHand({ hand: player.hand, discard: player.discard });
+      const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
+
+      // Mercenaries: weapons that were given "+X damage, Trash at the end of
+      // this turn" (Custom Standard Sidearm, Reliable Blade) leave the game.
+      const trashNow = player.trashAtEndOfTurn ?? [];
+      const trashSet = new Set(trashNow);
+      const discardAfterTrash = dh2.discard.filter(id => !trashSet.has(id));
+      const removedAfterTrash = trashNow.length > 0
+        ? [...state.removed, ...trashNow.filter(id => !state.removed.includes(id))]
+        : state.removed;
+
+      // Mansion attachment effects at end of turn (e.g., Rampage trashing
+      // inventory cards). Applied to the active player's inventory.
+      let currentInventory = [...recalledIds, ...recycledAmmoIds, ...player.inventory];
+      let currentRemoved = removedAfterTrash;
+      let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
+      let currentAttachments = [...(state.mansionAttachments ?? [])];
+      const attachmentsToRemove: string[] = [];
+
+      for (const attId of currentAttachments) {
+        const attDef = cardDef(state, attId);
+        if (attDef?.attachmentEffects === undefined) continue;
+        for (const effect of attDef.attachmentEffects) {
+          if (effect.kind === 'trashTopInventoryAtTurnEnd') {
+            // Trash the top N cards from inventory
+            const toTrash = currentInventory.slice(0, effect.count);
+            if (toTrash.length > 0) {
+              currentInventory = currentInventory.slice(effect.count);
+              currentRemoved = [...currentRemoved, ...toTrash.filter(id => !currentRemoved.includes(id))];
+              // Update trash counter
+              const currentCount = currentTrashCounts[attId] ?? 0;
+              const newCount = currentCount + toTrash.length;
+              currentTrashCounts[attId] = newCount;
+              // Check if attachment should be removed
+              if (newCount >= effect.removeAfter) {
+                attachmentsToRemove.push(attId);
+              }
+            }
+          }
+        }
+      }
+
+      // Remove attachments that have reached their limit
+      if (attachmentsToRemove.length > 0) {
+        currentAttachments = currentAttachments.filter(id => !attachmentsToRemove.includes(id));
+        currentRemoved = [...currentRemoved, ...attachmentsToRemove.filter(id => !currentRemoved.includes(id))];
+        // Clean up counters for removed attachments
+        for (const attId of attachmentsToRemove) {
+          delete currentTrashCounts[attId];
+        }
+      }
+
+      // Outbreak: if the active Player did not Explore the Mansion or
+      // Attack an Infected Character this turn, increase their Infection
+      // Level by 1 (draw the top Infection card, place it face up next to
+      // the Character). Infected Characters cannot change their level.
+      let infectionDeckOut = state.infectionDeck ?? [];
+      const infectionCardsOut = [...(player.infectionCards ?? [])];
+      // AC-023 Power of the t-Virus: at end of turn, if the player
+      // explored or attacked an Infected Character, +1 Infection.
+      const playedTVirus = player.playArea.some(id => cardDef(state, id)?.id === 'ac-023');
+      if (
+        state.infectionDeck !== undefined &&
+        player.isInfectedCharacter !== true &&
+        // Outbreak: a face-down Character is out of the game, so its
+        // Infection Level cannot be raised for any reason.
+        !player.downed &&
+        !isImmuneToInfectionEffects(characterAbilities(state, seat), player.infectionCards) &&
+        ((player.exploredOrAttackedThisTurn === true && playedTVirus) ||
+          (player.exploredOrAttackedThisTurn !== true))
+      ) {
+        const [topInfection, ...restInfections] = infectionDeckOut;
+        if (topInfection !== undefined) {
+          infectionCardsOut.push(topInfection);
+          infectionDeckOut = restInfections;
+        }
+      }
+
+      // Infected Horde: if player didn't explore this turn, take damage instead.
+      const hordeBonus = infectedHordeBonus(state);
+      let hordeHp = player.hp;
+      if (hordeBonus.damage > 0 && !player.exploredOrAttackedThisTurn && !player.downed && !player.dead) {
+        const ric = applyRicardoDamage(state, seat, player.hp, hordeBonus.damage);
+        state = ric.state;
+        hordeHp = ric.hp;
+      }
+
+      // RC-002 Rebecca Chambers L1: if didn't explore this turn, heal at end of turn.
+      // Self-healing belongs to the character whose ability it is: a Partner
+      // Rebecca restores her OWN Health (partnerHp), never the Main's — the
+      // same rule `healAtTurnStart` follows in startTurn. The condition is
+      // seat-level because the Main and Partner explore at the same time.
+      const didExploreOrAttack = player.exploredOrAttackedThisTurn === true;
+      const mainHealAbility = characterAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
+      if (mainHealAbility !== undefined && mainHealAbility.kind === 'healIfDidNotExplore' &&
+          !didExploreOrAttack && !player.downed && !player.dead) {
+        hordeHp = Math.min(player.maxHp, hordeHp + mainHealAbility.amount);
+      }
+      let partnerHpOut = player.partnerHp;
+      const partnerHealAbility = partnerAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
+      if (partnerHealAbility !== undefined && partnerHealAbility.kind === 'healIfDidNotExplore' &&
+          !didExploreOrAttack && !player.downed && !player.dead && player.partnerInstanceId !== undefined) {
+        partnerHpOut = Math.min(
+          player.partnerMaxHp ?? player.maxHp,
+          (player.partnerHp ?? player.hp) + partnerHealAbility.amount,
+        );
+      }
+
+      const ctx = advanceTurn({
+        seatCount: state.seats.length,
+        activeSeat: seat,
+        turnNumber: state.turnNumber,
+        aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
+      });
+
+      // Downed players skip their turn: flipDown already merged
+      // hand+discard into the inventory. Do NOT draw the end-of-turn 5 —
+      // the revive branch of startTurn redraws and would silently drop
+      // them (deck shrinkage bug: -5 cards per death).
+      if (player.downed) {
+        const downedPlayer: PlayerState = {
+          ...player,
+          hp: hordeHp,
+          hand: [],
+          discard: discardAfterTrash,
+          playArea: [],
+          infectionCards: infectionCardsOut,
+        };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? downedPlayer : s)),
+          removed: currentRemoved,
+          activeSeat: ctx.activeSeat,
+          turnNumber: ctx.turnNumber,
+          ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+          mansionAttachments: currentAttachments,
+          attachmentTrashCounts: currentTrashCounts,
+        };
+      }
+
+      // "End of turn: discard Play Area (non-attached) + hand, draw 5
+      // (reshuffle discard into inventory if needed)" — rulebook.
+      // MA-093 Los Ganados (Handscythe): draw 1 additional card.
+      const extraDraws = player.pendingEndOfTurnDraws ?? 0;
+      const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
+
+      const newPlayer: PlayerState = {
+        ...player,
+        hp: hordeHp,
+        ...(partnerHpOut !== undefined ? { partnerHp: partnerHpOut } : {}),
+        hand: d.hand,
+        inventory: d.deck,
+        discard: d.discard,
+        playArea: [],
+        infectionCards: infectionCardsOut,
+        // CW-028 Machine Gun w/ Launcher: the armed mode lasts one turn.
+        armedLauncherInstanceId: undefined,
+        // Off-turn targeting notices: consumed when THIS seat's own turn
+        // ENDS, not when it starts — in bot games the client only receives
+        // a snapshot AFTER the bot stretch (which ends at the human's turn
+        // start), so a turn-start clear wiped the alert before it could be
+        // shown. The banner stays up through the turn, then clears here.
+        targetedBy: undefined,
+      };
+
+      return {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+        removed: currentRemoved,
+        activeSeat: ctx.activeSeat,
+        turnNumber: ctx.turnNumber,
+        rngState: d.rngState,
+        ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+        mansionAttachments: currentAttachments,
+        attachmentTrashCounts: currentTrashCounts,
+      };
 }
 
 export function applyAction(state: GameState, action: Action): GameState {
@@ -1220,6 +1447,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   }
                 }
               }
+              // CAC-015 This Shit Ends Now!: Weapons GAINED this turn go into the
+              // Play Area, and the first one gets +10 Damage this turn.
+              if (e.kind === 'weaponsGainedGoToPlayArea') {
+                newPlayer = { ...newPlayer, weaponsGainedGoToPlayArea: true };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              // CAC-014 Global Battle: choose another player to get +1 card.
+              if (e.kind === 'choosePlayerDrawCard') {
+                const others = seatsAfterEffects.filter(s => s.seat !== seat && !s.dead && !s.downed);
+                if (others.length > 0) {
+                  promptKind = 'cac014ChoosePlayer';
+                  promptOptions = [...others.map(s => String(s.seat)), 'Decline'];
+                }
+              }
+              // CAC-003 Change of Outfit: trash 1 from hand + 1 from discard,
+              // then gain a Resource Area card up to their combined cost.
+              if (e.kind === 'trashHandAndDiscardForMarketCard') {
+                if (played.player.hand.length > 0) {
+                  promptKind = 'cac003ChooseHand';
+                  promptOptions = [...played.player.hand];
+                }
+              }
               if (e.kind === 'martialArtsChoice') {
                 // AC-000 Martial Arts: choose +10 damage to Knife/Melee OR attach for double damage at turn start
                 promptKind = 'martialArtsChoice';
@@ -1666,6 +1915,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // or save them for a later, separate explore.
           const grantedExplores = grantedExploresFor(weapons.map(id => cardDef(state, id)));
 
+          // CW-034 / CW-036 Crossbow: USING it arms the coin flip — the
+          // next Infected Revealed this turn is flipped. Only one can be
+          // armed at a time; the last one used wins.
+          const armedCrossbow = weapons.find(id =>
+            cardDef(state, id)?.weaponEffects?.some(e => e.kind === 'armedCoinFlipDefeatNextInfected') === true);
+          if (armedCrossbow !== undefined) {
+            state = {
+              ...state,
+              seats: state.seats.map(s => (s.seat === seat ? { ...s, armedCrossbowInstanceId: armedCrossbow } : s)),
+            };
+            player = state.seats[seat] as PlayerState;
+          }
+
           // Nightmare: weapon effects that fire when the weapon is used
           // (WE-032/033 Silver Ghost / Punisher, WE-036/037 rifles, WE-038).
           const nightmareGains = nightmareWeaponGains(weapons, state);
@@ -1750,6 +2012,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             // CW-028 Machine Gun w/ Launcher: while the launcher mode is armed the
             // weapon deals NO weapon Damage (the 15 splash is added separately).
             const launcherArmed = player.armedLauncherInstanceId === instId;
+            // CAC-015 This Shit Ends Now!: the first Weapon routed to the Play
+            // Area by that effect gets +10 Damage this turn.
+            const cac015Bonus = (player.firstWeaponToPlayAreaInstanceId === instId)
+              ? (player.firstWeaponToPlayAreaBonus ?? 0)
+              : 0;
             // NOTE: the CW-027 / CW-030 / CW-031 multi-Infected bonuses are NOT
             // added here — `computeDamage` already applies them from the weapon's
             // `weaponEffects`, and this per-weapon value is summed into it, so
@@ -1764,7 +2031,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -1893,7 +2160,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? revealBottom({ deck: state.mansionDeck })
         : revealTop({ deck: state.mansionDeck });
       const revealedInstanceId = rev.revealedInstanceId;
-      const revealedDef = cardDef(state, revealedInstanceId);
+      let revealedDef = cardDef(state, revealedInstanceId);
       // CI-002 Infected Crow: a single explore that reveals it becomes a
       // combined engagement (the chained card joins the same battle).
       const crowChainPending = exploreCount === 1 && revealedDef?.type === 'infected' &&
@@ -3307,6 +3574,57 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         player = state.seats[seat] as PlayerState;
       }
 
+      // CW-034 / CW-036 Crossbow: while armed, the NEXT Infected Revealed
+      // this turn is coin-flipped — heads defeats it immediately and grants
+      // +1 Explore. The weapon disarms either way ("the next time").
+      const armedCrossbowId = revealedDef?.type === 'infected' ? player.armedCrossbowInstanceId : undefined;
+      let crossbowAutoDefeat = false;
+      let crossbowExplore = 0;
+      if (armedCrossbowId !== undefined) {
+        const flip = nextInt(makeRng(currentRng), 2);
+        currentRng = flip.rng.s;
+        const heads = flip.value === 1;
+        // Disarm regardless of the result — the effect is spent on this reveal.
+        state = {
+          ...state,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, armedCrossbowInstanceId: undefined } : s)),
+        };
+        player = state.seats[seat] as PlayerState;
+        if (heads) {
+          crossbowAutoDefeat = true;
+          crossbowExplore = 1;
+        }
+      }
+
+      // CW-035 Scoped Colt Anaconda: XP paid this turn buffs the FIRST
+      // Infected Revealed — +1 Decoration, +5 Health and +5 Damage per XP.
+      const magnumXp = (revealedDef?.type === 'infected' ? (player.scopedMagnumXp ?? 0) : 0);
+      // Decoration is read from the def by `decorationDelta`, so the magnum's
+      // +1-per-XP Decoration is awarded explicitly at the defeat site.
+      const magnumDecorationBonus = magnumXp;
+      const effectiveRevealed: CardDef | undefined = revealedDef === undefined
+        ? undefined
+        : magnumXp > 0
+          ? {
+              ...revealedDef,
+              hp: (revealedDef.hp ?? 0) + 5 * magnumXp,
+              attack: (revealedDef.attack ?? 0) + 5 * magnumXp,
+              decorations: (revealedDef.decorations ?? 0) + magnumXp,
+            }
+          : revealedDef;
+      // The magnum is spent on this reveal (first Infected only).
+      if (magnumXp > 0) {
+        state = {
+          ...state,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, scopedMagnumXp: undefined } : s)),
+        };
+        player = state.seats[seat] as PlayerState;
+      }
+      if (effectiveRevealed !== undefined) {
+        revealedDef = effectiveRevealed;
+      }
+      const autoDefeat = rocketAutoDefeat || crossbowAutoDefeat;
+
       // Reactive trash window: if a Las Plagas infected is revealed, eligible
       // players (Jill L2 with Flash Grenade in hand) may react.
       const isLasPlagas = revealedDef?.type === 'infected' && revealedDef?.plagas === true;
@@ -3547,8 +3865,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // on his own turn is lowered by 10.
       const chrisL1Reduction = chrisL1DamageReduction(state, seat);
 
-      const outcome = rocketAutoDefeat
-        ? { kind: 'defeated' as const, decorations: revealedDef?.decorations ?? 0, damage: 0, hp: revealedDef?.hp ?? 0 }
+      const outcome = autoDefeat
+        ? { kind: 'defeated' as const, decorations: effectiveRevealed?.decorations ?? 0, damage: 0, hp: effectiveRevealed?.hp ?? 0 }
         : resolveExplore({
               weapons: exploreWeapons,
               ammo: ammoForEffects,
@@ -3556,10 +3874,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ammoCardsInPlayArea,
               ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
               revealed: {
-                ...revealedDef,
-                hp: (revealedDef.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + (((revealedDef.hp ?? 0) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
-                attack: (revealedDef.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
-              },
+                ...(effectiveRevealed ?? revealedDef ?? {}),
+                hp: (effectiveRevealed?.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + ((((effectiveRevealed?.hp ?? 0)) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
+                attack: (effectiveRevealed?.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
+              } as CardDef,
               damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction + chrisL1Reduction,
               knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
               damageMultiplier: player.damageMultiplierThisTurn ?? 1,
@@ -3776,7 +4094,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           + decorationDelta(state, player.attached, newAttachedIds)
           // JM-001 Jake Muller L2: +amount for each high-Health Infected he
           // defeats (Barry-chain trophies included).
-          + jakeDefeatDecorationBonus(state, seat, [revealedInstanceId, ...chainAttachedIds]);
+          + jakeDefeatDecorationBonus(state, seat, [revealedInstanceId, ...chainAttachedIds])
+          // CW-035 Scoped Colt Anaconda: +1 Decoration per XP paid.
+          + magnumDecorationBonus;
         const maximizerXp = (revealedDef.decorations ?? 0) >= 2 &&
           activeSkillEffects(state, seat).some(e => e.kind === 'xpOnDefeatHighDecoration') ? 1 : 0;
         const charDef = cardDef(state, player.characterInstanceId);
@@ -3799,7 +4119,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   hand: handAfter,
                   playArea: playAreaAfter,
                   discard: discardAfterExplosives,
-                  exploresLeft: exploresLeft + sergeiExploreBonus + grantedExplores,
+                  exploresLeft: exploresLeft + sergeiExploreBonus + grantedExplores + crossbowExplore,
                   turnAmmo: turnAmmoAfter,
                   turnGold: turnGoldAfter,
                   mustExplore: false,
@@ -5233,208 +5553,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
 
     case 'endTurn': {
-          const { seat } = action;
-          const player = state.seats[seat] as PlayerState;
-
-          // CW-025 Elephant Killer: an unused weapon in the Play Area moves to
-          // the top of the Inventory instead of being discarded. The printed
-          // "you can" is resolved automatically — taking it is never worse than
-          // discarding it, and the play area is emptied either way.
-          const recalledIds = player.playArea.filter(id => {
-            const d = cardDef(state, id);
-            return d?.type === 'weapon'
-              && (d.weaponEffects ?? []).some(e => e.kind === 'recallToInventoryTopAtTurnEnd')
-              && weaponUsesThisTurn(state, seat, id) === 0;
-          });
-          const recalledSet = new Set(recalledIds);
-
-          // AM-007 Ammo x30: an Ammunition that was not used to Explore moves
-          // to the top of the Inventory instead of being discarded. The printed
-          // "you can" is resolved automatically, the same ruling as CW-025
-          // above — keeping the Ammunition is never worse than discarding it.
-          const recycledAmmoIds = recycleAmmoIds(state, seat);
-          const recalledOrRecycled = new Set([...recalledSet, ...recycledAmmoIds]);
-
-          const dh = discardHand({ hand: player.hand, discard: player.discard });
-          const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
-
-          // Mercenaries: weapons that were given "+X damage, Trash at the end of
-          // this turn" (Custom Standard Sidearm, Reliable Blade) leave the game.
-          const trashNow = player.trashAtEndOfTurn ?? [];
-          const trashSet = new Set(trashNow);
-          const discardAfterTrash = dh2.discard.filter(id => !trashSet.has(id));
-          const removedAfterTrash = trashNow.length > 0
-            ? [...state.removed, ...trashNow.filter(id => !state.removed.includes(id))]
-            : state.removed;
-
-          // Mansion attachment effects at end of turn (e.g., Rampage trashing
-          // inventory cards). Applied to the active player's inventory.
-          let currentInventory = [...recalledIds, ...recycledAmmoIds, ...player.inventory];
-          let currentRemoved = removedAfterTrash;
-          let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
-          let currentAttachments = [...(state.mansionAttachments ?? [])];
-          const attachmentsToRemove: string[] = [];
-
-          for (const attId of currentAttachments) {
-            const attDef = cardDef(state, attId);
-            if (attDef?.attachmentEffects === undefined) continue;
-            for (const effect of attDef.attachmentEffects) {
-              if (effect.kind === 'trashTopInventoryAtTurnEnd') {
-                // Trash the top N cards from inventory
-                const toTrash = currentInventory.slice(0, effect.count);
-                if (toTrash.length > 0) {
-                  currentInventory = currentInventory.slice(effect.count);
-                  currentRemoved = [...currentRemoved, ...toTrash.filter(id => !currentRemoved.includes(id))];
-                  // Update trash counter
-                  const currentCount = currentTrashCounts[attId] ?? 0;
-                  const newCount = currentCount + toTrash.length;
-                  currentTrashCounts[attId] = newCount;
-                  // Check if attachment should be removed
-                  if (newCount >= effect.removeAfter) {
-                    attachmentsToRemove.push(attId);
-                  }
-                }
-              }
-            }
-          }
-
-          // Remove attachments that have reached their limit
-          if (attachmentsToRemove.length > 0) {
-            currentAttachments = currentAttachments.filter(id => !attachmentsToRemove.includes(id));
-            currentRemoved = [...currentRemoved, ...attachmentsToRemove.filter(id => !currentRemoved.includes(id))];
-            // Clean up counters for removed attachments
-            for (const attId of attachmentsToRemove) {
-              delete currentTrashCounts[attId];
-            }
-          }
-
-          // Outbreak: if the active Player did not Explore the Mansion or
-          // Attack an Infected Character this turn, increase their Infection
-          // Level by 1 (draw the top Infection card, place it face up next to
-          // the Character). Infected Characters cannot change their level.
-          let infectionDeckOut = state.infectionDeck ?? [];
-          const infectionCardsOut = [...(player.infectionCards ?? [])];
-          // AC-023 Power of the t-Virus: at end of turn, if the player
-          // explored or attacked an Infected Character, +1 Infection.
-          const playedTVirus = player.playArea.some(id => cardDef(state, id)?.id === 'ac-023');
-          if (
-            state.infectionDeck !== undefined &&
-            player.isInfectedCharacter !== true &&
-            // Outbreak: a face-down Character is out of the game, so its
-            // Infection Level cannot be raised for any reason.
-            !player.downed &&
-            !isImmuneToInfectionEffects(characterAbilities(state, seat), player.infectionCards) &&
-            ((player.exploredOrAttackedThisTurn === true && playedTVirus) ||
-              (player.exploredOrAttackedThisTurn !== true))
-          ) {
-            const [topInfection, ...restInfections] = infectionDeckOut;
-            if (topInfection !== undefined) {
-              infectionCardsOut.push(topInfection);
-              infectionDeckOut = restInfections;
-            }
-          }
-
-          // Infected Horde: if player didn't explore this turn, take damage instead.
-          const hordeBonus = infectedHordeBonus(state);
-          let hordeHp = player.hp;
-          if (hordeBonus.damage > 0 && !player.exploredOrAttackedThisTurn && !player.downed && !player.dead) {
-            const ric = applyRicardoDamage(state, seat, player.hp, hordeBonus.damage);
-            state = ric.state;
-            hordeHp = ric.hp;
-          }
-
-          // RC-002 Rebecca Chambers L1: if didn't explore this turn, heal at end of turn.
-          // Self-healing belongs to the character whose ability it is: a Partner
-          // Rebecca restores her OWN Health (partnerHp), never the Main's — the
-          // same rule `healAtTurnStart` follows in startTurn. The condition is
-          // seat-level because the Main and Partner explore at the same time.
-          const didExploreOrAttack = player.exploredOrAttackedThisTurn === true;
-          const mainHealAbility = characterAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
-          if (mainHealAbility !== undefined && mainHealAbility.kind === 'healIfDidNotExplore' &&
-              !didExploreOrAttack && !player.downed && !player.dead) {
-            hordeHp = Math.min(player.maxHp, hordeHp + mainHealAbility.amount);
-          }
-          let partnerHpOut = player.partnerHp;
-          const partnerHealAbility = partnerAbilities(state, seat).find(a => a.kind === 'healIfDidNotExplore');
-          if (partnerHealAbility !== undefined && partnerHealAbility.kind === 'healIfDidNotExplore' &&
-              !didExploreOrAttack && !player.downed && !player.dead && player.partnerInstanceId !== undefined) {
-            partnerHpOut = Math.min(
-              player.partnerMaxHp ?? player.maxHp,
-              (player.partnerHp ?? player.hp) + partnerHealAbility.amount,
-            );
-          }
-
-          const ctx = advanceTurn({
-            seatCount: state.seats.length,
-            activeSeat: seat,
-            turnNumber: state.turnNumber,
-            aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
-          });
-
-          // Downed players skip their turn: flipDown already merged
-          // hand+discard into the inventory. Do NOT draw the end-of-turn 5 —
-          // the revive branch of startTurn redraws and would silently drop
-          // them (deck shrinkage bug: -5 cards per death).
-          if (player.downed) {
-            const downedPlayer: PlayerState = {
-              ...player,
-              hp: hordeHp,
-              hand: [],
-              discard: discardAfterTrash,
-              playArea: [],
-              infectionCards: infectionCardsOut,
-            };
-            return {
-              ...state,
-              ...nextBase,
-              seats: state.seats.map(s => (s.seat === seat ? downedPlayer : s)),
-              removed: currentRemoved,
-              activeSeat: ctx.activeSeat,
-              turnNumber: ctx.turnNumber,
-              ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
-              mansionAttachments: currentAttachments,
-              attachmentTrashCounts: currentTrashCounts,
-            };
-          }
-
-          // "End of turn: discard Play Area (non-attached) + hand, draw 5
-          // (reshuffle discard into inventory if needed)" — rulebook.
-          // MA-093 Los Ganados (Handscythe): draw 1 additional card.
-          const extraDraws = player.pendingEndOfTurnDraws ?? 0;
-          const d = drawWithReshuffle({ deck: currentInventory, discard: discardAfterTrash, count: 5 + extraDraws, rngState: state.rngState });
-
-          const newPlayer: PlayerState = {
-            ...player,
-            hp: hordeHp,
-            ...(partnerHpOut !== undefined ? { partnerHp: partnerHpOut } : {}),
-            hand: d.hand,
-            inventory: d.deck,
-            discard: d.discard,
-            playArea: [],
-            infectionCards: infectionCardsOut,
-            // CW-028 Machine Gun w/ Launcher: the armed mode lasts one turn.
-            armedLauncherInstanceId: undefined,
-            // Off-turn targeting notices: consumed when THIS seat's own turn
-            // ENDS, not when it starts — in bot games the client only receives
-            // a snapshot AFTER the bot stretch (which ends at the human's turn
-            // start), so a turn-start clear wiped the alert before it could be
-            // shown. The banner stays up through the turn, then clears here.
-            targetedBy: undefined,
-          };
-
+      const { seat } = action;
+      const player = state.seats[seat] as PlayerState;
+      // CAC-013 From Bad to Worse: at the end of the turn, the player may
+      // look at another Player's Hand and have them Discard a card; this
+      // card then goes into that Player's Hand. The turn finishes only
+      // after the choice, so raise the prompt instead of ending now.
+      const fromBad = player.playArea.find(id => cardDef(state, id)?.id === 'cac-013');
+      if (fromBad !== undefined && !state.prompts.some(p => p.seat === seat)) {
+        const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed && s.hand.length > 0);
+        if (others.length > 0) {
           return {
             ...state,
             ...nextBase,
-            seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
-            removed: currentRemoved,
-            activeSeat: ctx.activeSeat,
-            turnNumber: ctx.turnNumber,
-            rngState: d.rngState,
-            ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
-            mansionAttachments: currentAttachments,
-            attachmentTrashCounts: currentTrashCounts,
+            prompts: [...state.prompts, {
+              id: `cac013-${seat}-v${nextBase.version}`,
+              seat,
+              text: 'From Bad to Worse: choose a player to look at their Hand and have them Discard a card. This card goes into their Hand.',
+              options: [...others.map(s => String(s.seat)), 'Decline'],
+              payload: { kind: 'cac013ChoosePlayer', actionInstanceId: fromBad },
+            }],
           };
         }
+      }
+      return applyEndOfTurn(state, seat, nextBase);
+    }
 
     case 'moveXp': {
       const { seat, skillInstanceId, amount } = action;
@@ -5533,6 +5676,49 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       }
       return { ...state, ...nextBase };
+    }
+
+    case 'useActionAbility': {
+      // CAC-016 Take Them Down!: discard this Action from the Play Area to move
+      // 1 Weapon from the Discard Pile to the Hand. Free action, once per turn
+      // (enforced by validate's log scan).
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      const def = cardDef(state, instanceId);
+      if (def === undefined || def.type !== 'action') return { ...state, ...nextBase };
+      if (!player.playArea.includes(instanceId)) return { ...state, ...nextBase };
+      const weaponsInDiscard = player.discard.filter(id => cardDef(state, id)?.type === 'weapon');
+      if (weaponsInDiscard.length === 0) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        prompts: [...state.prompts, {
+          id: `cac016-${seat}-v${nextBase.version}`,
+          seat,
+          text: `${def.name}: discard this Action from your Play Area to move 1 Weapon from your Discard Pile to your Hand.`,
+          options: [...weaponsInDiscard, 'Decline'],
+          payload: { kind: 'cac016ChooseWeapon', actionInstanceId: instanceId },
+        }],
+      };
+    }
+
+    case 'usePreExploreXpAbility': {
+      // CW-035 Scoped Colt Anaconda: pay N XP before Exploring. The first
+      // Infected Revealed this turn gets that XP (+1 Decoration, +5 Health,
+      // +5 Damage per XP).
+      const { seat, instanceId, amount } = action;
+      const player = state.seats[seat] as PlayerState;
+      const def = cardDef(state, instanceId);
+      if (def === undefined || def.type !== 'weapon') return { ...state, ...nextBase };
+      const xp = player.xp ?? 0;
+      if (amount < 1 || amount > xp) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(s => (s.seat === seat
+          ? { ...s, xp: xp - amount, scopedMagnumXp: (s.scopedMagnumXp ?? 0) + amount }
+          : s)),
+      };
     }
 
     case 'chooseOption': {
@@ -7175,6 +7361,243 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               payload: { kind: 'giveOneCardNoChain' },
             },
           ],
+        };
+      }
+
+      if (kind === 'cac013ChoosePlayer') {
+        // CAC-013 From Bad to Worse, step 1: the player picks a target.
+        const actionInstanceId = String(prompt.payload?.actionInstanceId ?? '');
+        const targetOpt = prompt.options[option];
+        if (targetOpt === undefined || targetOpt === 'Decline' || actionInstanceId === '') {
+          // Declined (or nothing to target): the turn ends with no effect.
+          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+            version: nextBase.version,
+            log: nextBase.log,
+          });
+        }
+        const targetSeat = Number(targetOpt);
+        const target = state.seats[targetSeat];
+        if (target === undefined || target.dead || target.downed || target.hand.length === 0) {
+          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+            version: nextBase.version,
+            log: nextBase.log,
+          });
+        }
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `cac013-discard-${targetSeat}-v${nextBase.version}`,
+            seat: targetSeat,
+            text: `${state.seats[seat]?.name ?? 'Another Player'} used From Bad to Worse: look at your Hand and Discard a card. This card goes into your Hand.`,
+            options: [...target.hand],
+            payload: { kind: 'cac013TargetDiscards', fromSeat: String(seat), actionInstanceId },
+          }],
+        };
+      }
+
+      if (kind === 'cac013TargetDiscards') {
+        // CAC-013 step 2: the target discards; the Action moves into their
+        // Hand and the ORIGINATING player's turn ends.
+        const chosen = prompt.options[option];
+        const fromSeat = Number(prompt.payload?.fromSeat);
+        const actionInstanceId = String(prompt.payload?.actionInstanceId ?? '');
+        const origin = state.seats[fromSeat];
+        if (chosen === undefined || origin === undefined || actionInstanceId === '') {
+          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, fromSeat, {
+            version: nextBase.version,
+            log: nextBase.log,
+          });
+        }
+        const movedCards = { ...state.cards };
+        const actionInst = movedCards[actionInstanceId];
+        const discardInst = movedCards[chosen];
+        if (actionInst !== undefined) {
+          movedCards[actionInstanceId] = { ...actionInst, location: { zone: 'hand', index: 0, seat } };
+        }
+        if (discardInst !== undefined) {
+          movedCards[chosen] = { ...discardInst, location: { zone: 'discard', index: 0, seat } };
+        }
+        const afterMove: GameState = {
+          ...state,
+          ...nextBase,
+          cards: movedCards,
+          seats: state.seats.map(s => {
+            if (s.seat === fromSeat) {
+              return { ...s, playArea: s.playArea.filter(id => id !== actionInstanceId) };
+            }
+            if (s.seat === seat) {
+              return {
+                ...s,
+                hand: [...s.hand.filter(id => id !== chosen), actionInstanceId],
+                discard: [...s.discard, chosen],
+              };
+            }
+            return s;
+          }),
+          prompts: newPrompts,
+        };
+        return applyEndOfTurn(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
+      }
+
+      if (kind === 'cac003ChooseHand') {
+        // CAC-003 Change of Outfit, step 1: trash the chosen card from the hand.
+        const chosenHand = prompt.options[option];
+        const p0 = state.seats[seat];
+        if (chosenHand === undefined || p0 === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const afterHand: PlayerState = {
+          ...p0,
+          hand: p0.hand.filter(id => id !== chosenHand),
+          discard: [...p0.discard, chosenHand],
+        };
+        const s1: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? afterHand : s)),
+          prompts: newPrompts,
+        };
+        if (afterHand.discard.length === 0) return s1;
+        return {
+          ...s1,
+          prompts: [...s1.prompts, {
+            id: `cac003-discard-${seat}-v${nextBase.version}`,
+            seat,
+            text: 'Change of Outfit: trash 1 card from your discard pile.',
+            options: [...afterHand.discard],
+            payload: { kind: 'cac003ChooseDiscard', handId: chosenHand },
+          }],
+        };
+      }
+
+      if (kind === 'cac003ChooseDiscard') {
+        // CAC-003 step 2: trash the chosen discard card, then offer the gain.
+        const chosenDiscard = prompt.options[option];
+        const handId = String(prompt.payload?.handId ?? '');
+        const p1 = state.seats[seat];
+        if (chosenDiscard === undefined || p1 === undefined || handId === '') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const handDef = cardDef(state, handId);
+        const discardDef = cardDef(state, chosenDiscard);
+        const combined = (handDef?.cost ?? 0) + (discardDef?.cost ?? 0);
+        const removedIds = [handId, chosenDiscard];
+        const afterDiscard: PlayerState = {
+          ...p1,
+          hand: p1.hand.filter(id => id !== chosenDiscard),
+          discard: p1.discard.filter(id => id !== chosenDiscard),
+        };
+        const s2: GameState = {
+          ...state,
+          ...nextBase,
+          removed: [...state.removed, ...removedIds.filter(id => !state.removed.includes(id))],
+          cards: (() => {
+            const cards = { ...state.cards };
+            for (const id of removedIds) {
+              const inst = cards[id];
+              if (inst !== undefined) cards[id] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+            }
+            return cards;
+          })(),
+          seats: state.seats.map(s => (s.seat === seat ? afterDiscard : s)),
+          prompts: newPrompts,
+        };
+        const gainable = marketCardIds(s2, combined);
+        if (gainable.length === 0) return s2;
+        return {
+          ...s2,
+          prompts: [...s2.prompts, {
+            id: `cac003-gain-${seat}-v${nextBase.version}`,
+            seat,
+            text: `Change of Outfit: gain a card from the resource area costing up to ${combined}.`,
+            options: [...gainable, 'Decline'],
+            payload: { kind: 'cac003ChooseGain' },
+          }],
+        };
+      }
+
+      if (kind === 'cac003ChooseGain') {
+        // CAC-003 step 3: the chosen Resource Area card moves to the discard.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        const fromPile = Object.values(s.marketPiles).find(pile => pile.cards[0] === chosen);
+        if (fromPile === undefined) return s;
+        s = {
+          ...s,
+          marketPiles: {
+            ...s.marketPiles,
+            [fromPile.pileId]: { pileId: fromPile.pileId, cards: fromPile.cards.slice(1) },
+          },
+        };
+        return gainCard(s, { seat, cardId: cardDef(s, chosen)?.id ?? '', instanceId: chosen, destination: 'discard', reason: 'ability' });
+      }
+
+      if (kind === 'cac016ChooseWeapon') {
+        // CAC-016 Take Them Down!: the chosen Weapon moves from the Discard
+        // Pile to the Hand; this Action leaves the Play Area for the Discard.
+        const actionInstanceId = String(prompt.payload?.actionInstanceId ?? '');
+        const chosenWeapon = prompt.options[option];
+        if (chosenWeapon === undefined || chosenWeapon === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const weaponDef = cardDef(state, chosenWeapon);
+        if (weaponDef === undefined || weaponDef.type !== 'weapon') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const movedCards = { ...state.cards };
+        const actionInst = movedCards[actionInstanceId];
+        const weaponInst = movedCards[chosenWeapon];
+        if (actionInst !== undefined) {
+          movedCards[actionInstanceId] = { ...actionInst, location: { zone: 'discard', index: 0, seat } };
+        }
+        if (weaponInst !== undefined) {
+          movedCards[chosenWeapon] = { ...weaponInst, location: { zone: 'hand', index: 0, seat } };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          cards: movedCards,
+          seats: state.seats.map(s => (s.seat === seat ? {
+            ...s,
+            playArea: s.playArea.filter(id => id !== actionInstanceId),
+            discard: [...s.discard.filter(id => id !== chosenWeapon), actionInstanceId],
+            hand: [...s.hand, chosenWeapon],
+          } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'cac014ChoosePlayer') {
+        // CAC-014 Global Battle: the chosen player draws +1 card.
+        const targetOpt = prompt.options[option];
+        if (targetOpt === undefined || targetOpt === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const targetSeat = Number(targetOpt);
+        const target = state.seats[targetSeat];
+        if (target === undefined || target.dead || target.downed) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const d = drawWithReshuffle({
+          deck: target.inventory,
+          discard: target.discard,
+          count: 1,
+          rngState: state.rngState,
+        });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === targetSeat
+            ? { ...s, hand: [...s.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : s)),
+          prompts: newPrompts,
         };
       }
 

@@ -189,8 +189,11 @@ export function exploreDamage(
     const xpEff = def?.weaponEffects?.find(e => e.kind === 'plusDamageIfCharacterXpAtLeast');
     const bowBonus = bowEff !== undefined && bowEff.kind === 'plusDamageIfNoActionsInPlayArea' && noActions ? bowEff.amount : 0;
     const xpBonus = xpEff !== undefined && xpEff.kind === 'plusDamageIfCharacterXpAtLeast' && (player.xp ?? 0) >= xpEff.threshold ? xpEff.amount : 0;
+    // CAC-015 This Shit Ends Now!: the first Weapon routed to the Play Area by
+    // that effect gets +10 Damage this turn (mirror of the reducer term).
+    const cac015Bonus = player.firstWeaponToPlayAreaInstanceId === id ? (player.firstWeaponToPlayAreaBonus ?? 0) : 0;
     return {
-      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
+      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + cac015Bonus + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
       ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,

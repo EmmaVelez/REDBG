@@ -276,6 +276,30 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
   }
 
+  // --- 6a-i. useActionAbility (CAC-016 Take Them Down!) ---
+  for (const instanceId of player.playArea) {
+    const cardData = state.cards[instanceId];
+    if (!cardData) continue;
+    const def = state.cardDefs[cardData.cardId];
+    if (def?.type !== 'action') continue;
+    if (!(def.actionEffects ?? []).some(e => e.kind === 'discardSelfFromPlayForWeaponFromDiscard')) continue;
+    if (!player.discard.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'weapon')) continue;
+    generatedActions.push({ type: 'useActionAbility', seat, instanceId });
+  }
+
+  // --- 6a-ii. usePreExploreXpAbility (CW-035 Scoped Colt Anaconda) ---
+  for (const instanceId of [...player.hand, ...player.playArea]) {
+    const cardData = state.cards[instanceId];
+    if (!cardData) continue;
+    const def = state.cardDefs[cardData.cardId];
+    if (def?.type !== 'weapon') continue;
+    if (!(def.weaponEffects ?? []).some(e => e.kind === 'payXpForFirstRevealedBuff')) continue;
+    const xp = player.xp ?? 0;
+    for (let amount = 1; amount <= xp; amount++) {
+      generatedActions.push({ type: 'usePreExploreXpAbility', seat, instanceId, amount });
+    }
+  }
+
   // --- 6b. moveXp (Mercenaries Skill System) ---
   // Moving XP is a free action; offer the amount that fills each Skill to its
   // requirement, plus dumping the whole pool onto it.

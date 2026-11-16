@@ -232,6 +232,9 @@ export type WeaponEffect =
   | { readonly kind: "plusDamageIfInfectedBattledAtLeast"; readonly threshold: number; readonly amount: number } // CW-031: +N when Battling `threshold`+ Infected
   | { readonly kind: "moveFromDiscardToHandAtTurnStart" } // CW-032 Combat Knife w/ Chain: recycle from Discard at turn start
   | { readonly kind: "cannotUseWithNonExplosiveWeapons" } // CW-033 Semi-Auto Sniper Rifle: no other non-Explosive weapon
+  // --- Fan "JP 2025" weapon set (CW-034..) ---
+  | { readonly kind: "armedCoinFlipDefeatNextInfected" } // CW-034 Crossbow: the next Infected Revealed this turn is coin-flipped; heads = defeated + 1 Explore
+  | { readonly kind: "payXpForFirstRevealedBuff" } // CW-035 Scoped Colt Anaconda: pay XP before Exploring; the first Infected Revealed gets +1 Decoration, +5 Health, +5 Damage per XP
 export type InfectedEffect =
   | { readonly kind: "shuffleBackIfNotDefeated" }                            // Uroboros Aheri
   | { readonly kind: "skipNextTurnOfAPlayerOnDefeat" }                       // Executioner: on defeat, attacker chooses a player (Prompt) who skips their next turn
@@ -395,6 +398,12 @@ export type ActionEffect =
   | { readonly kind: "martialArtsChoice" } // AC-000 Martial Arts: choose +10 damage to Knife/Melee this turn OR attach for double damage at turn start
   | { readonly kind: "tacticalAdvanceChooseType" } // AC-003 Tactical Advance: choose weapon type for +5 damage (+10 for Melee/Knife)
   | { readonly kind: "mysteriousFindRoll" } // AC-003 Mysterious Find: roll d6 for cards/ammo/gold
+  // --- Fan "JP 2025" action set (CAC-003..) ---
+  | { readonly kind: "choosePlayerDrawCard" } // CAC-014 Global Battle: another player gets +1 card (Prompt)
+  | { readonly kind: "weaponsGainedGoToPlayArea" } // CAC-015 This Shit Ends Now!: gains route to the Play Area; first gets +10 Damage
+  | { readonly kind: "discardSelfFromPlayForWeaponFromDiscard" } // CAC-016 Take Them Down!: discard this Action from the Play Area -> move 1 Weapon from Discard to Hand
+  | { readonly kind: "endOfTurnPeekAndGiveHand" } // CAC-013 From Bad to Worse: at end of turn, look at another Player's Hand, they Discard 1, this card goes into their Hand
+  | { readonly kind: "trashHandAndDiscardForMarketCard" } // CAC-003 Change of Outfit: trash 1 from hand + 1 from discard, gain a Resource Area card up to the combined cost
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -846,6 +855,26 @@ export interface PlayerState {
   /** B4MC-CH-005 L1: the "pay 1 Action to charge" Stun Rod effect is active for
    *  the rest of this turn (her Stun Rod explores get +10 Damage). */
   readonly stunRodCharged?: boolean;
+  /** CAC-015 This Shit Ends Now!: while set, Weapons GAINED this turn go into
+   *  the Play Area instead of the discard. Cleared at the start of the next turn. */
+  readonly weaponsGainedGoToPlayArea?: boolean;
+  /** CAC-015: the instance id of the first Weapon routed to the Play Area by
+   *  that effect — it gets +amount Damage this turn. */
+  readonly firstWeaponToPlayAreaInstanceId?: string;
+  /** CAC-015: the +Damage amount for `firstWeaponToPlayAreaInstanceId`. */
+  readonly firstWeaponToPlayAreaBonus?: number;
+  /** CW-034 Crossbow: armed this turn. The NEXT Infected Revealed is
+   *  coin-flipped — heads defeats it immediately and grants +1 Explore. */
+  readonly armedCrossbowInstanceId?: string;
+  /** CW-035 Scoped Colt Anaconda: XP paid this turn, buffing the first Infected
+   *  Revealed (+1 Decoration, +5 Health, +5 Damage per XP). */
+  readonly scopedMagnumXp?: number;
+  /** CAC-013 From Bad to Worse: the pending end-of-turn target choice. */
+  readonly pendingFromBadToWorse?: { readonly step: 'choosePlayer' | 'targetDiscards'; readonly actionInstanceId: string; readonly targetSeat?: number };
+  /** CAC-003 Change of Outfit: the two cards chosen to trash, awaiting the
+   *  Resource Area gain. `handId` comes from the hand, `discardId` from the
+   *  Discard Pile. */
+  readonly pendingChangeOfOutfit?: { readonly handId: string; readonly discardId: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -1107,6 +1136,12 @@ export type Action =
   | { readonly type: "endTurn"; readonly seat: number }
   /** Mercenaries: activate a manual ("can") weapon effect (free action). */
   | { readonly type: "useWeaponAbility"; readonly seat: number; readonly instanceId: string }
+  /** Fan action CAC-016 Take Them Down!: discard this Action from the Play
+   *  Area to move 1 Weapon from the Discard Pile to the Hand (free action). */
+  | { readonly type: "useActionAbility"; readonly seat: number; readonly instanceId: string }
+  /** Fan weapon CW-035 Scoped Colt Anaconda: pay N XP before Exploring to buff
+   *  the first Infected Revealed this turn (free action). */
+  | { readonly type: "usePreExploreXpAbility"; readonly seat: number; readonly instanceId: string; readonly amount: number }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */

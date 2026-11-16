@@ -726,6 +726,87 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'useActionAbility': {
+      // CAC-016 Take Them Down!: manual action-card ability.
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'useActionAbility: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `useActionAbility: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'useActionAbility: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'useActionAbility: not your turn' };
+      }
+      const def = cardDef(state, action.instanceId);
+      if (def === undefined || def.type !== 'action') {
+        return { ok: false, reason: 'useActionAbility: unknown action card' };
+      }
+      const manual = (def.actionEffects ?? []).some(e => e.kind === 'discardSelfFromPlayForWeaponFromDiscard');
+      if (!manual) {
+        return { ok: false, reason: 'useActionAbility: no manual effect' };
+      }
+      if (!player.playArea.includes(action.instanceId)) {
+        return { ok: false, reason: 'useActionAbility: card not in the Play Area' };
+      }
+      if (!player.discard.some(id => cardDef(state, id)?.type === 'weapon')) {
+        return { ok: false, reason: 'useActionAbility: no Weapon in the Discard Pile' };
+      }
+      // Once per turn — the log scan resets at the seat's own endTurn.
+      for (let i = state.log.length - 1; i >= 0; i--) {
+        const logged = state.log[i]?.action;
+        if (logged === undefined) continue;
+        if (logged.type === 'endTurn' && logged.seat === action.seat) break;
+        if (logged.type === 'useActionAbility' && logged.seat === action.seat && logged.instanceId === action.instanceId) {
+          return { ok: false, reason: 'useActionAbility: already used this turn' };
+        }
+      }
+      return { ok: true };
+    }
+
+    case 'usePreExploreXpAbility': {
+      // CW-035 Scoped Colt Anaconda: pay XP before Exploring.
+      if (state.phase !== 'main') {
+        return { ok: false, reason: 'usePreExploreXpAbility: not in main phase' };
+      }
+      if (player === undefined) {
+        return { ok: false, reason: `usePreExploreXpAbility: unknown seat: ${action.seat}` };
+      }
+      if (player.dead) {
+        return { ok: false, reason: 'usePreExploreXpAbility: player is dead' };
+      }
+      if (action.seat !== state.activeSeat) {
+        return { ok: false, reason: 'usePreExploreXpAbility: not your turn' };
+      }
+      const def = cardDef(state, action.instanceId);
+      if (def === undefined || def.type !== 'weapon') {
+        return { ok: false, reason: 'usePreExploreXpAbility: unknown weapon' };
+      }
+      const manual = (def.weaponEffects ?? []).some(e => e.kind === 'payXpForFirstRevealedBuff');
+      if (!manual) {
+        return { ok: false, reason: 'usePreExploreXpAbility: no manual effect' };
+      }
+      if (!player.hand.includes(action.instanceId) && !player.playArea.includes(action.instanceId)) {
+        return { ok: false, reason: 'usePreExploreXpAbility: weapon not in hand or play area' };
+      }
+      const xp = player.xp ?? 0;
+      if (action.amount < 1 || action.amount > xp) {
+        return { ok: false, reason: 'usePreExploreXpAbility: not enough XP' };
+      }
+      // Once per turn.
+      for (let i = state.log.length - 1; i >= 0; i--) {
+        const logged = state.log[i]?.action;
+        if (logged === undefined) continue;
+        if (logged.type === 'endTurn' && logged.seat === action.seat) break;
+        if (logged.type === 'usePreExploreXpAbility' && logged.seat === action.seat && logged.instanceId === action.instanceId) {
+          return { ok: false, reason: 'usePreExploreXpAbility: already used this turn' };
+        }
+      }
+      return { ok: true };
+    }
+
     case 'attachToPartnerStart':
       if (state.phase !== 'main') {
         return { ok: false, reason: 'attachToPartnerStart: not in main phase' };
