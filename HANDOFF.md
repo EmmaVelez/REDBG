@@ -1,5 +1,28 @@
 # HANDOFF — resume here
 
+**FR-001 FRANCIS + LO-001 LOUIS (2026-11-16):** two custom characters from Manny's scans
+(TWO separate images; the second arrived in a separate gateway folder — always check the newest
+native-inputs dirs). Printed codes NOT legible in either scan -> provisional ids fr-001 / lo-001
+(type comment + card blocks document this; rename when codes are known). Both 70 HP, gates 3/8.
+- **Francis fr-001**: L1 "If you have no cards in your hand, one weapon Francis uses gets an
+  additional +10 damage" -> new kind `plusDamageIfEmptyHand`, evaluated on the hand AFTER the used
+  weapons leave it (handAfter), flat bonus (one weapon +10 == +10 total; documented). L2 "At the
+  beginning of your turn, you can draw 2 cards and discard 2 cards" -> REUSED+extended
+  `turnStartDrawThenDiscardCard` with optional draw/discard counts (Rebecca stays 1/1; Francis
+  2/2). RULING: the scan's draw count read as both 2 and 3 — majority 2; one-number fix if the
+  card says 3.
+- **Louis lo-001**: L1 "When Louis explores you can move the bottom card of the mansion to the
+  top" -> new manual once-per-turn kind `moveMansionBottomToTop` (useCharacterAbility; log-scan
+  once-per-turn guard; validate rejects with <2 mansion cards). L2 reuses
+  `plusDamageForWeaponTags` tags ['rifle','machineGun'] amount 10.
+- **LATENT BUG FIXED**: the Rebecca draw-1-discard-1 chain offered options as 'Name (id)'
+  strings but the resolver filtered hand ids against them — the discard silently never removed a
+  card. The chain now uses raw instance ids and supports multi-discard loops (remaining count),
+  and 'No Discard' still ends it early. Regression test added.
+- Tests: customFrancisLouis.test.ts 5/5 (empty-hand bonus on/off, draw2/discard2 chain,
+  bottom-to-top move + once-per-turn, rifle +10, Rebecca discard regression). Gates: game-core
+  1261/1261, client 258/258, typecheck clean. Art: FR-001.png / LO-001.png.
+
 **AW-001 LEVEL-0 TIER + AC-000 ART (2026-11-16):**
 - Manny: "Aw-001 actually has 3 character abilities starting at level 0." The type comments
   already recorded the intended mapping (drawOncePerTurnIfDamaged = L0) but the DATA had drifted

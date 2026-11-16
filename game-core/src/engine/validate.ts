@@ -529,7 +529,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'choosePlayerIncreaseAmmoReqNextTurn':
         case 'discardActionCardFromHandForPlusTwoCards':
         case 'forceAllyExploreWithSupport':
-        case 'stunRodCharge': {
+        case 'stunRodCharge':
+        case 'moveMansionBottomToTop': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -571,6 +572,12 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             // B4MC-CH-005 L1: costs 1 Action, so it needs one to spend.
             if (player.actionsLeft < 1) {
               return { ok: false, reason: 'useCharacterAbility: no Action to spend' };
+            }
+          }
+          if (ability.kind === 'moveMansionBottomToTop') {
+            // lo-001 Louis L1: needs at least two cards for a meaningful move.
+            if (state.mansionDeck.length < 2) {
+              return { ok: false, reason: 'useCharacterAbility: Mansion has fewer than 2 cards' };
             }
           }
           if (ability.kind === 'exchangeHandWithInventoryTop') {

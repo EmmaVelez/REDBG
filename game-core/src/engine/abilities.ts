@@ -1191,6 +1191,14 @@ export function chrisL1TurnDamageBonus(state: GameState, seat: number): number {
   return state.seats.some(s => s.downed) ? ability.downedAmount : ability.amount;
 }
 
+/** fr-001 Francis L1: if the hand is empty, one weapon he uses gets +amount
+ *  damage. Implemented as a flat explore bonus (a single +amount to one weapon
+ *  is +amount of total damage in every case this engine models). */
+export function emptyHandDamage(abilities: readonly CharacterAbility[], handLength: number): number {
+  const a = abilities.find(x => x.kind === 'plusDamageIfEmptyHand');
+  return a !== undefined && a.kind === 'plusDamageIfEmptyHand' && handLength === 0 ? a.amount : 0;
+}
+
 /** ch-005q Jill L1: +amount Damage per Action card she discarded this turn
  *  (played Action cards never count — they sit in the play area). */
 export function actionDiscardDamage(abilities: readonly CharacterAbility[], count: number): number {

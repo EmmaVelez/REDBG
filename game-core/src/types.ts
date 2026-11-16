@@ -680,7 +680,10 @@ export type CharacterAbility =
   | { readonly kind: "forceAllyExploreWithSupport"; readonly level: 1 | 2 } // FCH-008 Sherry: once per turn, force another Player to Explore with her
   | { readonly kind: "cannotBePartner"; readonly level: 1 | 2 } // FCH-008 Sherry: she can only ever be a Main character
   // --- Fan characters (RC-001..) ---
-  | { readonly kind: "turnStartDrawThenDiscardCard"; readonly level: 1 | 2 } // RC-001 Rebecca L1: at turn start, may get +1 card and discard a card
+  | { readonly kind: "turnStartDrawThenDiscardCard"; readonly draw?: number; readonly discard?: number; readonly level: 1 | 2 } // RC-001 Rebecca L1 (1/1) / fr-001 Francis L2 (2/2): at turn start, may draw N and discard N
+  // --- Custom characters fr-001 (Francis) / lo-001 (Louis) ---
+  | { readonly kind: "plusDamageIfEmptyHand"; readonly amount: number; readonly level: 1 | 2 } // fr-001 L1: no cards in hand -> one weapon gets +amount (flat explore bonus)
+  | { readonly kind: "moveMansionBottomToTop"; readonly level: 1 | 2 } // lo-001 L1: manual once/turn — move the Mansion's bottom card to the top
   | { readonly kind: "goldWhenDiscardingAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // RC-001 Rebecca L2: when discarding due to card effect during turn, gain +amount gold
   | { readonly kind: "healIfDidNotExplore"; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L1: if didn't explore this turn, heal N at end of turn
   | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L2: Machine Gun weapons get +N damage

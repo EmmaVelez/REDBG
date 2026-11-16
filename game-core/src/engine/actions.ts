@@ -74,6 +74,7 @@ import {
   chrisL2TopOfMansion,
   markChrisL2TopUsed,
   chrisL2CanDrawOnTrash,
+  emptyHandDamage,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -2233,7 +2234,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
             exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons) +
-            actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0);
+            actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0) +
+            emptyHandDamage(abilities, handAfter.length);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
           const perDiscardCardBonus = player.playArea.reduce((sum, id) => {
@@ -4863,6 +4865,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           const promptId = `ability-${seat}-v${nextBase.version}-${abilityIndex}`;
           switch (ability.kind) {
+            case 'moveMansionBottomToTop': {
+              // lo-001 Louis L1: move the Mansion's bottom card to the top.
+              const deck = state.mansionDeck;
+              const bottom = deck[deck.length - 1];
+              if (bottom === undefined) return { ...state, ...nextBase };
+              return {
+                ...state,
+                ...nextBase,
+                mansionDeck: deck.length < 2 ? deck : [bottom, ...deck.slice(0, -1)],
+              };
+            }
             case 'plusDamageThisTurn': {
               // Barry L1: one of Barry's weapons gets +amount damage this turn
               // (once per turn — enforced by validate's log scan, which stops
@@ -7892,7 +7905,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
 
       if (kind === 'rebeccaDiscard') {
-        // RC-001 Rebecca Chambers L1: discard the chosen card.
+        // RC-001 Rebecca / fr-001 Francis: discard the chosen card (options are
+        // RAW ids). With more picks left the chain re-raises for the next one.
         // L2: if discarding due to card effect during turn, gain +20 gold.
         const chosenId = prompt.options[option];
         if (chosenId === undefined) {
@@ -7902,15 +7916,30 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (p === undefined) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
-        const goldBonus = rebeccaDiscardGoldBonus(state, seat);
-        return {
-          ...state,
-          ...nextBase,
-          seats: state.seats.map(s =>
-            s.seat === seat ? { ...p, hand: p.hand.filter(id => id !== chosenId), discard: [...p.discard, chosenId], turnGold: p.turnGold + goldBonus } : s,
-          ),
-          prompts: newPrompts,
+        const remaining = Number(prompt.payload?.remaining ?? 1);
+        if (chosenId === 'No Discard') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const afterDiscard: PlayerState = {
+          ...p,
+          hand: p.hand.filter(id => id !== chosenId),
+          discard: [...p.discard, chosenId],
+          turnGold: p.turnGold + rebeccaDiscardGoldBonus(state, seat),
         };
+        const base = { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? afterDiscard : s)), prompts: newPrompts };
+        if (remaining > 1 && afterDiscard.hand.length > 0) {
+          return {
+            ...base,
+            prompts: [...newPrompts, {
+              id: `${prompt.id}:${remaining}`,
+              seat,
+              text: `${remaining - 1} more card${remaining - 1 === 1 ? '' : 's'} to discard.`,
+              options: [...afterDiscard.hand, 'No Discard'],
+              payload: { kind: 'rebeccaDiscard', remaining: String(remaining - 1) },
+            }],
+          };
+        }
+        return base;
       }
 
       if (kind === 'cw029TrashAmmo') {
@@ -9313,14 +9342,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
       }
       
-      // RC-001 Rebecca Chambers L1: at turn start, may draw 1 card then discard 1.
+      // RC-001 Rebecca (1/1) / fr-001 Francis L2 (2/2): at turn start, may draw
+      // N then discard N. The discard options are RAW instance ids (the old
+      // 'Name (id)' display strings never matched the hand ids, so the discard
+      // silently did nothing); 'No Discard' ends the chain early.
       if (kind === 'rebeccaTurnStartDrawAndDiscard') {
         const chosen = prompt.options[option];
         if (chosen === undefined || chosen === 'Pass') return { ...state, ...nextBase, prompts: newPrompts };
-        // Draw +1 card from inventory to hand
-        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: 1, rngState: state.rngState });
+        const drawN = Number(prompt.payload?.draw ?? 1);
+        const discardN = Number(prompt.payload?.discard ?? 1);
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: drawN, rngState: state.rngState });
         const drawnPlayer: PlayerState = { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard };
-        // Now prompt to discard 1 card
+        const flag = { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true };
         if (drawnPlayer.hand.length === 0) {
           return {
             ...state,
@@ -9328,27 +9361,21 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             rngState: d.rngState,
             seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
             prompts: newPrompts,
-            usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
+            usedStartOfTurnAbilities: flag,
           };
         }
-        const handCards = drawnPlayer.hand;
-        const discardOptions = handCards.map(id => {
-          const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
-          return `${cd?.name ?? 'Unknown'} (${id})`;
-        });
-        discardOptions.push('No Discard');
         return {
           ...state,
           ...nextBase,
           rngState: d.rngState,
           seats: state.seats.map(s => (s.seat === seat ? drawnPlayer : s)),
-          usedStartOfTurnAbilities: { ...(state.usedStartOfTurnAbilities ?? {}), turnStartDrawThenDiscardCard: true },
+          usedStartOfTurnAbilities: flag,
           prompts: [...newPrompts, {
             id: `${prompt.id}:discard`,
             seat,
-            text: 'Rebecca Chambers L1: choose a card to discard.',
-            options: discardOptions,
-            payload: { kind: 'rebeccaDiscard' },
+            text: discardN === 1 ? 'Choose a card to discard.' : `Choose ${discardN} cards to discard.`,
+            options: [...drawnPlayer.hand, 'No Discard'],
+            payload: { kind: 'rebeccaDiscard', remaining: String(discardN) },
           }],
         };
       }

@@ -521,6 +521,56 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 
+  // ── Custom characters read from Manny's scans (2026-11-16): fr-001 Francis +
+  // lo-001 Louis. Printed codes were NOT legible in the scans, so the ids are
+  // provisional two-letter prefixes (same scheme as aw-001 / cu-001); rename
+  // once the user supplies the printed codes. Both: 70 HP, gates 3 / 8.
+  {
+    // FRANCIS — L1: if the hand is empty one weapon he uses gets +10 (flat
+    // bonus). L2: turn start, may draw 2 and discard 2 (RULING: the scan's
+    // draw count read as both '2' and '3' — majority read 2; one-number fix
+    // if the card says 3).
+    id: 'fr-001',
+    name: 'Francis',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: If you have no cards in your hand, one weapon Francis uses gets an additional +10 damage.\nLevel 2: At the beginning of your turn, you can draw 2 cards and discard 2 cards.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 3,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'If you have no cards in your hand, one weapon Francis uses gets an additional +10 damage.' },
+      { level: 2, text: 'At the beginning of your turn, you can draw 2 cards and discard 2 cards.' },
+    ],
+    abilities: [
+      { kind: 'plusDamageIfEmptyHand', amount: 10, level: 1 },
+      { kind: 'turnStartDrawThenDiscardCard', draw: 2, discard: 2, level: 2 },
+    ],
+  },
+  {
+    // LOUIS — L1: when exploring, may move the Mansion's bottom card to the
+    // top (manual once-per-turn button). L2: Rifle + Machine Gun weapons get
+    // +10 (reuses plusDamageForWeaponTags).
+    id: 'lo-001',
+    name: 'Louis',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: When Louis explores you can move the bottom card of the mansion to the top.\nLevel 2: All of your Rifle and machine gun weapons get an additional +10 damage.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 3,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'When Louis explores you can move the bottom card of the mansion to the top.' },
+      { level: 2, text: 'All of your Rifle and machine gun weapons get an additional +10 damage.' },
+    ],
+    abilities: [
+      { kind: 'moveMansionBottomToTop', level: 1 },
+      { kind: 'plusDamageForWeaponTags', tags: ['rifle', 'machineGun'], amount: 10, level: 2 },
+    ],
+  },
+
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
   // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).

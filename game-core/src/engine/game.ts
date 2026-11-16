@@ -458,14 +458,18 @@ function turnStartAbilityPrompts(
     });
   }
 
-  // RC-001 Rebecca Chambers L1: at turn start, may draw 1 card then discard 1.
+  // RC-001 Rebecca Chambers L1 (1/1) and fr-001 Francis L2 (2/2): at turn
+  // start, may draw N cards then discard N.
   if (abilities.some(a => a.kind === 'turnStartDrawThenDiscardCard')) {
+    const dd = abilities.find(a => a.kind === 'turnStartDrawThenDiscardCard');
+    const drawN = dd?.kind === 'turnStartDrawThenDiscardCard' ? (dd.draw ?? 1) : 1;
+    const discardN = dd?.kind === 'turnStartDrawThenDiscardCard' ? (dd.discard ?? 1) : 1;
     prompts.push({
       id: `ability-${player.seat}-v${newVersion}`,
       seat: player.seat,
-      text: 'At the beginning of your turn, you can get +1 card, and if you do, discard a card.',
+      text: `At the beginning of your turn, you can get +${drawN} card${drawN === 1 ? '' : 's'}, and if you do, discard ${discardN} card${discardN === 1 ? '' : 's'}.`,
       options: ['Draw & Discard', 'Pass'],
-      payload: { kind: 'rebeccaTurnStartDrawAndDiscard' },
+      payload: { kind: 'rebeccaTurnStartDrawAndDiscard', draw: String(drawN), discard: String(discardN) },
     });
   }
 
