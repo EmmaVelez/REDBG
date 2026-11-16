@@ -110,6 +110,7 @@ export function resolveAllyExplore(
   const bonusDamage = target.weaponDamageBonusThisTurn + abilityDamage;
 
   const outcome: ExploreOutcome = resolveExplore({
+    infectedHpReduction: state.infectedHpReductionThisTurn,
     weapons,
     ammo: combinedAmmo,
     bonusDamage,

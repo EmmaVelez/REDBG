@@ -69,6 +69,49 @@ function weaponTypeCounts(state: GameState, seat: number): Readonly<Record<strin
   return counts;
 }
 
+/** Card ids in the seat's hand/discard/play area/inventory whose ORIGINAL
+ *  market pile is now empty — the Lounge scoring reading. */
+function cardsFromEmptyPiles(state: GameState, seat: number): number {
+  const p = state.seats[seat];
+  if (p === undefined) return 0;
+  // A MarketPile holds INSTANCE ids, and a pile may be EMPTY, so derive
+  // each pile's cardId from every instance whose location names that pile.
+  const pileCard = new Map<string, string>();
+  for (const [id, inst] of Object.entries(state.cards)) {
+    const loc = inst.location;
+    if (loc.zone !== 'marketPile' || !('pileId' in loc) || loc.pileId === undefined) continue;
+    if (!pileCard.has(loc.pileId)) pileCard.set(loc.pileId, inst.cardId);
+    void id;
+  }
+  const pileOf = new Map<string, string>();
+  for (const [pileId, cid] of pileCard) pileOf.set(cid, pileId);
+  let total = 0;
+  for (const id of [...p.hand, ...p.discard, ...p.playArea, ...p.inventory]) {
+    const cid = state.cards[id]?.cardId;
+    if (cid === undefined) continue;
+    const pileId = pileOf.get(cid);
+    if (pileId === undefined) continue;
+    const pile = state.marketPiles[pileId];
+    if (pile !== undefined && pile.cards.length === 0) total += 1;
+  }
+  return total;
+}
+
+/** Copies the seat holds of its 2nd most common weapon card NAME (a tie
+ *  counts one name, not both — "count either, not both"). */
+function secondMostCommonWeaponCopies(state: GameState, seat: number): number {
+  const p = state.seats[seat];
+  if (p === undefined) return 0;
+  const counts = new Map<string, number>();
+  for (const id of [...p.hand, ...p.discard, ...p.playArea, ...p.inventory]) {
+    const def = state.cardDefs[state.cards[id]?.cardId ?? ''];
+    if (def?.type !== 'weapon') continue;
+    counts.set(def.name, (counts.get(def.name) ?? 0) + 1);
+  }
+  const sorted = [...counts.values()].sort((a, b) => b - a);
+  return sorted.length >= 2 ? (sorted[1] ?? 0) : 0;
+}
+
 /** Distinct card names in a seat's Inventory. */
 function distinctInventoryNames(state: GameState, seat: number): number {
   const p = state.seats[seat];
@@ -117,6 +160,22 @@ function scoreEffectValue(state: GameState, seat: number, effect: LocationScoreE
       return distinctInventoryNames(state, seat) * effect.perName;
     case 'scorePerDuplicateActionName':
       return duplicateActionNames(state, seat) * effect.perName;
+    case 'scorePerCardFromEmptyPile':
+      return cardsFromEmptyPiles(state, seat) * effect.perCard;
+    case 'scorePerCopyOfSecondMostCommonWeapon':
+      return secondMostCommonWeaponCopies(state, seat) * effect.perCopy;
+    case 'scorePenaltyPerInventoryOver':
+      return -Math.max(0, (p?.inventory.length ?? 0) - effect.freeCards) * effect.perCard;
+    case 'scorePenaltyPerSingletonInInventory': {
+      const counts = new Map<string, number>();
+      for (const id of p?.inventory ?? []) {
+        const name = state.cardDefs[state.cards[id]?.cardId ?? '']?.name;
+        if (name !== undefined) counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+      let singletons = 0;
+      for (const c of counts.values()) if (c === 1) singletons += 1;
+      return -singletons * effect.perCard;
+    }
     case 'scoreLowHpInfectedWorth': {
       let total = 0;
       for (const id of p?.attached ?? []) {
@@ -211,10 +270,9 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
   for (const effect of revealEffectsOf(def)) {
     switch (effect.kind) {
       case 'revealGainHealth': {
-        // GLOBAL: every player gains the health. Otherwise the revealing seat.
-        const seats = def.locationKind === 'global'
-          ? s.seats.filter(x => !x.dead).map(x => x.seat)
-          : [seat];
+        // "On Reveal" fires for EVERY living player, whatever the card's kind —
+        // the GLOBAL/1X/invest label governs the ONGOING effect, not the reveal.
+        const seats = s.seats.filter(x => !x.dead).map(x => x.seat);
         s = {
           ...s,
           seats: s.seats.map(x => (seats.includes(x.seat)
@@ -224,7 +282,8 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         break;
       }
       case 'revealLoseHealth': {
-        const seats = def.locationKind === 'global' ? s.seats.filter(x => !x.dead).map(x => x.seat) : [seat];
+        // "On Reveal" fires for every living player (see revealGainHealth).
+        const seats = s.seats.filter(x => !x.dead).map(x => x.seat);
         s = {
           ...s,
           seats: s.seats.map(x => (seats.includes(x.seat) ? { ...x, hp: Math.max(0, x.hp - effect.amount) } : x)),
@@ -261,7 +320,35 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         }
         break;
       }
+      case 'revealRemoveInfectionAndCounters': {
+        // Lounge: the REVEALING seat's top attached Infected and every
+        // counter on their Character leave play.
+        const attached = s.seats[seat]?.attached ?? [];
+        const top = attached[attached.length - 1];
+        const counters = s.seats[seat]?.counters ?? [];
+        const leaving = [...counters, ...(top !== undefined ? [top] : [])];
+        if (leaving.length > 0) {
+          const moved = { ...s.cards };
+          for (const id of leaving) {
+            const inst = moved[id];
+            if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'removed', index: 0 } };
+          }
+          s = {
+            ...s,
+            cards: moved,
+            removed: [...s.removed, ...leaving],
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, counters: x.counters?.filter(c => !counters.includes(c)), attached: x.attached.filter(a => a !== top) }
+              : x)),
+          };
+        }
+        break;
+      }
+      case 'revealInfectedHpReductionThisTurn':
+        s = { ...s, infectedHpReductionThisTurn: { amount: effect.amount, min: effect.min } };
+        break;
       case 'ongoingDrawAtTurnEnd':
+      case 'ongoingGainXpOnTrash':
       case 'onexGainAmmoAndDamagePerCardGained':
         // Ongoing / 1X effects are applied at their own trigger sites.
         break;
@@ -298,6 +385,15 @@ export function locationEndOfTurnDraws(state: GameState, seat: number): number {
   let total = 0;
   for (const effect of investEffectsFor(state, seat)) {
     if (effect.kind === 'ongoingDrawAtTurnEnd') total += effect.count;
+  }
+  return total;
+}
+
+/** Lord Spencer's Study: XP the seat earns when it trashes a card. */
+export function locationXpOnTrash(state: GameState, seat: number): number {
+  let total = 0;
+  for (const effect of investEffectsFor(state, seat)) {
+    if (effect.kind === 'ongoingGainXpOnTrash') total += effect.amount;
   }
   return total;
 }

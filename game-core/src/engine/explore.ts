@@ -298,7 +298,7 @@ export type ExploreOutcome =
   | { readonly kind: 'nonInfected'; readonly cardId: string }
   | { readonly kind: 'insufficientAmmo'; readonly required: number; readonly available: number };
 
-export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number; readonly ammoX10InDiscardCount?: number; readonly exploringCharacterMaxHp?: number }): ExploreOutcome {
+export function resolveExplore(params: { readonly weapons: readonly ExploreWeapon[]; readonly ammo: number; readonly bonusDamage: number; readonly revealed: CardDef; readonly damageReduction?: number; readonly knifeUsesEarlierThisTurn?: number; readonly attachedInfectedCount?: number; readonly ammoCardsInPlayArea?: number; readonly actionsInPlayArea?: number; readonly inventoryCount?: number; readonly inventory?: readonly unknown[]; readonly discardWeaponTagCounts?: Readonly<Partial<Record<WeaponTag, number>>>; readonly characterDamage?: number; readonly characterAbilities?: readonly CharacterAbility[]; readonly damageMultiplier?: number; readonly sameNameAttachedCount?: number; readonly characterXp?: number; readonly infectedBattledThisTurn?: number; readonly ammoX10InDiscardCount?: number; readonly exploringCharacterMaxHp?: number; readonly infectedHpReduction?: { readonly amount: number; readonly min: number } }): ExploreOutcome {
   const { weapons, ammo, bonusDamage, revealed, knifeUsesEarlierThisTurn, attachedInfectedCount, ammoCardsInPlayArea, actionsInPlayArea, inventoryCount, inventory, discardWeaponTagCounts, characterDamage, characterAbilities, damageMultiplier, sameNameAttachedCount, characterXp, infectedBattledThisTurn, ammoX10InDiscardCount } = params;
   const count = attachedInfectedCount ?? 0;
   const required = requiredAmmo(weapons);
@@ -374,6 +374,12 @@ export function resolveExplore(params: { readonly weapons: readonly ExploreWeapo
       }
     }
   }
+  // Fan Location (Mirror Corridor): Infected revealed this turn have
+  // reduced Health, never below the printed minimum.
+  if (params.infectedHpReduction !== undefined) {
+    const reduced = effectiveHp - params.infectedHpReduction.amount;
+    effectiveHp = Math.max(params.infectedHpReduction.min, reduced);
+  }
 
   if (effective >= effectiveHp) {
     const blockedByInventory = revealed.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (inventoryCount ?? 0) <= e.count) ?? false;
@@ -419,6 +425,8 @@ export interface MultiExploreTarget {
 export function resolveMultiExplore(params: {
   readonly damage: number;
   readonly revealed: readonly MultiExploreTarget[];
+  /** Fan Location (Mirror Corridor): reduce each revealed Infected's Health. */
+  readonly infectedHpReduction?: { readonly amount: number; readonly min: number };
   readonly attachedInfectedCount?: number;
   readonly ammo?: number;
   readonly weapons?: readonly ExploreWeapon[];
@@ -512,6 +520,10 @@ export function resolveMultiExplore(params: {
     // Maximum Health — it replaces the printed value outright.
     if (target.infectedEffects?.some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')) {
       hp = params.exploringCharacterMaxHp ?? 0;
+    }
+    // Fan Location (Mirror Corridor): reduced Health for this turn only.
+    if (params.infectedHpReduction !== undefined) {
+      hp = Math.max(params.infectedHpReduction.min, hp - params.infectedHpReduction.amount);
     }
     combinedHp += hp;
     combinedAttack += atk;

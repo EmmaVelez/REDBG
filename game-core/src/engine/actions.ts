@@ -87,7 +87,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
-import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube } from './locations';
+import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -657,7 +657,7 @@ export function applyAction(state: GameState, action: Action): GameState {
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action))));
+  return applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action)))));
 }
 
 /**
@@ -692,6 +692,30 @@ function applyActionDiscardedHooks(prev: GameState, next: GameState): GameState 
     };
   }
   return out;
+}
+
+/**
+ * Fan Location — Lord Spencer's Study: "When you trash a card, gain 1 xp."
+ * Same reasoning as the AM-005 hook below: trashing has no single choke
+ * point, so diff `removed` and pay the seat that OWNED the card (its
+ * CardInstance still records the owning seat in `location`).
+ */
+function applyLocationTrashXpHooks(prev: GameState, next: GameState): GameState {
+  const already = new Set(prev.removed);
+  const xp = new Map<number, number>();
+  for (const id of next.removed) {
+    if (already.has(id)) continue;
+    const seat = next.cards[id]?.location.seat;
+    if (seat === undefined) continue;
+    const amount = locationXpOnTrash(next, seat);
+    if (amount <= 0) continue;
+    xp.set(seat, (xp.get(seat) ?? 0) + amount);
+  }
+  if (xp.size === 0) return next;
+  return {
+    ...next,
+    seats: next.seats.map(s => (xp.has(s.seat) ? { ...s, xp: (s.xp ?? 0) + (xp.get(s.seat) ?? 0) } : s)),
+  };
 }
 
 /**
@@ -2609,6 +2633,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ? { defeated: true, combinedHp: 0, combinedAttack: 0, splashDefeated: targets.map(() => true), survivingAttack: 0, shuffleBackCards: [] as string[], blockedByCannotDefeat: false, effectiveDamage: damage }
           : resolveMultiExplore({
               damage,
+              infectedHpReduction: state.infectedHpReductionThisTurn,
               explosiveDamage,
               splashDamageToEachRevealed: armedLauncherEffect,
               revealed: targets,
@@ -3473,6 +3498,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
+          infectedHpReduction: state.infectedHpReductionThisTurn,
           ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
           exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
@@ -3992,6 +4018,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? { kind: 'defeated' as const, decorations: effectiveRevealed?.decorations ?? 0, damage: 0, hp: effectiveRevealed?.hp ?? 0 }
         : resolveExplore({
               weapons: exploreWeapons,
+              infectedHpReduction: state.infectedHpReductionThisTurn,
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
               ammoCardsInPlayArea,

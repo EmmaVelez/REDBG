@@ -445,9 +445,16 @@ export type LocationEffect =
   | { readonly kind: 'revealEachOtherPlayerRevealsHandAndDiscard' }
   | { readonly kind: 'revealEachOtherPlayerMayDrawAndGainXp' }
   | { readonly kind: 'revealLoseHealth'; readonly amount: number }
+  /** Lounge: the revealing seat's top attached Infected and all its counters
+   *  leave play (removed from the game). */
+  | { readonly kind: 'revealRemoveInfectionAndCounters' }
+  /** Mirror Corridor: Infected revealed THIS turn get −amount Health, min 5. */
+  | { readonly kind: 'revealInfectedHpReductionThisTurn'; readonly amount: number; readonly min: number }
   // --- ongoing / investment ---
   | { readonly kind: 'ongoingGainHealthOnReveal'; readonly amount: number }
   | { readonly kind: 'ongoingTrashOnSecondCardGain' }
+  /** Lord Spencer's Study: the investor gains 1 XP whenever they trash a card. */
+  | { readonly kind: 'ongoingGainXpOnTrash'; readonly amount: number }
   | { readonly kind: 'ongoingDrawAtTurnEnd'; readonly count: number; /** GLOBAL cards: 'revealer' limits this to the seat that revealed it. */
     readonly scope?: 'all' | 'revealer' }
   // --- 1X (paid use) ---
@@ -460,7 +467,15 @@ export type LocationScoreEffect =
   | { readonly kind: 'scorePerXp'; readonly perXp: number }
   | { readonly kind: 'scorePerDistinctInventoryName'; readonly perName: number }
   | { readonly kind: 'scorePerDuplicateActionName'; readonly perName: number }
-  | { readonly kind: 'scoreLowHpInfectedWorth'; readonly hpThreshold: number; readonly decorations: number };
+  | { readonly kind: 'scoreLowHpInfectedWorth'; readonly hpThreshold: number; readonly decorations: number }
+  /** Lounge: per card the seat holds that came from a now-empty supply pile. */
+  | { readonly kind: 'scorePerCardFromEmptyPile'; readonly perCard: number }
+  /** Mansion Bathroom: per copy of the 2nd most common weapon card name held. */
+  | { readonly kind: 'scorePerCopyOfSecondMostCommonWeapon'; readonly perCopy: number }
+  /** Materials Room: −1 per Inventory card beyond `freeCards` (a penalty). */
+  | { readonly kind: 'scorePenaltyPerInventoryOver'; readonly freeCards: number; readonly perCard: number }
+  /** Mirror Corridor: −1 per Inventory card the seat holds exactly one copy of. */
+  | { readonly kind: 'scorePenaltyPerSingletonInInventory'; readonly perCard: number };
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -1031,6 +1046,10 @@ export interface GameState {
    *  top is revealed (flipped face-up) the next time the Mansion is explored;
    *  its On Reveal effect fires at that moment. */
   readonly locationDeck?: readonly string[];
+
+  /** Mirror Corridor (fan Location): Infected revealed while this is set have
+   *  their Health reduced to `max(min, hp − amount)`, for THIS turn only. */
+  readonly infectedHpReductionThisTurn?: { readonly amount: number; readonly min: number };
 
   /** Revealed locations, in reveal order. `cubes` maps seat -> number of
    *  investment cubes on that card (GLOBAL / 1X cards carry none). */

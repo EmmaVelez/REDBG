@@ -1523,13 +1523,15 @@ function startTurnInternal(state: GameState): GameState {
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
   return {
-    ...state,
-    version: newVersion,
-    rngState: nextRng,
-    seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
-    prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
-    ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
-  };
+      ...state,
+      version: newVersion,
+      rngState: nextRng,
+      seats: turnSeats.map((s, i) => (i === state.activeSeat ? turnPlayer : s)),
+      prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
+      // Fan Location (Mirror Corridor): the Health reduction lasts one turn.
+      infectedHpReductionThisTurn: undefined,
+      ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
+    };
 }
 
 export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' } {

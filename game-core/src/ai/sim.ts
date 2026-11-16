@@ -25,6 +25,8 @@ export interface SimConfig {
   readonly outbreakMode?: boolean;
   /** Partner Modification rules (Alliance). */
   readonly partnerMode?: boolean;
+  /** Fan Locations: deal the location deck (opt-in). */
+  readonly locationsMode?: boolean;
   /** Called with each applied action; can be used for live telemetry or
    *  unit tests that assert action sequences. */
   readonly onAction?: (action: Action, stateBefore: GameState) => void;
@@ -76,6 +78,7 @@ export function playBotGame(config: SimConfig): SimResult {
     players,
     outbreakMode: config.outbreakMode ?? scenario === 'outbreak',
     partnerMode: config.partnerMode,
+    locationsMode: config.locationsMode,
   };
 
   const initialState = setup(setupConfig, cards, piles, mansionCards, winInfectedCardId);
