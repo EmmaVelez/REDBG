@@ -1152,6 +1152,7 @@ function startTurnInternal(state: GameState): GameState {
       pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
     cac005HealUsedThisTurn: undefined,
+    nextItemToHand: undefined,
     setAsideActionInstanceId: undefined,
       mustExplore: false,
       actionsDiscardedThisTurn: 0,
@@ -1401,6 +1402,7 @@ function startTurnInternal(state: GameState): GameState {
     pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
     cac005HealUsedThisTurn: undefined,
+    nextItemToHand: undefined,
     setAsideActionInstanceId: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,

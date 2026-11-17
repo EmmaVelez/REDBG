@@ -1280,6 +1280,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                                   }
                                   break;
                                 }
+                                if (e.kind === 'trashUpToFromHandOrDiscard') {
+                                  // CAC-001 Can't Let Go: up to N from hand OR discard.
+                                  const pool = [...player.hand, ...player.discard];
+                                  if (pool.length > 0) {
+                                    promptKind = 'cantLetGoChoice';
+                                    promptOptions = [...pool, 'DONE'];
+                                    promptExtra = { max: String(e.max), draw: String(e.draw) };
+                                  }
+                                  break;
+                                }
                                 if (e.kind === 'upgradeAmmoBy30Gold') {
                                   const ammoInHand = played.player.hand.filter(id => cardDef(state, id)?.type === 'ammunition');
                                   if (ammoInHand.length > 0) {
@@ -1519,6 +1529,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               if (e.kind === 'gainedCardsGoToHand') {
                 // AC-021 Gathering Forces: cards gained this turn go to hand.
                 newPlayer = { ...newPlayer, gainedCardsGoToHand: true };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+              }
+              if (e.kind === 'nextItemGoesToHand') {
+                // CAC-004 Resupply: the next Item gain this turn goes to Hand.
+                newPlayer = { ...newPlayer, nextItemToHand: true };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
               if (e.kind === 'damageCharacter') {
@@ -2306,6 +2321,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             // LOC-002 Arklay Laboratory: while armed, the FIRST explore this
             // turn gets +damage per card gained this turn.
             const arklayBonus = arklayWasArmed ? 10 * (player.gainedThisTurn?.length ?? 0) : 0;
+            // CAC-008 Gather Intel: +5 Damage per 3 Infected attached to the
+            // Character. CAC-009 Welcome to the Club: +5, or +10 while battling
+            // an Infected with 80+ Health.
+            const attachedInfected = (player.attached ?? []).filter(id => {
+              const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+              return cd?.type === 'infected';
+            }).length;
+            const cac008Bonus = player.playArea.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.id === 'cac-008')
+              ? 5 * Math.floor(attachedInfected / 3)
+              : 0;
+            const cac009Card = player.playArea.find(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.id === 'cac-009');
+            const cac009Bonus = cac009Card !== undefined
+              ? (() => {
+                const hp = revealedInstanceId !== undefined
+                  ? (state.cardDefs[state.cards[revealedInstanceId]?.cardId ?? '']?.hp ?? 0)
+                  : 0;
+                return hp >= 80 ? 10 : 5;
+              })()
+              : 0;
             // NOTE: the CW-027 / CW-030 / CW-031 multi-Infected bonuses are NOT
             // added here — `computeDamage` already applies them from the weapon's
             // `weaponEffects`, and this per-weapon value is summed into it, so
@@ -2320,7 +2354,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + arklayBonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + arklayBonus + cac008Bonus + cac009Bonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
@@ -8358,6 +8392,86 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
+      }
+
+      if (kind === 'cantLetGoChoice') {
+        const chosen = prompt.options[option];
+        const max = Number(prompt.payload?.max ?? 2);
+        const draw = Number(prompt.payload?.draw ?? 0);
+        const already = Number(prompt.payload?.trashed ?? 0);
+        const inPool = (id: string): boolean => player.hand.includes(id) || player.discard.includes(id);
+        const selfId = String(prompt.payload?.instanceId ?? '');
+
+        /** Apply the "discard empty" rider: trash this card, draw `draw`. */
+        const finish = (base: GameState): GameState => {
+          const seatAfter = base.seats[seat] as PlayerState;
+          if (seatAfter.discard.length !== 0) return base;
+          if (selfId === '' || !seatAfter.playArea.includes(selfId)) return base;
+          const d = drawWithReshuffle({
+            deck: seatAfter.inventory,
+            discard: seatAfter.discard,
+            count: draw,
+            rngState: base.rngState,
+          });
+          const moved = { ...base.cards };
+          const inst = moved[selfId];
+          if (inst !== undefined) moved[selfId] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+          return {
+            ...base,
+            rngState: d.rngState,
+            cards: moved,
+            removed: [...base.removed, selfId],
+            seats: base.seats.map(x => (x.seat === seat
+              ? {
+                ...x,
+                playArea: x.playArea.filter(id => id !== selfId),
+                inventory: d.deck,
+                hand: [...x.hand, ...d.hand],
+              }
+              : x)),
+          };
+        };
+
+        if (chosen === undefined || chosen === 'DONE' || !inPool(chosen)) {
+          return finish({ ...state, ...nextBase, prompts: newPrompts });
+        }
+
+        const n = already + 1;
+        const trashedCard = { ...state.cards };
+        const inst = trashedCard[chosen];
+        if (inst !== undefined) trashedCard[chosen] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+
+        // Continue the chain until the cap is reached or the pool runs dry.
+        let prompts2 = newPrompts;
+        if (n < max) {
+          const remaining = [...player.hand, ...player.discard].filter(id => id !== chosen);
+          if (remaining.length > 0) {
+            prompts2 = [...prompts2, {
+              id: `${prompt.id}:t${n}`,
+              seat,
+              text: prompt.text,
+              options: [...remaining, 'DONE'],
+              payload: { ...prompt.payload, trashed: String(n) },
+            }];
+          }
+        }
+
+        const seatAfter = state.seats[seat] as PlayerState;
+        const after: GameState = {
+          ...state,
+          ...nextBase,
+          cards: trashedCard,
+          removed: [...state.removed, chosen],
+          seats: state.seats.map(x => (x.seat === seat
+            ? {
+              ...x,
+              hand: x.hand.filter(id => id !== chosen),
+              discard: x.discard.filter(id => id !== chosen),
+            }
+            : x)),
+          prompts: prompts2,
+        };
+        return finish(after);
       }
 
       if (kind === 'cac005HealChoice') {

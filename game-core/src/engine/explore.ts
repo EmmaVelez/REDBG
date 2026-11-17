@@ -1,6 +1,7 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
 import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
+import { revealTop } from './mansion';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
 export interface ExploreWeapon {
@@ -192,8 +193,27 @@ export function exploreDamage(
     // CAC-015 This Shit Ends Now!: the first Weapon routed to the Play Area by
     // that effect gets +10 Damage this turn (mirror of the reducer term).
     const cac015Bonus = player.firstWeaponToPlayAreaInstanceId === id ? (player.firstWeaponToPlayAreaBonus ?? 0) : 0;
+    // CAC-008 Gather Intel / CAC-009 Welcome to the Club (mirror of the
+    // reducer terms, so the picker preview agrees). The preview peeks the
+    // Mansion top for the 80+ Health condition.
+    const attachedInfectedPrev = (player.attached ?? []).filter(a => {
+      const cd = state.cardDefs[state.cards[a]?.cardId ?? ''] as { type?: string } | undefined;
+      return cd?.type === 'infected';
+    }).length;
+    const cac008Prev = player.playArea.some(pid => state.cardDefs[state.cards[pid]?.cardId ?? '']?.id === 'cac-008')
+      ? 5 * Math.floor(attachedInfectedPrev / 3)
+      : 0;
+    const cac009Prev = player.playArea.some(pid => state.cardDefs[state.cards[pid]?.cardId ?? '']?.id === 'cac-009')
+      ? (() => {
+        const top = revealTop({ deck: state.mansionDeck });
+        const hp = top.revealedInstanceId !== undefined
+          ? (state.cardDefs[state.cards[top.revealedInstanceId]?.cardId ?? '']?.hp ?? 0)
+          : 0;
+        return hp >= 80 ? 10 : 5;
+      })()
+      : 0;
     return {
-      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + cac015Bonus + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
+      damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + cac015Bonus + cac008Prev + cac009Prev + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
       ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
       tags: def?.weaponTags,

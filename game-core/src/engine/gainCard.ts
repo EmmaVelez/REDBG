@@ -147,6 +147,26 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     };
   }
 
+  // CAC-004 Resupply: the next Item gain this turn goes to Hand instead of
+  // the Discard Pile. `dest` is already computed, so re-route here.
+  if (player.nextItemToHand === true
+    && (s.cardDefs[req.cardId]?.type === 'item')
+    && (dest === 'discard' || dest === 'hand')) {
+    const ids = [...gainedIds];
+    const moved = { ...s.cards };
+    for (const id of ids) {
+      const inst = moved[id];
+      if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'hand', index: 0, seat } };
+    }
+    s = {
+      ...s,
+      cards: moved,
+      seats: s.seats.map(p => (p.seat === seat
+        ? { ...p, nextItemToHand: false, discard: p.discard.filter(id => !ids.includes(id)), hand: [...p.hand, ...ids] }
+        : p)),
+    };
+  }
+
   // CAC-005 Combat Medic: the FIRST gain of the turn offers a 10 Health heal.
   // The card must be in the player's PLAY AREA (i.e. played this turn).
   if ((newPlayer.gainedThisTurn ?? []).length === 1

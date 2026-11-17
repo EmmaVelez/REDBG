@@ -386,6 +386,16 @@ export type ActionEffect =
   /** CAC-005 Combat Medic: the first time you Gain a card this turn, you
    *  may Heal a Character by `amount`. */
   | { readonly kind: "healOnFirstGainThisTurn"; readonly amount: number }
+  /** CAC-001 Can't Let Go: trash up to `max` from hand or discard; if the
+   *  discard is empty afterwards, trash this card and gain `draw` cards. */
+  | { readonly kind: "trashUpToFromHandOrDiscard"; readonly max: number; readonly draw: number }
+  /** CAC-008 Gather Intel: +amount Damage per `per` Infected attached. */
+  | { readonly kind: "weaponDamagePerAttachedInfected"; readonly amount: number; readonly per: number }
+  /** CAC-009 Welcome to the Club: flat +amount, or +highAmount while
+   *  battling an Infected with at least `hpThreshold` Health. */
+  | { readonly kind: "allWeaponsDamageThisTurn"; readonly amount: number; readonly highAmount?: number; readonly hpThreshold?: number }
+  /** CAC-004 Resupply: the next Item gained this turn goes to Hand. */
+  | { readonly kind: "nextItemGoesToHand" }
   | { readonly kind: "beginTurnTrashIfHealthAtMost"; readonly threshold: number }
   | { readonly kind: "elseDamageAndDraw"; readonly damage: number; readonly cards: number }
   | { readonly kind: "powerOfTVirus" } // AC-023
@@ -978,6 +988,8 @@ export interface PlayerState {
   readonly pendingEndOfTurnDraws?: number;
   /** CAC-005 Combat Medic: the first-gain heal has been used this turn. */
   readonly cac005HealUsedThisTurn?: boolean;
+  /** CAC-004 Resupply: the next Item gain routes to Hand this turn. */
+  readonly nextItemToHand?: boolean;
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
   readonly pendingBackstab?: { readonly targetSeat: number };
   /** AC-045 Coup de Grâce: the chosen weapon + bonus for this turn's explores. */
