@@ -92,7 +92,7 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
-  beginPostTurnCleanup, applyPostTurnCleanupChosen } from './locations';
+  beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -1976,6 +1976,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const arklayWasArmed = (state.seats[seat] as PlayerState | undefined)?.arklayArmed === true;
           const exploreResult: GameState = (() => {
           let player = state.seats[seat] as PlayerState;
+
+          // Fan Location (Bedroom): this turn's Mansion reveals are blocked.
+          // The Explore is REFUSED rather than consumed — the seat keeps it.
+          if (mansionRevealBlocked(state, seat)) {
+            throw new Error('applyAction: explore: the Bedroom blocks Mansion reveals this turn');
+          }
 
           // Survival Horror: before exploring, roll a d6 and apply the result.
           // The die roll is handled via a prompt so the player sees the result.
@@ -4815,6 +4821,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       };
 
           })();
+          // NOTE: the Bedroom's reveal block is deliberately NOT cleared here —
+          // the explore that reveals it must leave it armed for the turn.
           return arklayWasArmed
             ? { ...exploreResult, seats: exploreResult.seats.map(s => (s.seat === seat ? { ...s, arklayArmed: undefined } : s)) }
             : exploreResult;
@@ -4878,29 +4886,61 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         ? (exploreAbility as { amount: number }).amount
         : 0;
 
-      const marketPiles = { ...state.marketPiles, [pileId]: { pileId, cards: pile.cards.slice(1) } };
-
-      let s: GameState = {
-        ...state,
-        ...nextBase,
-        seats: state.seats.map(s => (s.seat === seat ? {
-          ...player,
-          turnGold: player.turnGold - cost,
-          buysLeft: player.buysLeft - 1,
-          exploresLeft: player.exploresLeft + bonusExplores,
-        } : s)),
-        marketPiles,
+      // Complete the purchase. Shared by the buy action and the Bar's
+      // buy-with-XP-token choice so the two cannot drift.
+      const completeBuy = (base: GameState): GameState => {
+        const p = base.marketPiles[pileId];
+        const instId = p?.cards[0];
+        const def = instId === undefined ? undefined : cardDef(base, instId);
+        const c = Math.max(0, buyCostAfterReduction(characterAbilities(base, seat), def)
+          - locationBuyCostReduction(base, seat));
+        const pl = base.marketPiles[pileId];
+        const piles = { ...base.marketPiles, [pileId]: { pileId, cards: (pl?.cards ?? []).slice(1) } };
+        let out: GameState = {
+          ...base,
+          ...nextBase,
+          seats: base.seats.map(x => (x.seat === seat ? {
+            ...x,
+            turnGold: x.turnGold - c,
+            buysLeft: x.buysLeft - 1,
+            exploresLeft: x.exploresLeft + bonusExplores,
+          } : x)),
+          marketPiles: piles,
+        };
+        out = gainCard(out, {
+          seat,
+          cardId: def?.id ?? '',
+          instanceId: instId,
+          destination: 'discard',
+          reason: 'buy',
+        });
+        return out;
       };
-      // Centralized gain: the bought instance moves from its market pile into
-      // the discard (or to hand under Gathering Forces). Passing instanceId
-      // keeps the physical card's identity instead of minting a duplicate.
-      s = gainCard(s, {
-        seat,
-        cardId: boughtDef?.id ?? (boughtInstanceId.split('#')[0] as string),
-        instanceId: boughtInstanceId,
-        destination: 'discard',
-        reason: 'buy',
-      });
+
+      // Fan Location (Bar): a token on the pile makes the buyer expend XP —
+      // 1 XP to buy with the token still on the next card, 2 XP to strip it.
+      // The choice handler calls completeBuy DIRECTLY, so this gate runs once.
+      if (pileHasXpToken(state, pileId) && !state.prompts.some(p => p.payload?.kind === 'buyXpChoice')) {
+        const xp = player.xp ?? 0;
+        if (xp < 1) return { ...state, ...nextBase };
+        const opts: string[] = ['Keep the token (1 XP)'];
+        if (xp >= 2) opts.push('Remove the token (2 XP)');
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...state.prompts, {
+            id: `buy-xp-${seat}-${pileId}-v${state.version}`,
+            seat,
+            text: `${boughtDef?.name ?? 'That card'} carries an XP token. Spend XP to buy it?`,
+            options: opts,
+            payload: { kind: 'buyXpChoice', pileId, cost: String(cost) },
+          }],
+        };
+      }
+
+      // completeBuy charges the gold/Buy, pops the pile and gains the card
+      // (instance-preserving, so the physical card keeps its identity).
+      let s: GameState = completeBuy(state);
       // The log entry only carries the pileId, and a single-card pile is empty
       // by the time the history is rendered — record the physical card so the
       // line can still name it (the custom EX piles are all single-card).
@@ -6332,6 +6372,49 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             };
           } else {
             s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + effect.xp } : x)) };
+          }
+        } else if (effect.kind === 'onexAddXpTokenToPile') {
+          // Bar: choose a Resource Area pile to carry an XP token.
+          const candidates = Object.values(s.marketPiles)
+            .filter(p => p.cards.length > 0 && !pileHasXpToken(s, p.pileId))
+            .map(p => p.pileId);
+          if (candidates.length > 0) {
+            s = {
+              ...s,
+              prompts: [...s.prompts, {
+                id: `bar-token-${seat}-v${s.version}`,
+                seat,
+                text: 'Bar: add an XP token to which supply pile?',
+                options: candidates,
+                payload: { kind: 'barTokenChoice' },
+              }],
+            };
+          }
+        } else if (effect.kind === 'onexGainAmmoAndChooseCard') {
+          // Bedroom: gain `ammoCount` Ammo x`ammo`, then choose a card up to `maxCost`.
+          for (let i = 0; i < effect.ammoCount; i += 1) {
+            s = gainAmmoX10(s, seat, 1);
+          }
+          // Gained ammo cards credit their Ammo bonus to the turn's pool
+          // immediately (the player does not have to play them).
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, turnAmmo: x.turnAmmo + effect.ammo * effect.ammoCount }
+              : x)),
+          };
+          const options = affordableMarketActions(s, effect.maxCost);
+          if (options.length > 0) {
+            s = {
+              ...s,
+              prompts: [...s.prompts, {
+                id: `bedroom-gain-${seat}-v${s.version}`,
+                seat,
+                text: `Bedroom: gain a card costing up to ${effect.maxCost}?`,
+                options: [...options, 'Decline'],
+                payload: { kind: 'bedroomGainChoice', maxCost: String(effect.maxCost) },
+              }],
+            };
           }
         }
       }
@@ -8212,6 +8295,81 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
+      }
+
+      if (kind === 'barTokenChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return { ...addXpTokenToPile({ ...state, ...nextBase, prompts: newPrompts }, chosen), version: state.version + 1 };
+      }
+
+      if (kind === 'buyXpChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const remove = chosen.startsWith('Remove');
+        const spend = remove ? 2 : 1;
+        const seatXp = (state.seats[seat] as PlayerState).xp ?? 0;
+        if (seatXp < spend) return { ...state, ...nextBase, prompts: newPrompts };
+        const stripped: GameState = remove
+          ? { ...state, xpTokens: (state.xpTokens ?? []).filter(x => x !== prompt.payload?.pileId) }
+          : state;
+        const paid: GameState = {
+          ...stripped,
+          ...nextBase,
+          prompts: newPrompts,
+          seats: stripped.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) - spend } : x)),
+        };
+        // Complete the purchase directly: re-entering `buy` would hit the
+        // token gate again (the prompt is gone, so the gate would re-fire).
+        const target = String(prompt.payload?.pileId ?? '');
+        const pile = paid.marketPiles[target];
+        const instId = pile?.cards[0];
+        const def = instId === undefined ? undefined : cardDef(paid, instId);
+        const gold = Math.max(0, buyCostAfterReduction(characterAbilities(paid, seat), def)
+          - locationBuyCostReduction(paid, seat));
+        let out: GameState = {
+          ...paid,
+          marketPiles: {
+            ...paid.marketPiles,
+            [target]: { pileId: target, cards: (pile?.cards ?? []).slice(1) },
+          },
+          seats: paid.seats.map(x => (x.seat === seat
+            ? { ...x, turnGold: x.turnGold - gold, buysLeft: x.buysLeft - 1 }
+            : x)),
+        };
+        out = gainCard(out, {
+          seat,
+          cardId: def?.id ?? '',
+          instanceId: instId,
+          destination: 'discard',
+          reason: 'buy',
+        });
+        return out;
+      }
+
+      if (kind === 'bedroomGainChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const pile = Object.values(state.marketPiles).find(p => p.cards[0] === chosen);
+        if (pile === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        // Bedroom's card is a GRANT, not a purchase: move the instance to the
+        // discard without spending gold or a Buy.
+        const free: GameState = {
+          ...state,
+          ...nextBase,
+          prompts: newPrompts,
+          marketPiles: {
+            ...state.marketPiles,
+            [pile.pileId]: { pileId: pile.pileId, cards: pile.cards.slice(1) },
+          },
+          cards: { ...state.cards, [chosen]: { ...state.cards[chosen]!, location: { zone: 'discard', index: 0, seat } } },
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, discard: [...x.discard, chosen] }
+            : x)),
+        };
+        return free;
       }
 
       if (kind === 'atticActionChoice') {

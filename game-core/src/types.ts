@@ -486,7 +486,13 @@ export type LocationEffect =
   | { readonly kind: 'atticUpgrade'; readonly maxCost: number }
   /** Art Supply Room: after this turn, fold Inventory + discard into hand,
    *  trash up to `trash` cards, shuffle the hand into the Inventory, draw `draw`. */
-  | { readonly kind: 'postTurnCleanup'; readonly trash: number; readonly draw: number };
+  | { readonly kind: 'postTurnCleanup'; readonly trash: number; readonly draw: number }
+  /** Bar: this 1X puts an XP token on a Resource Area pile. */
+  | { readonly kind: 'onexAddXpTokenToPile' }
+  /** Bedroom: the revealing seat may not reveal Mansion cards this turn. */
+  | { readonly kind: 'revealBlockMansionRevealThisTurn' }
+  /** Bedroom: gain `ammoCount` Ammo x`ammo` cards, then choose a card up to `maxCost`. */
+  | { readonly kind: 'onexGainAmmoAndChooseCard'; readonly ammo: number; readonly ammoCount: number; readonly maxCost: number };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -1104,6 +1110,11 @@ export interface GameState {
   readonly pendingEndPhaseSeat?: number;
   /** Cards the seat has already chosen to trash in this phase. */
   readonly postTurnTrashIds?: readonly string[];
+  /** Fan Location (Bar): Resource Area piles carrying an XP token. */
+  readonly xpTokens?: readonly string[];
+  /** Fan Location (Bedroom): the seat that may not reveal Mansion cards
+   *  this turn (the card says "You", so it is seat-scoped). */
+  readonly mansionRevealBlockedSeat?: number;
 
   /** Revealed locations, in reveal order. `cubes` maps seat -> number of
    *  investment cubes on that card (GLOBAL / 1X cards carry none). */

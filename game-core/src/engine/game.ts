@@ -1566,6 +1566,8 @@ function startTurnInternal(state: GameState): GameState {
       infectedHpReductionThisTurn: undefined,
       // Fan Location (Attic Landing): the Health bonus lasts one turn.
       infectedHpBonusThisTurn: undefined,
+      // Fan Location (Bedroom): the reveal block lasts one turn.
+      mansionRevealBlockedSeat: undefined,
       ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
     };
 }

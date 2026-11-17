@@ -2,7 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost, locationBuyCostReduction } from './locations';
+import { nextCubeCost, locationBuyCostReduction, pileHasXpToken } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -222,6 +222,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
 
     case 'explore':
+      // Fan Location (Bedroom): no Mansion reveals this turn.
+      if (state.mansionRevealBlockedSeat === action.seat) {
+        return { ok: false, reason: 'explore: the Bedroom blocks Mansion reveals this turn' };
+      }
       if (state.phase !== 'main') {
         return { ok: false, reason: 'explore: not in main phase' };
       }
@@ -453,6 +457,10 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       }
       if (player.buysLeft < 1) {
         return { ok: false, reason: 'buy: no buys left' };
+      }
+      // Fan Location (Bar): a token on the pile costs 1 XP (2 to remove it).
+      if (pileHasXpToken(state, action.pileId) && (player.xp ?? 0) < 1) {
+        return { ok: false, reason: 'buy: that pile carries an XP token and you have no XP' };
       }
       const pile = state.marketPiles[action.pileId];
       if (pile === undefined) {

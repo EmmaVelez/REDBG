@@ -353,6 +353,10 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         // Attic Landing: Infected revealed this turn are harder to kill.
         s = { ...s, infectedHpBonusThisTurn: effect.amount };
         break;
+      case 'revealBlockMansionRevealThisTurn':
+        // Bedroom: the revealing seat may not reveal Mansion cards this turn.
+        s = { ...s, mansionRevealBlockedSeat: seat };
+        break;
       case 'revealEachPlayerMayGainItem': {
         // Terrace: every living player may take one item from the Resource Area.
         for (const other of s.seats.filter(x => !x.dead && !x.downed)) {
@@ -403,6 +407,9 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'onexGainBuyAndAmmo':
       case 'atticUpgrade':
       case 'postTurnCleanup':
+      case 'onexAddXpTokenToPile':
+      case 'onexGainAmmoAndChooseCard':
+      case 'revealBlockMansionRevealThisTurn':
         // Ongoing / 1X effects are applied at their own trigger sites.
         break;
     }
@@ -568,6 +575,33 @@ export function applyPostTurnCleanupChosen(
     player: { ...player, hand: d.hand, inventory: d.deck, discard: d.discard },
     rngState: shuffled.rng.s,
   };
+}
+
+/** Fan Location (Bar): piles carrying an XP token. */
+export function xpTokenPiles(state: GameState): readonly string[] {
+  return state.xpTokens ?? [];
+}
+
+/** True when the pile's TOP card carries an XP token. */
+export function pileHasXpToken(state: GameState, pileId: string): boolean {
+  return (state.xpTokens ?? []).includes(pileId);
+}
+
+/** Add an XP token to a Resource Area pile. */
+export function addXpTokenToPile(state: GameState, pileId: string): GameState {
+  const current = state.xpTokens ?? [];
+  if (current.includes(pileId)) return state;
+  return { ...state, xpTokens: [...current, pileId] };
+}
+
+/** Spend XP and (optionally) strip the token: the buy gate. */
+export function xpCostToBuy(state: GameState, pileId: string): number {
+  return pileHasXpToken(state, pileId) ? 1 : 0;
+}
+
+/** Fan Location (Bedroom): this seat may not reveal Mansion cards this turn. */
+export function mansionRevealBlocked(state: GameState, seat: number): boolean {
+  return state.mansionRevealBlockedSeat === seat;
 }
 
 /** Fan Location (Attic Landing): the +Health Infected get this turn. */
