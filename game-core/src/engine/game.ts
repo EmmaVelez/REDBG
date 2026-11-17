@@ -1150,8 +1150,6 @@ function startTurnInternal(state: GameState): GameState {
       ...(terraceInvested(state, 0) ? { freeActionPlayAvailable: true } : { freeActionPlayAvailable: undefined }),
       pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
-    // Fan character (Leon): the trash-claim refreshes each round.
-    leonTrashClaimUsedThisRound: undefined,
     setAsideActionInstanceId: undefined,
       mustExplore: false,
       actionsDiscardedThisTurn: 0,
@@ -1400,8 +1398,6 @@ function startTurnInternal(state: GameState): GameState {
     locationUsesThisTurn: [],
     pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
-    // Fan character (Leon): the trash-claim refreshes each round.
-    leonTrashClaimUsedThisRound: undefined,
     setAsideActionInstanceId: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,

@@ -819,9 +819,6 @@ export interface PlayerState {
     /** Highest tier unlocked: 0 = below L1 gate, 1 = L1, 2 = L2 (per-card gates). */
     readonly level: 0 | 1 | 2;
 
-  /** Fan character (Leon): the trash-claim has been used this round. */
-  readonly leonTrashClaimUsedThisRound?: boolean;
-
   /** Per-turn resource pools (reset at turn start; granted by played cards). */
   readonly turnAmmo: number;
   readonly turnGold: number;

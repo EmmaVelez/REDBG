@@ -1232,6 +1232,29 @@ export function chrisL2TopOfMansion(state: GameState, seat: number): boolean {
   return player.roundUsedAbilities?.notDefeatedInfectedToMansionTopOncePerRound !== true;
 }
 
+/**
+ * Fan character (b4mc-ch-015 Leon): is the trash-claim still available this
+ * round? Uses the shared round mechanism (`roundUsedAbilities`), which the
+ * turn-start code clears for every seat when the turn circles back to the
+ * first living player.
+ */
+export function leonTrashClaimAvailable(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (!characterAbilities(state, seat).some(a => a.kind === 'takeTrashedCardFromOtherPlayerOncePerRound')) return false;
+  return player.roundUsedAbilities?.takeTrashedCardFromOtherPlayerOncePerRound !== true;
+}
+
+/** Mark Leon's trash-claim as used for the rest of the round. */
+export function markLeonTrashClaimUsed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, roundUsedAbilities: { ...(s.roundUsedAbilities ?? {}), takeTrashedCardFromOtherPlayerOncePerRound: true } }
+      : s)),
+  };
+}
+
 /** Mark B4MC-CH-008 L2 as used for the rest of the round. */
 export function markChrisL2TopUsed(state: GameState, seat: number): GameState {
   return {

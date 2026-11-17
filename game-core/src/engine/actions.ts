@@ -87,6 +87,7 @@ import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
+import { leonTrashClaimAvailable, markLeonTrashClaimUsed } from './abilities';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, exploreExplosiveDamage, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
@@ -818,7 +819,7 @@ function applyLeonTrashHook(prev: GameState, next: GameState, action: Action): G
   let out = next;
   for (const leon of next.seats) {
     if (leon.seat === seat || leon.dead || leon.downed) continue;
-    if (leon.leonTrashClaimUsedThisRound === true) continue;
+    if (!leonTrashClaimAvailable(next, leon.seat)) continue;
     const charInst = next.cards[leon.characterInstanceId];
     const charDef = charInst === undefined ? undefined : next.cardDefs[charInst.cardId];
     const level = charDef === undefined ? 0 : levelForDecorations(charDef.level1At, charDef.level2At, leon.decorations);
@@ -8347,21 +8348,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ...state,
             ...nextBase,
             prompts: newPrompts,
-            seats: state.seats.map(x => (x.seat === seat ? { ...x, leonTrashClaimUsedThisRound: true } : x)),
+            seats: markLeonTrashClaimUsed({ ...state, ...nextBase, prompts: newPrompts }, seat).seats,
           };
         }
         const inst = state.cards[chosen];
         if (inst === undefined) return { ...state, ...nextBase, prompts: newPrompts };
-        return {
+        const taken = markLeonTrashClaimUsed({
           ...state,
           ...nextBase,
           prompts: newPrompts,
           removed: state.removed.filter(id => id !== chosen),
           cards: { ...state.cards, [chosen]: { ...inst, location: { zone: 'hand', index: 0, seat } } },
           seats: state.seats.map(x => (x.seat === seat
-            ? { ...x, leonTrashClaimUsedThisRound: true, hand: [...x.hand, chosen] }
+            ? { ...x, hand: [...x.hand, chosen] }
             : x)),
-        };
+        }, seat);
+        return taken;
       }
 
       if (kind === 'barTokenChoice') {

@@ -83,7 +83,7 @@ describe('Leon — take a card another player trashed', () => {
     const claimed = applyAction(out, { type: 'chooseOption', seat: 1, promptId: prompt!.id, option: 0 });
     expect(leon(claimed).hand).toContain(victim);
     expect(claimed.removed).not.toContain(victim);
-    expect(leon(claimed).leonTrashClaimUsedThisRound).toBe(true);
+    expect(leon(claimed).roundUsedAbilities?.takeTrashedCardFromOtherPlayerOncePerRound).toBe(true);
   });
 
   it('only fires once per round', () => {
@@ -96,7 +96,7 @@ describe('Leon — take a card another player trashed', () => {
     });
     const prompt = s.prompts.find(p => p.payload?.kind === 'leonTrashClaim')!;
     s = applyAction(s, { type: 'chooseOption', seat: 1, promptId: prompt.id, option: 0 });
-    expect(leon(s).leonTrashClaimUsedThisRound).toBe(true);
+    expect(leon(s).roundUsedAbilities?.takeTrashedCardFromOtherPlayerOncePerRound).toBe(true);
     // A second trash this round raises nothing.
     const after = applyAction(seedTrashPrompt(s, second), {
       type: 'chooseOption', seat: 0, promptId: 'trashprobe', option: 0,
@@ -112,9 +112,13 @@ describe('Leon — take a card another player trashed', () => {
     });
     const prompt = s.prompts.find(p => p.payload?.kind === 'leonTrashClaim')!;
     s = applyAction(s, { type: 'chooseOption', seat: 1, promptId: prompt.id, option: prompt.options.length - 1 });
-    expect(leon(s).leonTrashClaimUsedThisRound).toBe(true);
-    // Next round: the flag clears at the turn boundary.
-    const next = startTurn(applyAction(s, { type: 'endTurn', seat: 0 }));
-    expect((next.seats[1] as PlayerState).leonTrashClaimUsedThisRound).toBeUndefined();
+    expect(leon(s).roundUsedAbilities?.takeTrashedCardFromOtherPlayerOncePerRound).toBe(true);
+    // Next ROUND: walk the turn around the table — seat 0 ends, seat 1 takes
+    // its turn, and when seat 0 starts again the round flags clear.
+    const seat1 = startTurn(applyAction(s, { type: 'endTurn', seat: 0 }));
+    expect(seat1.activeSeat).toBe(1);
+    const seat0again = startTurn(applyAction(seat1, { type: 'endTurn', seat: 1 }));
+    expect(seat0again.activeSeat).toBe(0);
+    expect((seat0again.seats[1] as PlayerState).roundUsedAbilities).toBeUndefined();
   });
 });
