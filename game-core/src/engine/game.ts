@@ -3,6 +3,7 @@ import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner } from './characters';
 import { dropEmptyPrompts } from './prompts';
+import { withBonusesAndDraws } from './actions';
 import { advanceTurn } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities, chrisL1TurnDamageBonus, applyHealTracking } from './abilities';
 
@@ -1148,6 +1149,8 @@ function startTurnInternal(state: GameState): GameState {
     locationUsesThisTurn: [],
       ...(terraceInvested(state, 0) ? { freeActionPlayAvailable: true } : { freeActionPlayAvailable: undefined }),
       pendingFreeActionInstanceId: undefined,
+    pendingRepeatInstanceId: undefined,
+    setAsideActionInstanceId: undefined,
       mustExplore: false,
       actionsDiscardedThisTurn: 0,
       pendingKeepEndOfTurn: undefined,
@@ -1394,6 +1397,8 @@ function startTurnInternal(state: GameState): GameState {
     arklayArmed: undefined,
     locationUsesThisTurn: [],
     pendingFreeActionInstanceId: undefined,
+    pendingRepeatInstanceId: undefined,
+    setAsideActionInstanceId: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
     pendingEndOfTurnDraws: undefined,
@@ -1527,6 +1532,22 @@ function startTurnInternal(state: GameState): GameState {
       });
     }
   }
+  // Fan Location (Underground Passage): a card set aside last turn is
+  // played automatically at the start of this one — no Action spent.
+  const setAsideId = (state.seats[state.activeSeat] as PlayerState | undefined)?.setAsideActionInstanceId;
+  if (setAsideId !== undefined) {
+    const def = state.cardDefs[state.cards[setAsideId]?.cardId ?? ''];
+    if (def !== undefined && def.type === 'action') {
+      const played = withBonusesAndDraws(
+        { ...turnPlayer, playArea: [...turnPlayer.playArea, setAsideId] },
+        def,
+        nextRng,
+      );
+      turnPlayer = { ...played.player, setAsideActionInstanceId: undefined };
+      nextRng = played.rngState;
+    }
+  }
+
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
   return {

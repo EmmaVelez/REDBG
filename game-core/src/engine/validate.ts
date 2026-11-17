@@ -100,10 +100,12 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (action.seat !== state.activeSeat) {
         return { ok: false, reason: 'playActionCard: not your turn' };
       }
-      if (player.actionsLeft < 1) {
+      // A free repeat (Trevor's Tomb) costs no Action and re-resolves the card
+      // from the PLAY AREA, so it is exempt from both checks.
+      if (action.isFreeRepeat !== true && player.actionsLeft < 1) {
         return { ok: false, reason: 'playActionCard: no actions left' };
       }
-      if (!player.hand.includes(action.instanceId)) {
+      if (!player.hand.includes(action.instanceId) && !player.playArea.includes(action.instanceId)) {
         return { ok: false, reason: `playActionCard: card not in hand: ${action.instanceId}` };
       }
       const actionCardDef = cardDef(state, action.instanceId);
@@ -856,6 +858,40 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (player.turnGold < cost) {
         return { ok: false, reason: 'investLocation: not enough gold' };
       }
+      return { ok: true };
+    }
+
+    case 'passageChooseAction': {
+      if (player === undefined) return { ok: false, reason: 'passageChooseAction: no player' };
+      if (state.phase !== 'main') return { ok: false, reason: 'passageChooseAction: not in main phase' };
+      if (player.dead) return { ok: false, reason: 'passageChooseAction: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'passageChooseAction: not your turn' };
+      return { ok: true };
+    }
+
+    case 'passageChooseGain': {
+      if (player === undefined) return { ok: false, reason: 'passageChooseGain: no player' };
+      if (state.phase !== 'main') return { ok: false, reason: 'passageChooseGain: not in main phase' };
+      if (player.dead) return { ok: false, reason: 'passageChooseGain: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'passageChooseGain: not your turn' };
+      return { ok: true };
+    }
+
+    case 'passageStart': {
+      // Fan Location (Underground Passage): the 1X chain start. Same cost
+      // gate as useLocation, but the seat must have an action to trash.
+      if (state.phase !== 'main') return { ok: false, reason: 'passageStart: not in main phase' };
+      if (player === undefined) return { ok: false, reason: 'passageStart: unknown seat' };
+      if (player.dead) return { ok: false, reason: 'passageStart: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'passageStart: not your turn' };
+      if (player.buysLeft < 1) return { ok: false, reason: 'passageStart: no Buy left' };
+      const passage = (state.locations ?? []).find(l => {
+        const d = state.cardDefs[state.cards[l.instanceId]?.cardId ?? ''];
+        return d?.locationKind === 'onex' && (d.locationRevealEffects ?? []).some(e => e.kind === 'passageUpgrade');
+      });
+      if (passage === undefined) return { ok: false, reason: 'passageStart: no Underground Passage revealed' };
+      const passageCost = state.cardDefs[state.cards[passage.instanceId]?.cardId ?? '']?.locationCost ?? 0;
+      if (player.turnGold < passageCost) return { ok: false, reason: 'passageStart: not enough gold' };
       return { ok: true };
     }
 

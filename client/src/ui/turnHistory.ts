@@ -40,6 +40,9 @@ const VERBS: Record<Action['type'], string> = {
   usePreExploreXpAbility: 'paid XP to empower a weapon',
   investLocation: 'invested in a location',
   useLocation: 'used a location',
+  passageStart: 'used the Underground Passage',
+  passageChooseAction: 'chose an action to trash',
+  passageChooseGain: 'chose a replacement action',
   removeAttachedItem: 'removed an attached item',
   exploreReveal: '', // supplementary — no verb of its own, text comes from describe() below
 };

@@ -314,6 +314,11 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
         generatedActions.push({ type: 'useLocation', seat, instanceId: loc.instanceId });
       }
     }
+    if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1
+      && (def.locationRevealEffects ?? []).some(e => e.kind === 'passageUpgrade')) {
+      const hasAction = [...player.hand, ...player.discard].some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action');
+      if (hasAction) generatedActions.push({ type: 'passageStart', seat });
+    }
   }
 
   // --- 6b. moveXp (Mercenaries Skill System) ---

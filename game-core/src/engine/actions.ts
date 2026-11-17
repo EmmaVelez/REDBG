@@ -90,7 +90,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
-import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay } from './locations';
+import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -264,7 +264,7 @@ function trashRedirectPrompt(
   ];
 }
 
-function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number): { player: PlayerState; rngState: number } {
+export function withBonusesAndDraws(player: PlayerState, def: CardDef, rngState: number): { player: PlayerState; rngState: number } {
   const bonuses = sumBonuses([def]);
   const pools = applyBonusPools(
     {
@@ -670,6 +670,30 @@ export function applyAction(state: GameState, action: Action): GameState {
     };
     internal = applyActionInternal(internal, { type: 'playActionCard', seat: pendingSeat, instanceId: pendingId });
   }
+  // Fan Location (Trevor's Tomb): the first action card the investor plays
+  // each turn is played again afterwards, for free. Armed here so EVERY
+  // play path counts (the playActionCard case has several returns).
+  if (pendingSeat !== undefined && action.type === 'playActionCard' && action.isFreeRepeat !== true) {
+    const seatAfter = internal.seats[pendingSeat];
+    if (seatAfter !== undefined
+      && seatAfter.pendingRepeatInstanceId === undefined
+      && hasFreeActionRepeat(internal, pendingSeat)) {
+      internal = {
+        ...internal,
+        seats: internal.seats.map(x => (x.seat === pendingSeat
+          ? { ...x, pendingRepeatInstanceId: (action as { instanceId?: string }).instanceId }
+          : x)),
+      };
+    }
+  }
+  const repeatId = internal.seats[pendingSeat ?? -1]?.pendingRepeatInstanceId;
+  if (repeatId !== undefined && pendingSeat !== undefined) {
+    internal = {
+      ...internal,
+      seats: internal.seats.map(x => (x.seat === pendingSeat ? { ...x, pendingRepeatInstanceId: undefined } : x)),
+    };
+    internal = applyActionInternal(internal, { type: 'playActionCard', seat: pendingSeat, instanceId: repeatId, isFreeRepeat: true });
+  }
   const next = applyDownedHooks(applyDamageTakenHooks(state, internal));
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
@@ -1036,12 +1060,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const player = state.seats[seat] as PlayerState;
       const def = cardDef(state, instanceId) as CardDef;
 
+      const freeRepeat = action.isFreeRepeat === true;
       const played = withBonusesAndDraws(
               {
                 ...player,
                 hand: player.hand.filter(id => id !== instanceId),
                 playArea: [...player.playArea, instanceId],
-                actionsLeft: player.actionsLeft - 1,
+                // A free repeat resolves the card again WITHOUT spending an Action.
+                actionsLeft: freeRepeat ? player.actionsLeft : player.actionsLeft - 1,
               },
               def,
               state.rngState,
@@ -1640,7 +1666,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               prompts: finalPrompts,
               rngState: rngAfterEffects,
             };
-          }
+          
+
+}
 
           case 'playItem': {
                  const { seat, instanceId } = action;
@@ -1910,7 +1938,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               seats: state.seats.map(s => (s.seat === seat ? playerAfterBonus : s)),
               rngState: played.rngState,
             };
-          }
+
+        }
 
     case 'explore': {
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
@@ -5955,6 +5984,90 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       return addCube(s, instanceId, seat);
     }
 
+    case 'passageStart': {
+      // Fan Location (Underground Passage): pay the 1X gold + 1 Buy, then
+      // offer the seat's own action cards in hand + discard to trash.
+      const { seat } = action;
+      const player = state.seats[seat] as PlayerState;
+      const passageLoc = (state.locations ?? []).find(l => state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.locationKind === 'onex');
+      const passageCost = passageLoc !== undefined
+        ? (state.cardDefs[state.cards[passageLoc.instanceId]?.cardId ?? '']?.locationCost ?? 0)
+        : 0;
+      const candidates = [...player.hand, ...player.discard].filter(id => cardDef(state, id)?.type === 'action');
+      if (candidates.length === 0) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, turnGold: x.turnGold - passageCost, buysLeft: x.buysLeft - 1 }
+          : x)),
+        prompts: [...state.prompts, {
+          id: `passage-action-${seat}-v${state.version}`,
+          seat,
+          text: 'Underground Passage: trash an action card?',
+          options: [...candidates, 'Decline'],
+          payload: { kind: 'passageActionChoice' },
+        }],
+      };
+    }
+
+    case 'passageChooseAction': {
+      // Trash the chosen action, then offer replacements up to cost + 20.
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      const def = cardDef(state, instanceId);
+      if (def === undefined || def.type !== 'action') return { ...state, ...nextBase };
+      const cap = (def.cost ?? 0) + 20;
+      const options = affordableMarketActions(state, cap);
+      if (options.length === 0) return { ...state, ...nextBase };
+      const moved = { ...state.cards };
+      const inst = moved[instanceId];
+      if (inst !== undefined) moved[instanceId] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+      let out: GameState = {
+        ...state,
+        ...nextBase,
+        cards: moved,
+        removed: [...state.removed, instanceId],
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, hand: x.hand.filter(id => id !== instanceId), discard: x.discard.filter(id => id !== instanceId) }
+          : x)),
+      };
+      out = {
+        ...out,
+        prompts: [...out.prompts, {
+          id: `passage-gain-${seat}-v${out.version}`,
+          seat,
+          text: `Underground Passage: gain an action costing up to ${cap}?`,
+          options: [...options, 'Decline'],
+          payload: { kind: 'passageGainChoice', cap: String(cap) },
+        }],
+      };
+      return out;
+    }
+
+    case 'passageChooseGain': {
+      // Set the chosen action aside; it is played at the seat's next turn start.
+      const { seat, instanceId } = action;
+      const pile = Object.values(state.marketPiles).find(p => p.cards[0] === instanceId);
+      if (pile === undefined) return { ...state, ...nextBase };
+      let out: GameState = {
+        ...state,
+        ...nextBase,
+        marketPiles: {
+          ...state.marketPiles,
+          [pile.pileId]: { pileId: pile.pileId, cards: pile.cards.slice(1) },
+        },
+      };
+      // The card sits in no zone until the turn start — represent that by
+      // leaving the instance registered but out of every list.
+      out = {
+        ...out,
+        cards: { ...out.cards, [instanceId]: { ...out.cards[instanceId]!, location: { zone: 'supply', index: 0 } } },
+        seats: out.seats.map(x => (x.seat === seat ? { ...x, setAsideActionInstanceId: instanceId } : x)),
+      };
+      return out;
+    }
+
     case 'useLocation': {
       // Fan Locations (1X): pay the printed gold + 1 Buy for a one-shot effect.
       const { seat, instanceId } = action;
@@ -7824,6 +7937,50 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : x)),
           prompts: newPrompts,
         };
+      }
+
+      if (kind === 'locPayXpRemoveInfectionChoice') {
+        // Trevor's Tomb: pay XP to remove one of your own infection cards.
+        const xp = Number(prompt.payload?.xp ?? 1);
+        const choice = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (choice !== 'Pay' || (p.xp ?? 0) < xp) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const infected = p.infectionCards ?? [];
+        const removedId = infected[infected.length - 1];
+        if (removedId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const moved = { ...state.cards };
+        const inst = moved[removedId];
+        if (inst !== undefined) moved[removedId] = { ...inst, location: { zone: 'supply', index: 0 } };
+        return {
+          ...state,
+          ...nextBase,
+          cards: moved,
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, xp: (x.xp ?? 0) - xp, infectionCards: x.infectionCards?.filter(id => id !== removedId) }
+            : x)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'passageActionChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseAction', seat, instanceId: chosen });
+      }
+
+      if (kind === 'passageGainChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
       }
 
       if (kind === 'cac003ChooseHand') {

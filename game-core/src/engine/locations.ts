@@ -362,6 +362,21 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         }
         break;
       }
+      case 'revealEachPlayerMayPayXpToRemoveInfection': {
+        // Trevor's Tomb: pay 1 XP to remove one of your own infection cards.
+        for (const other of s.seats.filter(x => !x.dead && !x.downed)) {
+          const infected = other.infectionCards ?? [];
+          if (infected.length === 0 || (other.xp ?? 0) < effect.xp) continue;
+          prompts = [...prompts, {
+            id: `loc-payxp-${other.seat}-${s.version}`,
+            seat: other.seat,
+            text: `${def.name}: pay ${effect.xp} XP to remove an infection?`,
+            options: ['Pay', 'Decline'],
+            payload: { kind: 'locPayXpRemoveInfectionChoice', xp: String(effect.xp) },
+          }];
+        }
+        break;
+      }
       case 'revealEachPlayerMayDiscardForXp': {
         // Tiger Statue Room: every living player may discard a card for XP.
         for (const other of s.seats.filter(x => !x.dead && !x.downed && x.hand.length > 0)) {
@@ -453,6 +468,24 @@ export function hasFreeActionPlay(state: GameState, seat: number): boolean {
   if (p === undefined) return false;
   if (p.freeActionPlayAvailable === false) return false;
   return investEffectsFor(state, seat).some(e => e.kind === 'ongoingFreePlayFirstActionGained');
+}
+
+/** Trevor's Tomb: the investor's first action card each turn is played again. */
+export function hasFreeActionRepeat(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingRepeatFirstActionPlayed');
+}
+
+/** Every market ACTION whose cost is at most `maxCost` (top instance ids). */
+export function affordableMarketActions(state: GameState, maxCost: number): string[] {
+  const out: string[] = [];
+  for (const pile of Object.values(state.marketPiles)) {
+    const top = pile.cards[0];
+    if (top === undefined) continue;
+    const def = state.cardDefs[state.cards[top]?.cardId ?? ''];
+    if (def?.type !== 'action') continue;
+    if ((def.cost ?? 0) <= maxCost) out.push(top);
+  }
+  return out;
 }
 
 /** True when the seat's location lets them trash on their 2nd gain of a turn. */

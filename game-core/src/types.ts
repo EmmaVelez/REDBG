@@ -454,6 +454,8 @@ export type LocationEffect =
   | { readonly kind: 'revealEachPlayerMayGainItem' }
   /** Tiger Statue Room: every living player may discard a card for 1 XP. */
   | { readonly kind: 'revealEachPlayerMayDiscardForXp'; readonly xp: number }
+  /** Trevor's Tomb: every living player may pay XP to remove one of their own infections. */
+  | { readonly kind: 'revealEachPlayerMayPayXpToRemoveInfection'; readonly xp: number }
   // --- ongoing / investment ---
   | { readonly kind: 'ongoingGainHealthOnReveal'; readonly amount: number }
   | { readonly kind: 'ongoingTrashOnSecondCardGain' }
@@ -464,10 +466,13 @@ export type LocationEffect =
   | { readonly kind: 'ongoingFreePlayFirstActionGained' }
   /** Tiger Statue Room: cards cost `amount` less gold on the investor's turn. */
   | { readonly kind: 'ongoingBuyCostReduction'; readonly amount: number }
+  | { readonly kind: 'ongoingRepeatFirstActionPlayed' }
   | { readonly kind: 'ongoingDrawAtTurnEnd'; readonly count: number; /** GLOBAL cards: 'revealer' limits this to the seat that revealed it. */
     readonly scope?: 'all' | 'revealer' }
   // --- 1X (paid use) ---
-  | { readonly kind: 'onexGainAmmoAndDamagePerCardGained'; readonly ammo: number; readonly damage: number };
+  | { readonly kind: 'onexGainAmmoAndDamagePerCardGained'; readonly ammo: number; readonly damage: number }
+  /** Underground Passage: this 1X is the trash-and-upgrade chain. */
+  | { readonly kind: 'passageUpgrade' };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -986,6 +991,12 @@ export interface PlayerState {
   /** Fan Location (Terrace): an action card just bought that should be
    *  played immediately and for free. Consumed by applyAction. */
   readonly pendingFreeActionInstanceId?: string;
+  /** Fan Location (Trevor's Tomb): the first action card played this turn
+   *  still has its free repeat outstanding. */
+  readonly pendingRepeatInstanceId?: string;
+  /** Fan Location (Underground Passage): an action card set aside to be
+   *  played automatically at the start of the seat's next turn. */
+  readonly setAsideActionInstanceId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1244,7 +1255,7 @@ export interface LoggedAction {
 
 export type Action = 
   | { readonly type: "startGame"; readonly setup: GameSetup } 
-  | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string } 
+  | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string; readonly isFreeRepeat?: boolean }
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string; readonly healTarget?: "main" | "partner" }
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[]; readonly leader?: "main" | "partner"; /** FCH-008 Sherry: the seat whose ability forced this explore (absent for a normal explore). */ readonly forcedBy?: number; /** ENGINE-FILLED, never client-sent: the instance ids this explore revealed, in reveal order. A CI-002 Crow chain or a MA-039 / MA-072 expansion reveals more cards than `exploreCount`, and the client cannot recover the extra ones from the deck diff — returned cards are shuffled back in, so they look like ordinary deck cards. Absent on logs written before this field existed (the client falls back to the top-`exploreCount` prefix). */ readonly revealedInstanceIds?: readonly string[] }
@@ -1276,6 +1287,12 @@ export type Action =
   | { readonly type: "investLocation"; readonly seat: number; readonly instanceId: string }
   /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
   | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
+  /** Fan Location (Underground Passage): start the trash-and-upgrade chain. */
+  | { readonly type: "passageStart"; readonly seat: number }
+  /** Fan Location (Underground Passage): the action to trash. */
+  | { readonly type: "passageChooseAction"; readonly seat: number; readonly instanceId: string }
+  /** Fan Location (Underground Passage): the replacement to set aside. */
+  | { readonly type: "passageChooseGain"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */

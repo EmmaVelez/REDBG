@@ -75,6 +75,19 @@ describe('LocationsRow', () => {
     expect(actions.at(-1)).toMatchObject({ type: 'useLocation', seat: 0 });
   });
 
+  it('dispatches passageStart for the Underground Passage', () => {
+    let s = stateWithLocations();
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 && p !== undefined ? { ...p, turnGold: 100, buysLeft: 2 } : p)) };
+    s = revealOnly(s, 'loc-017');
+    const loc = (s.locations ?? [])[0];
+    if (loc === undefined) throw new Error('location not revealed');
+    const def = s.cardDefs[s.cards[loc.instanceId]?.cardId ?? ''];
+    const isPassage = (def?.locationRevealEffects ?? []).some(e => e.kind === 'passageUpgrade');
+    expect(isPassage).toBe(true);
+    const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('Use 40g');
+  });
+
   it('renders the Board with the locations row present', () => {
     const s = revealOnly(stateWithLocations(), 'loc-005');
     const html = renderToStaticMarkup(<Board state={s} mySeat={0} onAction={() => {}} />);
