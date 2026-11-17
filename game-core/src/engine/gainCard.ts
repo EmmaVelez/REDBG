@@ -147,6 +147,32 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     };
   }
 
+  // CAC-005 Combat Medic: the FIRST gain of the turn offers a 10 Health heal.
+  // The card must be in the player's PLAY AREA (i.e. played this turn).
+  if ((newPlayer.gainedThisTurn ?? []).length === 1
+    && newPlayer.cac005HealUsedThisTurn !== true
+    && newPlayer.playArea.some(id => s.cardDefs[s.cards[id]?.cardId ?? '']?.id === 'cac-005')) {
+    const medic = newPlayer.playArea.find(id => s.cardDefs[s.cards[id]?.cardId ?? '']?.id === 'cac-005');
+    const amount = (s.cardDefs[s.cards[medic ?? '']?.cardId ?? '']?.actionEffects ?? [])
+      .find(e => e.kind === 'healOnFirstGainThisTurn') as { amount: number } | undefined;
+    if (medic !== undefined && amount !== undefined) {
+      const targets = s.seats.filter(x => !x.dead).map(x => String(x.seat));
+      if (targets.length > 0) {
+        s = {
+          ...s,
+          version: s.version + 1,
+          prompts: [...s.prompts, {
+            id: `cac005-heal-${seat}-v${s.version}`,
+            seat,
+            text: 'Combat Medic: Heal a Character\'s Health by 10?',
+            options: [...targets, 'Decline'],
+            payload: { kind: 'cac005HealChoice', amount: String(amount.amount) },
+          }],
+        };
+      }
+    }
+  }
+
   // Unofficial Expansion: EX-002 Special Rocket Launcher attaches to the
   // Character as soon as it is gained — bought, drawn, or granted by EX-001.
   // The instance leaves whatever destination it landed in and joins `attached`.

@@ -1231,6 +1231,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Cards this action reveals through an ability/effect (Mansion peek,
       // PDA, Master of Unlocking, …) — handed to the client's reveal overlay.
       const cardReveals: CardReveal[] = [];
+      const attachedZoneIds: string[] = [];
       for (const e of def.actionEffects ?? []) {
         if (e.kind === 'recoverWeaponFromDiscardToHand') {
           const weaponsInDiscard = player.discard.filter(id => cardDef(state, id)?.type === 'weapon');
@@ -1552,6 +1553,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
                 seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
               }
+              if (e.kind === 'attachToCharacterAndBeginTurnBonus') {
+                // CAC-010 Onslaught: attach like the above, and remember the
+                // instance so the case can rewrite its zone (the play-area
+                // effect loop has no `cards` handle of its own).
+                newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
+                seatsAfterEffects = seatsAfterEffects.map(s => (s.seat === seat ? newPlayer : s));
+                attachedZoneIds.push(instanceId);
+              }
               if (e.kind === 'attachAndRestrictWeapons') {
                 // CQ-001 Close Quarters Combat: attach to character.
                 newPlayer = { ...newPlayer, attached: [...newPlayer.attached, instanceId], playArea: newPlayer.playArea.filter(id => id !== instanceId) };
@@ -1730,9 +1739,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
 
       recordCardReveals(cardReveals);
+      const attachedZoneCards = attachedZoneIds.length === 0
+        ? state.cards
+        : (() => {
+          const moved = { ...state.cards };
+          for (const id of attachedZoneIds) {
+            const inst = moved[id];
+            if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'attached', index: 0, seat } };
+          }
+          return moved;
+        })();
       return {
               ...state,
               ...nextBase,
+              cards: attachedZoneCards,
               seats: seatsAfterEffects.map(s => applyArchrival(s)),
               prompts: finalPrompts,
               rngState: rngAfterEffects,
@@ -8338,6 +8358,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
+      }
+
+      if (kind === 'cac005HealChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return {
+            ...state,
+            ...nextBase,
+            prompts: newPrompts,
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, cac005HealUsedThisTurn: true } : x)),
+          };
+        }
+        const target = Number(chosen);
+        const amount = Number(prompt.payload?.amount ?? 0);
+        return {
+          ...state,
+          ...nextBase,
+          prompts: newPrompts,
+          seats: state.seats.map(x => {
+            // Heal the chosen Character; the OFFERING seat spends its
+            // once-per-turn heal either way (the two can be the same seat).
+            const healed = x.seat === target ? { ...x, hp: Math.min(x.maxHp, x.hp + amount) } : x;
+            return x.seat === seat ? { ...healed, cac005HealUsedThisTurn: true } : healed;
+          }),
+        };
       }
 
       if (kind === 'leonTrashClaim') {

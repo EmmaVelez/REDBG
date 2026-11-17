@@ -11,6 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { scoreTotal, revealedLocations } from './locations';
+import { sumBonuses, applyBonusPools } from './cards';
 
 /** Check if any active mansion attachment has the given effect kind. */
 export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
@@ -1150,6 +1151,7 @@ function startTurnInternal(state: GameState): GameState {
       ...(terraceInvested(state, 0) ? { freeActionPlayAvailable: true } : { freeActionPlayAvailable: undefined }),
       pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
+    cac005HealUsedThisTurn: undefined,
     setAsideActionInstanceId: undefined,
       mustExplore: false,
       actionsDiscardedThisTurn: 0,
@@ -1398,6 +1400,7 @@ function startTurnInternal(state: GameState): GameState {
     locationUsesThisTurn: [],
     pendingFreeActionInstanceId: undefined,
     pendingRepeatInstanceId: undefined,
+    cac005HealUsedThisTurn: undefined,
     setAsideActionInstanceId: undefined,
     // AM-006: "this type of effect can only be applied once during your turn".
     ammoX10UpgradeUsedThisTurn: undefined,
@@ -1546,6 +1549,47 @@ function startTurnInternal(state: GameState): GameState {
       turnPlayer = { ...played.player, setAsideActionInstanceId: undefined };
       nextRng = played.rngState;
     }
+  }
+
+  // CAC-010 Onslaught: at the beginning of the turn, an attached copy applies
+  // its bonus icons, grants +amount Damage this turn, then is discarded.
+  const onslaughtIds = turnPlayer.attached.filter(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.id === 'cac-010');
+  if (onslaughtIds.length > 0) {
+    let op = turnPlayer;
+    let orng = nextRng;
+    for (const id of onslaughtIds) {
+      const oDef = state.cardDefs[state.cards[id]?.cardId ?? ''];
+      const amount = (oDef?.actionEffects ?? []).find(e => e.kind === 'attachToCharacterAndBeginTurnBonus') as
+        { amount: number } | undefined;
+      const ob = oDef === undefined ? { cards: 0, gold: 0, ammo: 0, buys: 0, actions: 0, explores: 0 } : sumBonuses([oDef]);
+      const pools = applyBonusPools({
+        turnAmmo: op.turnAmmo, turnGold: op.turnGold, actionsLeft: op.actionsLeft,
+        buysLeft: op.buysLeft, exploresLeft: op.exploresLeft,
+      }, ob);
+      let oh = op.hand;
+      let oi = op.inventory;
+      let od = op.discard;
+      if (pools.draws > 0 && (oi.length > 0 || od.length > 0)) {
+        const d = drawWithReshuffle({ deck: oi, discard: od, count: pools.draws, rngState: orng });
+        oh = [...oh, ...d.hand]; oi = d.deck; od = d.discard; orng = d.rngState;
+      }
+      op = {
+        ...op,
+        hand: oh,
+        inventory: oi,
+        discard: [...od, id],
+        attached: op.attached.filter(x => x !== id),
+        turnAmmo: pools.pools.turnAmmo,
+        turnGold: pools.pools.turnGold,
+        actionsLeft: pools.pools.actionsLeft,
+        buysLeft: pools.pools.buysLeft,
+        exploresLeft: pools.pools.exploresLeft,
+        weaponDamageBonusThisTurn: op.weaponDamageBonusThisTurn + (amount?.amount ?? 0),
+      };
+    }
+    nextRng = orng;
+    turnPlayer = op;
+    turnSeats = turnSeats.map(x => (x.seat === player.seat ? op : x));
   }
 
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];

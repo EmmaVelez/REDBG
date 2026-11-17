@@ -380,6 +380,12 @@ export type ActionEffect =
   | { readonly kind: "unlimitedActionsThisTurn" }
   | { readonly kind: "damagePerAdditionalAction"; readonly amount: number }
   | { readonly kind: "attachToCharacter" }
+  /** CAC-010 Onslaught: attach, then at the start of the turn apply this
+   *  card's bonus icons, deal +amount Damage this turn, then discard. */
+  | { readonly kind: "attachToCharacterAndBeginTurnBonus"; readonly amount: number }
+  /** CAC-005 Combat Medic: the first time you Gain a card this turn, you
+   *  may Heal a Character by `amount`. */
+  | { readonly kind: "healOnFirstGainThisTurn"; readonly amount: number }
   | { readonly kind: "beginTurnTrashIfHealthAtMost"; readonly threshold: number }
   | { readonly kind: "elseDamageAndDraw"; readonly damage: number; readonly cards: number }
   | { readonly kind: "powerOfTVirus" } // AC-023
@@ -970,6 +976,8 @@ export interface PlayerState {
   readonly armedLauncherInstanceId?: string;
   /** MA-093 Los Ganados (Handscythe): extra cards drawn at end of turn. */
   readonly pendingEndOfTurnDraws?: number;
+  /** CAC-005 Combat Medic: the first-gain heal has been used this turn. */
+  readonly cac005HealUsedThisTurn?: boolean;
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
   readonly pendingBackstab?: { readonly targetSeat: number };
   /** AC-045 Coup de Grâce: the chosen weapon + bonus for this turn's explores. */
