@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { enumerateLegalActions } from '@re/game-core';
+import { enumerateLegalActions, setup, startTurn, PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK, CUSTOM_CARDS } from '@re/game-core';
 import type { GameState } from '@re/game-core';
 import { createHotseatGame, applyHotseatAction, hotseatView } from './hotseat';
 import { useGameStore } from './store';
@@ -202,5 +202,48 @@ describe('store hot-seat wiring', () => {
     const ok = useGameStore.getState().dispatch({ kind: 'sendAction', action: { type: 'endTurn', seat } });
     expect(ok).toBe(true);
     expect(useGameStore.getState().hotseat?.passPending).toBe(true);
+  });
+
+  it('holds the turn open for the end-of-turn phase and starts it after the choice', () => {
+    let s = startTurn(
+      setup(
+        { seed: 11, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'bot' }], locationsMode: true },
+        [...PREMIER_CARDS, ...CUSTOM_CARDS],
+        FIRST_TIMER_PILES,
+        STANDARD_MANSION_DECK,
+      ),
+    );
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 && p !== undefined ? { ...p, turnGold: 100, buysLeft: 2 } : p)) };
+    const id = 'loc-018#hs';
+    s = { ...s, cards: { ...s.cards, [id]: { instanceId: id, cardId: 'loc-018', location: { zone: 'supply', index: 0 } } }, locationDeck: [id], locations: [] };
+    const explored = applyHotseatAction(s, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 });
+    expect(explored.ok).toBe(true);
+    if (!explored.ok) return;
+    s = explored.state;
+    for (let i = 0; i < 10 && s.prompts.length > 0; i += 1) {
+      const p = s.prompts[0];
+      if (p === undefined) break;
+      const r = applyHotseatAction(s, { type: 'chooseOption', seat: p.seat, promptId: p.id, option: 0 });
+      if (!r.ok) break;
+      s = r.state;
+    }
+    const inst = (s.locations ?? [])[0]?.instanceId;
+    if (inst === undefined) throw new Error('location not revealed');
+    const used = applyHotseatAction(s, { type: 'useLocation', seat: 0, instanceId: inst });
+    expect(used.ok).toBe(true);
+    if (!used.ok) return;
+    s = used.state;
+
+    const ended = applyHotseatAction(s, { type: 'endTurn', seat: 0 });
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.state.pendingEndPhaseSeat).toBe(0);
+    expect(ended.state.prompts.some(p => p.payload?.kind === 'postTurnTrashChoice')).toBe(true);
+
+    const done = applyHotseatAction(ended.state, { type: 'postTurnTrashChoose', seat: 0, instanceId: 'Done' });
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(done.state.pendingEndPhaseSeat).toBeUndefined();
+    expect(done.state.activeSeat).toBe(1);
   });
 });

@@ -504,6 +504,72 @@ export function hasTrashOnSecondGain(state: GameState, seat: number): boolean {
 }
 
 
+/** True when the seat's endTurn must open the END-OF-TURN PHASE. */
+export function hasArmedPostTurnCleanup(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead) return false;
+  const used = player.locationUsesThisTurn ?? [];
+  return (state.locations ?? []).some(l => used.includes(l.instanceId) && hasPostTurnCleanup(state, l.instanceId));
+}
+
+/**
+ * Open the end-of-turn phase for `seat`: mark it pending and raise the
+ * trash prompt over the seat's current hand. The turn does NOT advance until
+ * the seat resolves it (`postTurnTrashChoose` with 'Done', or the last pick).
+ */
+export function beginPostTurnCleanup(state: GameState, seat: number): GameState {
+  const player = state.seats[seat];
+  if (player === undefined) return state;
+  const loc = (state.locations ?? []).find(l => (player.locationUsesThisTurn ?? []).includes(l.instanceId)
+    && hasPostTurnCleanup(state, l.instanceId));
+  if (loc === undefined) return state;
+  const def = state.cardDefs[state.cards[loc.instanceId]?.cardId ?? ''];
+  const effect = (def?.locationRevealEffects ?? []).find(e => e.kind === 'postTurnCleanup') as
+    { trash: number; draw: number } | undefined;
+  if (effect === undefined) return state;
+  const version = state.version + 1;
+  return {
+    ...state,
+    version,
+    pendingEndPhaseSeat: seat,
+    postTurnTrashIds: [],
+    prompts: [...state.prompts, {
+      id: `endphase-trash-${seat}-v${version}`,
+      seat,
+      text: `${def?.name ?? 'Art Supply Room'}: trash up to ${effect.trash} card${effect.trash === 1 ? '' : 's'} (or Done)`,
+      options: [...player.hand, 'Done'],
+      payload: { kind: 'postTurnTrashChoice', trash: String(effect.trash), draw: String(effect.draw), trashed: '0' },
+    }],
+  };
+}
+
+/**
+ * Apply the Art Supply Room cleanup with an EXPLICIT trash selection.
+ * Order on the card: Inventory + discard into the hand, trash, shuffle the
+ * hand into the Inventory, draw `draw`.
+ */
+export function applyPostTurnCleanupChosen(
+  player: PlayerState,
+  effect: { readonly trash: number; readonly draw: number },
+  trashedIds: readonly string[],
+  rngState: number,
+): { player: PlayerState; rngState: number } {
+  const inPlay = new Set([...player.hand, ...player.inventory, ...player.discard]);
+  const trashed = trashedIds.filter(id => inPlay.has(id)).slice(0, effect.trash);
+  const kept = [...player.hand, ...player.inventory, ...player.discard].filter(id => !trashed.includes(id));
+  const shuffled = shuffle(makeRng(rngState), kept);
+  const d = draw({
+    deck: shuffled.value,
+    discard: [],
+    reshuffledDiscard: [],
+    count: effect.draw,
+  });
+  return {
+    player: { ...player, hand: d.hand, inventory: d.deck, discard: d.discard },
+    rngState: shuffled.rng.s,
+  };
+}
+
 /** Fan Location (Attic Landing): the +Health Infected get this turn. */
 export function locationInfectedHpBonus(state: GameState): number {
   return state.infectedHpBonusThisTurn ?? 0;

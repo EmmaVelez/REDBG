@@ -56,7 +56,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
   // Prompt-gating: while any prompt awaits this seat, only chooseOption (for
   // that prompt) is legal. Choice effects must resolve before further cards
   // can be played (user rule: "resolve before another card").
-  if (action.type !== 'startGame' && action.type !== 'chooseOption') {
+  // postTurnTrashChoose IS the end-of-turn phase's resolution action, so it
+  // must be legal while its own prompt is open.
+  if (action.type !== 'startGame' && action.type !== 'chooseOption' && action.type !== 'postTurnTrashChoose') {
     if ('seat' in action && state.prompts.some(p => p.seat === action.seat)) {
       return { ok: false, reason: `${action.type}: resolve pending prompt first` };
     }
@@ -874,6 +876,18 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (state.phase !== 'main') return { ok: false, reason: 'passageChooseGain: not in main phase' };
       if (player.dead) return { ok: false, reason: 'passageChooseGain: player is dead' };
       if (action.seat !== state.activeSeat) return { ok: false, reason: 'passageChooseGain: not your turn' };
+      return { ok: true };
+    }
+
+    case 'postTurnTrashChoose': {
+      if (state.pendingEndPhaseSeat !== action.seat) {
+        return { ok: false, reason: 'postTurnTrashChoose: not the end-phase seat' };
+      }
+      const player = state.seats[action.seat];
+      if (player === undefined) return { ok: false, reason: 'postTurnTrashChoose: no player' };
+      if (action.instanceId !== 'Done' && !player.hand.includes(action.instanceId)) {
+        return { ok: false, reason: 'postTurnTrashChoose: card not in hand' };
+      }
       return { ok: true };
     }
 

@@ -80,6 +80,7 @@ import {
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
+import { startTurn } from './game';
 import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
 import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
@@ -90,7 +91,8 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
-import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, applyPostTurnCleanup } from './locations';
+import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
+  beginPostTurnCleanup, applyPostTurnCleanupChosen } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -641,36 +643,25 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
         targetedBy: undefined,
       };
 
-      // Fan Location (Art Supply Room): "after this turn" - fold the Inventory
-      // and discard into the hand, trash up to N, shuffle the hand into the
-      // Inventory, draw M. Fires at the end of the turn it was used.
-      const cleanupLoc = (state.locations ?? []).find(l => hasPostTurnCleanup(state, l.instanceId)
-        && (newPlayer.locationUsesThisTurn ?? []).some(x => x === l.instanceId));
-      if (cleanupLoc !== undefined) {
-        const effect = (state.cardDefs[state.cards[cleanupLoc.instanceId]?.cardId ?? '']?.locationRevealEffects ?? [])
-          .find(e => e.kind === 'postTurnCleanup') as { trash: number; draw: number } | undefined;
-        if (effect !== undefined) {
-          const cleaned = applyPostTurnCleanup(newPlayer, effect, d.rngState);
-          const trashedCards = { ...state.cards };
-          for (const id of cleaned.trashed) {
-            const inst = trashedCards[id];
-            if (inst !== undefined) trashedCards[id] = { ...inst, location: { zone: 'removed', index: 0, seat } };
-          }
-          return {
-            ...state,
-            ...nextBase,
-            cards: trashedCards,
-            seats: state.seats.map(s => (s.seat === seat ? cleaned.player : s)),
-            removed: [...currentRemoved, ...cleaned.trashed],
-            activeSeat: ctx.activeSeat,
-            turnNumber: ctx.turnNumber,
-            rngState: cleaned.rngState,
-            ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
-            mansionAttachments: currentAttachments,
-            attachmentTrashCounts: currentTrashCounts,
-          };
-        }
+      // Fan Location (Art Supply Room): "after this turn" opens the real
+      // END-OF-TURN PHASE — the seat picks which cards to trash before the
+      // next turn starts (see postTurnTrashChoose).
+      const endedBase: GameState = {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(s => (s.seat === seat ? newPlayer : s)),
+        removed: currentRemoved,
+        activeSeat: ctx.activeSeat,
+        turnNumber: ctx.turnNumber,
+        rngState: d.rngState,
+        ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+        mansionAttachments: currentAttachments,
+        attachmentTrashCounts: currentTrashCounts,
+      };
+      if (hasArmedPostTurnCleanup(endedBase, seat)) {
+        return beginPostTurnCleanup(endedBase, seat);
       }
+      return endedBase;
 
       return {
         ...state,
@@ -716,6 +707,12 @@ export function applyAction(state: GameState, action: Action): GameState {
           : x)),
       };
     }
+  }
+  // END-OF-TURN PHASE: when the seat resolves its post-turn choice, the next
+  // turn starts from here (the host/hotseat loops skip startTurn while a
+  // prompt is open, so the wrapper owns the hand-off).
+  if (action.type === 'postTurnTrashChoose' && internal.pendingEndPhaseSeat === undefined) {
+    internal = startTurn(internal);
   }
   const repeatId = internal.seats[pendingSeat ?? -1]?.pendingRepeatInstanceId;
   if (repeatId !== undefined && pendingSeat !== undefined) {
@@ -6161,6 +6158,70 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }],
       };
       return out;
+    }
+
+    case 'postTurnTrashChoose': {
+      // END-OF-TURN PHASE: accumulate picks, then finalize the cleanup.
+      const { seat, instanceId } = action;
+      if (state.pendingEndPhaseSeat !== seat) return { ...state, ...nextBase };
+      const prompt = state.prompts.find(p => p.id === `endphase-trash-${seat}-v${state.version}`) ??
+        state.prompts.find(p => p.payload?.kind === 'postTurnTrashChoice');
+      const trash = Number(prompt?.payload?.trash ?? 0);
+      const draw = Number(prompt?.payload?.draw ?? 0);
+      const already = Number(prompt?.payload?.trashed ?? 0);
+      const player = state.seats[seat] as PlayerState;
+      if (instanceId === 'Done') {
+        return finalizePostTurnCleanup(state, seat, trash, draw, already);
+      }
+      if (!player.hand.includes(instanceId) || already >= trash) {
+        return finalizePostTurnCleanup(state, seat, trash, draw, already);
+      }
+      const trashedTotal = already + 1;
+      const version = state.version + 1;
+      return {
+        ...state,
+        version,
+        postTurnTrashIds: [...(state.postTurnTrashIds ?? []), instanceId],
+        cards: (() => {
+          const moved = { ...state.cards };
+          const inst = moved[instanceId];
+          if (inst !== undefined) moved[instanceId] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+          return moved;
+        })(),
+        removed: [...state.removed, instanceId],
+        seats: state.seats.map(x => (x.seat === seat ? { ...x, hand: x.hand.filter(id => id !== instanceId) } : x)),
+        prompts: [...state.prompts.filter(p => p.id !== prompt?.id), {
+          id: `endphase-trash-${seat}-v${version}`,
+          seat,
+          text: `Art Supply Room: trash up to ${trash} (trashed ${trashedTotal}, or Done)`,
+          options: [...player.hand.filter(id => id !== instanceId), 'Done'],
+          payload: { kind: 'postTurnTrashChoice', trash: String(trash), draw: String(draw), trashed: String(trashedTotal) },
+        }],
+      };
+    }
+
+    /** Close the end-of-turn phase: shuffle + draw, clear the pending seat. */
+    function finalizePostTurnCleanup(base: GameState, seat: number, trash: number, draw: number, trashedCount: number): GameState {
+      void trash;
+      void trashedCount;
+      const player = base.seats[seat] as PlayerState;
+      const loc = (base.locations ?? []).find(l => (player.locationUsesThisTurn ?? []).includes(l.instanceId)
+        && hasPostTurnCleanup(base, l.instanceId));
+      const def = loc === undefined ? undefined : base.cardDefs[base.cards[loc.instanceId]?.cardId ?? ''];
+      const effect = (def?.locationRevealEffects ?? []).find(e => e.kind === 'postTurnCleanup') as
+        { trash: number; draw: number } | undefined;
+      const trashedIds = base.postTurnTrashIds ?? [];
+      const result = effect === undefined
+        ? { player, rngState: base.rngState }
+        : applyPostTurnCleanupChosen(player, effect, trashedIds, base.rngState);
+      return {
+        ...base,
+        rngState: result.rngState,
+        pendingEndPhaseSeat: undefined,
+        postTurnTrashIds: undefined,
+        seats: base.seats.map(x => (x.seat === seat ? result.player : x)),
+        prompts: base.prompts.filter(p => p.payload?.kind !== 'postTurnTrashChoice'),
+      };
     }
 
     case 'atticChooseGain': {

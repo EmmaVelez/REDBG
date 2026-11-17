@@ -113,7 +113,10 @@ export function createHost(room: Room): GameHost {
       // A CAC-013 "From Bad to Worse" prompt can hold the turn open: the turn
       // only ends when the choice resolves, so do NOT auto-start the next seat
       // while a prompt is awaiting an answer.
-      if (action.type === 'endTurn' && next.prompts.length === 0) {
+      // The END-OF-TURN PHASE holds the turn open: startTurn runs only once
+      // no prompt is pending AND no seat awaits its post-turn choice.
+      if (action.type === 'endTurn' && next.prompts.length === 0
+        && next.pendingEndPhaseSeat === undefined) {
         next = startTurn(next);
       }
       state = next;
@@ -139,7 +142,10 @@ export function createHost(room: Room): GameHost {
       }
       const action = chooseBotAction(state, seat, difficulty, () => 0.5);
       let next = applyAction(state, action);
-      if (action.type === 'endTurn' && next.prompts.length === 0) {
+      // The END-OF-TURN PHASE holds the turn open: startTurn runs only once
+      // no prompt is pending AND no seat awaits its post-turn choice.
+      if (action.type === 'endTurn' && next.prompts.length === 0
+        && next.pendingEndPhaseSeat === undefined) {
         next = startTurn(next);
       }
       state = next;

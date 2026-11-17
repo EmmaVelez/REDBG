@@ -78,7 +78,10 @@ export function applyHotseatAction(state: GameState, action: Action): HotseatRes
   let next = applyAction(state, action);
   // A CAC-013 "From Bad to Worse" prompt can hold the turn open (same ruling as
   // the server host): only auto-start the next seat once no prompt is pending.
-  if (action.type === 'endTurn' && next.prompts.length === 0) {
+  // The END-OF-TURN PHASE holds the turn open: startTurn runs only once no
+  // prompt is pending AND no seat is waiting on its post-turn choice.
+  if (action.type === 'endTurn' && next.prompts.length === 0
+    && next.pendingEndPhaseSeat === undefined) {
     next = startTurn(next);
   }
   const win = checkWin(next);

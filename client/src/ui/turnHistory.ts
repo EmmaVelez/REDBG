@@ -46,6 +46,7 @@ const VERBS: Record<Action['type'], string> = {
   atticStart: 'used the Attic',
   atticChooseAction: 'chose an action to trash',
   atticChooseGain: 'chose an action to gain',
+  postTurnTrashChoose: 'chose a card to trash at turn end',
   removeAttachedItem: 'removed an attached item',
   exploreReveal: '', // supplementary — no verb of its own, text comes from describe() below
 };

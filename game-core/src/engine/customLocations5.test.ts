@@ -160,48 +160,58 @@ describe('Attic — trash an action for a better one', () => {
   });
 });
 
-describe('Art Supply Room — post-turn cleanup', () => {
-  it('folds Inventory + discard into hand, trashes up to 3, shuffles, draws 4', () => {
-    let s = game({ level: 1, turnGold: 100, buysLeft: 2, actionsLeft: 3 });
-    s = revealFor(s, 'loc-018', 0);
-    const out = applyAction(s, {
-      type: 'useLocation', seat: 0, instanceId: (s.locations ?? [])[0]!.instanceId,
-    });
-    const seat = out.seats[0] as PlayerState;
-    // The effect resolves "after this turn".
-    expect(seat.hand.length).toBe(5);
-    const ended = applyAction(out, { type: 'endTurn', seat: 0 });
-    const endSeat = ended.seats[0] as PlayerState;
-    // hand (5) + inventory + discard, minus up to 3 trashed, then 4 drawn.
-    const totalBefore = seat.hand.length + seat.inventory.length + seat.discard.length;
-    const totalAfter = endSeat.hand.length + endSeat.inventory.length + endSeat.discard.length + ended.removed.length;
-    expect(totalAfter).toBe(totalBefore);
-    expect(endSeat.hand.length).toBeLessThanOrEqual(4);
-    expect(ended.removed.length).toBeGreaterThanOrEqual(0);
-  });
-
-  it('is capped at once per turn', () => {
+describe('Art Supply Room — end-of-turn phase', () => {
+  it('opens a real choice, trashes the picked cards, then starts the next turn', () => {
     let s = game({ level: 1, turnGold: 100, buysLeft: 2, actionsLeft: 3 });
     s = revealFor(s, 'loc-018', 0);
     const inst = (s.locations ?? [])[0]!.instanceId;
-    const first = applyAction(s, { type: 'useLocation', seat: 0, instanceId: inst });
-    const used = (first.seats[0] as PlayerState).locationUsesThisTurn ?? [];
-    expect(used).toContain(inst);
-  });
-});
+    const used = applyAction(s, { type: 'useLocation', seat: 0, instanceId: inst });
+    expect((used.seats[0] as PlayerState).locationUsesThisTurn).toContain(inst);
 
-describe('applyPostTurnCleanup (unit)', () => {
-  it('trashes exactly the requested count and draws the requested hand', () => {
-    const player = {
-      hand: ['h1', 'h2'],
-      inventory: ['i1', 'i2', 'i3'],
-      discard: ['d1'],
-    } as unknown as PlayerState;
-    const r = applyPostTurnCleanup(player, { trash: 3, draw: 4 }, 12345);
-    expect(r.trashed).toHaveLength(3);
-    // only 3 cards survive the trash, so the 4-card draw is capped by the deck
-    expect(r.player.hand).toHaveLength(3);
-    expect(r.player.hand.length + r.player.inventory.length + r.player.discard.length)
-      .toBe(3);
+    const ended = applyAction(used, { type: 'endTurn', seat: 0 });
+    // The turn does NOT advance: the seat is parked in the end-of-turn phase.
+    expect(ended.activeSeat).toBe(1);
+    expect(ended.pendingEndPhaseSeat).toBe(0);
+    const prompt = ended.prompts.find(p => p.payload?.kind === 'postTurnTrashChoice');
+    expect(prompt).toBeDefined();
+    expect(prompt!.options).toContain('Done');
+
+    // Trash one card, then finish.
+    const hand = (ended.seats[0] as PlayerState).hand;
+    const pick = hand[0]!;
+    const afterPick = applyAction(ended, { type: 'postTurnTrashChoose', seat: 0, instanceId: pick });
+    expect(afterPick.postTurnTrashIds).toEqual([pick]);
+    expect(afterPick.removed).toContain(pick);
+    expect(afterPick.pendingEndPhaseSeat).toBe(0);
+
+    const done = applyAction(afterPick, { type: 'postTurnTrashChoose', seat: 0, instanceId: 'Done' });
+    expect(done.pendingEndPhaseSeat).toBeUndefined();
+    expect(done.postTurnTrashIds).toBeUndefined();
+    // The wrapper hands off to the next turn.
+    expect(done.activeSeat).toBe(1);
+    const doneSeat0 = done.seats[0] as PlayerState;
+    expect(doneSeat0.hand.length + doneSeat0.inventory.length + doneSeat0.discard.length)
+      .toBe(hand.length + (ended.seats[0] as PlayerState).inventory.length + (ended.seats[0] as PlayerState).discard.length - 1);
+  });
+
+  it('resolves immediately on Done, trashing nothing', () => {
+    let s = game({ level: 1, turnGold: 100, buysLeft: 2, actionsLeft: 3 });
+    s = revealFor(s, 'loc-018', 0);
+    const inst = (s.locations ?? [])[0]!.instanceId;
+    const used = applyAction(s, { type: 'useLocation', seat: 0, instanceId: inst });
+    const ended = applyAction(used, { type: 'endTurn', seat: 0 });
+    const done = applyAction(ended, { type: 'postTurnTrashChoose', seat: 0, instanceId: 'Done' });
+    expect(done.postTurnTrashIds).toBeUndefined();
+    expect(done.removed).toHaveLength(ended.removed.length);
+  });
+
+  it('cannot be answered by a seat that is not in the phase', () => {
+    let s = game({ level: 1, turnGold: 100, buysLeft: 2, actionsLeft: 3 });
+    s = revealFor(s, 'loc-018', 0);
+    const inst = (s.locations ?? [])[0]!.instanceId;
+    const used = applyAction(s, { type: 'useLocation', seat: 0, instanceId: inst });
+    const ended = applyAction(used, { type: 'endTurn', seat: 0 });
+    expect(() => applyAction(ended, { type: 'postTurnTrashChoose', seat: 1, instanceId: 'Done' }))
+      .toThrow(/not the end-phase seat/);
   });
 });

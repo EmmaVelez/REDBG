@@ -1099,6 +1099,11 @@ export interface GameState {
   readonly infectedHpReductionThisTurn?: { readonly amount: number; readonly min: number };
   /** Fan Location (Attic Landing): Infected revealed this turn get +amount Health. */
   readonly infectedHpBonusThisTurn?: number;
+  /** END-OF-TURN PHASE: the seat that must resolve its post-turn choice
+   *  before the next turn starts (Art Supply Room's trash). */
+  readonly pendingEndPhaseSeat?: number;
+  /** Cards the seat has already chosen to trash in this phase. */
+  readonly postTurnTrashIds?: readonly string[];
 
   /** Revealed locations, in reveal order. `cubes` maps seat -> number of
    *  investment cubes on that card (GLOBAL / 1X cards carry none). */
@@ -1313,14 +1318,8 @@ export type Action =
   | { readonly type: "atticStart"; readonly seat: number }
   | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
-  /** Fan Location (Attic): trash an action from hand for a better one. */
-  | { readonly type: "atticStart"; readonly seat: number }
-  | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
-  | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
-  /** Fan Location (Attic): trash an action from hand for a better one. */
-  | { readonly type: "atticStart"; readonly seat: number }
-  | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
-  | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
+  /** END-OF-TURN PHASE: pick one more card to trash, or finish. */
+  | { readonly type: "postTurnTrashChoose"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */

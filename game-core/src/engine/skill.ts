@@ -144,6 +144,9 @@ export function draftPrompt(state: GameState): Prompt | undefined {
  * pass-and-play hand-off both key off this.
  */
 export function seatAwaitingAction(state: GameState): number {
+  // The END-OF-TURN PHASE outranks everything: its seat answers before the
+  // next turn's startTurn runs.
+  if (state.pendingEndPhaseSeat !== undefined) return state.pendingEndPhaseSeat;
   const draft = state.skillDraft;
   if (draft !== undefined) {
     return draft.step === 'pick' ? draft.pickSeat : draft.keepSeat;
