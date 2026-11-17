@@ -12,6 +12,7 @@ import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { scoreTotal, revealedLocations } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
+import { helenaLowHpDrawAvailable } from './abilities';
 
 /** Check if any active mansion attachment has the given effect kind. */
 export function hasMansionAttachmentEffect(state: GameState, kind: string): boolean {
@@ -201,7 +202,7 @@ function turnStartAbilityPrompts(
   state: GameState,
   player: PlayerState,
   newVersion: number
-): GameState['prompts'] {
+): Prompt[] {
   const charInst = state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
   const partnerInst = player.partnerInstanceId !== undefined ? state.cards[player.partnerInstanceId] : undefined;
@@ -1592,6 +1593,20 @@ function startTurnInternal(state: GameState): GameState {
     nextRng = orng;
     turnPlayer = op;
     turnSeats = turnSeats.map(x => (x.seat === player.seat ? op : x));
+  }
+
+  // CH-018: during your turn, if her Health is at or below the threshold, she
+  // may get +1 card (once per turn). Gated on the turn number so it cannot
+  // refresh mid-turn.
+  if (helenaLowHpDrawAvailable(state, player.seat)
+    && (Number(player.roundUsedAbilities?.drawOncePerTurnIfHpAtMost ?? 0)) < state.turnNumber) {
+    abilityPrompts.push({
+      id: `helena-lowhp-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: 'Helena Harper: get +1 card?',
+      options: ['Draw +1 card', 'Decline'],
+      payload: { kind: 'helenaLowHpDrawChoice' },
+    });
   }
 
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];

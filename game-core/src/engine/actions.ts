@@ -87,7 +87,8 @@ import { requiredAmmoForExplore, exploreAmmoReq } from './ammo';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 
 import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
-import { leonTrashClaimAvailable, markLeonTrashClaimUsed } from './abilities';
+import { leonTrashClaimAvailable, markLeonTrashClaimUsed, helenaRevealDiscardAvailable,
+  markHelenaRevealUsed, helenaLowHpDrawAvailable, hasChoosePlayerOnDefeat } from './abilities';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, exploreExplosiveDamage, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
@@ -723,7 +724,42 @@ export function applyAction(state: GameState, action: Action): GameState {
     };
     internal = applyActionInternal(internal, { type: 'playActionCard', seat: pendingSeat, instanceId: repeatId, isFreeRepeat: true });
   }
-  const next = applyDownedHooks(applyDamageTakenHooks(state, internal));
+  // CH-016 L2: when the acting seat Defeats an Infected, it may choose a
+  // Player to get +1 card. Diff the `attached` lists to find the defeat.
+  let afterDefeat = internal;
+  {
+    const beforeCounts = new Map<number, number>();
+    for (const p of state.seats) beforeCounts.set(p.seat, p.attached.length);
+    for (const p of internal.seats) {
+      const beforeAttached = new Set(state.seats[p.seat]?.attached ?? []);
+      const gained = p.attached.filter(id => !beforeAttached.has(id));
+      if (gained.length === 0) continue;
+      // Only a DEFEATED INFECTED joining the trophy row counts. CH-016's own
+      // L1 face-down attach also adds to `attached` and must not trigger this.
+      const defeatedInfected = gained.some(id => {
+        const inst = internal.cards[id];
+        const def = inst === undefined ? undefined : internal.cardDefs[inst.cardId];
+        return def?.type === 'infected';
+      });
+      if (!defeatedInfected) continue;
+      if (!hasChoosePlayerOnDefeat(internal, p.seat)) continue;
+      const others = internal.seats.filter(x => x.seat !== p.seat && !x.dead).map(x => String(x.seat));
+      if (others.length === 0) continue;
+      afterDefeat = {
+        ...afterDefeat,
+        version: afterDefeat.version + 1,
+        prompts: [...afterDefeat.prompts, {
+          id: `helena-defeat-${p.seat}-v${afterDefeat.version}`,
+          seat: p.seat,
+          text: 'Helena Harper: choose a Player to get +1 card?',
+          options: others,
+          payload: { kind: 'helenaDefeatChoice' },
+        }],
+      };
+      break;
+    }
+  }
+  const next = applyDownedHooks(applyDamageTakenHooks(state, afterDefeat));
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
@@ -2061,6 +2097,29 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             throw new Error('applyAction: explore: the Bedroom blocks Mansion reveals this turn');
           }
 
+          // CH-017 L2: once per round, when an Infected with 50+ Health is
+          // Revealed, may discard a card for +10 Damage this turn.
+          if (player.helenaRevealBonus === undefined && helenaRevealDiscardAvailable(state, seat)) {
+            const top = revealTop({ deck: state.mansionDeck });
+            const topId = top.revealedInstanceId;
+            const topHp = topId !== undefined ? (state.cardDefs[state.cards[topId]?.cardId ?? '']?.hp ?? 0) : 0;
+            if (topHp >= 50) {
+              return {
+                ...state,
+                // -1 = "asked, awaiting an answer": blocks a re-offer on a
+                // re-dispatch without arming the +10.
+                seats: state.seats.map(x => (x.seat === seat ? { ...x, helenaRevealBonus: -1 } : x)),
+                prompts: [...state.prompts, {
+                  id: `helena-reveal-${seat}-v${state.version}`,
+                  seat,
+                  text: 'Helena Harper: discard a card to give the Exploring Character +10 Damage this turn?',
+                  options: [...player.hand, 'Decline'],
+                  payload: { kind: 'helenaRevealChoice' },
+                }],
+              };
+            }
+          }
+
           // Survival Horror: before exploring, roll a d6 and apply the result.
           // The die roll is handled via a prompt so the player sees the result.
           // Check both for an active prompt AND the flag to prevent re-rolling
@@ -2814,6 +2873,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               damage,
               infectedHpReduction: state.infectedHpReductionThisTurn,
               infectedHpBonus: locationInfectedHpBonus(state),
+          revealBonus: player.helenaRevealBonus ?? 0,
               explosiveDamage,
               splashDamageToEachRevealed: armedLauncherEffect,
               revealed: targets,
@@ -3680,6 +3740,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           damage: exploreDmg,
           infectedHpReduction: state.infectedHpReductionThisTurn,
           infectedHpBonus: locationInfectedHpBonus(state),
+          revealBonus: player.helenaRevealBonus ?? 0,
           ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
           exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
@@ -4201,6 +4262,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               weapons: exploreWeapons,
               infectedHpReduction: state.infectedHpReductionThisTurn,
               infectedHpBonus: locationInfectedHpBonus(state),
+          revealBonus: player.helenaRevealBonus ?? 0,
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
               ammoCardsInPlayArea,
@@ -6295,6 +6357,66 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }],
       };
       return out;
+    }
+
+    case 'attachCardFaceDown': {
+      // CH-016 L1: attach a hand card to the Character face down. A card
+      // already attached by this effect returns to hand.
+      const { seat, instanceId } = action;
+      const player = state.seats[seat] as PlayerState;
+      if (!player.hand.includes(instanceId)) return { ...state, ...nextBase };
+      const replaced = player.attached.length > 0 ? player.attached[0] : undefined;
+      return {
+        ...state,
+        ...nextBase,
+        cards: (() => {
+          const moved = { ...state.cards };
+          const inst = moved[instanceId];
+          if (inst !== undefined) moved[instanceId] = { ...inst, location: { zone: 'attached', index: 0, seat } };
+          if (replaced !== undefined) {
+            const r = moved[replaced];
+            if (r !== undefined) moved[replaced] = { ...r, location: { zone: 'hand', index: 0, seat } };
+          }
+          return moved;
+        })(),
+        seats: state.seats.map(x => (x.seat === seat
+          ? {
+            ...x,
+            hand: [...x.hand.filter(id => id !== instanceId), ...(replaced !== undefined ? [replaced] : [])],
+            attached: [instanceId],
+          }
+          : x)),
+      };
+    }
+
+    case 'helenaRevealChoice': {
+      // CH-017 L2: the reveal-time discard. Declining arms nothing.
+      const { seat, instanceId } = action;
+      if (instanceId === 'Decline') {
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, helenaRevealBonus: 0 } : x)),
+        };
+      }
+      const player = state.seats[seat] as PlayerState;
+      if (!player.hand.includes(instanceId)) return { ...state, ...nextBase };
+      const moved = { ...state.cards };
+      const inst = moved[instanceId];
+      if (inst !== undefined) moved[instanceId] = { ...inst, location: { zone: 'discard', index: 0, seat } };
+      const withDiscard: GameState = {
+        ...state,
+        ...nextBase,
+        cards: moved,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, hand: x.hand.filter(id => id !== instanceId), discard: [...x.discard, instanceId] }
+          : x)),
+      };
+      const marked = markHelenaRevealUsed(withDiscard, seat);
+      return {
+        ...marked,
+        seats: marked.seats.map(x => (x.seat === seat ? { ...x, helenaRevealBonus: 10 } : x)),
+      };
     }
 
     case 'postTurnTrashChoose': {
@@ -8472,6 +8594,87 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           prompts: prompts2,
         };
         return finish(after);
+      }
+
+      if (kind === 'helenaRevealChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          // Declining consumes nothing and arms no bonus.
+          return {
+            ...state,
+            ...nextBase,
+            prompts: newPrompts,
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, helenaRevealBonus: 0 } : x)),
+          };
+        }
+        const inst = state.cards[chosen];
+        if (inst === undefined || inst.location.zone !== 'hand' || inst.location.seat !== seat) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const moved: GameState['cards'] = {
+          ...state.cards,
+          [chosen]: { instanceId: inst.instanceId, cardId: inst.cardId, xp: inst.xp, location: { zone: 'discard', index: 0, seat } },
+        };
+        const withDiscard: GameState = {
+          ...state,
+          ...nextBase,
+          cards: moved,
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, hand: x.hand.filter(id => id !== chosen), discard: [...x.discard, chosen] }
+            : x)),
+        };
+        const marked = markHelenaRevealUsed(withDiscard, seat);
+        return {
+          ...marked,
+          prompts: newPrompts,
+          seats: marked.seats.map(x => (x.seat === seat ? { ...x, helenaRevealBonus: 10 } : x)),
+        };
+      }
+
+      if (kind === 'helenaDefeatChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const target = Number(chosen);
+        const t = state.seats[target];
+        if (t === undefined || t.dead) return { ...state, ...nextBase, prompts: newPrompts };
+        const d = drawWithReshuffle({ deck: t.inventory, discard: t.discard, count: 1, rngState: state.rngState });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          prompts: newPrompts,
+          seats: state.seats.map(x => (x.seat === target
+            ? { ...x, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : x)),
+        };
+      }
+
+      if (kind === 'helenaLowHpDrawChoice') {
+        const draw = prompt.options[option] !== 'Decline';
+        const used: NonNullable<PlayerState['roundUsedAbilities']> = { ...(player.roundUsedAbilities ?? {}), drawOncePerTurnIfHpAtMost: state.turnNumber };
+        if (!draw) {
+          return {
+            ...state,
+            ...nextBase,
+            prompts: newPrompts,
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, roundUsedAbilities: used } : x)),
+          };
+        }
+        const d = drawWithReshuffle({
+          deck: player.inventory,
+          discard: player.discard,
+          count: 1,
+          rngState: state.rngState,
+        });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          prompts: newPrompts,
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, roundUsedAbilities: used, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : x)),
+        };
       }
 
       if (kind === 'cac005HealChoice') {

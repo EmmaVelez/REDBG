@@ -887,6 +887,22 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'attachCardFaceDown': {
+      if (state.phase !== 'main') return { ok: false, reason: 'attachCardFaceDown: not in main phase' };
+      if (player === undefined) return { ok: false, reason: 'attachCardFaceDown: no player' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'attachCardFaceDown: not your turn' };
+      if (!player.hand.includes(action.instanceId)) return { ok: false, reason: 'attachCardFaceDown: card not in hand' };
+      return { ok: true };
+    }
+
+    case 'helenaRevealChoice': {
+      if (player === undefined) return { ok: false, reason: 'helenaRevealChoice: no player' };
+      if (action.instanceId !== 'Decline' && !player.hand.includes(action.instanceId)) {
+        return { ok: false, reason: 'helenaRevealChoice: card not in hand' };
+      }
+      return { ok: true };
+    }
+
     case 'postTurnTrashChoose': {
       if (state.pendingEndPhaseSeat !== action.seat) {
         return { ok: false, reason: 'postTurnTrashChoose: not the end-phase seat' };

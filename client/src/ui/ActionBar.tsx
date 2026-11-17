@@ -237,6 +237,10 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
       const def = defForInstance(state, a.instanceId);
       return `Attach ${def?.name ?? a.instanceId} to Partner${a.replaceIndex !== undefined ? ` (replace slot ${a.replaceIndex + 1})` : ''}`;
     }
+    if (a.type === 'attachCardFaceDown') {
+      const def = defForInstance(state, a.instanceId);
+      return `Attach ${def?.name ?? a.instanceId} to Helena (face down)`;
+    }
     return a.type;
   };
   const player = state.seats[seat];

@@ -497,6 +497,41 @@ export function knifeWeaponsUsedThisTurn(state: GameState, seat: number): number
   return count;
 }
 
+/** CH-017 L2: is the reveal-time discard available this round? */
+export function helenaRevealDiscardAvailable(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (player.hand.length === 0) return false;
+  if (player.roundUsedAbilities?.revealHighHpDiscardForDamage === true) return false;
+  return characterAbilities(state, seat).some(a => a.kind === 'revealHighHpDiscardForDamage');
+}
+
+/** Mark CH-017 L2 as used for the rest of the round. */
+export function markHelenaRevealUsed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat
+      ? { ...s, roundUsedAbilities: { ...(s.roundUsedAbilities ?? {}), revealHighHpDiscardForDamage: true } }
+      : s)),
+  };
+}
+
+/** CH-018: the low-Health draw is available this turn. */
+export function helenaLowHpDrawAvailable(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (!isOwnTurn(state, seat)) return false;
+  const ability = characterAbilities(state, seat).find(a => a.kind === 'drawOncePerTurnIfHpAtMost');
+  if (ability === undefined || ability.kind !== 'drawOncePerTurnIfHpAtMost') return false;
+  if (player.hp > ability.hpThreshold) return false;
+  return (Number(player.roundUsedAbilities?.drawOncePerTurnIfHpAtMost ?? 0)) < state.turnNumber;
+}
+
+/** CH-016 L2: the seat has the "choose a Player on Defeat" ability. */
+export function hasChoosePlayerOnDefeat(state: GameState, seat: number): boolean {
+  return characterAbilities(state, seat).some(a => a.kind === 'choosePlayerOnDefeatForCard');
+}
+
 export function revealHighHpInfectedBonusDamage(
   abilities: readonly CharacterAbility[],
   revealedHp: number

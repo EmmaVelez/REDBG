@@ -19,6 +19,8 @@ export interface HistoryLine {
 }
 
 const VERBS: Record<Action['type'], string> = {
+  attachCardFaceDown: 'attached a card face down',
+  helenaRevealChoice: 'discarded for Helena bonus',
   playActionCard: 'played action',
   playItem: 'used item',
   playAmmo: 'played ammo',

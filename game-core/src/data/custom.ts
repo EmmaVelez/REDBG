@@ -1324,6 +1324,62 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'damagePerCharacterHealedThisTurn', amount: 5, level: 2 },
     ],
   },
+  // ── Fan characters: Helena Harper (JP 2025 prints, CH-016/017/018) ─────
+  // The printed codes collide with official CH-016..018, hence the prefix.
+  {
+    id: 'b4mc-ch-016',
+    name: 'Helena Harper',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: During your turn, you can attach a card from your Hand to Helena, face down. In that case, if another card was already attached to Helena due to this effect, move that card to your Hand.\nLevel 2: When you Defeat an Infected, you can choose a Player. That Player gets +1 card.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 3,
+    level2At: 5,
+    levels: [
+      { level: 1, text: 'During your turn, you can attach a card from your Hand to Helena, face down. In that case, if another card was already attached to Helena due to this effect, move that card to your Hand.' },
+      { level: 2, text: 'When you Defeat an Infected, you can choose a Player. That Player gets +1 card.' },
+    ],
+    abilities: [
+      { kind: 'attachCardFaceDownToCharacter', level: 1 },
+      { kind: 'choosePlayerOnDefeatForCard', level: 2 },
+    ],
+  },
+  {
+    id: 'b4mc-ch-017',
+    name: 'Helena Harper',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: "Shotgun" Weapons cost you 10 less to Buy.\nLevel 2: Once per round, when an Infected with 50 or more Health is Revealed, you can Discard a card from your Hand. In that case, the Exploring Character does +10 Damage this turn.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 0,
+    level2At: 5,
+    levels: [
+      { level: 1, text: '"Shotgun" Weapons cost you 10 less to Buy.' },
+      { level: 2, text: 'Once per round, when an Infected with 50 or more Health is Revealed, you can Discard a card from your Hand. In that case, the Exploring Character does +10 Damage this turn.' },
+    ],
+    abilities: [
+      { kind: 'weaponBuyCostReduction', tag: 'shotgun', amount: 10, level: 1 },
+      { kind: 'revealHighHpDiscardForDamage', amount: 10, threshold: 50, level: 2 },
+    ],
+  },
+  {
+    id: 'b4mc-ch-018',
+    name: 'Helena Harper',
+    type: 'character',
+    set: 'custom',
+    text: "During your turn, if Helena's Health is 40 or less, you can get +1 card.",
+    copies: 1,
+    maxHp: 80,
+    level1At: 2,
+    levels: [
+      { level: 1, text: "During your turn, if Helena's Health is 40 or less, you can get +1 card." },
+    ],
+    abilities: [
+      { kind: 'drawOncePerTurnIfHpAtMost', hpThreshold: 40, level: 1 },
+    ],
+  },
   // ── Fan character: Leon Kennedy (JP print, CH-015) ─────────────────────
   // The printed code collides with official CH-015, hence the family prefix.
   {

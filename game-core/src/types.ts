@@ -769,7 +769,19 @@ export type CharacterAbility =
   | { readonly kind: "endOfTurnKeepUpToAndDrawTo"; readonly keep: number; readonly handSize: number; readonly level: 1 | 2 } // ch-005q L2: end of turn keep up to N hand cards, draw back to hand size
   // --- Custom official print (ch-005p, Jill Valentine Pirate) ---
   | { readonly kind: "plusDamageForWeaponTags"; readonly tags: readonly WeaponTag[]; readonly amount: number; readonly level: 1 | 2 } // ch-005p Jill Valentine L1: all "Pistol" and "Machine Gun" Weapons get +N Damage
-  | { readonly kind: "trashCardToNegateDamage"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2: when she would take any Damage, may Trash 1 card to negate the Damage
+  | { readonly kind: "trashCardToNegateDamage"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2
+  // --- Fan characters: Helena Harper (JP 2025, CH-016/017/018) ---
+  /** CH-016 L1: attach a card from hand to her face down; a previously
+   *  attached card moves to hand. */
+  | { readonly kind: "attachCardFaceDownToCharacter"; readonly level: 1 | 2 }
+  /** CH-017 L2: once per round, when an Infected with 50+ Health is
+   *  revealed, may discard a card for +amount Damage this turn. */
+  | { readonly kind: "revealHighHpDiscardForDamage"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 }
+  /** CH-018: during your turn, if her Health is at most `hpThreshold`,
+   *  you may get +1 card (once per turn). */
+  | { readonly kind: "drawOncePerTurnIfHpAtMost"; readonly hpThreshold: number; readonly level: 1 | 2 }
+  /** CH-016 L2: when you Defeat an Infected, choose a Player; they get +1 card. */
+  | { readonly kind: "choosePlayerOnDefeatForCard"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2: when she would take any Damage, may Trash 1 card to negate the Damage
 
 
 // ---------------------------------------------------------------------------
@@ -876,7 +888,9 @@ export interface PlayerState {
   /** B4MC Chris cards: once-per-round ability keys already used this
    *  round. Cleared for every seat when the turn circles back to the
    *  first living player (a new round). */
-  readonly roundUsedAbilities?: Readonly<Record<string, boolean>>;
+  /** Once-per-round / once-per-turn latches. A number value means
+   *  "used on this turn number" (see drawOncePerTurnIfHpAtMost). */
+  readonly roundUsedAbilities?: Readonly<Record<string, boolean | number>>;
   /** Off-turn targeting notices: who used a card or ability against this seat
    *  while it was NOT their turn (now rendered as a board banner so the
    *  viewing player knows they were targeted). Cleared at the start of the
@@ -990,6 +1004,9 @@ export interface PlayerState {
   readonly cac005HealUsedThisTurn?: boolean;
   /** CAC-004 Resupply: the next Item gain routes to Hand this turn. */
   readonly nextItemToHand?: boolean;
+  /** CH-017 L2: the reveal-time +10 Damage is armed for this explore. */
+  readonly helenaRevealBonus?: number;
+
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
   readonly pendingBackstab?: { readonly targetSeat: number };
   /** AC-045 Coup de Grâce: the chosen weapon + bonus for this turn's explores. */
@@ -1354,6 +1371,10 @@ export type Action =
   | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
   /** END-OF-TURN PHASE: pick one more card to trash, or finish. */
   | { readonly type: "postTurnTrashChoose"; readonly seat: number; readonly instanceId: string }
+  /** CH-016 L1: attach a hand card to the Character face down. */
+  | { readonly type: "attachCardFaceDown"; readonly seat: number; readonly instanceId: string }
+  /** CH-017 L2: the reveal-time discard choice. */
+  | { readonly type: "helenaRevealChoice"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */
