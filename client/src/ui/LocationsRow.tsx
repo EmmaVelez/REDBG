@@ -100,9 +100,16 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     className="btn btn-small"
                     disabled={!canUse}
                     title={capped ? 'Max once per turn' : `Use: ${def.locationCost ?? 0}g + 1 Buy`}
-                    onClick={() => onAction((def.locationRevealEffects ?? []).some(e => e.kind === 'passageUpgrade')
-                      ? { type: 'passageStart', seat: mySeat }
-                      : { type: 'useLocation', seat: mySeat, instanceId: loc.instanceId })}
+                    onClick={() => {
+                      const effects = def.locationRevealEffects ?? [];
+                      if (effects.some(e => e.kind === 'passageUpgrade')) {
+                        onAction({ type: 'passageStart', seat: mySeat });
+                      } else if (effects.some(e => e.kind === 'atticUpgrade')) {
+                        onAction({ type: 'atticStart', seat: mySeat });
+                      } else {
+                        onAction({ type: 'useLocation', seat: mySeat, instanceId: loc.instanceId });
+                      }
+                    }}
                   >
                     Use {def.locationCost ?? 0}g
                   </button>

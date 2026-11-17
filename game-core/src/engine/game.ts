@@ -1564,6 +1564,8 @@ function startTurnInternal(state: GameState): GameState {
       prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
       // Fan Location (Mirror Corridor): the Health reduction lasts one turn.
       infectedHpReductionThisTurn: undefined,
+      // Fan Location (Attic Landing): the Health bonus lasts one turn.
+      infectedHpBonusThisTurn: undefined,
       ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
     };
 }

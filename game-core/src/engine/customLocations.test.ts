@@ -15,7 +15,7 @@ import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK } from '../data
  * Explore is consumed); its On Reveal effect fires at that moment.
  */
 
-const LOC_IDS = ['loc-001', 'loc-002', 'loc-003', 'loc-004', 'loc-005', 'loc-006', 'loc-007', 'loc-008', 'loc-009', 'loc-010', 'loc-011', 'loc-012', 'loc-013', 'loc-014', 'loc-015', 'loc-016', 'loc-017'] as const;
+const LOC_IDS = ['loc-001', 'loc-002', 'loc-003', 'loc-004', 'loc-005', 'loc-006', 'loc-007', 'loc-008', 'loc-009', 'loc-010', 'loc-011', 'loc-012', 'loc-013', 'loc-014', 'loc-015', 'loc-016', 'loc-017', 'loc-018', 'loc-019', 'loc-020', 'loc-021'] as const;
 
 function locDef(id: string) {
   const d = CUSTOM_CARDS.find(c => c.id === id);

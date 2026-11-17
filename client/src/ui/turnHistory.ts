@@ -43,6 +43,9 @@ const VERBS: Record<Action['type'], string> = {
   passageStart: 'used the Underground Passage',
   passageChooseAction: 'chose an action to trash',
   passageChooseGain: 'chose a replacement action',
+  atticStart: 'used the Attic',
+  atticChooseAction: 'chose an action to trash',
+  atticChooseGain: 'chose an action to gain',
   removeAttachedItem: 'removed an attached item',
   exploreReveal: '', // supplementary — no verb of its own, text comes from describe() below
 };

@@ -319,6 +319,11 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       const hasAction = [...player.hand, ...player.discard].some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action');
       if (hasAction) generatedActions.push({ type: 'passageStart', seat });
     }
+    if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1
+      && (def.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade')) {
+      const hasAction = player.hand.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action');
+      if (hasAction) generatedActions.push({ type: 'atticStart', seat });
+    }
   }
 
   // --- 6b. moveXp (Mercenaries Skill System) ---

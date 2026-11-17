@@ -877,6 +877,40 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'atticStart': {
+      // Fan Location (Attic): pay the 1X gold + 1 Buy, then trash an action.
+      if (state.phase !== 'main') return { ok: false, reason: 'atticStart: not in main phase' };
+      if (player === undefined) return { ok: false, reason: 'atticStart: unknown seat' };
+      if (player.dead) return { ok: false, reason: 'atticStart: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'atticStart: not your turn' };
+      if (player.buysLeft < 1) return { ok: false, reason: 'atticStart: no Buy left' };
+      const loc = (state.locations ?? []).find(l => (state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade'));
+      if (loc === undefined) return { ok: false, reason: 'atticStart: no Attic revealed' };
+      if (player.turnGold < (state.cardDefs[state.cards[loc.instanceId]?.cardId ?? '']?.locationCost ?? 0)) {
+        return { ok: false, reason: 'atticStart: not enough gold' };
+      }
+      if (!player.hand.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action')) {
+        return { ok: false, reason: 'atticStart: no action in hand' };
+      }
+      return { ok: true };
+    }
+
+    case 'atticChooseAction': {
+      if (player === undefined) return { ok: false, reason: 'atticChooseAction: no player' };
+      if (state.phase !== 'main') return { ok: false, reason: 'atticChooseAction: not in main phase' };
+      if (player.dead) return { ok: false, reason: 'atticChooseAction: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'atticChooseAction: not your turn' };
+      return { ok: true };
+    }
+
+    case 'atticChooseGain': {
+      if (player === undefined) return { ok: false, reason: 'atticChooseGain: no player' };
+      if (state.phase !== 'main') return { ok: false, reason: 'atticChooseGain: not in main phase' };
+      if (player.dead) return { ok: false, reason: 'atticChooseGain: player is dead' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'atticChooseGain: not your turn' };
+      return { ok: true };
+    }
+
     case 'passageStart': {
       // Fan Location (Underground Passage): the 1X chain start. Same cost
       // gate as useLocation, but the seat must have an action to trash.

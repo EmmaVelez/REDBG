@@ -456,6 +456,10 @@ export type LocationEffect =
   | { readonly kind: 'revealEachPlayerMayDiscardForXp'; readonly xp: number }
   /** Trevor's Tomb: every living player may pay XP to remove one of their own infections. */
   | { readonly kind: 'revealEachPlayerMayPayXpToRemoveInfection'; readonly xp: number }
+  /** Attic Landing: Infected revealed this turn get +amount Health. */
+  | { readonly kind: 'revealInfectedHpBonusThisTurn'; readonly amount: number }
+  /** Attic Landing: Infected revealed this turn get +amount Health. */
+  | { readonly kind: 'revealInfectedHpBonusThisTurn'; readonly amount: number }
   // --- ongoing / investment ---
   | { readonly kind: 'ongoingGainHealthOnReveal'; readonly amount: number }
   | { readonly kind: 'ongoingTrashOnSecondCardGain' }
@@ -472,7 +476,17 @@ export type LocationEffect =
   // --- 1X (paid use) ---
   | { readonly kind: 'onexGainAmmoAndDamagePerCardGained'; readonly ammo: number; readonly damage: number }
   /** Underground Passage: this 1X is the trash-and-upgrade chain. */
-  | { readonly kind: 'passageUpgrade' };
+  | { readonly kind: 'passageUpgrade' }
+  /** Armor Room: look through the discard, take one ammo + one action + one
+   *  weapon onto the TOP of the Inventory, and gain `xp` XP. */
+  | { readonly kind: 'onexLookThroughDiscard'; readonly xp: number }
+  /** Attic Landing: +1 Buy and gain a `ammo` ammo card. */
+  | { readonly kind: 'onexGainBuyAndAmmo'; readonly ammo: number }
+  /** Attic: trash an action from hand, gain an action costing up to `maxCost`. */
+  | { readonly kind: 'atticUpgrade'; readonly maxCost: number }
+  /** Art Supply Room: after this turn, fold Inventory + discard into hand,
+   *  trash up to `trash` cards, shuffle the hand into the Inventory, draw `draw`. */
+  | { readonly kind: 'postTurnCleanup'; readonly trash: number; readonly draw: number };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -1083,6 +1097,8 @@ export interface GameState {
   /** Mirror Corridor (fan Location): Infected revealed while this is set have
    *  their Health reduced to `max(min, hp − amount)`, for THIS turn only. */
   readonly infectedHpReductionThisTurn?: { readonly amount: number; readonly min: number };
+  /** Fan Location (Attic Landing): Infected revealed this turn get +amount Health. */
+  readonly infectedHpBonusThisTurn?: number;
 
   /** Revealed locations, in reveal order. `cubes` maps seat -> number of
    *  investment cubes on that card (GLOBAL / 1X cards carry none). */
@@ -1293,6 +1309,18 @@ export type Action =
   | { readonly type: "passageChooseAction"; readonly seat: number; readonly instanceId: string }
   /** Fan Location (Underground Passage): the replacement to set aside. */
   | { readonly type: "passageChooseGain"; readonly seat: number; readonly instanceId: string }
+  /** Fan Location (Attic): trash an action from hand for a better one. */
+  | { readonly type: "atticStart"; readonly seat: number }
+  | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
+  | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
+  /** Fan Location (Attic): trash an action from hand for a better one. */
+  | { readonly type: "atticStart"; readonly seat: number }
+  | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
+  | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
+  /** Fan Location (Attic): trash an action from hand for a better one. */
+  | { readonly type: "atticStart"; readonly seat: number }
+  | { readonly type: "atticChooseAction"; readonly seat: number; readonly instanceId: string }
+  | { readonly type: "atticChooseGain"; readonly seat: number; readonly instanceId: string }
   /** Mercenaries: move XP from the Character onto one of its Skills (free action). */
   | { readonly type: "moveXp"; readonly seat: number; readonly skillInstanceId: string; readonly amount: number }
   /** Mercenaries: activate a manual ("can") Skill effect (free action, once per turn). */

@@ -90,7 +90,7 @@ import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillE
 import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
-import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions } from './locations';
+import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, applyPostTurnCleanup } from './locations';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -640,6 +640,37 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
         // shown. The banner stays up through the turn, then clears here.
         targetedBy: undefined,
       };
+
+      // Fan Location (Art Supply Room): "after this turn" - fold the Inventory
+      // and discard into the hand, trash up to N, shuffle the hand into the
+      // Inventory, draw M. Fires at the end of the turn it was used.
+      const cleanupLoc = (state.locations ?? []).find(l => hasPostTurnCleanup(state, l.instanceId)
+        && (newPlayer.locationUsesThisTurn ?? []).some(x => x === l.instanceId));
+      if (cleanupLoc !== undefined) {
+        const effect = (state.cardDefs[state.cards[cleanupLoc.instanceId]?.cardId ?? '']?.locationRevealEffects ?? [])
+          .find(e => e.kind === 'postTurnCleanup') as { trash: number; draw: number } | undefined;
+        if (effect !== undefined) {
+          const cleaned = applyPostTurnCleanup(newPlayer, effect, d.rngState);
+          const trashedCards = { ...state.cards };
+          for (const id of cleaned.trashed) {
+            const inst = trashedCards[id];
+            if (inst !== undefined) trashedCards[id] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+          }
+          return {
+            ...state,
+            ...nextBase,
+            cards: trashedCards,
+            seats: state.seats.map(s => (s.seat === seat ? cleaned.player : s)),
+            removed: [...currentRemoved, ...cleaned.trashed],
+            activeSeat: ctx.activeSeat,
+            turnNumber: ctx.turnNumber,
+            rngState: cleaned.rngState,
+            ...(state.infectionDeck !== undefined ? { infectionDeck: infectionDeckOut } : {}),
+            mansionAttachments: currentAttachments,
+            attachmentTrashCounts: currentTrashCounts,
+          };
+        }
+      }
 
       return {
         ...state,
@@ -2682,6 +2713,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           : resolveMultiExplore({
               damage,
               infectedHpReduction: state.infectedHpReductionThisTurn,
+              infectedHpBonus: locationInfectedHpBonus(state),
               explosiveDamage,
               splashDamageToEachRevealed: armedLauncherEffect,
               revealed: targets,
@@ -3547,6 +3579,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
           infectedHpReduction: state.infectedHpReductionThisTurn,
+          infectedHpBonus: locationInfectedHpBonus(state),
           ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
           exploringCharacterMaxHp: exploreLeader === 'partner' ? (player.partnerMaxHp ?? player.maxHp) : player.maxHp,
           revealed: [revealedDef, secondDef].filter(d => d?.type === 'infected').map(d => ({
@@ -4067,6 +4100,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : resolveExplore({
               weapons: exploreWeapons,
               infectedHpReduction: state.infectedHpReductionThisTurn,
+              infectedHpBonus: locationInfectedHpBonus(state),
               ammo: ammoForEffects,
               bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
               ammoCardsInPlayArea,
@@ -6068,6 +6102,84 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       return out;
     }
 
+    case 'atticStart': {
+      // Fan Location (Attic): pay the 1X gold + 1 Buy, then offer the seat's
+      // own action cards IN HAND to trash.
+      const { seat } = action;
+      const player = state.seats[seat] as PlayerState;
+      const loc = (state.locations ?? []).find(l => state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.locationKind === 'onex'
+        && (state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade'));
+      const cost = loc !== undefined ? (state.cardDefs[state.cards[loc.instanceId]?.cardId ?? '']?.locationCost ?? 0) : 0;
+      const candidates = player.hand.filter(id => cardDef(state, id)?.type === 'action');
+      if (candidates.length === 0) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, turnGold: x.turnGold - cost, buysLeft: x.buysLeft - 1 }
+          : x)),
+        prompts: [...state.prompts, {
+          id: `attic-action-${seat}-v${state.version}`,
+          seat,
+          text: 'Attic: trash an action card from your hand?',
+          options: [...candidates, 'Decline'],
+          payload: { kind: 'atticActionChoice' },
+        }],
+      };
+    }
+
+    case 'atticChooseAction': {
+      const { seat, instanceId } = action;
+      const def = cardDef(state, instanceId);
+      if (def === undefined || def.type !== 'action') return { ...state, ...nextBase };
+      const loc = (state.locations ?? []).find(l => (state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade'));
+      const locDef = loc === undefined ? undefined : state.cardDefs[state.cards[loc.instanceId]?.cardId ?? ''];
+      const maxCost = (locDef?.locationRevealEffects ?? []).find(e => e.kind === 'atticUpgrade') as { maxCost: number } | undefined;
+      const cap = maxCost?.maxCost ?? 70;
+      const options = affordableMarketActions(state, cap);
+      if (options.length === 0) return { ...state, ...nextBase };
+      const moved = { ...state.cards };
+      const inst = moved[instanceId];
+      if (inst !== undefined) moved[instanceId] = { ...inst, location: { zone: 'removed', index: 0, seat } };
+      let out: GameState = {
+        ...state,
+        ...nextBase,
+        cards: moved,
+        removed: [...state.removed, instanceId],
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, hand: x.hand.filter(id => id !== instanceId) }
+          : x)),
+      };
+      out = {
+        ...out,
+        prompts: [...out.prompts, {
+          id: `attic-gain-${seat}-v${out.version}`,
+          seat,
+          text: `Attic: gain an action costing up to ${cap}?`,
+          options: [...options, 'Decline'],
+          payload: { kind: 'atticGainChoice', cap: String(cap) },
+        }],
+      };
+      return out;
+    }
+
+    case 'atticChooseGain': {
+      // The gained action goes straight to the hand (no set-aside).
+      const { seat, instanceId } = action;
+      const pile = Object.values(state.marketPiles).find(p => p.cards[0] === instanceId);
+      if (pile === undefined) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        marketPiles: {
+          ...state.marketPiles,
+          [pile.pileId]: { pileId: pile.pileId, cards: pile.cards.slice(1) },
+        },
+        cards: { ...state.cards, [instanceId]: { ...state.cards[instanceId]!, location: { zone: 'hand', index: 0, seat } } },
+        seats: state.seats.map(x => (x.seat === seat ? { ...x, hand: [...x.hand, instanceId] } : x)),
+      };
+    }
+
     case 'useLocation': {
       // Fan Locations (1X): pay the printed gold + 1 Buy for a one-shot effect.
       const { seat, instanceId } = action;
@@ -6102,6 +6214,64 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? { ...x, turnAmmo: x.turnAmmo + effect.ammo, buysLeft: x.buysLeft + 1, arklayArmed: true }
               : x)),
           };
+        } else if (effect.kind === 'onexGainBuyAndAmmo') {
+          // Attic Landing: +1 Buy, then gain a `ammo` ammo card (its own
+          // Ammo/Gold bonus applies, as for any gained ammo card).
+          const pile = Object.values(s.marketPiles).find(p => {
+            const topId = p.cards[0];
+            const d = topId === undefined ? undefined : s.cardDefs[s.cards[topId]?.cardId ?? ''];
+            return d?.type === 'ammunition' && (d.bonuses?.ammo ?? 0) === effect.ammo;
+          });
+          const topId = pile?.cards[0];
+          if (pile !== undefined && topId !== undefined) {
+            const ammoDef = s.cardDefs[s.cards[topId]?.cardId ?? ''];
+            // `s` already carries the 1X gold + Buy charge from useLocation's
+            // own deduction above; gain on top of THAT, not the pre-charge state.
+            const gained = gainCard(s, { seat, instanceId: topId, cardId: ammoDef?.id ?? '', destination: 'discard' });
+            const after = gained.seats[seat] as PlayerState;
+            const played = ammoDef === undefined
+              ? { player: after, rngState: gained.rngState }
+              : withBonusesAndDraws(after, ammoDef, gained.rngState);
+            s = {
+              ...gained,
+              rngState: played.rngState,
+              seats: gained.seats.map(x => (x.seat === seat
+                ? { ...played.player, buysLeft: played.player.buysLeft + 1 }
+                : x)),
+            };
+          } else {
+            s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, buysLeft: x.buysLeft + 1 } : x)) };
+          }
+        } else if (effect.kind === 'onexLookThroughDiscard') {
+          // Armor Room: one ammo + one action + one weapon from the discard
+          // go to the TOP of the Inventory, then gain `xp` XP.
+          const takeType = (type: string): string | undefined =>
+            player.discard.find(id => cardDef(s, id)?.type === type);
+          const picks = [takeType('ammunition'), takeType('action'), takeType('weapon')]
+            .filter((id): id is string => id !== undefined);
+          if (picks.length > 0) {
+            s = {
+              ...s,
+              cards: (() => {
+                const moved = { ...s.cards };
+                for (const id of picks) {
+                  const inst = moved[id];
+                  if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'inventory', index: 0, seat } };
+                }
+                return moved;
+              })(),
+              seats: s.seats.map(x => (x.seat === seat
+                ? {
+                  ...x,
+                  discard: x.discard.filter(id => !picks.includes(id)),
+                  inventory: [...picks.slice().reverse(), ...x.inventory.filter(id => !picks.includes(id))],
+                  xp: (x.xp ?? 0) + effect.xp,
+                }
+                : x)),
+            };
+          } else {
+            s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + effect.xp } : x)) };
+          }
         }
       }
       return s;
@@ -7981,6 +8151,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
+      }
+
+      if (kind === 'atticActionChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'atticChooseAction', seat, instanceId: chosen });
+      }
+
+      if (kind === 'atticGainChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'atticChooseGain', seat, instanceId: chosen });
       }
 
       if (kind === 'cac003ChooseHand') {

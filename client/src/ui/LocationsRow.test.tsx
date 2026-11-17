@@ -88,6 +88,18 @@ describe('LocationsRow', () => {
     expect(html).toContain('Use 40g');
   });
 
+  it('dispatches atticStart for the Attic', () => {
+    let s = stateWithLocations();
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 && p !== undefined ? { ...p, turnGold: 100, buysLeft: 2 } : p)) };
+    s = revealOnly(s, 'loc-021');
+    const loc = (s.locations ?? [])[0];
+    if (loc === undefined) throw new Error('location not revealed');
+    const def = s.cardDefs[s.cards[loc.instanceId]?.cardId ?? ''];
+    expect((def?.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade')).toBe(true);
+    const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('Use 10g');
+  });
+
   it('renders the Board with the locations row present', () => {
     const s = revealOnly(stateWithLocations(), 'loc-005');
     const html = renderToStaticMarkup(<Board state={s} mySeat={0} onAction={() => {}} />);

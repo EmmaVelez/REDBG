@@ -1,4 +1,6 @@
 import type { CardDef, GameState, LocationEffect, LocationScoreEffect, PlayerState } from '../types';
+import { makeRng, shuffle } from '../util/rng';
+import { draw } from './deck';
 
 /**
  * Fan "Locations" line — GLOBAL / 1X / investment room cards.
@@ -347,6 +349,10 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'revealInfectedHpReductionThisTurn':
         s = { ...s, infectedHpReductionThisTurn: { amount: effect.amount, min: effect.min } };
         break;
+      case 'revealInfectedHpBonusThisTurn':
+        // Attic Landing: Infected revealed this turn are harder to kill.
+        s = { ...s, infectedHpBonusThisTurn: effect.amount };
+        break;
       case 'revealEachPlayerMayGainItem': {
         // Terrace: every living player may take one item from the Resource Area.
         for (const other of s.seats.filter(x => !x.dead && !x.downed)) {
@@ -393,6 +399,10 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'onexGainAmmoAndDamagePerCardGained':
+      case 'onexLookThroughDiscard':
+      case 'onexGainBuyAndAmmo':
+      case 'atticUpgrade':
+      case 'postTurnCleanup':
         // Ongoing / 1X effects are applied at their own trigger sites.
         break;
     }
@@ -491,4 +501,54 @@ export function affordableMarketActions(state: GameState, maxCost: number): stri
 /** True when the seat's location lets them trash on their 2nd gain of a turn. */
 export function hasTrashOnSecondGain(state: GameState, seat: number): boolean {
   return investEffectsFor(state, seat).some(e => e.kind === 'ongoingTrashOnSecondCardGain');
+}
+
+
+/** Fan Location (Attic Landing): the +Health Infected get this turn. */
+export function locationInfectedHpBonus(state: GameState): number {
+  return state.infectedHpBonusThisTurn ?? 0;
+}
+
+/** True when the location's 1X is the ART SUPPLY ROOM post-turn cleanup. */
+export function hasPostTurnCleanup(state: GameState, instanceId: string): boolean {
+  const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
+  return (def?.locationRevealEffects ?? []).some(e => e.kind === 'postTurnCleanup');
+}
+
+/**
+ * Fan Location (Art Supply Room): after the turn, fold the Inventory and the
+ * discard pile into the hand, trash up to `trash` cards, shuffle the hand back
+ * into the Inventory, then draw `draw` cards.
+ *
+ * The trash is DETERMINISTIC (the first `trash` cards of the merged hand): the
+ * card grants a player CHOICE, but the engine has no prompt slot between
+ * end-of-turn cleanup and the next turn, and a prompt raised there would block
+ * the next turn from opening. Trashing fewer is always legal, so taking the
+ * first N is a valid (if unfavourable) resolution.
+ */
+export function applyPostTurnCleanup(
+  player: PlayerState,
+  effect: { readonly trash: number; readonly draw: number },
+  rngState: number,
+): { player: PlayerState; rngState: number; trashed: readonly string[] } {
+  const pool = [...player.hand, ...player.inventory, ...player.discard];
+  const trashed = pool.slice(0, Math.max(0, effect.trash));
+  const kept = pool.slice(trashed.length);
+  const shuffled = shuffle(makeRng(rngState), kept);
+  const d = draw({
+    deck: shuffled.value,
+    discard: [],
+    reshuffledDiscard: [],
+    count: effect.draw,
+  });
+  return {
+    player: {
+      ...player,
+      hand: d.hand,
+      inventory: d.deck,
+      discard: d.discard,
+    },
+    rngState: shuffled.rng.s,
+    trashed,
+  };
 }
