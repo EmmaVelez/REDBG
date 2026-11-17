@@ -147,6 +147,14 @@ export function seatAwaitingAction(state: GameState): number {
   // The END-OF-TURN PHASE outranks everything: its seat answers before the
   // next turn's startTurn runs.
   if (state.pendingEndPhaseSeat !== undefined) return state.pendingEndPhaseSeat;
+  // A pending prompt HOLDS the turn. CAC-013 "From Bad to Worse" raises its
+  // target's discard prompt while the originator's turn is still open, so
+  // `activeSeat` still names the originator — answering it is the TARGET's job.
+  // Returning activeSeat there made the server's bot stretch keep stepping the
+  // originator's bot and the hot-seat UI never pass the device, locking the
+  // game. The prompt's seat is the seat that can actually move.
+  const pending = state.prompts[0];
+  if (pending !== undefined) return pending.seat;
   const draft = state.skillDraft;
   if (draft !== undefined) {
     return draft.step === 'pick' ? draft.pickSeat : draft.keepSeat;
