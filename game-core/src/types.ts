@@ -600,6 +600,9 @@ export type CharacterAbility =
   | { readonly kind: "weaponPlusDamagePerInfectedFought"; readonly amount: number; readonly level: 1 | 2 } // Chris L1: +5 per Infected being fought
   | { readonly kind: "noHealingNoNonInfectedAttach"; readonly level: 1 | 2 }                              // Chris restriction
   | { readonly kind: "explosivesGoToDiscardInsteadOfTrash"; readonly level: 1 | 2 }                       // Jill L2
+  /** Fan character (Leon, JP print): once per round, when another Player
+   *  trashes a card, put that card into your Hand. */
+  | { readonly kind: "takeTrashedCardFromOtherPlayerOncePerRound"; readonly level: 1 | 2 }
   | { readonly kind: "explosivesPlusDamage"; readonly amount: number; readonly level: 1 | 2 }             // Jill L1: +amount per Explosive weapon used
   | { readonly kind: "weaponTagPlusDamage"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // Barry L2 magnums +20 dmg, Krauser L2 knives +5 dmg
   | { readonly kind: "ammoReqReduction"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 }     // Leon L1 pistols -10 ammoReq, Sheva L2 rifles -20 ammoReq
@@ -815,6 +818,9 @@ export interface PlayerState {
     readonly decorations: number;
     /** Highest tier unlocked: 0 = below L1 gate, 1 = L1, 2 = L2 (per-card gates). */
     readonly level: 0 | 1 | 2;
+
+  /** Fan character (Leon): the trash-claim has been used this round. */
+  readonly leonTrashClaimUsedThisRound?: boolean;
 
   /** Per-turn resource pools (reset at turn start; granted by played cards). */
   readonly turnAmmo: number;

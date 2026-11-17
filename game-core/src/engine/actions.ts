@@ -726,7 +726,8 @@ export function applyAction(state: GameState, action: Action): GameState {
   const afterTrash = applyTrashDrawHook(state, next, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  return applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action)))));
+  const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action)))));
+  return applyLeonTrashHook(state, hooked, action);
 }
 
 /**
@@ -798,6 +799,47 @@ function applyLocationTrashXpHooks(prev: GameState, next: GameState): GameState 
  * this card" is the owner's action, and an opponent's effect trashing your ammo
  * is still your card being trashed.
  */
+/**
+ * Fan character (b4mc-ch-015 Leon): "Once per round, when another Player Trashes
+ * a card, you can put that card into your Hand."
+ *
+ * Trashing has no single choke point (same problem AM-005's trash-XP had), so
+ * this is a DIFF of the game's `removed` list across the action, filtered to
+ * cards the acting seat trashed. Leon gets ONE offer per round; picking a card
+ * (or declining) consumes it.
+ */
+function applyLeonTrashHook(prev: GameState, next: GameState, action: Action): GameState {
+  // (The claim resolves through chooseOption, not its own action type.)
+  if (next.removed.length <= prev.removed.length) return next;
+  const seat = (action as { seat?: number }).seat;
+  if (seat === undefined) return next;
+  const newlyRemoved = next.removed.filter(id => !prev.removed.includes(id));
+  if (newlyRemoved.length === 0) return next;
+  let out = next;
+  for (const leon of next.seats) {
+    if (leon.seat === seat || leon.dead || leon.downed) continue;
+    if (leon.leonTrashClaimUsedThisRound === true) continue;
+    const charInst = next.cards[leon.characterInstanceId];
+    const charDef = charInst === undefined ? undefined : next.cardDefs[charInst.cardId];
+    const level = charDef === undefined ? 0 : levelForDecorations(charDef.level1At, charDef.level2At, leon.decorations);
+    if (!abilitiesForLevel(charDef?.abilities, level)
+      .some(a => a.kind === 'takeTrashedCardFromOtherPlayerOncePerRound')) continue;
+    out = {
+      ...out,
+      version: out.version + 1,
+      prompts: [...out.prompts, {
+        id: `leon-trash-${leon.seat}-v${out.version}`,
+        seat: leon.seat,
+        text: 'Leon Kennedy: put a card another player trashed into your Hand?',
+        options: [...newlyRemoved, 'Decline'],
+        payload: { kind: 'leonTrashClaim' },
+      }],
+    };
+    break;
+  }
+  return out;
+}
+
 function applyTrashAmmoGoldHooks(prev: GameState, next: GameState): GameState {
   if (next.removed.length === prev.removed.length) return next;
   const already = new Set(prev.removed);
@@ -8295,6 +8337,31 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
         return applyActionInternal({ ...state, ...nextBase, prompts: newPrompts }, { type: 'passageChooseGain', seat, instanceId: chosen });
+      }
+
+      if (kind === 'leonTrashClaim') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          // Declining consumes the once-per-round offer.
+          return {
+            ...state,
+            ...nextBase,
+            prompts: newPrompts,
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, leonTrashClaimUsedThisRound: true } : x)),
+          };
+        }
+        const inst = state.cards[chosen];
+        if (inst === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          prompts: newPrompts,
+          removed: state.removed.filter(id => id !== chosen),
+          cards: { ...state.cards, [chosen]: { ...inst, location: { zone: 'hand', index: 0, seat } } },
+          seats: state.seats.map(x => (x.seat === seat
+            ? { ...x, leonTrashClaimUsedThisRound: true, hand: [...x.hand, chosen] }
+            : x)),
+        };
       }
 
       if (kind === 'barTokenChoice') {

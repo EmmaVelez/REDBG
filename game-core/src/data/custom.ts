@@ -1324,6 +1324,26 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'damagePerCharacterHealedThisTurn', amount: 5, level: 2 },
     ],
   },
+  // ── Fan character: Leon Kennedy (JP print, CH-015) ─────────────────────
+  // The printed code collides with official CH-015, hence the family prefix.
+  {
+    id: 'b4mc-ch-015',
+    name: 'Leon Kennedy',
+    type: 'character',
+    set: 'custom',
+    text: 'Once per round, when another Player Trashes a card, you can put that card into your Hand.',
+    copies: 1,
+    maxHp: 90,
+    level1At: 1,
+    level2At: 5,
+    levels: [
+      { level: 1, text: 'Once per round, when another Player Trashes a card, you can put that card into your Hand.' },
+      { level: 2, text: 'Once per round, when another Player Trashes a card, you can put that card into your Hand.' },
+    ],
+    abilities: [
+      { kind: 'takeTrashedCardFromOtherPlayerOncePerRound', level: 1 },
+    ],
+  },
   {
     id: 'b4mc-ch-005',
     name: 'Sherry Birkin',

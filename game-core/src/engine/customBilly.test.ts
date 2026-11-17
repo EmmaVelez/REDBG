@@ -70,7 +70,10 @@ describe('BC-001 Billy Coen data', () => {
 
   it('joins the deal pool only when the room selected it', () => {
     const off = setup(
-      { seed: 11, players: [{ name: 'P', controller: 'human' }] },
+      // Explicit character: a RANDOM deal depends on the composition of
+      // CUSTOM_CARDS (adding a character reseeds it), which made this
+      // assertion fragile for a reason unrelated to Billy.
+      { seed: 11, players: [{ name: 'P', controller: 'human', characterCardId: 'ch-001' }] },
       [...PREMIER_CARDS, ...CUSTOM_CARDS],
       FIRST_TIMER_PILES,
       STANDARD_MANSION_DECK,
