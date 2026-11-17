@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
 
@@ -232,7 +232,8 @@ export function exploreDamage(
     exploreBonusIfFullHp(abilities, player.hp, player.maxHp) +
     exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
     actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0) +
-    emptyHandDamage(abilities, player.hand.filter(id => !weaponIds.includes(id)).length);
+    emptyHandDamage(abilities, player.hand.filter(id => !weaponIds.includes(id)).length) +
+    plusDamagePerUnusedAction(abilities, player.actionsLeft);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;

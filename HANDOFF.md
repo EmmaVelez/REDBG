@@ -1,5 +1,30 @@
 # HANDOFF — resume here
 
+**ZO-001 ZOEY + BO-001 BILL OVERBECK (2026-11-16, batch 2):** two more custom
+characters from Manny's scans. Printed codes still not legible -> provisional
+ids zo-001 / bo-001 (rename when codes are known). Both 70 HP.
+- **Zoey zo-001** (gates 0/7 — RULING: level-box emblems read as 0 and 7 by two
+  vision models): L1 "Zoey can't use shotguns" -> new `cannotUseWeaponTag`
+  (validate rejects shotgun-tag weapons in her explores; envelope: I-legal ->
+  grayed buttons for bots/humans). L2 "-10 ammo and +10 damage for pistol and
+  rifle weapons" -> two `ammoReqReduction` entries (Leon L1 precedent) + a
+  `plusDamageForWeaponTags` ['pistol','rifle'] (ch-005p precedent).
+- **Bill bo-001** (gates 10/25 — RULING: three reads of the box-left emblems
+  agreed; the vision model kept merging the level digit with the emblem digit,
+  so the tight crop reads had to be separated): L1 "Infected deal +10 damage to
+  Bill when he does not defeat them" -> new `extraDamageTakenWhenNotDefeated`,
+  added at the hp-loss site (the branch is type-narrowed 'notDefeated' already)
+  AND the pendingExplore display damage. L2 "+10 damage per unused Action" ->
+  new `plusDamagePerUnusedAction(amount * actionsLeft)`, in abilityDamage +
+  preview.
+- Tests customZoeyBill.test.ts 4/4 (shotgun ban, pistol +10/-10ammo, per-action
+  preview, Salvador 35+10=45 damage -> hp 25). Gates: game-core 1276/1276,
+  client 258/258, typecheck clean. Art: ZO-001.png / BO-001.png.
+- Vision gotcha this round: gate digits on these two cards are tiny; the most
+  reliable recipe was an 8x crop of JUST the shield/emblem with 'read the number
+  inside the shape only, ignore the level digit' — the level+emblem pair read as
+  a two-digit number (e.g. "27" = level 2 + gate 7) on full-image reads.
+
 **FR-001 FRANCIS + LO-001 LOUIS (2026-11-16):** two custom characters from Manny's scans
 (TWO separate images; the second arrived in a separate gateway folder — always check the newest
 native-inputs dirs). Printed codes NOT legible in either scan -> provisional ids fr-001 / lo-001

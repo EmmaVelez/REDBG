@@ -75,6 +75,8 @@ import {
   markChrisL2TopUsed,
   chrisL2CanDrawOnTrash,
   emptyHandDamage,
+  extraDamageTakenWhenNotDefeated,
+  plusDamagePerUnusedAction,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -2249,7 +2251,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
             exploreSkillDamageBonus(activeSkillEffects(state, seat), weaponDefs, state, seat, weapons) +
             actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0) +
-            emptyHandDamage(abilities, handAfter.length);
+            emptyHandDamage(abilities, handAfter.length) +
+            plusDamagePerUnusedAction(abilities, player.actionsLeft);
           // Lonewolf (AC-032): +amount explore damage per card in the discard
           // pile, while its action card is in the play area this turn.
           const perDiscardCardBonus = player.playArea.reduce((sum, id) => {
@@ -4100,7 +4103,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (shouldDefer) {
         const pendingOutcome = outcome.kind === 'defeated' ? 'defeated' : 'notDefeated';
         const pendingDecorations = outcome.kind === 'defeated' ? player.decorations + (revealedDef.decorations ?? 0) : player.decorations;
-        const pendingDamageTaken = outcome.kind === 'notDefeated' ? Math.max((revealedDef.attack ?? 0) - 0, 0) : 0;
+        const pendingDamageTaken = outcome.kind === 'notDefeated'
+          ? Math.max((revealedDef.attack ?? 0) + extraDamageTakenWhenNotDefeated(abilities), 0)
+          : 0;
         const pendingPlayer: PlayerState = {
           ...player,
           hand: handAfter,
@@ -4477,9 +4482,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const giantThreshold = skillGiantKillingThreshold(damageSkillEffects);
       const skillSuppressed = giantThreshold !== undefined && (revealedDef?.hp ?? 0) >= giantThreshold;
       const skillLethal = skillLethalReplacementAmount(damageSkillEffects);
+      // bo-001 Bill L1: +10 Damage whenever an explore does not defeat the
+      // Infected on his own turn (this branch is always 'notDefeated').
+      const billPenalty = extraDamageTakenWhenNotDefeated(abilities);
       const rawSkillDamage = (skillSuppressed || negateConsumption.negated)
         ? 0
-        : Math.max((outcome.damageTaken ?? 0) - skillReduction, 0);
+        : Math.max((outcome.damageTaken ?? 0) - skillReduction + billPenalty, 0);
       const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
         ? skillLethal
         : rawSkillDamage;

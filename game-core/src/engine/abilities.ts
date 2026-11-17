@@ -1191,6 +1191,19 @@ export function chrisL1TurnDamageBonus(state: GameState, seat: number): number {
   return state.seats.some(s => s.downed) ? ability.downedAmount : ability.amount;
 }
 
+/** bo-001 Bill L1: +amount Damage taken when an explore does not defeat the
+ *  Infected (a penalty, not a reduction — this is ADDED to incoming damage). */
+export function extraDamageTakenWhenNotDefeated(abilities: readonly CharacterAbility[]): number {
+  const a = abilities.find(x => x.kind === 'extraDamageTakenWhenNotDefeated');
+  return a !== undefined && a.kind === 'extraDamageTakenWhenNotDefeated' ? a.amount : 0;
+}
+
+/** bo-001 Bill L2: +amount Damage for every unused Action available. */
+export function plusDamagePerUnusedAction(abilities: readonly CharacterAbility[], actionsLeft: number): number {
+  const a = abilities.find(x => x.kind === 'plusDamagePerUnusedAction');
+  return a !== undefined && a.kind === 'plusDamagePerUnusedAction' ? a.amount * Math.max(actionsLeft, 0) : 0;
+}
+
 /** fr-001 Francis L1: if the hand is empty, one weapon he uses gets +amount
  *  damage. Implemented as a flat explore bonus (a single +amount to one weapon
  *  is +amount of total damage in every case this engine models). */

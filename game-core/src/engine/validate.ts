@@ -1,5 +1,5 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
-import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
 import { nextCubeCost, locationBuyCostReduction } from './locations';
@@ -304,6 +304,14 @@ export function validateAction(state: GameState, action: Action): ValidationResu
               }
               if (weaponCardDef.type !== 'weapon') {
                 return { ok: false, reason: `explore: not a weapon: ${weaponId}` };
+              }
+              // z-001 Zoey L1: cannot use weapons with the banned tag (shotgun).
+              const zoeyBan = seatAbilities(state, action.seat).some(x =>
+                x.kind === 'cannotUseWeaponTag'
+                  ? effectiveWeaponTags(state, action.seat, weaponId).includes(x.tag)
+                  : false);
+              if (zoeyBan) {
+                return { ok: false, reason: `explore: Zoey cannot use this weapon (${weaponCardDef.name ?? weaponId})` };
               }
             }
             // CW-033 Semi-Auto Sniper Rifle: "cannot be used with other

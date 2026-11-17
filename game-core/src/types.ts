@@ -693,6 +693,10 @@ export type CharacterAbility =
   // --- Custom characters fr-001 (Francis) / lo-001 (Louis) ---
   | { readonly kind: "plusDamageIfEmptyHand"; readonly amount: number; readonly level: 1 | 2 } // fr-001 L1: no cards in hand -> one weapon gets +amount (flat explore bonus)
   | { readonly kind: "moveMansionBottomToTop"; readonly level: 1 | 2 } // lo-001 L1: manual once/turn — move the Mansion's bottom card to the top
+  // --- Custom characters zo-001 (Zoey) / bo-001 (Bill Overbeck) ---
+  | { readonly kind: "cannotUseWeaponTag"; readonly tag: WeaponTag; readonly level: 1 | 2 } // zo-001 L1: never able to use weapons with this tag (shotgun)
+  | { readonly kind: "extraDamageTakenWhenNotDefeated"; readonly amount: number; readonly level: 1 | 2 } // bo-001 L1: +amount damage taken when an explore does not defeat the Infected
+  | { readonly kind: "plusDamagePerUnusedAction"; readonly amount: number; readonly level: 1 | 2 } // bo-001 L2: +amount Damage for every unused Action during the turn
   | { readonly kind: "goldWhenDiscardingAtTurnStart"; readonly amount: number; readonly level: 1 | 2 } // RC-001 Rebecca L2: when discarding due to card effect during turn, gain +amount gold
   | { readonly kind: "healIfDidNotExplore"; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L1: if didn't explore this turn, heal N at end of turn
   | { readonly kind: "plusDamageForWeaponTag"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // RC-002 Rebecca L2: Machine Gun weapons get +N damage

@@ -571,6 +571,53 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 
+  // ── Custom characters from Manny's scans (2026-11-16, batch 2): zo-001 Zoey
+  // + bo-001 Bill Overbeck. Printed codes NOT legible -> provisional two-letter
+  // ids (rename when the codes are known). Both 70 HP.
+  // RULING (verify on the physical cards): gates were read from the scans'
+  // level-box emblems — zo-001 L1=0 / L2=7 (two vision models agreed), bo-001
+  // L1=10 / L2=25 (three reads of the box-left emblems agreed).
+  {
+    id: 'zo-001',
+    name: 'Zoey',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Zoey can\'t use shotguns.\nLevel 2: All pistol and rifle weapons Zoey is using require -10 ammo and do +10 damage.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 0,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'Zoey can\'t use shotguns.' },
+      { level: 2, text: 'All pistol and rifle weapons Zoey is using require -10 ammo and do +10 damage.' },
+    ],
+    abilities: [
+      { kind: 'cannotUseWeaponTag', tag: 'shotgun', level: 1 },
+      { kind: 'ammoReqReduction', tag: 'pistol', amount: 10, level: 2 },
+      { kind: 'ammoReqReduction', tag: 'rifle', amount: 10, level: 2 },
+      { kind: 'plusDamageForWeaponTags', tags: ['pistol', 'rifle'], amount: 10, level: 2 },
+    ],
+  },
+  {
+    id: 'bo-001',
+    name: 'Bill Overbeck',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Infected deal an additional 10 damage to Bill when he does not defeat them.\nLevel 2: Bill gets an additional 10 damage during your turn for every unused action you have available to you.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 10,
+    level2At: 25,
+    levels: [
+      { level: 1, text: 'Infected deal an additional 10 damage to Bill when he does not defeat them.' },
+      { level: 2, text: 'Bill gets an additional 10 damage during your turn for every unused action you have available to you.' },
+    ],
+    abilities: [
+      { kind: 'extraDamageTakenWhenNotDefeated', amount: 10, level: 1 },
+      { kind: 'plusDamagePerUnusedAction', amount: 10, level: 2 },
+    ],
+  },
+
   // --- Unofficial Expansion 1 (EX-001..EX-009) ---
   // Manny's rulings (2026-11-09):
   // - [STORAGE] and [BOX] cards are MANSION TOKENS (like ma-012/ma-013).
