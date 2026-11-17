@@ -1439,7 +1439,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     text: 'Trash 2 cards, 1 from your hand and 1 from your discard pile.\nGain a card from the resource area up to the combined cost of the trashed cards.',
     copies: 1,
     cost: 30,
-    bonuses: { cards: 1, gold: 10 },
+    bonuses: { cards: 1, ammo: 10 },
     actionEffects: [{ kind: 'trashHandAndDiscardForMarketCard' }],
   },
   {

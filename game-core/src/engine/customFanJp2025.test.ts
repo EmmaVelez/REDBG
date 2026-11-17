@@ -72,7 +72,7 @@ describe('Fan JP 2025 set — data', () => {
   it('defines all seven cards with the printed stats', () => {
     expect(def('cac-003')).toEqual(expect.objectContaining({
       id: 'cac-003', name: 'Change of Outfit', type: 'action', set: 'custom', cost: 30,
-      bonuses: { cards: 1, gold: 10 },
+      bonuses: { cards: 1, ammo: 10 },
     }));
     expect(def('cac-013')).toEqual(expect.objectContaining({
       id: 'cac-013', name: 'From Bad to Worse', type: 'action', cost: 70,
