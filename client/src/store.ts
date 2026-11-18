@@ -174,7 +174,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hotseat: { ...hs, game, passPending },
       view: passPending ? s.view : hotseatView(game, hs.viewerSeat),
       lastError: null,
-      gameOver: result.gameOver ? { winners: result.winners } : null,
+      gameOver: result.gameOver ? { winners: result.winners, endReason: result.endReason } : null,
     });
   },
   continuePass: () => {

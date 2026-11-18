@@ -1643,7 +1643,16 @@ function terraceInvested(state: GameState, seat: number): boolean {
   return false;
 }
 
-export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' } {
+/** The seat playing FCH-008 Sherry Birkin, if any. */
+export function sherrySeat(state: GameState): number | undefined {
+  for (const seat of state.seats) {
+    const inst = state.cards[seat.characterInstanceId];
+    if (inst !== undefined && inst.cardId === 'fch-008') return seat.seat;
+  }
+  return undefined;
+}
+
+export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' | 'sherryLastAlive' } {
   // Scenario trigger (Outbreak: Tyrant T-002) - ends the game as soon as that
   // Infected is Defeated and attached to a Character.
   if (state.endInfectedCardId !== undefined) {
@@ -1686,6 +1695,24 @@ export function checkWin(state: GameState): { gameOver: boolean; winners: readon
 
   if (state.seats.every(seat => seat.dead)) {
     return { gameOver: true, winners: [], endReason: 'allPlayersDead' };
+  }
+
+  // FCH-008 Sherry Birkin: when she is the LAST living Character the
+  // match ends at once, and the Decorations ranking decides the winner
+  // (Health breaks an exact tie, matching the other end conditions).
+  const living = state.seats.filter(seat => !seat.dead);
+  if (living.length === 1 && sherrySeat(state) === living[0]?.seat) {
+    // Purely Decorations: no Health tiebreak (a dead seat must not edge out
+    // the living Character on HP), and an exact tie is a SHARED victory.
+    const ranked = state.seats
+      .map((seat, i) => ({ index: i, decorations: scoreTotal(state, seat.seat) }))
+      .sort((a, b) => b.decorations - a.decorations || a.index - b.index);
+    const top = ranked[0];
+    const winners = (top === undefined ? [] : ranked
+      .filter((w) => w.decorations === top.decorations)
+      .map(w => w.index)
+      .sort((a, b) => a - b));
+    return { gameOver: true, winners, endReason: 'sherryLastAlive' };
   }
 
   return { gameOver: false, winners: [] };

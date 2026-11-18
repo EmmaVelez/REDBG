@@ -26,6 +26,7 @@ export type HotseatResult =
       readonly state: GameState;
       readonly gameOver: boolean;
       readonly winners: readonly number[];
+      readonly endReason?: string;
     }
   | {
       readonly ok: false;
@@ -85,5 +86,5 @@ export function applyHotseatAction(state: GameState, action: Action): HotseatRes
     next = startTurn(next);
   }
   const win = checkWin(next);
-  return { ok: true, state: next, gameOver: win.gameOver, winners: win.winners };
+  return { ok: true, state: next, gameOver: win.gameOver, winners: win.winners, endReason: win.endReason };
 }

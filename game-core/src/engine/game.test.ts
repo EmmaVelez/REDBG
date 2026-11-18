@@ -9,6 +9,7 @@ function def(id: string, over: Partial<CardDef> = {}): CardDef {
 const CARDS: ReadonlyArray<CardDef> = [
   def('ch-1', { type: 'character', maxHp: 100, level2At: 4, abilities: [{ kind: 'weaponPlusDamagePerInfectedFought', amount: 5, level: 1 }] }),
   def('ch-2', { type: 'character', maxHp: 80, level2At: 3 }),
+  def('fch-008', { type: 'character', maxHp: 50, level1At: 0 }),
   def('ch-3', { type: 'character', maxHp: 80, level1At: 1, level2At: 7, abilities: [{ kind: 'gainKnifeAtTurnStart', level: 1 }, { kind: 'weaponTagPlusDamage', tag: 'knife', amount: 5, level: 2 }], levels: [{ level: 1, text: 'At beginning of your turn, may gain 1 Knife weapon.' }] }),
   def('am-1', { type: 'ammunition', copies: 28, bonuses: { ammo: 10, gold: 10 } }),
   def('we-1', { type: 'weapon', copies: 9, cost: 20, ammoReq: 20, damage: 10 }),
@@ -527,4 +528,59 @@ test('checkWin empty seats', () => {
   const c = checkWin(empty);
   expect(c.gameOver).toBe(true);
   expect(c.endReason).toBe('allPlayersDead');
+});
+
+test('checkWin: Sherry last alive ends the game', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'fch-008' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const end = seatMap(s, (p, i) => i === 1
+    ? { ...p, dead: true, decorations: 1 }
+    : { ...p, decorations: 2 });
+  const c = checkWin(end);
+  expect(c.gameOver).toBe(true);
+  expect(c.endReason).toBe('sherryLastAlive');
+  expect(c.winners).toEqual([0]);
+});
+
+test('checkWin: Sherry last alive decides by decorations, not seat order', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'fch-008' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const end = seatMap(s, (p, i) => i === 1
+    ? { ...p, dead: true, decorations: 9 }
+    : { ...p, decorations: 2 });
+  const c = checkWin(end);
+  expect(c.gameOver).toBe(true);
+  expect(c.endReason).toBe('sherryLastAlive');
+  // The ranking covers EVERY seat, including one that is already dead.
+  expect(c.winners).toEqual([1]);
+});
+
+test('checkWin: Sherry last alive, Health must NOT break a decoration tie', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'fch-008' }, { name: 'B', characterCardId: 'ch-1' }]);
+  // Both at 3 decorations; the DEAD seat has more Health.
+  const end = seatMap(s, (p, i) => i === 1
+    ? { ...p, dead: true, decorations: 3, hp: 100 }
+    : { ...p, decorations: 3, hp: 50 });
+  const c = checkWin(end);
+  expect(c.endReason).toBe('sherryLastAlive');
+  expect(c.winners).toEqual([0, 1]);
+});
+
+test('checkWin: Sherry alive but not last does NOT end the game', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'fch-008' }, { name: 'B', characterCardId: 'ch-1' }]);
+  expect(checkWin(s).gameOver).toBe(false);
+});
+
+test('checkWin: last alive is NOT Sherry -> no sherry ending', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'ch-1' }, { name: 'B', characterCardId: 'fch-008' }]);
+  const end = seatMap(s, (p, i) => i === 1 ? { ...p, dead: true } : p);
+  const c = checkWin(end);
+  expect(c.gameOver).toBe(false);
+  expect(c.endReason).toBeUndefined();
+});
+
+test('checkWin: Sherry last alive, exact tie -> shared victory', () => {
+  const s = setup2(1, [{ name: 'A', characterCardId: 'fch-008' }, { name: 'B', characterCardId: 'ch-1' }]);
+  const end = seatMap(s, (p, i) => i === 1 ? { ...p, dead: true, decorations: 4 } : { ...p, decorations: 4 });
+  const c = checkWin(end);
+  expect(c.endReason).toBe('sherryLastAlive');
+  expect(c.winners).toEqual([0, 1]);
 });

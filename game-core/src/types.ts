@@ -1241,7 +1241,7 @@ export interface GameState {
 
   /** Winner seat(s) once phase === "gameOver". */
   readonly winners: readonly number[];
-  readonly endReason?: "uroborosDefeated" | "allPlayersDead";
+  readonly endReason?: "uroborosDefeated" | "allPlayersDead" | "sherryLastAlive";
 
   /** Reactive trash window (AC-018, Jill L2, AC-042): pending off-turn reaction. */
   readonly reactiveTrashWindow?: {

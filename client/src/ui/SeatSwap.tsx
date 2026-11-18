@@ -35,7 +35,9 @@ export function SeatSwap({ mode, nextName, winners, endReason, playerNames, stan
     const title = names.length > 1 ? 'SHARED VICTORY' : 'CHAMPION';
     const sub = endReason === 'allHumansDead'
       ? 'Your character has fallen. The match is over.'
-      : 'The Mansion is cleared. Congratulations!';
+      : endReason === 'sherryLastAlive'
+        ? 'Sherry Birkin is the last Character standing. The match is over.'
+        : 'The Mansion is cleared. Congratulations!';
 
     return (
       <div className="seat-swap-backdrop" data-seat-swap="gameover">
