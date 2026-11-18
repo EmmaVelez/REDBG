@@ -1140,25 +1140,56 @@ h1, h2 { margin: 0 0 8px; }
 /* The flight layer sets the art inline; hide the emblem when it is present. */
 .flight-face-down[style*='background-image'] .card-back-emblem { display: none; }
 
+/* The reveal starts FACE DOWN: the flipper rotates in 3D from the back
+   to the face, and the entrance / shake / border-flash are DELAYED until
+   the flip has finished so they read as one sequence. The element is
+   keyed by card + index, so a multi-explore's cards each replay it. */
 .mansion-door-card {
   position: relative;
+  perspective: 1100px;
+}
+.mansion-door-flip {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: door-card-flip 0.55s cubic-bezier(0.3, 0.8, 0.35, 1) both;
+}
+@keyframes door-card-flip {
+  from { transform: rotateY(90deg) scale(0.86); opacity: 0.35; }
+  40%  { opacity: 1; }
+  to   { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+.mansion-door-face,
+.mansion-door-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.mansion-door-face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mansion-door-art {
+  position: absolute;
+  inset: 0;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  /* Each revealed card re-runs this entrance (the element is keyed by card +
-     index), so a multi-explore's cards animate in ONE AT A TIME. */
-  animation: door-card-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }
-@keyframes door-card-in {
-  from { transform: translateX(-46px) scale(0.8); opacity: 0; }
-  to   { transform: translateX(0) scale(1); opacity: 1; }
+.mansion-door-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.mansion-door-back .card-back { width: 100%; height: 100%; border-radius: 8px; }
 /* Defeated Infected — shake + crimson border flash after entrance.
    The damage burst layers on top of the entrance transform via
    matching origin; the border overlay appears mid-entrance. */
 .mansion-door-card.has-defeated-infected {
-  animation: door-card-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15),
-             infected-dmg-shake 0.9s ease-in-out 0.24s;
+  animation: infected-dmg-shake 0.9s ease-in-out 0.6s;
   transform-origin: center center;
 }
 @keyframes infected-dmg-shake {
@@ -1179,7 +1210,7 @@ h1, h2 { margin: 0 0 8px; }
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  animation: dmg-border-flash 0.6s ease-out 0.26s forwards;
+  animation: dmg-border-flash 0.6s ease-out 0.62s forwards;
 }
 @keyframes dmg-border-flash {
   0%   { opacity: 0; }

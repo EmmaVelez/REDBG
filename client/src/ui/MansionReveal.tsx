@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { CardDef, GameState, Prompt } from '@re/game-core';
 import { CardView } from './CardView';
+import { CardBack } from './CardBack';
 import { cardArtUrl } from './cardArt';
 import { optionLabel } from './promptLabels';
 
@@ -145,10 +146,22 @@ export function MansionReveal({
           <div
             className={`mansion-door-card${isInfected && damage > 0 ? ' has-defeated-infected' : ''}`}
             key={`${def.id}-${index}`}
-            style={{ backgroundImage: art ? `url(${art})` : undefined, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }}
           >
+            {/* The card starts FACE DOWN (the mansion-door back) and flips
+                over before the entrance / shake / border-flash run. */}
+            <div className="mansion-door-flip">
+              <div className="mansion-door-face">
+                <div
+                  className="mansion-door-art"
+                  style={art !== undefined ? { backgroundImage: `url(${art})` } : undefined}
+                />
+                <CardView def={def} hideCost hp={hp} maxHp={hp} />
+              </div>
+              <div className="mansion-door-back">
+                <CardBack />
+              </div>
+            </div>
             <div className="mansion-door-dmg-flash" />
-            <CardView def={def} hideCost hp={hp} maxHp={hp} />
           </div>
         </div>
         <span className="mansion-door-result">{resultText}</span>
