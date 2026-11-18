@@ -381,6 +381,11 @@ h1, h2 { margin: 0 0 8px; }
 .cc-fan > .card { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 /* Resting face down (downed / dead) — origin declared with the keyframes. */
 .cc-fan.cc-face-down .cc-back { display: block; }
+/* Face down, the card shows ONLY the back art: no health gauge bleeding
+   through. (The ring lives inside the 3D-transformed card, so
+   backface-visibility alone does not reliably hide it.) */
+.cc-fan.cc-face-down .cc-hp-ring,
+.cc-fan.cc-flipping-down .cc-hp-ring { display: none; }
 /* The flip itself. `both` keeps the end pose; the resting class above
    takes over once the animation class is removed. */
 .cc-fan.cc-flipping-down { animation: cc-flip-down 0.7s cubic-bezier(0.4, 0, 0.3, 1) both; }
