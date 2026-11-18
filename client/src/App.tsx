@@ -415,7 +415,7 @@ export function App(): JSX.Element {
           for attention. Human games show it immediately. */}
       <TargetedNotice items={isBotGame && revealQueue !== null ? [] : targetedByMe} />
       <main className="app-main">
-        <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} />
+        <Board state={gameState} mySeat={mySeat} onAction={a => dispatchClient({ kind: 'sendAction', action: a })} disabled={disabled} overlayOpen={youDied !== null} />
         {logOpen && (
           <aside className="app-side">
             <GameLog state={gameState} chat={chat} lastError={lastError} seatNames={seatNames} onClose={() => setLogOpen(false)} />
@@ -444,6 +444,7 @@ export function App(): JSX.Element {
           status={status}
           roomCode={room?.roomCode ?? null}
           cardHidden={revealCurrent !== null || youDied !== null || cardReveal !== null}
+          overlayOpen={youDied !== null}
         />
       </footer>
       {revealCurrent !== null && (

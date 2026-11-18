@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import type { CardDef, GameState } from '@re/game-core';
 import { CardView } from './CardView';
 import { defForInstance } from './cards';
+import { CHARACTER_BACK_ART } from './cardArt';
 import { useDamageEffect } from './useDamageEffect';
 
 /**
@@ -64,6 +65,29 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
   const { flash: charFlash, animHp: charAnimHp } = useDamageEffect(hp, maxHp, `${seat}-char`);
   const { flash: partnerFlash, animHp: partnerAnimHp } = useDamageEffect(hp, maxHp, `${seat}-partner`);
 
+  // FACE-DOWN state. The flip is driven by a TRANSITION of the seat's
+  // downed flag, so it plays once: down on death, up on revive. A dead
+  // seat never flips back (revive is impossible when dead).
+  const downed = player.downed;
+  const dead = player.dead;
+  const wasDownedRef = useRef(downed);
+  const [flip, setFlip] = useState<'none' | 'down' | 'up'>('none');
+  useEffect(() => {
+    const was = wasDownedRef.current;
+    wasDownedRef.current = downed;
+    if (was === downed) return;
+    setFlip(downed ? 'down' : 'up');
+  }, [downed]);
+  useEffect(() => {
+    if (flip === 'none') return;
+    const t = setTimeout(() => setFlip('none'), 900);
+    return () => clearTimeout(t);
+  }, [flip]);
+  // The resting state: a downed/dead seat stays face down after the
+  // animation finishes.
+  const faceDown = downed || dead;
+  const flipClass = flip !== 'none' ? ` cc-flipping-${flip}` : (faceDown ? ' cc-face-down' : '');
+
   return (
     <div className="player-character-row" data-character-row>
       {charDef !== null && (
@@ -74,8 +98,11 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
           data-poison={hasPoison ? true : undefined}
           style={{ '--cc-overlap': attachedOverlap(mainAttached.length) } as CSSProperties}
         >
-          <div className="cc-fan">
+          <div className={`cc-fan${flipClass}`} data-cc-flip={flip !== 'none' ? flip : (faceDown ? 'down' : 'up')}>
             <CardView def={charDef} compact artOnly decorations={player.decorations} hp={player.hp} maxHp={player.maxHp} poisoned={hasPoison} cardAnimHp={charAnimHp} />
+            {CHARACTER_BACK_ART !== undefined && (
+              <div className="cc-back" data-cc-back style={{ backgroundImage: `url(${CHARACTER_BACK_ART})` }} />
+            )}
             {mainAttached.length > 0 && (
               <div className="cc-attached-fan" data-attached-fan={mainAttached.length}>
                 {mainAttached.map(x => (
@@ -107,7 +134,7 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
           data-anim-zone="attached"
           style={{ '--cc-overlap': attachedOverlap(partnerAttached.length) } as CSSProperties}
         >
-          <div className="cc-fan">
+          <div className={`cc-fan${flipClass}`} data-cc-flip={flip !== 'none' ? flip : (faceDown ? 'down' : 'up')}>
             {/* Alliance Partner Modification: "Your Partner's level is determined
                 by the total Decorations attached to your Main Character." The
                 Partner holds no Decorations of its own, so feed it the Main

@@ -96,9 +96,12 @@ export interface ActionBarProps {
   /** Force the decision card away — set while a full-screen overlay (mansion
    *  reveal, you died) is showing, because those carry their own prompts. */
   readonly cardHidden?: boolean;
+  /** YOU DIED overlay is up for this seat — hold the character-card flip
+   *  until it resolves. */
+  readonly overlayOpen?: boolean;
 }
 
-export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false, status, roomCode = null, cardHidden = false }: ActionBarProps): JSX.Element {
+export function ActionBar({ state, seat, onAction, disabled = false, lastError, onOpenLog, logOpen = false, status, roomCode = null, cardHidden = false, overlayOpen = false }: ActionBarProps): JSX.Element {
   const legal = enumerateLegalActions(state, seat);
   const canEndTurn = legal.some(a => a.type === 'endTurn' && a.seat === seat);
   const explores = legalExplores(state, seat);

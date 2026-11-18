@@ -20,9 +20,11 @@ export interface BoardProps {
   readonly mySeat: number;
   readonly onAction: (action: Action) => void;
   readonly disabled?: boolean;
+  /** YOU DIED overlay is up — hold character-card flips until it resolves. */
+  readonly overlayOpen?: boolean;
 }
 
-export function Board({ state, mySeat, onAction, disabled = false }: BoardProps): JSX.Element {
+export function Board({ state, mySeat, onAction, disabled = false, overlayOpen = false }: BoardProps): JSX.Element {
   const piles = Object.values(state.marketPiles)
     .filter(p => p.cards.length > 0)
     .sort((a, b) => a.pileId.localeCompare(b.pileId));

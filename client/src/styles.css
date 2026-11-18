@@ -361,6 +361,38 @@ h1, h2 { margin: 0 0 8px; }
   position: relative;
   transition: transform 0.12s ease-out;
   transform-origin: bottom left;
+  /* The flip is a 3D rotation of the fan; the back face sits behind it. */
+  transform-style: preserve-3d;
+}
+/* The character card's face-down back. It is the mansion-cover art, sits
+   exactly over the fan, and is only revealed while the flip animation
+   runs or the seat is resting face down. */
+.cc-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: rotateY(180deg);
+  display: none;
+}
+.cc-fan > .card { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+/* Resting face down (downed / dead). */
+.cc-fan.cc-face-down { transform: rotateY(180deg); }
+.cc-fan.cc-face-down .cc-back { display: block; }
+/* The flip itself. `both` keeps the end pose; the resting class above
+   takes over once the animation class is removed. */
+.cc-fan.cc-flipping-down { animation: cc-flip-down 0.7s cubic-bezier(0.4, 0, 0.3, 1) both; }
+.cc-fan.cc-flipping-up { animation: cc-flip-up 0.7s cubic-bezier(0.4, 0, 0.3, 1) 0.2s both; }
+@keyframes cc-flip-down {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(180deg); }
+}
+@keyframes cc-flip-up {
+  from { transform: rotateY(180deg); }
+  to   { transform: rotateY(0deg); }
 }
 .player-character-card:hover { z-index: 60; }
 /* 2.5x: enough that the whole ability text is legible once the clamp is gone

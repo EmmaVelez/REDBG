@@ -34,3 +34,6 @@ export function hasCardArt(cardId: string): boolean {
 
 /** The shared card-back art (the mansion door). */
 export const CARD_BACK_ART: string | undefined = BY_ID['CARD-BACK'];
+
+/** The CHARACTER card back art (Spencer Mansion cover). */
+export const CHARACTER_BACK_ART: string | undefined = BY_ID['CARD-BACK-CHARACTER'];
