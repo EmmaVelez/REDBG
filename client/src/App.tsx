@@ -21,6 +21,10 @@ import { defForInstance } from './ui/cards';
 import { TargetedNotice } from './ui/TargetedNotice';
 import type { RevealPartyMember } from './ui/MansionReveal';
 
+/** Beat between two explorers' reveal blocks, so back-to-back bot explores
+ *  read as separate fights. */
+const REVEAL_GAP_MS = 450;
+
 /** One step of the mansion-door reveal: a revealed card plus its outcome. */
 interface RevealEntry {
   readonly def: CardDef;
@@ -104,6 +108,9 @@ export function App(): JSX.Element {
   // the panel steps through one at a time (the index is the current card).
   const [revealQueue, setRevealQueue] = useState<RevealEntry[] | null>(null);
   const [revealIndex, setRevealIndex] = useState(0);
+  /** True during the short beat BETWEEN two explorers' reveal blocks. */
+  const [revealGap, setRevealGap] = useState(false);
+  const revealGapRef = useRef(false);
   // Non-explore ability/effect reveal (Ada's peek, the PDA, Master of
   // Unlocking, …): a separate, lighter overlay than the mansion-door reveal.
   const [cardReveal, setCardReveal] = useState<CardRevealBatch | null>(null);
@@ -270,6 +277,13 @@ export function App(): JSX.Element {
   }, [state, mySeat]);
 
   const revealCurrent = revealQueue !== null ? revealQueue[revealIndex] ?? null : null;
+  const nextReveal = revealQueue !== null ? revealQueue[revealIndex + 1] ?? null : null;
+  // A bot stretch arrives as one snapshot, so several explorers' cards queue
+  // back to back. This is true when the NEXT card belongs to a DIFFERENT
+  // explorer than the one on screen — the seam where a gap belongs.
+  const crossesExplorer = nextReveal !== null
+    && revealCurrent !== null
+    && nextReveal.explorerSeat !== revealCurrent.explorerSeat;
 
   // Every viewer sees EVERY player's mansion-door reveal (the zone diff is
   // public), and the overlay pauses the table as before — but it now AUTO-
@@ -284,8 +298,24 @@ export function App(): JSX.Element {
     && ((view?.state.prompts.some(p => p.seat === mySeat)) ?? false);
   useEffect(() => {
     if (revealQueue === null || revealLocked) return;
+    // Mid-gap: the beat is over, show the next explorer's first card.
+    if (revealGapRef.current) {
+      const timer = setTimeout(() => {
+        revealGapRef.current = false;
+        setRevealGap(false);
+        setRevealIndex(i => i + 1);
+      }, REVEAL_GAP_MS);
+      return () => clearTimeout(timer);
+    }
     const timer = setTimeout(() => {
       if (revealQueue !== null && revealIndex < revealQueue.length - 1) {
+        // Crossing to a different explorer: drop the panel for a beat so the
+        // two fights read as separate events rather than one blur.
+        if (crossesExplorer) {
+          revealGapRef.current = true;
+          setRevealGap(true);
+          return;
+        }
         setRevealIndex(revealIndex + 1);
         return;
       }
@@ -296,7 +326,7 @@ export function App(): JSX.Element {
       if (queued !== null) setYouDied(queued === 'dead');
     }, 2000);
     return () => clearTimeout(timer);
-  }, [revealQueue, revealIndex, revealLocked]);
+  }, [revealQueue, revealIndex, revealLocked, crossesExplorer]);
 
   const inLobby = room !== null && (room.phase === 'lobby' || view === null);
   const seatNames = room?.players.map(p => p.name) ?? hotseat?.names ?? [];
@@ -446,7 +476,7 @@ export function App(): JSX.Element {
           cardHidden={revealCurrent !== null || youDied !== null || cardReveal !== null}
         />
       </footer>
-      {revealCurrent !== null && (
+      {revealCurrent !== null && !revealGap && (
         <MansionReveal
           def={revealCurrent.def}
           resultText={revealCurrent.resultText}
