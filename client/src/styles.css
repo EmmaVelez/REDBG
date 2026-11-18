@@ -1110,7 +1110,7 @@ h1, h2 { margin: 0 0 8px; }
   background-position: center;
   /* Each revealed card re-runs this entrance (the element is keyed by card +
      index), so a multi-explore's cards animate in ONE AT A TIME. */
-  animation: door-card-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  animation: door-card-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }
 @keyframes door-card-in {
   from { transform: translateX(-46px) scale(0.8); opacity: 0; }
@@ -1120,8 +1120,8 @@ h1, h2 { margin: 0 0 8px; }
    The damage burst layers on top of the entrance transform via
    matching origin; the border overlay appears mid-entrance. */
 .mansion-door-card.has-defeated-infected {
-  animation: door-card-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15),
-             infected-dmg-shake 1.6s ease-in-out 0.38s;
+  animation: door-card-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15),
+             infected-dmg-shake 0.9s ease-in-out 0.24s;
   transform-origin: center center;
 }
 @keyframes infected-dmg-shake {
@@ -1142,7 +1142,7 @@ h1, h2 { margin: 0 0 8px; }
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  animation: dmg-border-flash 1s ease-out 0.4s forwards;
+  animation: dmg-border-flash 0.6s ease-out 0.26s forwards;
 }
 @keyframes dmg-border-flash {
   0%   { opacity: 0; }
@@ -1326,7 +1326,7 @@ h1, h2 { margin: 0 0 8px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: door-backdrop-in 0.25s ease-out;
+  animation: door-backdrop-in 0.16s ease-out;
 }
 @keyframes door-backdrop-in {
   from { opacity: 0; }
@@ -1344,13 +1344,26 @@ h1, h2 { margin: 0 0 8px; }
     radial-gradient(circle at 50% 0%, #2a2418 0%, #17130b 70%),
     linear-gradient(180deg, #1d1911 0%, #0e0b06 100%);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.85), inset 0 0 40px rgba(0, 0, 0, 0.6);
-  animation: door-panel-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  animation: door-panel-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2);
   max-width: 700px;
   text-align: center;
 }
 @keyframes door-panel-in {
   from { transform: scale(0.8) translateY(20px); opacity: 0; }
   to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+.mansion-door-explorer {
+  color: #ffe6a8;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.mansion-door-divider {
+  width: 62%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #6b5a34, transparent);
 }
 .mansion-door-title {
   color: #ffd479;

@@ -1382,7 +1382,11 @@ export type Action =
   | { readonly type: "removeAttachedItem"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "chooseOption"; readonly seat: number; readonly promptId: string; readonly option: number }
   /** Outbreak/Mercenaries: supplementary log entry emitted by applyOutbreakHooks — records which mansion card was revealed during an explore. */
-  | { readonly type: "exploreReveal"; readonly seat: number; readonly instanceId: string; readonly name: string };
+  | { readonly type: "exploreReveal"; readonly seat: number; readonly instanceId: string; readonly name: string;
+    /** How the fight resolved, for the log: defeated / removed / not defeated. */
+    readonly outcome?: "defeated" | "removed" | "notDefeated";
+    /** Damage the EXPLORING seat took from this reveal (0 when defeated). */
+    readonly damageTaken?: number };
 
 
 export interface GameSetup {

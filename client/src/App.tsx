@@ -31,6 +31,7 @@ interface RevealEntry {
   readonly hp?: number;
   readonly weapons: readonly CardDef[];
   readonly explorerSeat: number;
+  readonly explorerName: string;
   readonly party: readonly RevealPartyMember[];
 }
 
@@ -257,7 +258,8 @@ export function App(): JSX.Element {
         const revealedHp = (def.infectedEffects ?? []).some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')
           ? party.find(m => m.leader)?.maxHp
           : undefined;
-        queue.push({ def, resultText, damage: r.damage, hp: revealedHp, weapons: weaponDefs, explorerSeat: r.explorerSeat, party });
+        const explorerName = state.seats[r.explorerSeat]?.name ?? `Player ${r.explorerSeat + 1}`;
+        queue.push({ def, resultText, damage: r.damage, hp: revealedHp, weapons: weaponDefs, explorerSeat: r.explorerSeat, explorerName, party });
       }
     }
     if (queue.length === 0) return;
@@ -292,7 +294,7 @@ export function App(): JSX.Element {
       const queued = pendingDeathRef.current;
       pendingDeathRef.current = null;
       if (queued !== null) setYouDied(queued === 'dead');
-    }, 2000);
+    }, 1000);
     return () => clearTimeout(timer);
   }, [revealQueue, revealIndex, revealLocked]);
 
@@ -452,6 +454,8 @@ export function App(): JSX.Element {
           hp={revealCurrent.hp}
           weapons={revealCurrent.weapons}
           damageLabel={revealCurrent.explorerSeat === mySeat ? 'Your damage' : 'Damage dealt'}
+          explorerName={revealCurrent.explorerSeat === mySeat ? 'Your explore' : `${revealCurrent.explorerName}'s explore`}
+          explorerChanged={revealIndex === 0 || (revealQueue?.[revealIndex - 1]?.explorerSeat !== revealCurrent.explorerSeat)}
           forcedByLabel={forcedByLabel}
           party={revealCurrent.party}
           index={revealIndex}

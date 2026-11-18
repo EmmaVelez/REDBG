@@ -951,22 +951,33 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
       } else if (cardData) {
         name = cardData.cardId ?? 'Unknown';
       }
+      const zone = cardData?.location.zone;
+      const outcome: 'defeated' | 'removed' | 'notDefeated' =
+        zone === 'attached' ? 'defeated' : zone === 'removed' ? 'removed' : 'notDefeated';
+      const before = prev.seats[action.seat];
+      const after = state.seats[action.seat];
+      const damageTaken = before !== undefined && after !== undefined
+        ? Math.max(0, before.hp - after.hp)
+        : 0;
       state = {
         ...state,
-        log: [...state.log, { seq: state.log.length + 1, action: { type: 'exploreReveal' as const, seat: action.seat, instanceId, name } }],
+        log: [...state.log, { seq: state.log.length + 1, action: { type: 'exploreReveal' as const, seat: action.seat, instanceId, name, outcome, damageTaken } }],
       };
     }
   } else if (action.type === 'attack') {
     const target = state.seats[action.targetSeat];
     if (target?.isInfectedCharacter === true) mark(action.seat);
   }
-  if (state.infectionDeck === undefined) return state;
-  for (let i = 0; i < state.seats.length; i++) {
+  // Outbreak-only reanimation. The explore-reveal log entry above is emitted
+  // for EVERY explore regardless of mode.
+  if (state.infectionDeck !== undefined) {
+    for (let i = 0; i < state.seats.length; i++) {
     const s = state.seats[i];
     if (s === undefined) continue;
     const level = s.infectionCards?.length ?? 0;
-    if (level >= MAX_INFECTION_LEVEL && !s.dead && s.isInfectedCharacter !== true) {
-      state = reanimateAsInfected(state, s.seat);
+      if (level >= MAX_INFECTION_LEVEL && !s.dead && s.isInfectedCharacter !== true) {
+        state = reanimateAsInfected(state, s.seat);
+      }
     }
   }
   return state;

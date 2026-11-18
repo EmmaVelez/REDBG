@@ -59,6 +59,14 @@ function cardName(state: GameState, instanceId: string | undefined): string | nu
   return def !== null ? def.name : null;
 }
 
+/** The fight result appended to an explore's log line. */
+function revealResult(a: Extract<Action, { type: 'exploreReveal' }>): string {
+  if (a.outcome === 'defeated') return ' — defeated';
+  if (a.outcome === 'removed') return ' — removed from the game';
+  const dmg = a.damageTaken ?? 0;
+  return dmg > 0 ? ` — took ${dmg} damage` : '';
+}
+
 function describe(state: GameState, action: Action): string {
   switch (action.type) {
     case 'playActionCard':
@@ -113,9 +121,11 @@ export function formatTurnHistory(state: GameState): readonly HistoryLine[] {
     const a = entry.action;
     const seat = 'seat' in a ? a.seat : -1;
     // Handle supplementary exploreReveal entries by appending to prior explore.
+    // The line names the revealed card AND the result of the fight, so a
+    // spectator can read who fought what without opening the reveal.
     if (a.type === 'exploreReveal' && lastExploreText !== null && lastExploreIndex >= 0) {
       const prev = lines[lastExploreIndex]!;
-      lines[lastExploreIndex] = { seq: prev.seq, turn: prev.turn, seat: prev.seat, seatName: prev.seatName, text: `${lastExploreText} — revealed ${a.name}` };
+      lines[lastExploreIndex] = { seq: prev.seq, turn: prev.turn, seat: prev.seat, seatName: prev.seatName, text: `${lastExploreText} — revealed ${a.name}${revealResult(a)}` };
       continue;
     }
     const line: HistoryLine = {

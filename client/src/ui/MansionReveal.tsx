@@ -46,6 +46,10 @@ export interface MansionRevealProps {
   readonly weapons?: readonly CardDef[];
   /** "Your damage" for the exploring player; "Damage dealt" for someone
    *  watching a forced explore (FCH-008 Sherry). */
+  /** Who explored: "Your explore" / "Ada's explore". Serves as the panel header. */
+  readonly explorerName?: string;
+  /** True when this card starts a DIFFERENT explorer's reveal block. */
+  readonly explorerChanged?: boolean;
   readonly damageLabel?: string;
   /** Attribution for a forced explore (FCH-008 Sherry): "X forced you to
    *  Explore!" for the target, "You forced X to Explore!" for Sherry. */
@@ -70,6 +74,8 @@ export function MansionReveal({
   damage,
   hp,
   weapons,
+  explorerName,
+  explorerChanged = false,
   damageLabel = 'Your damage',
   forcedByLabel,
   party,
@@ -87,6 +93,10 @@ export function MansionReveal({
   return (
     <div className="mansion-door-backdrop" data-mansion-door>
       <div className="mansion-door-panel" data-reveal-type={def.type}>
+        {explorerName !== undefined && explorerName !== '' && (
+          <div className="mansion-door-explorer" data-reveal-explorer={explorerName}>{explorerName}</div>
+        )}
+        {explorerChanged && <div className="mansion-door-divider" data-reveal-divider />}
         <span className="mansion-door-title">{isInfected ? 'The door creaks open…' : 'You found something…'}</span>
         {forcedByLabel !== undefined && forcedByLabel !== '' && (
           <div className="mansion-door-forced" data-forced-by>{forcedByLabel}</div>
