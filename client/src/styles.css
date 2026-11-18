@@ -379,21 +379,26 @@ h1, h2 { margin: 0 0 8px; }
   display: none;
 }
 .cc-fan > .card { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-/* Resting face down (downed / dead). */
-.cc-fan.cc-face-down { transform: rotateY(180deg); }
+/* Resting face down (downed / dead) — origin declared with the keyframes. */
 .cc-fan.cc-face-down .cc-back { display: block; }
 /* The flip itself. `both` keeps the end pose; the resting class above
    takes over once the animation class is removed. */
 .cc-fan.cc-flipping-down { animation: cc-flip-down 0.7s cubic-bezier(0.4, 0, 0.3, 1) both; }
 .cc-fan.cc-flipping-up { animation: cc-flip-up 0.7s cubic-bezier(0.4, 0, 0.3, 1) 0.2s both; }
+/* The flip must rotate about the card's VERTICAL CENTRE, not the fan's
+   `transform-origin: bottom left` (that origin belongs to the hover scale).
+   Without this the card swings out around its bottom-left corner and ends up
+   off screen. */
 @keyframes cc-flip-down {
-  from { transform: rotateY(0deg); }
-  to   { transform: rotateY(180deg); }
+  from { transform: rotateY(0deg); transform-origin: center center; }
+  to   { transform: rotateY(180deg); transform-origin: center center; }
 }
 @keyframes cc-flip-up {
-  from { transform: rotateY(180deg); }
-  to   { transform: rotateY(0deg); }
+  from { transform: rotateY(180deg); transform-origin: center center; }
+  to   { transform: rotateY(0deg); transform-origin: center center; }
 }
+/* The resting face-down pose needs the same origin. */
+.cc-fan.cc-face-down { transform: rotateY(180deg); transform-origin: center center; }
 .player-character-card:hover { z-index: 60; }
 /* 2.5x: enough that the whole ability text is legible once the clamp is gone
    (at 2x the enlarged card is 160x228 with 14px text). The origin stays the
