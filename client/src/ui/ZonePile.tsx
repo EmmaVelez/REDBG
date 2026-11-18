@@ -44,7 +44,7 @@ export function ZonePile({ label, count, animZone, topDef = null, seat, fanDefs 
         <div className="zone-pile-cards" data-fan={fan}>
           {Array.from({ length: visibleCount }, (_, i) => (
             <div key={i} className="zone-pile-card" data-depth={i}>
-              <CardBack compact />
+              <CardBack compact variant="resource" />
             </div>
           ))}
         </div>

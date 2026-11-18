@@ -37,3 +37,6 @@ export const CARD_BACK_ART: string | undefined = BY_ID['CARD-BACK'];
 
 /** The CHARACTER card back art (Spencer Mansion cover). */
 export const CHARACTER_BACK_ART: string | undefined = BY_ID['CARD-BACK-CHARACTER'];
+
+/** The RESOURCE card back art (biohazard cover) — deck / discard piles. */
+export const RESOURCE_BACK_ART: string | undefined = BY_ID['CARD-BACK-RESOURCE'];

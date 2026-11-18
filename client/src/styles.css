@@ -1183,7 +1183,7 @@ h1, h2 { margin: 0 0 8px; }
 .mansion-door-flip {
   position: relative;
   transform-style: preserve-3d;
-  animation: door-card-flip 0.55s cubic-bezier(0.3, 0.8, 0.35, 1) both;
+  animation: door-card-flip 1.55s cubic-bezier(0.3, 0.8, 0.35, 1) both;
 }
 @keyframes door-card-flip {
   from { transform: rotateY(90deg) scale(0.86); opacity: 0.35; }
@@ -1221,7 +1221,7 @@ h1, h2 { margin: 0 0 8px; }
    The damage burst layers on top of the entrance transform via
    matching origin; the border overlay appears mid-entrance. */
 .mansion-door-card.has-defeated-infected {
-  animation: infected-dmg-shake 0.9s ease-in-out 0.6s;
+  animation: infected-dmg-shake 0.9s ease-in-out 1.6s;
   transform-origin: center center;
 }
 @keyframes infected-dmg-shake {
@@ -1242,7 +1242,7 @@ h1, h2 { margin: 0 0 8px; }
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  animation: dmg-border-flash 0.6s ease-out 0.62s forwards;
+  animation: dmg-border-flash 0.6s ease-out 1.62s forwards;
 }
 @keyframes dmg-border-flash {
   0%   { opacity: 0; }

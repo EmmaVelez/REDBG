@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 import type { CardDef, GameState } from '@re/game-core';
 import { diffCardMoves, type CardMove } from './anims';
 import { defForInstance } from './cards';
-import { CARD_BACK_ART } from './cardArt';
+import { RESOURCE_BACK_ART } from './cardArt';
 
 /**
  * Card flight layer — animates cards moving between zones.
@@ -35,9 +35,9 @@ function buildFlightCard(def: CardDef | null): HTMLElement {
   host.className = 'flight-card-inner';
   if (def === null) {
     host.classList.add('flight-face-down');
-    // Same mansion-door art as the static CardBack, so a face-down flight
+    // Same resource back as the deck/discard piles, so a face-down flight
     // looks identical to the pile it leaves.
-    if (CARD_BACK_ART !== undefined) host.style.backgroundImage = `url(${CARD_BACK_ART})`;
+    if (RESOURCE_BACK_ART !== undefined) host.style.backgroundImage = `url(${RESOURCE_BACK_ART})`;
     const emblem = document.createElement('span');
     emblem.className = 'card-back-emblem';
     emblem.textContent = 'R.E.';
