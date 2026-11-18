@@ -927,22 +927,43 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
     // debt, whatever explore path was taken (single, multi, weapon-granted).
     // A multi-explore with exploreCount 2 IS two Explores, so it pays 2.
     state = payExploreDebt(state, action.seat, action.exploreCount ?? 1);
-    // Detect which mansion deck card was revealed by comparing decks before/after.
-    // A revealed card disappears from mansionDeck and appears in a player's
-    // inventory/discard/playArea — track what left the deck.
+    // Which mansion card was revealed? Prefer the engine's OWN record on the
+    // explore action (`revealedInstanceIds`): it is exact and covers cards
+    // that end up back in the deck (Zombie Grab, a bottomed card, a shuffled-
+    // back Infected), which a deck-zone diff cannot see. Fall back to the diff
+    // for logs written before that field existed.
+    // `revealedInstanceIds` is written onto the LOGGED action by
+    // `recordExploreReveals` (a clone in nextBase.log) — the raw `action`
+    // object this hook receives never carries it.
+    let loggedExplore: Action | undefined;
+    for (let i = state.log.length - 1; i >= 0; i--) {
+      const e = state.log[i];
+      if (e !== undefined && e.action.type === 'explore') { loggedExplore = e.action; break; }
+    }
+    const engineRevealed = (loggedExplore as { revealedInstanceIds?: readonly string[] } | undefined)
+      ?.revealedInstanceIds ?? null;
     const prevDeck = new Set(prev.mansionDeck);
     const nextDeck = new Set(state.mansionDeck ?? []);
-    // Cards that were in the deck but aren't anymore (revealed/removed cards).
-    const revealedInstances: string[] = [];
-    for (const id of prevDeck) { if (!nextDeck.has(id)) revealedInstances.push(id); }
-    // Filter to instances that are now in a player's non-mansion zone.
-    const validCards = revealedInstances.filter(id => {
-      const loc = state.cards[id]?.location;
-      return loc && loc.zone !== 'mansionDeck';
-    });
-    if (validCards.length > 0) {
+    const diffRevealed: string[] = [];
+    for (const id of prevDeck) { if (!nextDeck.has(id)) diffRevealed.push(id); }
+    const revealedInstances = engineRevealed ?? diffRevealed;
+    const removed = new Set(state.removed);
+    /** Where a revealed card ended up. A defeated Infected's CardInstance keeps
+     *  `zone: 'mansionDeck'` — the trophy is the seat's `attached` entry. */
+    const outcomeOf = (id: string): 'defeated' | 'removed' | 'notDefeated' => {
+      if (removed.has(id)) return 'removed';
+      const attached = state.seats.some(seat => seat.attached.includes(id));
+      if (attached) return 'defeated';
+      return 'notDefeated';
+    };
+    // The primary card is the first revealed one that RESOLVED (defeated or
+    // removed); a card merely revealed and returned to the deck is the fallback.
+    const resolved = revealedInstances.filter(id => outcomeOf(id) !== 'notDefeated');
+    const primaryRevealed = resolved[0] ?? revealedInstances[0] ?? undefined;
+    const validCardsOrPrimary = primaryRevealed !== undefined ? [primaryRevealed] : [];
+    if (validCardsOrPrimary.length > 0) {
       // Use the first revealed card as the primary reveal.
-      const instanceId = validCards[0]!;
+      const instanceId = validCardsOrPrimary[0]!;
       const cardData = state.cards[instanceId];
       let name = 'Unknown';
       if (cardData && typeof cardData.cardId === 'string' && cardData.cardId.length > 0) {
@@ -951,9 +972,7 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
       } else if (cardData) {
         name = cardData.cardId ?? 'Unknown';
       }
-      const zone = cardData?.location.zone;
-      const outcome: 'defeated' | 'removed' | 'notDefeated' =
-        zone === 'attached' ? 'defeated' : zone === 'removed' ? 'removed' : 'notDefeated';
+      const outcome = outcomeOf(instanceId);
       const before = prev.seats[action.seat];
       const after = state.seats[action.seat];
       const damageTaken = before !== undefined && after !== undefined

@@ -886,7 +886,9 @@ describe('Survival Knife (we-005): +5 per other Knife used this turn', () => {
     const s = knifeGame();
     // first explore: two combat knives (no survival knife) -> 5+5 = 10 dmg
     const after1 = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-004#1', 'we-004#2'], exploreCount: 1 });
-    expect(after1.log[after1.log.length - 1]?.action.type).toBe('explore');
+    // The explore's own entry is followed by its supplementary exploreReveal
+    // log entry (which names the revealed card for the history line).
+    expect(['explore', 'exploreReveal']).toContain(after1.log[after1.log.length - 1]?.action.type);
     // second explore: survival knife alone now sees 2 earlier knives -> 10 + 10
     expect(exploreDamage(after1, 0, ['we-005#1'])).toBe(20);
   });

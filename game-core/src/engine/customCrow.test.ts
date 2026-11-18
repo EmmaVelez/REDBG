@@ -115,8 +115,8 @@ describe('CI-002 reveal chain', () => {
     const { state, ids } = setMansionTop(crowGame({ level: 1, hp: 80, turnAmmo: 70 }), ['ci-002', 'ma-006']);
     const { state: armed, id } = addWeapon(state, 0, 'we-012');
     const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
-    const logged = next.log[next.log.length - 1]?.action;
-    expect(logged).toMatchObject({ type: 'explore', seat: 0, exploreCount: 1 });
+    // The explore's own entry is followed by its exploreReveal supplement.
+    const logged = next.log.filter(e => e.action.type === 'explore').at(-1)?.action;
     if (logged?.type !== 'explore') throw new Error('expected an explore log entry');
     expect(logged.revealedInstanceIds).toEqual(ids);
   });
@@ -125,7 +125,7 @@ describe('CI-002 reveal chain', () => {
     const { state, ids } = setMansionTop(crowGame({ level: 1, hp: 100, turnAmmo: 70 }), ['ci-002', 'ci-002', 'ma-006']);
     const { state: armed, id } = addWeapon(state, 0, 'we-012');
     const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
-    const logged = next.log[next.log.length - 1]?.action;
+    const logged = next.log.filter(e => e.action.type === 'explore').at(-1)?.action;
     if (logged?.type !== 'explore') throw new Error('expected an explore log entry');
     expect(logged.revealedInstanceIds).toEqual(ids);
   });
