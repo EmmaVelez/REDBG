@@ -381,9 +381,12 @@ h1, h2 { margin: 0 0 8px; }
 }
 /* Explicit show/hide rather than backface-visibility: the card face lives in
    the fan's preserve-3d context, where backface-visibility is not reliably
-   honoured, so the inverted face won over the back. */
+   honoured, so the inverted face won over the back.
+   The face is hidden with VISIBILITY, not display — .cc-back is absolutely
+   positioned, so removing the face from layout would collapse .cc-fan to zero
+   height and the back would have no box to fill (and the fan would jump). */
 .cc-fan.cc-face-down > .card,
-.cc-fan.cc-flipping-down > .card { display: none; }
+.cc-fan.cc-flipping-down > .card { visibility: hidden; }
 .cc-fan.cc-face-down .cc-back,
 .cc-fan.cc-flipping-down .cc-back { display: block; }
 /* Face down, the card shows ONLY the back art: no health gauge bleeding
