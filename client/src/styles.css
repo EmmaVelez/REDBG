@@ -390,6 +390,9 @@ h1, h2 { margin: 0 0 8px; }
    hovered. `:has` scopes it to the hover, so the dock still scrolls normally
    the rest of the time. */
 .app-action-dock:has(.player-character-card:hover) { overflow: visible; }
+/* Same for the discard hover fan: the dock clips, so it must stop while a
+   pile is hovered or the fan is cut off at the dock's edge. */
+.app-action-dock:has(.zone-pile:hover) { overflow: visible; }
 .card-art-only:hover .card-top,
 .card-art-only:hover .card-name,
 .card-art-only:hover .card-stats,
@@ -988,6 +991,27 @@ h1, h2 { margin: 0 0 8px; }
 .zone-pile-top .card { width: 60px; min-height: 82px; padding: 4px 5px; gap: 2px; font-size: 8px; }
 .zone-pile-top .card::before { height: 14px; }
 .zone-pile-top .card-cost { min-width: 14px; height: 14px; line-height: 12px; font-size: 8px; }
+/* Hover fan: the pile's contents fanned to the LEFT, mirroring the
+   character's attached-trophy fan (which opens to the right). Absolutely
+   positioned so it never affects layout. */
+.zone-pile-fan {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  display: none;
+  align-items: flex-start;
+  z-index: 120;
+}
+.zone-pile:hover .zone-pile-fan { display: flex; }
+.zone-pile-fan-card { flex: 0 0 auto; }
+.zone-pile-fan-card .card { width: 60px; min-height: 82px; }
+/* The fan is anchored at the pile's LEFT edge (right: 100%) and grows
+   leftward: the first card sits against the pile and each later card overlaps
+   the previous one, mirroring .cc-attached-fan. */
+.zone-pile-fan-card:first-child { margin-left: 0; }
+.zone-pile-fan-card:not(:first-child) {
+  margin-left: calc(var(--zf-overlap, 0.3) * -60px);
+}
 .zone-pile-top .card-name { font-size: 8px; }
 .zone-pile-count {
   position: absolute;

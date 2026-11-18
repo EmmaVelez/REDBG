@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { JSX, ButtonHTMLAttributes } from 'react';
-import type { Action, GameState } from '@re/game-core';
+import type { Action, CardDef, GameState } from '@re/game-core';
 import { enumerateLegalActions } from '@re/game-core';
 import type { ConnectionStatus } from '../net/ws';
 import { ActionBarStats } from './ActionBarStats';
@@ -246,6 +246,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   const player = state.seats[seat];
   const discardTopId = player?.discard[0];
   const discardTopDef = discardTopId === undefined ? null : defForInstance(state, discardTopId);
+  // The discard pile fans its CONTENTS out on hover (the top card first —
+  // discard[0] is the most recent).
+  const discardFanDefs = (player?.discard ?? [])
+    .map(id => defForInstance(state, id))
+    .filter((d): d is CardDef => d !== null);
   const charInst = player === undefined ? undefined : state.cards[player.characterInstanceId];
   const charDef = charInst === undefined ? undefined : state.cardDefs[charInst.cardId];
   const partnerInst = player?.partnerInstanceId === undefined ? undefined : state.cards[player.partnerInstanceId];
@@ -364,7 +369,7 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
             <button type="button" className="hand-scroll hand-scroll-right" onClick={() => scrollHand(1)} title="Scroll hand right" aria-label="Scroll hand right">▶</button>
           </div>
           <div className="action-col">
-            <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} />
+            <ZonePile label="Discard" count={player.discard.length} animZone="discard" seat={seat} topDef={discardTopDef} fanDefs={discardFanDefs} />
           </div>
         </div>
       )}

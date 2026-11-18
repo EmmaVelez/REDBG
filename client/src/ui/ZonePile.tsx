@@ -1,7 +1,17 @@
 import type { JSX } from 'react';
+import type { CSSProperties } from 'react';
 import type { CardDef } from '@re/game-core';
 import { CardBack } from './CardBack';
 import { CardView } from './CardView';
+
+/** Cap on the hover fan — a long discard must not span the whole dock. */
+const ZONE_FAN_MAX = 8;
+
+/** Overlap between fanned cards as a fraction of the pile card width. */
+function fanOverlap(n: number): number {
+  if (n <= 1) return 0.3;
+  return Math.max(0.16, Math.min(0.3, 26 / (n * 60)));
+}
 
 /**
  * A visual card pile (deck / discard / mansion): a fanned stack of card backs
@@ -16,11 +26,17 @@ export interface PileProps {
   /** Optional face-up top card (e.g. your own discard). */
   readonly topDef?: CardDef | null;
   readonly seat?: number;
+  /** Cards fanned out to the LEFT on hover (the discard's contents). */
+  readonly fanDefs?: readonly CardDef[];
 }
 
-export function ZonePile({ label, count, animZone, topDef = null, seat }: PileProps): JSX.Element {
+export function ZonePile({ label, count, animZone, topDef = null, seat, fanDefs }: PileProps): JSX.Element {
   const fan = Math.min(count, 3);
   const visibleCount = Math.max(fan, 1);
+  // The hover fan mirrors the character's attached-trophy fan, but opens
+  // to the LEFT (the discard is the rightmost column of the dock).
+  const fanCards = (fanDefs ?? []).slice(0, ZONE_FAN_MAX);
+  const overlap = fanOverlap(fanCards.length);
   return (
     <div className="zone-pile" data-anim-zone={animZone} data-seat={seat} data-pile-count={count}>
       <span className="zone-pile-label">{label}</span>
@@ -35,6 +51,19 @@ export function ZonePile({ label, count, animZone, topDef = null, seat }: PilePr
         {topDef !== null && topDef !== undefined && (
           <div className="zone-pile-top">
             <CardView def={topDef} compact />
+          </div>
+        )}
+        {fanCards.length > 0 && (
+          <div
+            className="zone-pile-fan"
+            data-zone-fan={fanCards.length}
+            style={{ '--zf-overlap': overlap } as CSSProperties}
+          >
+            {fanCards.map((def, i) => (
+              <div className="zone-pile-fan-card" key={`${def.id}-${i}`} data-fan-index={i}>
+                <CardView def={def} compact />
+              </div>
+            ))}
           </div>
         )}
         <span className="zone-pile-count">{count}</span>

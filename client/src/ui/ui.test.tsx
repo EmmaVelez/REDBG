@@ -1911,3 +1911,27 @@ describe('TargetedNotice (off-turn targeting banner)', () => {
   });
 });
 
+
+describe('ZonePile hover fan (discard contents)', () => {
+  it('fans the provided cards to the left on hover', () => {
+    const knife = PREMIER_CARDS.find(c => c.id === 'we-004');
+    const handgun = PREMIER_CARDS.find(c => c.id === 'we-001');
+    expect(knife).toBeDefined();
+    expect(handgun).toBeDefined();
+    if (knife === undefined || handgun === undefined) return;
+    const html = renderToStaticMarkup(
+      <ZonePile label="Discard" count={2} animZone="discard" fanDefs={[knife, handgun]} />
+    );
+    expect(html).toContain('data-zone-fan="2"');
+    expect(html).toContain('zone-pile-fan');
+    expect(html).toContain('Combat Knife');
+    expect(html).toContain('Grenade');
+  });
+
+  it('renders no fan when no cards are given', () => {
+    const html = renderToStaticMarkup(
+      <ZonePile label="Deck" count={5} animZone="deck" />
+    );
+    expect(html).not.toContain('data-zone-fan');
+  });
+});
