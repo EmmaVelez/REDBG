@@ -367,23 +367,27 @@ h1, h2 { margin: 0 0 8px; }
 /* The character card's face-down back. It is the mansion-cover art, sits
    exactly over the fan, and is only revealed while the flip animation
    runs or the seat is resting face down. */
+/* The back is NOT pre-rotated: the FAN supplies the 180-degree rotation, so
+   when the fan is over the back reads upright. (Previously the back carried
+   its own rotateY(180deg) AND backface-visibility, which left the INVERTED
+   character art showing through instead of the back.) */
 .cc-back {
   position: absolute;
   inset: 0;
   border-radius: 8px;
   background-size: cover;
   background-position: center;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: rotateY(180deg);
   display: none;
 }
-.cc-fan > .card { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-/* Resting face down (downed / dead) — origin declared with the keyframes. */
-.cc-fan.cc-face-down .cc-back { display: block; }
+/* Explicit show/hide rather than backface-visibility: the card face lives in
+   the fan's preserve-3d context, where backface-visibility is not reliably
+   honoured, so the inverted face won over the back. */
+.cc-fan.cc-face-down > .card,
+.cc-fan.cc-flipping-down > .card { display: none; }
+.cc-fan.cc-face-down .cc-back,
+.cc-fan.cc-flipping-down .cc-back { display: block; }
 /* Face down, the card shows ONLY the back art: no health gauge bleeding
-   through. (The ring lives inside the 3D-transformed card, so
-   backface-visibility alone does not reliably hide it.) */
+   through either. */
 .cc-fan.cc-face-down .cc-hp-ring,
 .cc-fan.cc-flipping-down .cc-hp-ring { display: none; }
 /* The flip itself. `both` keeps the end pose; the resting class above
