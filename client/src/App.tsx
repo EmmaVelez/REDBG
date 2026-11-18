@@ -294,7 +294,7 @@ export function App(): JSX.Element {
       const queued = pendingDeathRef.current;
       pendingDeathRef.current = null;
       if (queued !== null) setYouDied(queued === 'dead');
-    }, 1000);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [revealQueue, revealIndex, revealLocked]);
 
