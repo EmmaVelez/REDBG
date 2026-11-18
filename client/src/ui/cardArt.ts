@@ -31,3 +31,6 @@ export function cardArtUrl(cardId: string): string | undefined {
 export function hasCardArt(cardId: string): boolean {
   return BY_ID[cardId.toUpperCase()] !== undefined;
 }
+
+/** The shared card-back art (the mansion door). */
+export const CARD_BACK_ART: string | undefined = BY_ID['CARD-BACK'];
