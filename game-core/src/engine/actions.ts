@@ -678,6 +678,30 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       };
 }
 
+/**
+ * Finish a seat's turn, offering AM-007's "you can move this Ammunition to the
+ * top of your Inventory" choice first. Shared by the `endTurn` case and every
+ * other path that ends a turn (CAC-013's resolver) — without it the Ammunition
+ * is silently discarded and the printed "you can" never happens.
+ */
+function endTurnOrAmmoChoice(
+  state: GameState,
+  seat: number,
+  nextBase: { version: number; log: GameState['log'] },
+): GameState {
+  // The decline latch is per-turn, so clear it as this turn closes.
+  const cleared: GameState = state.seats[seat]?.am007Declined === undefined
+    ? state
+    : { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, am007Declined: undefined } : x)) };
+  if (!cleared.prompts.some(p => p.seat === seat)) {
+    const am007Prompt = recycleAmmoPrompt(cleared, seat);
+    if (am007Prompt !== undefined) {
+      return { ...cleared, ...nextBase, prompts: [...cleared.prompts, am007Prompt] };
+    }
+  }
+  return applyEndOfTurn(cleared, seat, nextBase);
+}
+
 export function applyAction(state: GameState, action: Action): GameState {
   let internal = applyActionInternal(state, action);
   // Fan Location (Terrace): a just-bought action card is played for free.
@@ -6079,17 +6103,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // AM-007 Ammo x30: "you can move this Ammunition to the top of your
       // Inventory" — a CHOICE, so ask BEFORE the turn ends (the Play Area is
       // still populated). The resolver finishes the turn.
-      // The decline latch is per-turn, so clear it as this turn closes.
-      const clearedDeclines: GameState = state.seats[seat]?.am007Declined === undefined
-        ? state
-        : { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, am007Declined: undefined } : x)) };
-      if (!clearedDeclines.prompts.some(p => p.seat === seat)) {
-        const am007Prompt = recycleAmmoPrompt(clearedDeclines, seat);
-        if (am007Prompt !== undefined) {
-          return { ...clearedDeclines, ...nextBase, prompts: [...clearedDeclines.prompts, am007Prompt] };
-        }
-      }
-      return applyEndOfTurn(clearedDeclines, seat, nextBase);
+      return endTurnOrAmmoChoice(state, seat, nextBase);
     }
 
     case 'moveXp': {
@@ -8331,7 +8345,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetOpt = prompt.options[option];
         if (targetOpt === undefined || targetOpt === 'Decline' || actionInstanceId === '') {
           // Declined (or nothing to target): the turn ends with no effect.
-          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8339,7 +8353,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetSeat = Number(targetOpt);
         const target = state.seats[targetSeat];
         if (target === undefined || target.dead || target.downed || target.hand.length === 0) {
-          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8365,7 +8379,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const actionInstanceId = String(prompt.payload?.actionInstanceId ?? '');
         const origin = state.seats[fromSeat];
         if (chosen === undefined || origin === undefined || actionInstanceId === '') {
-          return applyEndOfTurn({ ...state, ...nextBase, prompts: newPrompts }, fromSeat, {
+          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, fromSeat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8398,7 +8412,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }),
           prompts: newPrompts,
         };
-        return applyEndOfTurn(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
+        return endTurnOrAmmoChoice(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
       }
 
       if (kind === 'locTrashSecondGain') {

@@ -6,6 +6,7 @@ import { validateAction } from './validate';
 import { enumerateLegalActions } from '../ai/enumerate';
 import { exploreDamage } from './explore';
 import { CUSTOM_CARDS } from '../data/custom';
+import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK, cardsForScenario, pilesForScenario } from '../data/cards';
 
 /**
@@ -285,6 +286,39 @@ describe('CAC-013 From Bad to Worse — end-of-turn peek and give', () => {
     const resolved = applyAction(afterEnd, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: prompt!.options.length - 1 });
     expect(resolved.activeSeat).not.toBe(0);
     expect(resolved.seats[0]?.playArea).not.toContain(action.id);
+  });
+
+  it('still offers the AM-007 end-of-turn choice once CAC-013 has resolved', () => {
+    let s = game({ actionsLeft: 1 });
+    // am-007 is a Mercenaries card; register its def so the engine sees the
+    // printed "move this Ammunition to the top of your Inventory" ability.
+    const am007 = MERCENARIES_CARDS.find(c => c.id === 'am-007');
+    expect(am007).toBeDefined();
+    s = { ...s, cardDefs: { ...s.cardDefs, 'am-007': am007! } };
+
+    const action = place(s, 0, 'cac-013', 'playArea');
+    const ammo = place(action.state, 0, 'am-007', 'playArea');
+    s = ammo.state;
+
+    const afterEnd = applyAction(s, { type: 'endTurn', seat: 0 });
+    const prompt = afterEnd.prompts.find(p => p.payload?.kind === 'cac013ChoosePlayer');
+    const targetSeat = Number(prompt!.options[0]);
+    expect(targetSeat).not.toBe(0);
+
+    const picked = applyAction(afterEnd, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    const discardPrompt = picked.prompts.find(p => p.payload?.kind === 'cac013TargetDiscards');
+    const resolved = applyAction(picked, { type: 'chooseOption', seat: targetSeat, promptId: discardPrompt!.id, option: 0 });
+
+    // The turn must NOT have ended yet: the AM-007 "you can" is still owed.
+    const ammoPrompt = resolved.prompts.find(p => p.payload?.kind === 'am007Choose');
+    expect(ammoPrompt).toBeDefined();
+    expect(resolved.seats[0]?.playArea).toContain(ammo.id);
+
+    const moved = applyAction(resolved, { type: 'chooseOption', seat: 0, promptId: ammoPrompt!.id, option: 0 });
+    expect(moved.seats[0]?.playArea).not.toContain(ammo.id);
+    expect(moved.seats[0]?.discard).not.toContain(ammo.id);
+    expect(moved.seats[0]?.hand).toContain(ammo.id);
+    expect(moved.activeSeat).not.toBe(0);
   });
 });
 
