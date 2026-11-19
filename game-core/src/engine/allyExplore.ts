@@ -8,6 +8,10 @@ import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nem
 import { ammoX10CountInDiscard, saddlerAmmoGrantPerPlayer, trashHighestDamageUsedWeapons } from './customInfected';
 import { gainAmmoCard } from './mercenaries';
 import { clockLocationIntoPlay, applyRevealEffects } from './locations';
+// Hoisted-function import across the actions↔allyExplore cycle (the same
+// shape as game.ts↔actions.ts): safe because neither module calls the other
+// at evaluation time.
+import { eclipticTrashPromptFor } from './actions';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -292,5 +296,11 @@ export function resolveAllyExplore(
     };
   }
 
-  return applyClock(next);
+  // CE-009 Ecliptic Express (RULING Manny 2026-11-19): the EXPLORING player
+  // gets the optional discard-trash window when the forced explore defeats,
+  // even though the Infected itself is awarded to Sherry. Read the target's
+  // FINAL discard (after the redraw above).
+  const ecl = outcome.kind === 'defeated' ? eclipticTrashPromptFor(next, targetSeat) : undefined;
+  const withEcl = ecl !== undefined ? { ...next, prompts: [...next.prompts, ecl] } : next;
+  return applyClock(withEcl);
 }

@@ -1,5 +1,34 @@
 # HANDOFF — resume here
 
+**CE-009 ECLIPTIC EXPRESS ON-DEFEAT WINDOW FIXED (2026-11-19):** Manny: "does
+ce-009 trigger correctly when in play and a player defeats an infected — they
+should be prompted to trash a card in their discard pile if they choose to".
+NO — the eclipticTrash window existed ONLY in the multi-explore branch; the
+common SINGLE-explore defeat never prompted, and neither did the deferred
+resumes. Fix: one shared `eclipticTrashPromptFor(state, seat)` helper
+(actions.ts, beside applyPendingExploreOutcome) used by EVERY defeat path:
+single-explore defeated branch (reads the FINAL post-explore discard via
+defeatFxState), multi branch (replaces the old inline block), the AC-018 /
+AC-042 chooseOption resumes, and the next-explore entry guard. Prompt id now
+carries a counter (`ecliptic-trash-<seat>-<version>-<n>`) so a resolved pending
++ the new explore cannot collide (chooseOption removes every prompt with the
+same id). Handler unchanged (Decline guard already correct). Tests:
+eclipticExpress.test.ts 9 — RED before the fix (5 fails), GREEN after; covers
+prompt/options, trash, Decline, empty discard, not attached, not defeated,
+multi, entry-guard resume, AC-018 decline resume. Fixture lessons: the
+Uroboros window goes to NON-exploring seats holding ac-018; validate's prompt
+gate is per-seat, so the entry-guard scenario needs the stale prompt on a
+DIFFERENT seat; a cards-map overwrite must spread the STACKED state's cards or
+the revealed top card is unregistered (nightmare reveal crash).
+RULING (Manny, 2026-11-19): Sherry's forced explore prompts the EXPLORING
+player (the target), not Sherry — wired in allyExplore after the target's
+redraw (final discard), via the exported helper (hoisted-function import
+across the actions↔allyExplore cycle, same shape as game↔actions). 2 more
+tests (defeat prompts target + trash resolves; no-defeat silent) — RED→GREEN.
+Gates: typecheck x3 clean, ecliptic 11/11 + fanSherry/clock/usher 52/52,
+client 276/276, server 115/115, build OK; FINAL full game-core 1414/1414 ALL
+GREEN (the first soak, 1412/1412, predated the ally wiring and was superseded).
+
 **LOC BATCH-1 ART COMPLETE (2026-11-19):** Manny sent the 7 missing batch-1
 renders (Library, Arklay Laboratory, Keeper's Room, Kitchen, Large Art Room,
 Large Gallery, Large Library). Titles + printed costs verified with the LOCAL

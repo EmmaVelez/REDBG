@@ -757,6 +757,26 @@ function endTurnWithRecallChoice(
   return applyEndOfTurn(cleared, seat, nextBase);
 }
 
+/** CE-009 Ecliptic Express: the optional discard-trash window offered when a
+ *  player defeats an Infected while the event is attached to the Mansion.
+ *  Shared by EVERY defeat path (single explore, multi explore, deferred
+ *  resumes) so none of them drifts. The id carries a counter so two windows
+ *  in one version (a resolved pending explore + the new explore) cannot
+ *  collide — chooseOption removes every prompt carrying the same id. */
+export function eclipticTrashPromptFor(s: GameState, seat: number): Prompt | undefined {
+  const p = s.seats[seat];
+  if (p === undefined || p.discard.length === 0) return undefined;
+  if (!hasMansionAttachmentEffect(s, 'trashDiscardOnInfectedDefeat')) return undefined;
+  const n = s.prompts.filter(x => x.payload?.kind === 'eclipticTrash').length;
+  return {
+    id: `ecliptic-trash-${seat}-${s.version}-${n}`,
+    seat,
+    text: 'Ecliptic Express: trash a card from your discard pile?',
+    options: [...p.discard, 'Decline'],
+    payload: { kind: 'eclipticTrash' },
+  };
+}
+
 /**
  * Apply a deferred explore's OUTCOME to the board. Shared by the reactive trash
  * windows (AC-042 Fight or Flight, AC-018 Uroboros Injection) and the Las Plagas
@@ -2269,11 +2289,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // conservation check catches it).
           if (state.pendingExplore !== undefined) {
             const pending = state.pendingExplore;
+            const resolved = applyPendingExploreOutcome(state, pending, pending.outcome === 'defeated');
+            const ecl = pending.outcome === 'defeated' ? eclipticTrashPromptFor(resolved, pending.seat) : undefined;
             state = {
-              ...applyPendingExploreOutcome(state, pending, pending.outcome === 'defeated'),
+              ...resolved,
               reactiveTrashWindow: undefined,
-              prompts: state.prompts.filter(p => p.payload?.kind !== 'uroborosInjection'
-                && p.payload?.kind !== 'fightOrFlight' && p.payload?.kind !== 'jillFlashGrenade'),
+              prompts: [...state.prompts.filter(p => p.payload?.kind !== 'uroborosInjection'
+                && p.payload?.kind !== 'fightOrFlight' && p.payload?.kind !== 'jillFlashGrenade'), ...(ecl !== undefined ? [ecl] : [])],
             };
           }
           const { seat, weapons, exploreCount, ammoByWeapon } = action;
@@ -3219,15 +3241,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             }
           }
           // Ecliptic Express: when defeating an infected, may trash a discard card
-          if (hasMansionAttachmentEffect(state, 'trashDiscardOnInfectedDefeat') && player.discard.length > 0) {
-            outcomePrompts.push({
-              id: `ecliptic-trash-${seat}-${state.version}`,
-              seat,
-              text: 'Ecliptic Express: trash a card from your discard pile?',
-              options: [...player.discard, 'Decline'],
-              payload: { kind: 'eclipticTrash' },
-            });
-          }
+          const eclipticPrompt = eclipticTrashPromptFor(state, seat);
+          if (eclipticPrompt !== undefined) outcomePrompts.push(eclipticPrompt);
           // Decorations for every defeated Infected (Combo Pile aware), including
           // any Barry-chain attachments revealed by the batch.
           const allAttached = [...player.attached, ...defeatedIds, ...chainAttachedIds];
@@ -4923,6 +4938,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         // MA-092 reveal gains apply AFTER the explore's own seat updates.
         for (const g of revealGains) defeatFxState = gainCopy(defeatFxState, g.seat, g.cardId);
+        // CE-009 Ecliptic Express: the on-defeat trash window. The multi path
+        // offered it since batch 1; the single path was missing it, so the
+        // common case never prompted. Read the FINAL seat (post-explore discard).
+        const eclipticPrompt = eclipticTrashPromptFor(defeatFxState, seat);
         return {
           ...defeatFxState,
           ...nextBase,
@@ -4933,7 +4952,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           )),
           mansionDeck,
           rngState: defeatFxState.rngState,
-          prompts: [...cephaloPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts],
+          prompts: [...cephaloPrompts, ...defeatFxPrompts, ...zombieBDefeatedPrompts, ...(eclipticPrompt !== undefined ? [eclipticPrompt] : [])],
           ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
         };
       }
@@ -7333,7 +7352,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               : Math.max((revealedDef?.attack ?? 0) + extraDamageTakenWhenNotDefeated(characterAbilities(s, pe.seat)), 0),
             decorationDelta: defeated ? (revealedDef?.decorations ?? 0) : 0,
           };
-          return { ...applyPendingExploreOutcome(s, updated, defeated), prompts: newPrompts };
+          const resumed = applyPendingExploreOutcome(s, updated, defeated);
+          const ecl = defeated ? eclipticTrashPromptFor(resumed, pe.seat) : undefined;
+          return { ...resumed, prompts: ecl !== undefined ? [...newPrompts, ecl] : newPrompts };
         }
         return s;
       }
@@ -7379,7 +7400,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             };
           }
           const defeated = pe.outcome === 'defeated';
-          return { ...applyPendingExploreOutcome(s, pe, defeated), prompts: newPrompts };
+          const resumed = applyPendingExploreOutcome(s, pe, defeated);
+          const ecl = defeated ? eclipticTrashPromptFor(resumed, pe.seat) : undefined;
+          return { ...resumed, prompts: ecl !== undefined ? [...newPrompts, ecl] : newPrompts };
         }
         return s;
       }
