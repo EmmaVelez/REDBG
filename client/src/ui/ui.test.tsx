@@ -1477,6 +1477,7 @@ describe('Lobby (T08)', () => {
     onSetMercenariesBasicResources: () => {},
     onSetUsherMode: () => {},
     onSetClockMode: () => {},
+    onSetCeMode: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -1514,6 +1515,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -1542,6 +1544,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: true,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="mercenaries-basic-resources-toggle"');
@@ -1568,6 +1571,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: true,
       clockMode: false,
+      ceMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="usher-toggle"');
@@ -1601,10 +1605,37 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: true,
+      ceMode: true,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="clock-toggle"');
     // the host toggle reflects the room's value
+    expect(inRoom).toContain('checked=""');
+  });
+
+  it('offers the CE events toggle under Skill System in every lobby surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(noRoom).toContain('data-testid="create-ce-toggle"');
+    expect(noRoom).toContain('data-testid="hotseat-ce-toggle"');
+    expect(noRoom).toContain('Random CE Events (CE-001..CE-012)');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: true,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="ce-toggle"');
     expect(inRoom).toContain('checked=""');
   });
 
@@ -1687,6 +1718,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
@@ -1707,6 +1739,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
@@ -1736,6 +1769,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Chris
@@ -1762,6 +1796,7 @@ describe('Lobby (T08)', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Sherry

@@ -37,6 +37,17 @@ describe('createHotseatGame', () => {
     expect(s.locationDeck).toBeUndefined();
   });
 
+  it('ceMode hides floor(mansion/10) CE-001..CE-012 events in the Mansion deck', () => {
+    const s = createHotseatGame(['A', 'B'], 1, 'firstTimer', { ceMode: true });
+    const ceIds = s.mansionDeck.filter(id => (s.cards[id]?.cardId ?? '').startsWith('ce-'));
+    const base = s.mansionDeck.length - ceIds.length;
+    expect(ceIds.length).toBe(Math.floor(base / 10));
+    const isCe = new Set(ceIds);
+    s.mansionDeck.forEach((id, i) => {
+      if (i > 0) expect(isCe.has(id) && isCe.has(s.mansionDeck[i - 1]!)).toBe(false);
+    });
+  });
+
   it('rejects fewer than 2 or more than 4 players', () => {
     expect(() => createHotseatGame(['Solo'], 1)).toThrow();
     expect(() => createHotseatGame(['A', 'B', 'C', 'D', 'E'], 1)).toThrow();

@@ -87,17 +87,18 @@ describe('game server over WebSocket', () => {
     c.ws.close();
   });
 
-  it('createRoom carries usherMode/clockMode through to the started game', async () => {
+  it('createRoom carries usherMode/clockMode/ceMode through to the started game', async () => {
     const server = startServer({ tokenSeq: ['tok-mode'] });
     const c = connect(server);
     await open(c);
     await c.next(); // welcome
-    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false, usherMode: true, clockMode: true });
+    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false, usherMode: true, clockMode: true, ceMode: true });
     const roomState = await c.next();
     expect(roomState.kind).toBe('roomState');
     if (roomState.kind === 'roomState') {
       expect(roomState.room.usherMode).toBe(true);
       expect(roomState.room.clockMode).toBe(true);
+      expect(roomState.room.ceMode).toBe(true);
     }
     c.send({ kind: 'startGame' });
     const started = await c.next();

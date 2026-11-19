@@ -71,6 +71,7 @@ describe('createHost', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     };
     const host = createHost(lonely);
     expect(() => host.start(1)).toThrow('no seated players');

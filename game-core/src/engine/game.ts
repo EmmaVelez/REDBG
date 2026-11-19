@@ -10,6 +10,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
+import { CE_CARD_IDS } from '../data/custom';
 import { scoreTotal, revealedLocations } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
@@ -709,8 +710,12 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   // mansion-only — they are never dealt into the market).
   // Custom EVENT cards (ev-001 Zombie Grab) live in the Mansion too, even though
   // isMansionCard() only covers the official set's card types.
-  const isCustomMansionCard = (c: CardDef): boolean =>
-    c.set === 'custom' && (c.mansion === true || isMansionCard(c) || c.type === 'event');
+  const isCustomMansionCard = (c: CardDef): boolean => {
+    // CE mode owns the CE-001..CE-012 cards: `setup` below picks a random subset
+    // of them for the Mansion, so the picker-driven pass must not add all twelve.
+    if (setup.ceMode === true && CE_CARD_IDS.includes(c.id)) return false;
+    return c.set === 'custom' && (c.mansion === true || isMansionCard(c) || c.type === 'event');
+  };
   const customMansion = cards.filter(isCustomMansionCard);
   const mansionIds: string[] = [];
   if (mansionCards !== undefined) {
@@ -753,12 +758,28 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     register(id, cardId, 'mansionDeck');
     return id;
   });
+  // CE mode: X = floor(Mansion size / 10) random CE-001..CE-012 event cards join
+  // the Mansion deck. X is computed BEFORE they are added, exactly like the
+  // Clock mode above, so the two options do not inflate each other's count.
+  const cePool = setup.ceMode === true ? CE_CARD_IDS.filter(id => defsById.has(id)) : [];
+  const ceWant = Math.min(Math.floor(mansionIds.length / 10), cePool.length);
+  const cePicked = ceWant > 0 ? rngShuffle(cePool).slice(0, ceWant) : [];
+  const ceIds = cePicked.map(cardId => {
+    const id = `${cardId}#ce1`;
+    register(id, cardId, 'mansionDeck');
+    return id;
+  });
   let mansionDeck: readonly string[];
-  if (clockIds.length > 0) {
-    const all = [...mansionIds, ...clockIds];
-    const locSet = new Set(clockIds);
+  if (clockIds.length > 0 || ceIds.length > 0) {
+    const all = [...mansionIds, ...clockIds, ...ceIds];
+    const clockSet = new Set(clockIds);
+    const ceSet = new Set(ceIds);
+    // "no two CE cards in sequential order" = never two of them in adjacent
+    // slots; the Clock mode applies the same rule to Locations.
     const adjacent = (ids: readonly string[]): boolean =>
-      ids.some((id, i) => i > 0 && locSet.has(id) && locSet.has(ids[i - 1]!));
+      ids.some((id, i) => i > 0
+        && ((ceSet.has(id) && ceSet.has(ids[i - 1]!))
+          || (clockSet.has(id) && clockSet.has(ids[i - 1]!))));
     let shuffled = rngShuffle(all);
     let tries = 0;
     while (adjacent(shuffled) && tries < 100) {
@@ -766,15 +787,18 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       tries += 1;
     }
     if (adjacent(shuffled)) {
-      const non = shuffled.filter(id => !locSet.has(id));
-      const locs = shuffled.filter(id => locSet.has(id));
+      // Deterministic interleave fallback: alternate plain cards and special
+      // ones. X <= floor(N/10) (CE) / ceil(N/15) (Clock) always leaves gaps.
+      const spread = new Set([...clockIds, ...ceIds]);
+      const non = shuffled.filter(id => !spread.has(id));
+      const specials = shuffled.filter(id => spread.has(id));
       const out: string[] = [];
-      let li = 0;
+      let si = 0;
       for (const nid of non) {
         out.push(nid);
-        if (li < locs.length) { out.push(locs[li]!); li += 1; }
+        if (si < specials.length) { out.push(specials[si]!); si += 1; }
       }
-      while (li < locs.length) { out.push(locs[li]!); li += 1; }
+      while (si < specials.length) { out.push(specials[si]!); si += 1; }
       shuffled = out;
     }
     mansionDeck = shuffled;

@@ -1438,6 +1438,9 @@ export interface GameSetup {
    *  that draws one puts it into play immediately (standard On Reveal) and
    *  reveals the next card instead — Locations never consume Explore slots. */
   readonly clockMode?: boolean;
+  /** CE mode: floor(Mansion size / 10) random CE-001..CE-012 event cards are
+   *  shuffled into the Mansion deck, never two of them adjacent. Opt-in. */
+  readonly ceMode?: boolean;
 }
 
 /**

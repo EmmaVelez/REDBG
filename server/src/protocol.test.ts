@@ -33,7 +33,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1, mercenariesBasicResources: false, usherMode: false, clockMode: false } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1, mercenariesBasicResources: false, usherMode: false, clockMode: false, ceMode: false } },
     },
     {
       name: 'stateSync',
@@ -164,5 +164,12 @@ describe('protocol validation', () => {
     expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, clockMode: true }).ok).toBe(true);
     expect(validateMessage({ kind: 'setClockMode', clockMode: 1 }).ok).toBe(false);
     expect(validateMessage({ kind: 'setClockMode', clockMode: false }).ok).toBe(true);
+  });
+
+  it('validates ceMode as a boolean', () => {
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, ceMode: 'yes' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, ceMode: true }).ok).toBe(true);
+    expect(validateMessage({ kind: 'setCeMode', ceMode: 1 }).ok).toBe(false);
+    expect(validateMessage({ kind: 'setCeMode', ceMode: false }).ok).toBe(true);
   });
 });

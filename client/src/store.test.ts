@@ -38,6 +38,7 @@ const roomState = (): Extract<ServerMessage, { kind: 'roomState' }> => ({
     mercenariesBasicResources: false,
     usherMode: false,
     clockMode: false,
+    ceMode: false,
   },
 });
 

@@ -3,7 +3,7 @@ import { ALLIANCE_CARDS } from './alliance';
 import { OUTBREAK_CARDS } from './outbreak';
 import { MERCENARIES_CARDS } from './mercenaries';
 import { NIGHTMARE_CARDS } from './nightmare';
-import { CUSTOM_CARDS } from './custom';
+import { CUSTOM_CARDS, CE_CARD_IDS } from './custom';
 
 export const PREMIER_CARDS: ReadonlyArray<CardDef> = [
   // Characters
@@ -786,9 +786,9 @@ export function isExpansionScenario(id: ScenarioId): boolean {
  * to live as a duplicated inline copy in both the server and the client.
  * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
  */
-export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean }): ReadonlyArray<CardDef> {
+export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean; readonly ceMode?: boolean }): ReadonlyArray<CardDef> {
   const base = isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
-  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true && opts?.usherMode !== true && opts?.clockMode !== true) {
+  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true && opts?.usherMode !== true && opts?.clockMode !== true && opts?.ceMode !== true) {
     return base;
   }
   const known = new Set(base.map(c => c.id));
@@ -831,6 +831,14 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
   if (opts?.usherMode === true || opts?.clockMode === true) {
     for (const c of CUSTOM_CARDS) {
       if (c.type === 'location' && !known.has(c.id) && !extras.some(e => e.id === c.id)) extras.push(c);
+    }
+  }
+  // CE mode: setup picks a RANDOM subset of CE-001..CE-012 for the Mansion, so
+  // every one of the twelve defs must be in the pool (the picker is not involved).
+  if (opts?.ceMode === true) {
+    for (const cardId of CE_CARD_IDS) {
+      const def = CUSTOM_CARDS.find(c => c.id === cardId);
+      if (def !== undefined && !known.has(def.id) && !extras.some(e => e.id === def.id)) extras.push(def);
     }
   }
   if (opts?.skillSystem === true) {

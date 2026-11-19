@@ -193,6 +193,7 @@ describe('createRoomStore', () => {
       mercenariesBasicResources: false,
       usherMode: false,
       clockMode: false,
+      ceMode: false,
     });
   });
 
@@ -253,6 +254,21 @@ describe('createRoomStore', () => {
     expect(() => store.setClockMode(room.roomCode, 'stranger', true)).toThrow('not the host');
     store.startGame(room.roomCode, 'c1');
     expect(() => store.setClockMode(room.roomCode, 'c1', true)).toThrow('game already started');
+  });
+
+  it('setCeMode records the flag; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, [], 1, false, false, false, true);
+    expect(room.ceMode).toBe(true);
+    expect(store.toSnapshot(room).ceMode).toBe(true);
+
+    const changed = store.setCeMode(room.roomCode, 'c1', false);
+    expect(changed.ceMode).toBe(false);
+    expect(store.toSnapshot(changed).ceMode).toBe(false);
+
+    expect(() => store.setCeMode(room.roomCode, 'stranger', true)).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setCeMode(room.roomCode, 'c1', true)).toThrow('game already started');
   });
 
   it('rejects a main-only character (ch-008) as a partner', () => {

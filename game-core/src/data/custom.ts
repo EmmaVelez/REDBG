@@ -1917,3 +1917,15 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
 ];
+
+/**
+ * The twelve fan "Mansion Event" cards, CE-001 .. CE-012. They are ordinary
+ * custom cards (reachable through the Custom Cards picker) UNLESS the room's CE
+ * mode is on: `setup` then picks a random subset for the Mansion deck and they
+ * are excluded from the picker-driven `customMansion` pass, so the mode is the
+ * single switch that decides how many of them appear.
+ */
+export const CE_CARD_IDS: readonly string[] = [
+  'ce-001', 'ce-002', 'ce-003', 'ce-004', 'ce-005', 'ce-006',
+  'ce-007', 'ce-008', 'ce-009', 'ce-010', 'ce-011', 'ce-012',
+];

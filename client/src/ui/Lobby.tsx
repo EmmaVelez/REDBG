@@ -26,7 +26,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -39,9 +39,10 @@ export interface LobbyProps {
   readonly onSetMercenariesBasicResources: (mercenariesBasicResources: boolean) => void;
   readonly onSetUsherMode: (usherMode: boolean) => void;
   readonly onSetClockMode: (clockMode: boolean) => void;
+  readonly onSetCeMode: (ceMode: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -300,7 +301,7 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
@@ -311,6 +312,8 @@ function PassAndPlay(props: {
   const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
   const [usherMode, setUsherMode] = useState(false);
   const [clockMode, setClockMode] = useState(false);
+  const [ceMode, setCeMode] = useState(false);
+
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -366,6 +369,16 @@ function PassAndPlay(props: {
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>The House with a Clock in Its Walls</span>
       </label>
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={ceMode}
+          onChange={e => setCeMode(e.target.checked)}
+          data-testid="hotseat-ce-toggle"
+          title="floor(Mansion size / 10) random CE-001..CE-012 event cards are shuffled into the Mansion deck, never two of them adjacent"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
+      </label>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {hasAttachmentCards && (
         <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
@@ -410,7 +423,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode)}
       >
         Start pass &amp; play
       </button>
@@ -435,6 +448,7 @@ export function Lobby({
   onSetMercenariesBasicResources,
   onSetUsherMode,
   onSetClockMode,
+  onSetCeMode,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -522,6 +536,18 @@ export function Lobby({
                     title="Random Locations hide in the Mansion deck — an Explore puts them into play and reveals the next card instead"
                   />
                   {' '}The House with a Clock in Its Walls
+                </label>
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.ceMode}
+                    onChange={e => onSetCeMode(e.target.checked)}
+                    data-testid="ce-toggle"
+                    title="floor(Mansion size / 10) random CE-001..CE-012 event cards are shuffled into the Mansion deck, never two of them adjacent"
+                  />
+                  {' '}Random CE Events (CE-001..CE-012)
                 </label>
               </div>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
@@ -621,7 +647,7 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
@@ -632,6 +658,7 @@ function RoomEntry(props: {
   const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
   const [usherMode, setUsherMode] = useState(false);
   const [clockMode, setClockMode] = useState(false);
+  const [ceMode, setCeMode] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -639,7 +666,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -704,6 +731,16 @@ function RoomEntry(props: {
             title="Random Locations hide in the Mansion deck — an Explore puts them into play and reveals the next card instead"
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>The House with a Clock in Its Walls</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={ceMode}
+            onChange={e => setCeMode(e.target.checked)}
+            data-testid="create-ce-toggle"
+            title="floor(Mansion size / 10) random CE-001..CE-012 event cards are shuffled into the Mansion deck, never two of them adjacent"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
         </label>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
         {customCards.some(id => {

@@ -53,6 +53,8 @@ export interface RoomSnapshot {
   readonly usherMode: boolean;
   /** The House with a Clock in Its Walls: random Locations hide in the Mansion deck. */
   readonly clockMode: boolean;
+  /** CE mode: floor(Mansion/10) random CE-001..CE-012 events hide in the Mansion deck. */
+  readonly ceMode: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +62,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mansionAttachmentMode?: 1 | 2; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mansionAttachmentMode?: 1 | 2; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean; readonly ceMode?: boolean }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -87,6 +89,7 @@ export type ClientMessage =
   | { readonly kind: 'setUsherMode'; readonly usherMode: boolean }
   /** Host control: enable/disable The House with a Clock in Its Walls (Locations in the Mansion). */
   | { readonly kind: 'setClockMode'; readonly clockMode: boolean }
+  | { readonly kind: 'setCeMode'; readonly ceMode: boolean }
   | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
@@ -170,7 +173,7 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown; mansionAttachmentMode?: unknown; mercenariesBasicResources?: unknown; usherMode?: unknown; clockMode?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown; mansionAttachmentMode?: unknown; mercenariesBasicResources?: unknown; usherMode?: unknown; clockMode?: unknown; ceMode?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
@@ -197,6 +200,9 @@ export function validateMessage(value: unknown): DecodeResult {
     }
     if (m.clockMode !== undefined && typeof m.clockMode !== 'boolean') {
       return { ok: false, error: 'createRoom requires a clockMode boolean when present' };
+    }
+    if (m.ceMode !== undefined && typeof m.ceMode !== 'boolean') {
+      return { ok: false, error: 'createRoom requires a ceMode boolean when present' };
     }
     return { ok: true, msg: value as WireMessage };
   }
@@ -253,6 +259,13 @@ export function validateMessage(value: unknown): DecodeResult {
     const m = value as { kind: string; clockMode?: unknown };
     if (typeof m.clockMode !== 'boolean') {
       return { ok: false, error: 'setClockMode requires a clockMode boolean' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setCeMode') {
+    const m = value as { kind: string; ceMode?: unknown };
+    if (typeof m.ceMode !== 'boolean') {
+      return { ok: false, error: 'setCeMode requires a ceMode boolean' };
     }
     return { ok: true, msg: value as WireMessage };
   }

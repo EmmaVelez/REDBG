@@ -273,7 +273,7 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
           return;
         }
         if (session.clientId === null) return; // identity issued at connect
-        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId, msg.skillSystem, msg.customCards, msg.mansionAttachmentMode, msg.mercenariesBasicResources, msg.usherMode, msg.clockMode);
+        const room = roomStore.createRoom(session.clientId, msg.playerName, msg.scenario, msg.partnerMode, msg.mainCharacterId, msg.partnerCharacterId, msg.skillSystem, msg.customCards, msg.mansionAttachmentMode, msg.mercenariesBasicResources, msg.usherMode, msg.clockMode, msg.ceMode);
         session.roomCode = room.roomCode;
         broadcastRoomState(room.roomCode);
         return;
@@ -481,6 +481,17 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         if (session.roomCode === null || session.clientId === null) return;
         try {
           roomStore.setClockMode(session.roomCode, session.clientId, msg.clockMode);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
+      case 'setCeMode': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setCeMode(session.roomCode, session.clientId, msg.ceMode);
           broadcastRoomState(session.roomCode);
         } catch (e) {
           send(ws, { kind: 'error', message: (e as Error).message });
