@@ -75,7 +75,7 @@ describe('LocationsRow', () => {
       <LocationsRow state={s} mySeat={0} onAction={a => actions.push(a)} />,
     );
     expect(html).toContain('1X');
-    expect(html).toContain('Use 30g');
+    expect(html).toContain('USE LOC:1');
     // The button is a real dispatch target: simulate the click handler.
     const loc = (s.locations ?? [])[0];
     if (loc === undefined) throw new Error('location not revealed');
@@ -93,7 +93,7 @@ describe('LocationsRow', () => {
     const isPassage = (def?.locationRevealEffects ?? []).some(e => e.kind === 'passageUpgrade');
     expect(isPassage).toBe(true);
     const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
-    expect(html).toContain('Use 40g');
+    expect(html).toContain('USE LOC:1');
   });
 
   it('dispatches atticStart for the Attic', () => {
@@ -105,7 +105,26 @@ describe('LocationsRow', () => {
     const def = s.cardDefs[s.cards[loc.instanceId]?.cardId ?? ''];
     expect((def?.locationRevealEffects ?? []).some(e => e.kind === 'atticUpgrade')).toBe(true);
     const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
-    expect(html).toContain('Use 10g');
+    expect(html).toContain('USE LOC:1');
+  });
+
+  it('labels each button with the slot the room occupies in the location area', () => {
+    const base = stateWithLocations();
+    const ids = ['loc-002#ui1', 'loc-017#ui2'];
+    const cards = { ...base.cards };
+    for (const id of ids) {
+      cards[id] = { instanceId: id, cardId: id.split('#')[0]!, location: { zone: 'supply', index: 0 } };
+    }
+    const s: GameState = {
+      ...base,
+      cards,
+      locations: ids.map(id => ({ instanceId: id, cubes: {}, revealedBy: 0 })),
+      seats: base.seats.map((p, i) => (i === 0 ? { ...p, turnGold: 200, buysLeft: 4 } : p)),
+    };
+    const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('USE LOC:1');
+    expect(html).toContain('USE LOC:2');
+    expect(html).not.toContain('USE LOC:3');
   });
 
   it('renders the Board with the locations row present', () => {
