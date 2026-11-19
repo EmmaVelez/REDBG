@@ -58,6 +58,14 @@ function ActionButton({ variant = 'secondary', className, ...rest }: ActionButto
   return <button type="button" className={classes} {...rest} />;
 }
 
+/** 1-based slot a revealed location occupies in the location area, or undefined
+ *  when the instance is not on the table. The ActionBar's generic "Other
+ *  actions" buttons are labelled with it so `USE LOC:2` names the exact room. */
+function locationSlotIndex(state: GameState, instanceId: string): number | undefined {
+  const idx = (state.locations ?? []).findIndex(l => l.instanceId === instanceId);
+  return idx >= 0 ? idx + 1 : undefined;
+}
+
 /**
  * M4-T07: ActionBar — turn-level controls derived from the engine's own
  * legal-action enumeration (the server validates anything we dispatch, so
@@ -227,6 +235,23 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   // attachToPartner) — rendered as generic buttons so they stay reachable.
   const extraActions = legal.filter(a => 'seat' in a && a.seat === seat && !UI_HANDLED_ACTION_TYPES.has(a.type));
   const extraLabel = (a: Action): string => {
+    if (a.type === 'investLocation') {
+      const slot = locationSlotIndex(state, a.instanceId);
+      return slot === undefined ? 'Invest location' : `INVEST LOC:${slot}`;
+    }
+    if (a.type === 'useLocation') {
+      const slot = locationSlotIndex(state, a.instanceId);
+      return slot === undefined ? 'Use location' : `USE LOC:${slot}`;
+    }
+    if (a.type === 'passageStart' || a.type === 'atticStart') {
+      // These two carry no instanceId; find the room by its upgrade effect.
+      const want = a.type === 'passageStart' ? 'passageUpgrade' : 'atticUpgrade';
+      const idx = (state.locations ?? []).findIndex(l =>
+        (defForInstance(state, l.instanceId)?.locationRevealEffects ?? []).some(e => e.kind === want));
+      return idx >= 0
+        ? `USE LOC:${idx + 1}`
+        : (a.type === 'passageStart' ? 'Use Underground Passage' : 'Use Attic');
+    }
     if (a.type === 'attack') {
       const target = state.seats[a.targetSeat];
       const weapon = a.weaponInstanceId !== undefined ? defForInstance(state, a.weaponInstanceId)?.name : undefined;

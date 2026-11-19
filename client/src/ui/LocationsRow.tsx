@@ -48,12 +48,9 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
         )}
       </h2>
       <div className="locations-row">
-        {locations.map((loc, index) => {
+        {locations.map(loc => {
           const def = defForInstance(state, loc.instanceId);
           if (def === null) return null;
-          // Slot in the location area, 1-based — the buttons are labelled with
-          // it so "USE LOC:2" names the exact room on the table.
-          const slot = index + 1;
           const kind = def.locationKind;
           const cubes = Object.entries(loc.cubes).flatMap(([seat, n]) =>
             Array.from({ length: n }, () => Number(seat)),
@@ -96,7 +93,7 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     title={nextCost === undefined ? 'Fully invested' : `Invest: ${nextCost}g + 1 Buy`}
                     onClick={() => onAction({ type: 'investLocation', seat: mySeat, instanceId: loc.instanceId })}
                   >
-                    {`INVEST LOC:${slot}`}
+                    Invest{nextCost !== undefined ? ` ${nextCost}g` : ''}
                   </button>
                 )}
                 {kind === 'onex' && (
@@ -116,7 +113,7 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                       }
                     }}
                   >
-                    {`USE LOC:${slot}`}
+                    Use {def.locationCost ?? 0}g
                   </button>
                 )}
                 {kind === 'global' && <span className="location-global-note">active for everyone</span>}

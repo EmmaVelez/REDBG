@@ -220,3 +220,41 @@ describe('ActionBar unhandled actions fallback', () => {
     expect(html.indexOf('data-skill-column')).toBeLessThan(html.indexOf('data-anim-zone="deck"'));
   });
 });
+
+describe('ActionBar "Other actions" location buttons', () => {
+  /** Two revealed rooms on the table, seat 0 active with gold and buys. */
+  function twoRooms(): GameState {
+    const base = startTurn(setup(
+      { seed: 11, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'human' }] },
+      [...PREMIER_CARDS, ...CUSTOM_CARDS],
+      FIRST_TIMER_PILES,
+    ));
+    const ids = ['loc-002#ab1', 'loc-017#ab2'];
+    const cards = { ...base.cards };
+    for (const id of ids) {
+      cards[id] = { instanceId: id, cardId: id.split('#')[0]!, location: { zone: 'supply', index: 0 } };
+    }
+    // The Underground Passage / Attic shortcuts only enumerate when the player
+    // holds an Action card.
+    const actionId = 'cv-001#ab3';
+    cards[actionId] = { instanceId: actionId, cardId: 'cv-001', location: { zone: 'hand', index: 0, seat: 0 } };
+    const seat0 = base.seats[0];
+    return {
+      ...base,
+      cards,
+      locations: ids.map(id => ({ instanceId: id, cubes: {}, revealedBy: 0 })),
+      seats: base.seats.map((p, i) => (i === 0
+        ? { ...p, turnGold: 200, buysLeft: 4, hand: [...(seat0?.hand ?? []), actionId] }
+        : p)),
+    };
+  }
+
+  it('labels each location action with the slot it occupies in the location area', () => {
+    const html = renderToStaticMarkup(<ActionBar state={twoRooms()} seat={0} onAction={() => {}} />);
+    expect(html).toContain('USE LOC:1');
+    expect(html).toContain('USE LOC:2');
+    // the generic fallback still names the action type
+    expect(html).toContain('data-extra-action="useLocation"');
+    expect(html).toContain('data-extra-action="passageStart"');
+  });
+});
