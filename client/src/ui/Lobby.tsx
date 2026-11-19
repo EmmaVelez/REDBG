@@ -327,19 +327,22 @@ function PassAndPlay(props: {
   });
 
   return (
-    <div className="passandplay" data-testid="pass-and-play">
-      <h2 className="lobby-section">Pass &amp; Play (this device)</h2>
+    <details className="passandplay" data-testid="pass-and-play" open>
+      <summary className="lobby-section">Pass &amp; Play (this device)</summary>
+      <div className="passandplay-body">
       <p className="lobby-hint">No room or server needed — everyone shares this screen.</p>
       <ScenarioDropdown value={scenario} onChange={setScenario} />
-      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
-        <input
-          type="checkbox"
-          checked={skillSystem}
-          onChange={e => setSkillSystem(e.target.checked)}
-          data-testid="hotseat-skill-system-toggle"
-        />
-        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
-      </label>
+      <details className="optional-modes">
+        <summary>Optional modes</summary>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={skillSystem}
+            onChange={e => setSkillSystem(e.target.checked)}
+            data-testid="hotseat-skill-system-toggle"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Skill System (Mercenaries)</span>
+        </label>
       <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
         <input
           type="checkbox"
@@ -379,6 +382,7 @@ function PassAndPlay(props: {
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
       </label>
+      </details>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {hasAttachmentCards && (
         <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
@@ -427,7 +431,8 @@ function PassAndPlay(props: {
       >
         Start pass &amp; play
       </button>
-    </div>
+      </div>
+    </details>
   );
 }
 
@@ -482,16 +487,18 @@ export function Lobby({
               <div className="lobby-scenario-edit">
                 <ScenarioDropdown value={room.scenario} onChange={onSetScenario} />
               </div>
-              <div className="lobby-partner-toggle">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={room.partnerMode}
-                    onChange={e => onSetPartnerMode(e.target.checked)}
-                  />
-                  {' '}Partner Mode (Alliance expansion rules)
-                </label>
-              </div>
+              <details className="optional-modes">
+                <summary>Optional modes</summary>
+                <div className="lobby-partner-toggle">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={room.partnerMode}
+                      onChange={e => onSetPartnerMode(e.target.checked)}
+                    />
+                    {' '}Partner Mode (Alliance expansion rules)
+                  </label>
+                </div>
               <div className="lobby-partner-toggle">
                 <label>
                   <input
@@ -550,6 +557,7 @@ export function Lobby({
                   {' '}Random CE Events (CE-001..CE-012)
                 </label>
               </div>
+              </details>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
               {room.customCards.some(id => {
                 const card = CUSTOM_CARDS.find(c => c.id === id);
@@ -686,14 +694,16 @@ function RoomEntry(props: {
       </form>
       <div className="lobby-entry-scenario">
         <ScenarioDropdown value={scenario} onChange={setScenario} />
-        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
-          <input
-            type="checkbox"
-            checked={partnerMode}
-            onChange={e => setPartnerMode(e.target.checked)}
-          />
-          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
-        </label>
+        <details className="optional-modes">
+          <summary>Optional modes</summary>
+          <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+            <input
+              type="checkbox"
+              checked={partnerMode}
+              onChange={e => setPartnerMode(e.target.checked)}
+            />
+            <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Partner Mode</span>
+          </label>
         <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
           <input
             type="checkbox"
@@ -742,6 +752,7 @@ function RoomEntry(props: {
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
         </label>
+        </details>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
         {customCards.some(id => {
           const card = CUSTOM_CARDS.find(c => c.id === id);

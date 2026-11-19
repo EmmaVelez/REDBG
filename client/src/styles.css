@@ -754,6 +754,7 @@ h1, h2 { margin: 0 0 8px; }
 .board-section-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
 .market-piles { display: flex; flex-wrap: wrap; gap: 10px; }
 .market-pile {
+  position: relative;
   background: transparent;
   border: none;
   padding: 0;
@@ -763,6 +764,29 @@ h1, h2 { margin: 0 0 8px; }
   gap: 4px;
   font-size: 11px;
   color: var(--muted);
+}
+/* Bar (loc-022) XP token: a circular #xp badge crowning the pile, where #
+   is the XP stacked on it. Buying from a tokenized pile costs 1 XP first
+   (2 XP also strips the token) — the buyXpChoice prompt handles the spend. */
+.xp-token-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #f0d090, #d9b26a 60%, #a8823f);
+  border: 1px solid #5a4632;
+  color: #1a120b;
+  font-size: 10px;
+  font-weight: 800;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .market-pile .card { cursor: pointer; transition: transform 0.1s ease-out; }
 .market-pile .card:hover { transform: translateY(-3px); }
@@ -1854,12 +1878,18 @@ h1, h2 { margin: 0 0 8px; }
 .lobby-divider { color: var(--muted); text-align: center; font-size: 13px; }
 .lobby-section { font-size: 18px; margin: 0 0 6px; }
 .lobby-hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
-.passandplay { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.passandplay { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 14px; }
+/* the container is a <details>; the flex column lives on the body so the
+   summary stays a normal disclosure row */
+.passandplay > summary { cursor: pointer; list-style-position: inside; }
+.passandplay-body { display: flex; flex-direction: column; gap: 10px; }
 .passandplay-count { display: flex; gap: 8px; }
 .count-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 .count-btn-on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .passandplay-names { display: flex; flex-direction: column; gap: 6px; }
 .passandplay-name { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+.optional-modes { display: flex; flex-direction: column; gap: 2px; }
+.optional-modes > summary { cursor: pointer; font-size: 0.9em; color: var(--muted-foreground); padding: 2px 0; }
 
 /* ---- seat-swap overlay (pass the device) ---- */
 .seat-swap-backdrop {

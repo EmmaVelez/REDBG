@@ -1639,6 +1639,33 @@ describe('Lobby (T08)', () => {
     expect(inRoom).toContain('checked=""');
   });
 
+  it('groups the mode toggles in an "Optional modes" collapsible on every surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    // create-room form + pass & play
+    expect(noRoom.match(/<details[^>]*class="optional-modes"/g)?.length).toBeGreaterThanOrEqual(2);
+    // the pass & play container itself is a collapsible <details>
+    expect(noRoom).toMatch(/<details[^>]*data-testid="pass-and-play"[^>]*open=""/);
+    expect(noRoom).toContain('<summary class="lobby-section">Pass &amp; Play (this device)</summary>');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: false,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom.match(/<details[^>]*class="optional-modes"/g)?.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('lists the custom card line in an expandable picker (create-room form)', () => {
     const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     expect(html).toContain('data-testid="custom-cards"');
