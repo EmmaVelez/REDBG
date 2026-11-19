@@ -128,6 +128,36 @@ zone when the choice is offered".
 
 ---
 
+## D2. The NEXT 3 easiest (after the four above)
+
+1. **b4mc-ch-008 Chris L2** — "you can put it on top of the Mansion (even if it's
+   the BOSS)". The exact analog of ah-001. `chrisL2Top` is already computed at
+   both explore sites (`actions.ts:5056` single, `actions.ts:3328` multi, inside
+   the `undefeatedEntries` disposition loop). Raise `chrisL2TopChoose` instead of
+   inserting; the handler inserts at index 0 (drop the existing occurrence first).
+2. **ma-070 Treasure Map** — "you may attach this card to your character". The
+   auto-attach is one branch inside the `takeOrBottom` handler
+   (`actions.ts:9499`), which already chains follow-up prompts (Weapon Case at
+   `actions.ts:9457`). Delete the branch so the take lands in the discard
+   (`actions.ts:9540`) and raise `ma070Choose` from that normal-take return.
+3. **sk-004 Medic LV.1** — "you can Heal that amount, plus 10 instead".
+   `skillHealAmountBonus` has exactly ONE reader (`actions.ts:9271`, applied at
+   `9306`/`9311`) inside the `healGreenHerb` resolution. Cheapest route is a
+   follow-up prompt ("heal 10 more?") rather than re-encoding the heal prompt's
+   (target, amount) option list.
+
+After those, the rest is genuinely hard: the damage-reduction family
+(ch-045, ch-049, b4mc-ch-007 L1, ma-054o, in-004) needs the damage HELD across a
+prompt at an atomic reducer; ch-023 decides while the explore's weapon list is
+being built; ce-008 decides at weapon-use time inside `exploreWeapons`.
+`ac-040`'s unlimited actions is a grant, not a real either/or.
+
+Cheap adjacent fix (not a prompt): **ac-018 Uroboros Injection** — the trash
+prompt already exists, only the printed "+20 health to a revealed infected" is
+missing (`actions.ts:7042`). ~5 lines.
+
+---
+
 ## E. Deliberately auto, with a documented reason — do NOT "fix" blind
 
 - **ma-054o / in-004**: the damage reducer is atomic; a prompt would need the
