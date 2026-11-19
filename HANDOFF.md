@@ -1,5 +1,20 @@
 # HANDOFF — resume here
 
+**TIGER STATUE ROOM DISCOUNT — UI FIX (2026-11-19):** Manny asked if the
+loc-015 buy discount works when invested. ENGINE: yes — buy case + validate
++ the XP-token buy path all subtract locationBuyCostReduction (engine test
+customLocations3: invest 70, buy ac-001 cost 30 -> pays 20; bots enumerate
+through validate so they honour it too). UI: NO — Board.tsx checked
+affordability against the FULL printed cost and displayed it, so a player
+with 25 gold could not click a 30-cost card even though the engine would
+charge 20. Fix: export locationBuyCostReduction from game-core index; Board
+computes the viewer's discount on their turn (canBuy), uses the effective
+cost for the button's disabled state, the pile price label, and the tooltip
+("(Tiger Statue Room: −10)"). Test: LocationsRow.test.tsx "Tiger Statue Room
+investment discounts the buy button and price label" (25 gold + invested ->
+foyer button enabled + 20g; uninvested -> disabled) RED→GREEN. Gates:
+typecheck x3 clean, client 281/281, Tiger engine suite 11/11, build OK.
+
 **CE MODE SHOWS THE ATTACHMENT-MODE SELECTOR (2026-11-19):** Manny: checking
 Random CE Events should also trigger the Mansion Attachment Mode selector.
 The selector was gated on attachable events in the CUSTOM PICKER only, but

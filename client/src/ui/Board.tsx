@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import type { GameState, Action } from '@re/game-core';
+import { locationBuyCostReduction } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { PlayerPanel } from './PlayerPanel';
@@ -29,6 +30,10 @@ export function Board({ state, mySeat, onAction, disabled = false, overlayOpen =
     .filter(p => p.cards.length > 0)
     .sort((a, b) => a.pileId.localeCompare(b.pileId));
   const canBuy = state.activeSeat === mySeat && state.phase === 'main';
+  // Tiger Statue Room (loc-015): the investor's buys cost 10 less gold. The
+  // engine + validator already honour it; the button must too, or a player
+  // who can afford the discounted price is locked out of buying.
+  const buyDiscount = canBuy ? locationBuyCostReduction(state, mySeat) : 0;
 
   return (
     <div className="board">
@@ -52,7 +57,8 @@ export function Board({ state, mySeat, onAction, disabled = false, overlayOpen =
                 </div>
               );
             }
-            const clickable = canBuy && !disabled && state.seats[mySeat] !== undefined && state.seats[mySeat]?.turnGold >= (def.cost ?? 0);
+            const effectiveCost = Math.max(0, (def.cost ?? 0) - buyDiscount);
+            const clickable = canBuy && !disabled && state.seats[mySeat] !== undefined && state.seats[mySeat]?.turnGold >= effectiveCost;
             return (
               <button
                 key={pile.pileId}
@@ -62,14 +68,14 @@ export function Board({ state, mySeat, onAction, disabled = false, overlayOpen =
                 data-anim-zone={`market-${pile.pileId}`}
                 onClick={() => clickable && onAction({ type: 'buy', seat: mySeat, pileId: pile.pileId })}
                 disabled={!clickable}
-                title={`Buy ${def.name} for ${costText(def)} gold${xpCount > 0 ? ' — XP token: spend 1 XP first (2 XP also removes the token)' : ''}`}
+                title={`Buy ${def.name} for ${effectiveCost} gold${buyDiscount > 0 ? ` (Tiger Statue Room: −${buyDiscount})` : ''}${xpCount > 0 ? ' — XP token: spend 1 XP first (2 XP also removes the token)' : ''}`}
               >
                 {xpBadge}
                 <HoverCard def={def}>
                   <CardView def={def} compact artOnly />
                 </HoverCard>
                 <span className="pile-count">{count} left</span>
-                <span className="pile-cost">{costText(def)}g</span>
+                <span className="pile-cost">{buyDiscount > 0 ? `${effectiveCost}g` : `${costText(def)}g`}</span>
               </button>
             );
           })}

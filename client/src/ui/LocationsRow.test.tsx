@@ -38,6 +38,26 @@ function revealOnly(s: GameState, cardId: string): GameState {
 }
 
 describe('LocationsRow', () => {
+  it('Tiger Statue Room investment discounts the buy button and price label', () => {
+    const base = stateWithLocations();
+    // Seat 0 has invested in Tiger Statue Room (loc-015, -10 gold on buys).
+    const s: GameState = {
+      ...base,
+      cards: { ...base.cards, ['loc-015#inv1']: { instanceId: 'loc-015#inv1', cardId: 'loc-015', location: { zone: 'supply', index: 0 } } },
+      locations: [{ instanceId: 'loc-015#inv1', cubes: { 0: 1 }, revealedBy: 0 }],
+      seats: base.seats.map((p, i) => (i === 0 ? { ...p, turnGold: 25 } : p)),
+    };
+    // The foyer pile's top card costs 30 -> 20 after the discount. 25 gold
+    // affords the discounted price but NOT the printed one.
+    const html = renderToStaticMarkup(<Board state={s} mySeat={0} onAction={() => {}} />);
+    const foyerTag = html.match(/<button[^>]*data-pile="foyer"[^>]*>/)?.[0] ?? '';
+    expect(foyerTag).not.toBe('');
+    expect(foyerTag).not.toContain('disabled');
+    expect(html).toContain('20g');
+    // Without the investment the button stays disabled at 25 gold.
+    const plain = renderToStaticMarkup(<Board state={{ ...s, locations: [] }} mySeat={0} onAction={() => {}} />);
+    expect(plain.match(/<button[^>]*data-pile="foyer"[^>]*>/)?.[0] ?? '').toContain('disabled');
+  });
   it('crowns XP-token piles with a circular #xp badge (Bar, loc-022)', () => {
     const s = stateWithLocations();
     const pileId = Object.keys(s.marketPiles)[0]!;
