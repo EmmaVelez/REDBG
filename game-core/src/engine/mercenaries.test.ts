@@ -830,7 +830,7 @@ describe('Mercenaries ammunition', () => {
   it('the printed text matches the card art', () => {
     const byId = new Map(MERCENARIES_CARDS.map(c => [c.id, c]));
     expect(byId.get('am-005')?.text).toBe('When you Trash this card, you get +10 Gold during this turn.');
-    expect(byId.get('am-006')?.text).toBe('When you Defeat an Infected, if this Ammunition is in your Play Area, you can Trash it and gain 1 "Ammo x10". This type of effect can only be applied once during your turn.');
+    expect(byId.get('am-006')?.text).toBe('When you Defeat an Infected, if this Ammunition is in your Play Area, you can Trash it and gain 1 "Ammo x30". This type of effect can only be applied once during your turn.');
     expect(byId.get('am-007')?.text).toBe('At the end of your turn, if this card is in your Play Area and you did not Explore during this turn, you can move this Ammunition to the top of your Inventory.');
   });
 
@@ -865,7 +865,7 @@ describe('Mercenaries ammunition', () => {
     expect(next.removed).toContain(blade);
     expect(next.seats[0]?.turnGold).toBe(0);
   });
-  it('AM-006: on defeating an Infected, may trash it to gain 1 Ammo x10', () => {
+  it('AM-006: on defeating an Infected, may trash it to gain 1 Ammo x30', () => {
     let s = mercGame('ch-044');
     s = addCard(s, 0, 'am-006', 'playArea');
     const withInfected = mansionTop(s, 'ma-077'); // hp 5
@@ -876,7 +876,7 @@ describe('Mercenaries ammunition', () => {
     next = choose(next, 0, p, 0); // Yes
     expect(next.seats[0]?.playArea.some(id => next.cards[id]?.cardId === 'am-006')).toBe(false);
     expect(next.removed.some(id => next.cards[id]?.cardId === 'am-006')).toBe(true);
-    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-005')).toBe(true);
+    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-007')).toBe(true);
     expect(next.seats[0]?.ammoX10UpgradeUsedThisTurn).toBe(true);
   });
 
@@ -904,17 +904,45 @@ describe('Mercenaries ammunition', () => {
     expect(after.prompts.some(x => x.payload?.kind === 'am006Choose')).toBe(false);
   });
 
-  it('AM-007: unused at end of turn, it is kept instead of discarded', () => {
+  it('AM-007: unused at end of turn, the player is ASKED before it is recycled', () => {
     let s = mercGame('ch-044');
     s = addCard(s, 0, 'am-007', 'playArea');
     const ammo = s.seats[0]?.playArea.find(id => s.cards[id]?.cardId === 'am-007');
     expect(ammo).toBeDefined();
-    const next = applyAction(tune(s, { exploredOrAttackedThisTurn: false }), { type: 'endTurn', seat: 0 });
-    // It goes to the TOP of the Inventory, which the end-of-turn draw then
-    // takes straight into the new Hand — either way it is not discarded.
-    expect(next.seats[0]?.discard).not.toContain(ammo);
-    expect(next.seats[0]?.playArea).not.toContain(ammo);
-    expect(next.seats[0]?.hand).toContain(ammo);
+    // endTurn HOLDS: the "you can move it" choice is a prompt, not automatic.
+    const held = applyAction(tune(s, { exploredOrAttackedThisTurn: false }), { type: 'endTurn', seat: 0 });
+    const p = findPrompt(held, 'am007Choose');
+    expect(p).toBeDefined();
+    expect(held.seats[0]?.playArea).toContain(ammo);
+    // Yes → top of the Inventory, which the end-of-turn draw then takes into
+    // the new Hand.
+    const moved = choose(held, 0, p, 0);
+    expect(moved.seats[0]?.discard).not.toContain(ammo);
+    expect(moved.seats[0]?.playArea).not.toContain(ammo);
+    expect(moved.seats[0]?.hand).toContain(ammo);
+  });
+
+  it('AM-007: declining the prompt discards it like any unused card', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-007', 'playArea');
+    const ammo = s.seats[0]?.playArea.find(id => s.cards[id]?.cardId === 'am-007');
+    const held = applyAction(tune(s, { exploredOrAttackedThisTurn: false }), { type: 'endTurn', seat: 0 });
+    const declined = choose(held, 0, findPrompt(held, 'am007Choose'), 1); // Leave in Play Area
+    expect(declined.seats[0]?.discard).toContain(ammo);
+    expect(declined.seats[0]?.playArea).not.toContain(ammo);
+    expect(declined.seats[0]?.hand).not.toContain(ammo);
+  });
+
+  it('AM-007: two copies in the Play Area are asked one at a time', () => {
+    let s = mercGame('ch-044');
+    s = addCard(s, 0, 'am-007', 'playArea');
+    s = addCard(s, 0, 'am-007', 'playArea');
+    const held = applyAction(tune(s, { exploredOrAttackedThisTurn: false }), { type: 'endTurn', seat: 0 });
+    const first = choose(held, 0, findPrompt(held, 'am007Choose'), 0);
+    // The second copy still gets its own choice rather than being moved silently.
+    expect(first.prompts.some(x => x.payload?.kind === 'am007Choose')).toBe(true);
+    const second = choose(first, 0, findPrompt(first, 'am007Choose'), 1);
+    expect(second.prompts.some(x => x.payload?.kind === 'am007Choose')).toBe(false);
   });
 
   it('AM-007: after an Explore it is discarded instead', () => {

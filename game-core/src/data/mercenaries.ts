@@ -75,7 +75,7 @@ export const MERCENARIES_CARDS: ReadonlyArray<CardDef> = [
   // Each prints an EXTRA ability on top of the +Ammo/+Gold bonus icons.
   // -------------------------------------------------------------------------
   { id: 'am-005', name: 'Ammo x10', type: 'ammunition', set: 'mercenaries', text: 'When you Trash this card, you get +10 Gold during this turn.', copies: 28, cost: 0, bonuses: { ammo: 10, gold: 10 }, ammoEffects: [{ kind: 'gainGoldWhenTrashed', amount: 10 }] },
-  { id: 'am-006', name: 'Ammo x20', type: 'ammunition', set: 'mercenaries', text: 'When you Defeat an Infected, if this Ammunition is in your Play Area, you can Trash it and gain 1 "Ammo x10". This type of effect can only be applied once during your turn.', copies: 15, cost: 30, bonuses: { ammo: 20, gold: 20 }, ammoEffects: [{ kind: 'onDefeatTrashForAmmoX10' }] },
+  { id: 'am-006', name: 'Ammo x20', type: 'ammunition', set: 'mercenaries', text: 'When you Defeat an Infected, if this Ammunition is in your Play Area, you can Trash it and gain 1 "Ammo x30". This type of effect can only be applied once during your turn.', copies: 15, cost: 30, bonuses: { ammo: 20, gold: 20 }, ammoEffects: [{ kind: 'onDefeatTrashForAmmoX30' }] },
   { id: 'am-007', name: 'Ammo x30', type: 'ammunition', set: 'mercenaries', text: 'At the end of your turn, if this card is in your Play Area and you did not Explore during this turn, you can move this Ammunition to the top of your Inventory.', copies: 15, cost: 60, bonuses: { ammo: 30, gold: 30 }, ammoEffects: [{ kind: 'recycleToInventoryTopAtTurnEndIfDidNotExplore' }] },
 
   // -------------------------------------------------------------------------

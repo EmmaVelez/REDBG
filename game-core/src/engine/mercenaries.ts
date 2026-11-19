@@ -69,11 +69,17 @@ export function decorationDelta(state: GameState, prevIds: readonly string[], ne
 }
 
 /**
- * "Gain 1 Ammo x10" (rules glossary: Gain moves a card from the Resource Area
+ * "Gain 1 Ammo xN" (rules glossary: Gain moves a card from the Resource Area
  * to the player's Discard Pile). Finds a market pile whose TOP card is an
- * Ammunition worth 10 Ammo and moves up to `count` copies.
+ * Ammunition worth `ammo` Ammo and moves up to `count` copies.
  */
-export function gainAmmoX10(state: GameState, seat: number, count = 1, dest: 'discard' | 'hand' = 'discard'): GameState {
+export function gainAmmoCard(
+  state: GameState,
+  seat: number,
+  count = 1,
+  dest: 'discard' | 'hand' = 'discard',
+  ammo = 10,
+): GameState {
   const player = state.seats[seat];
   if (player === undefined || count <= 0) return state;
   let s = state;
@@ -83,7 +89,7 @@ export function gainAmmoX10(state: GameState, seat: number, count = 1, dest: 'di
       const top = pile.cards[0];
       if (top === undefined) return false;
       const def = s.cardDefs[s.cards[top]?.cardId ?? ''];
-      return def?.type === 'ammunition' && (def.bonuses?.ammo ?? 0) === 10;
+      return def?.type === 'ammunition' && (def.bonuses?.ammo ?? 0) === ammo;
     });
     if (entry === undefined) break;
     const [pileId, pile] = entry;
@@ -569,7 +575,7 @@ export function applyMercenariesNotDefeatedEffects(state: GameState, ctx: Mercen
         break;
       }
       case 'onNotDefeatedExploringPlayerGainsAmmoX10': {
-        s = gainAmmoX10(s, ctx.seat, e.count);
+        s = gainAmmoCard(s, ctx.seat, e.count);
         break;
       }
       case 'onNotDefeatedTrashTopInventory': {
@@ -679,7 +685,7 @@ export function applyMercenariesOnDefeatAbilities(state: GameState, ctx: Mercena
 
 /**
  * AM-006 "Ammo x20": "When you Defeat an Infected, if this Ammunition is in your
- * Play Area, you can Trash it and gain 1 'Ammo x10'. This type of effect can
+ * Play Area, you can Trash it and gain 1 'Ammo x30'. This type of effect can
  * only be applied once during your turn."
  *
  * Returns the yes/no prompt to raise after an Infected was defeated, or
@@ -688,14 +694,14 @@ export function applyMercenariesOnDefeatAbilities(state: GameState, ctx: Mercena
  * defeated Infected — the prompt id is keyed on the Ammunition instance, so a
  * second copy would collide with the first.
  */
-export function ammoX10UpgradePrompt(state: GameState, seat: number): Prompt | undefined {
+export function ammoUpgradePrompt(state: GameState, seat: number): Prompt | undefined {
   const player = state.seats[seat];
   if (player === undefined) return undefined;
   if (player.ammoX10UpgradeUsedThisTurn === true) return undefined;
   const ammoId = player.playArea.find(id => {
     const inst = state.cards[id];
     const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
-    return (def?.ammoEffects ?? []).some(e => e.kind === 'onDefeatTrashForAmmoX10');
+    return (def?.ammoEffects ?? []).some(e => e.kind === 'onDefeatTrashForAmmoX30');
   });
   if (ammoId === undefined) return undefined;
   const inst = state.cards[ammoId];
@@ -703,23 +709,39 @@ export function ammoX10UpgradePrompt(state: GameState, seat: number): Prompt | u
   return {
     id: `am006-${seat}-${ammoId}-v${state.version}`,
     seat,
-    text: `${def?.name ?? 'Ammo x20'}: Trash this Ammunition to gain 1 "Ammo x10"?`,
+    text: `${def?.name ?? 'Ammo x20'}: Trash this Ammunition to gain 1 "Ammo x30"?`,
     options: ['Yes', 'No'],
     payload: { kind: 'am006Choose', ammoInstanceId: ammoId },
   };
 }
 
-/** True when the seat has an AM-007 in the Play Area and did not Explore this
- *  turn — the card's end-of-turn "move to the top of the Inventory" condition. */
-export function recycleAmmoIds(state: GameState, seat: number): readonly string[] {
+/**
+ * AM-007 Ammo x30: "you can move this Ammunition to the top of your
+ * Inventory" — a CHOICE, so the end of the turn asks instead of moving it
+ * automatically. Returns the prompt for the FIRST eligible, not-yet-declined
+ * copy.
+ */
+export function recycleAmmoPrompt(state: GameState, seat: number): Prompt | undefined {
   const player = state.seats[seat];
-  if (player === undefined) return [];
-  if (player.exploredOrAttackedThisTurn === true) return [];
-  return player.playArea.filter(id => {
+  if (player === undefined) return undefined;
+  if (player.exploredOrAttackedThisTurn === true) return undefined;
+  const declined = new Set(player.am007Declined ?? []);
+  const ammoId = player.playArea.find(id => {
+    if (declined.has(id)) return false;
     const inst = state.cards[id];
     const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
     return (def?.ammoEffects ?? []).some(e => e.kind === 'recycleToInventoryTopAtTurnEndIfDidNotExplore');
   });
+  if (ammoId === undefined) return undefined;
+  const inst = state.cards[ammoId];
+  const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+  return {
+    id: `am007-${seat}-${ammoId}-v${state.version}`,
+    seat,
+    text: `${def?.name ?? 'Ammo x30'}: move this Ammunition to the top of your Inventory?`,
+    options: ['Move to Inventory', 'Leave in Play Area'],
+    payload: { kind: 'am007Choose', ammoInstanceId: ammoId },
+  };
 }
 
 /** True when the seat's character has the Barry Burton chain ability. */

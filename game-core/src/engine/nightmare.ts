@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState, Prompt } from '../types';
 import { characterAbilities, applyHpLoss, applyRicardoDamage } from './abilities';
 import { drawWithReshuffle } from './deck';
-import { nonEmptyPileIds, gainAmmoX10 } from './mercenaries';
+import { nonEmptyPileIds, gainAmmoCard } from './mercenaries';
 
 /**
  * Nightmare expansion — engine support for the infected / weapon / item /
@@ -153,7 +153,7 @@ export function applyNightmareNotDefeatedEffects(state: GameState, ctx: Nightmar
   for (const e of def.infectedEffects ?? []) {
     if (e.kind === 'onNotDefeatedGainAmmoAndShuffle') {
       const count = e.base + e.perLevel * player.level;
-      if (count > 0) s = gainAmmoX10(s, ctx.seat, count);
+      if (count > 0) s = gainAmmoCard(s, ctx.seat, count);
     }
   }
   return { state: s, prompts: [] };

@@ -6,7 +6,7 @@ import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
 import { ammoX10CountInDiscard, saddlerAmmoGrantPerPlayer, trashHighestDamageUsedWeapons } from './customInfected';
-import { gainAmmoX10 } from './mercenaries';
+import { gainAmmoCard } from './mercenaries';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -248,7 +248,7 @@ export function resolveAllyExplore(
   // trample when the forced explore does not defeat him.
   const saddlerGrant = saddlerAmmoGrantPerPlayer(revealedDef);
   if (saddlerGrant > 0) {
-    for (const s of next.seats) if (!s.dead) next = gainAmmoX10(next, s.seat, saddlerGrant);
+    for (const s of next.seats) if (!s.dead) next = gainAmmoCard(next, s.seat, saddlerGrant);
   }
   if (outcome.kind !== 'defeated' &&
       (revealedDef?.infectedEffects ?? []).some(e => e.kind === 'onNotDefeatedTrashHighestDamageUsedWeapons')) {

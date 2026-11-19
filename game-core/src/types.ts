@@ -539,9 +539,9 @@ export type AmmoEffect =
   /** AM-005: "When you Trash this card, you get +10 Gold during this turn." */
   | { readonly kind: "gainGoldWhenTrashed"; readonly amount: number }
   /** AM-006: "When you Defeat an Infected, if this Ammunition is in your Play
-   *  Area, you can Trash it and gain 1 'Ammo x10'. This type of effect can only
+   *  Area, you can Trash it and gain 1 'Ammo x30'. This type of effect can only
    *  be applied once during your turn." */
-  | { readonly kind: "onDefeatTrashForAmmoX10" }
+  | { readonly kind: "onDefeatTrashForAmmoX30" }
   /** AM-007: "At the end of your turn, if this card is in your Play Area and
    *  you did not Explore during this turn, you can move this Ammunition to the
    *  top of your Inventory." */
@@ -1015,6 +1015,9 @@ export interface PlayerState {
    *  has already been used this turn ("this type of effect can only be applied
    *  once during your turn"). Cleared at the start of the player's next turn. */
   readonly ammoX10UpgradeUsedThisTurn?: boolean;
+  /** AM-007: copies this seat DECLINED to recycle at the end of this turn.
+   *  Without it the end-of-turn prompt re-offers the same card forever. */
+  readonly am007Declined?: readonly string[];
   /** B4MC-CH-005 L1: the "pay 1 Action to charge" Stun Rod effect is active for
    *  the rest of this turn (her Stun Rod explores get +10 Damage). */
   readonly stunRodCharged?: boolean;

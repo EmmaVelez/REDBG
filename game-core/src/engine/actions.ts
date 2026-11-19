@@ -90,7 +90,7 @@ import { resolveAllyExplore, allyExploreUsedWeaponIds } from './allyExplore';
 import { leonTrashClaimAvailable, markLeonTrashClaimUsed, helenaRevealDiscardAvailable,
   markHelenaRevealUsed, helenaLowHpDrawAvailable, hasChoosePlayerOnDefeat } from './abilities';
 import { advanceDraft, moveXp, applyUseSkill, resolveSkillXpAmount, activeSkillEffects, exploreSkillDamageBonus, exploreExplosiveDamage, skillDamageReduction, skillGiantKillingThreshold, skillLethalReplacementAmount, skillHealAmountBonus, skillHealTrashFromDiscard, consumeNegateDamage, consumeInfectedEffectReaction, removePartnerSkill } from './skill';
-import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoX10UpgradePrompt, recycleAmmoIds, gainAmmoX10, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
+import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMercenariesNotDefeatedEffects, applyMercenariesOnDefeatAbilities, ammoUpgradePrompt, recycleAmmoPrompt, gainAmmoCard, gainCopy, gainCopyTracked, dealDamageToCharacter, removeInstanceEverywhere, ownerSeatOf, decorationDelta } from './mercenaries';
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
@@ -467,12 +467,11 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
       });
       const recalledSet = new Set(recalledIds);
 
-      // AM-007 Ammo x30: an Ammunition that was not used to Explore moves
-      // to the top of the Inventory instead of being discarded. The printed
-      // "you can" is resolved automatically, the same ruling as CW-025
-      // above — keeping the Ammunition is never worse than discarding it.
-      const recycledAmmoIds = recycleAmmoIds(state, seat);
-      const recalledOrRecycled = new Set([...recalledSet, ...recycledAmmoIds]);
+      // AM-007 Ammo x30 used to be recycled automatically here. It is a
+      // "you can" CHOICE, so the endTurn case asks the player instead (see
+      // recycleAmmoPrompt); declining leaves the card in the Play Area and it
+      // is discarded like any other unused card.
+      const recalledOrRecycled = new Set(recalledSet);
 
       const dh = discardHand({ hand: player.hand.filter(id => !keptIds.includes(id)), discard: player.discard });
       const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
@@ -488,7 +487,7 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
 
       // Mansion attachment effects at end of turn (e.g., Rampage trashing
       // inventory cards). Applied to the active player's inventory.
-      let currentInventory = [...recalledIds, ...recycledAmmoIds, ...player.inventory];
+      let currentInventory = [...recalledIds, ...player.inventory];
       let currentRemoved = removedAfterTrash;
       let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
       let currentAttachments = [...(state.mansionAttachments ?? [])];
@@ -1053,7 +1052,7 @@ function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
     // applied at the damage site; the gain fires once per damaging action.
     if (!seat.downed && !seat.dead &&
         characterAbilities(prev, seat.seat).some(a => a.kind === 'damageReductionForAmmo')) {
-      state = gainAmmoX10(state, seat.seat, 1);
+      state = gainAmmoCard(state, seat.seat, 1);
     }
     if (seat.seat !== state.activeSeat) continue; // only "during your turn"
     // A downed character has no hand (revive redraws one); drawing here would
@@ -3328,7 +3327,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Raised once, after the per-card loop — the prompt id keys on the
         // Ammunition instance, so one per defeated Infected would collide.
         if (defeatedEntries.length > 0) {
-          const am006Prompt = ammoX10UpgradePrompt(state, seat);
+          const am006Prompt = ammoUpgradePrompt(state, seat);
           if (am006Prompt !== undefined) defeatFxPrompts.push(am006Prompt);
         }
         // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
@@ -3476,7 +3475,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let out = result;
         if (saddlerAmmoGrant > 0) {
           for (const s of out.seats) {
-            if (!s.dead) out = gainAmmoX10(out, s.seat, saddlerAmmoGrant);
+            if (!s.dead) out = gainAmmoCard(out, s.seat, saddlerAmmoGrant);
           }
         }
         if (oscarTrample) out = trashHighestDamageUsedWeapons(out, weapons);
@@ -3486,7 +3485,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // snapshot, so a mid-branch gain would be dropped.
         if (!defeated && chrisL1Reduction > 0 && multi.combinedAttack > 0) {
           out = markChrisL1ReductionUsed(out, seat);
-          out = gainAmmoX10(out, seat, 1);
+          out = gainAmmoCard(out, seat, 1);
         }
         return out;
       }
@@ -4659,7 +4658,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         defeatFxPrompts.push(...onDefeatFx.prompts);
         // AM-006 Ammo x20: raised ONCE per explore (the prompt id keys on the
         // Ammunition instance, so one per defeated Infected would collide).
-        const am006Prompt = ammoX10UpgradePrompt(state, seat);
+        const am006Prompt = ammoUpgradePrompt(state, seat);
         if (am006Prompt !== undefined) defeatFxPrompts.push(am006Prompt);
 
         // Nightmare: on-defeat infected effects (MA-055 Bitores Mendez,
@@ -4688,7 +4687,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         // Custom card line: CI-003's 10x Ammo lands after the seat rebuild.
         if (saddlerAmmoGrant > 0) {
           for (const s of defeatFxState.seats) {
-            if (!s.dead) defeatFxState = gainAmmoX10(defeatFxState, s.seat, saddlerAmmoGrant);
+            if (!s.dead) defeatFxState = gainAmmoCard(defeatFxState, s.seat, saddlerAmmoGrant);
           }
         }
         // MA-092 reveal gains apply AFTER the explore's own seat updates.
@@ -4843,7 +4842,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const tied = alive.filter(s => s.decorations === maxDeco);
           const bestHp = Math.max(...tied.map(s => s.hp));
           const chosen = tied.filter(s => s.hp === bestHp).map(s => s.seat)[0];
-          if (chosen !== undefined) state = gainAmmoX10(state, chosen, duvaliaEffect.count);
+          if (chosen !== undefined) state = gainAmmoCard(state, chosen, duvaliaEffect.count);
         }
       }
 
@@ -4945,7 +4944,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Custom card line: CI-003's 10x Ammo lands after the seat rebuild.
       if (saddlerAmmoGrant > 0) {
         for (const s of state.seats) {
-          if (!s.dead) state = gainAmmoX10(state, s.seat, saddlerAmmoGrant);
+          if (!s.dead) state = gainAmmoCard(state, s.seat, saddlerAmmoGrant);
         }
       }
 
@@ -4953,7 +4952,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // each round is lowered by 10 and grants him one "Ammo x10".
       if (chrisL1Reduction > 0 && (revealedDef?.attack ?? 0) > 0) {
         state = markChrisL1ReductionUsed(state, seat);
-        state = gainAmmoX10(state, seat, 1);
+        state = gainAmmoCard(state, seat, 1);
       }
 
       // Nightmare: on-not-defeated infected effects (MA-054 Osmund Saddler).
@@ -6077,7 +6076,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           };
         }
       }
-      return applyEndOfTurn(state, seat, nextBase);
+      // AM-007 Ammo x30: "you can move this Ammunition to the top of your
+      // Inventory" — a CHOICE, so ask BEFORE the turn ends (the Play Area is
+      // still populated). The resolver finishes the turn.
+      // The decline latch is per-turn, so clear it as this turn closes.
+      const clearedDeclines: GameState = state.seats[seat]?.am007Declined === undefined
+        ? state
+        : { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, am007Declined: undefined } : x)) };
+      if (!clearedDeclines.prompts.some(p => p.seat === seat)) {
+        const am007Prompt = recycleAmmoPrompt(clearedDeclines, seat);
+        if (am007Prompt !== undefined) {
+          return { ...clearedDeclines, ...nextBase, prompts: [...clearedDeclines.prompts, am007Prompt] };
+        }
+      }
+      return applyEndOfTurn(clearedDeclines, seat, nextBase);
     }
 
     case 'moveXp': {
@@ -6642,7 +6654,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         } else if (effect.kind === 'onexGainAmmoAndChooseCard') {
           // Bedroom: gain `ammoCount` Ammo x`ammo`, then choose a card up to `maxCost`.
           for (let i = 0; i < effect.ammoCount; i += 1) {
-            s = gainAmmoX10(s, seat, 1);
+            s = gainAmmoCard(s, seat, 1);
           }
           // Gained ammo cards credit their Ammo bonus to the turn's pool
           // immediately (the player does not have to play them).
@@ -9867,7 +9879,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const chosen = prompt.options[option];
         const count = Number(prompt.payload?.count ?? '1');
         if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
-        return gainAmmoX10({ ...state, ...nextBase, prompts: newPrompts }, Number(chosen), count);
+        return gainAmmoCard({ ...state, ...nextBase, prompts: newPrompts }, Number(chosen), count);
       }
 
       if (kind === 'ma074ChoosePlayer') {
@@ -9902,7 +9914,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, chosen],
           prompts: newPrompts,
         };
-        s = gainAmmoX10(s, targetSeat, 1, 'hand');
+        s = gainAmmoCard(s, targetSeat, 1, 'hand');
         return s;
       }
 
@@ -10212,8 +10224,47 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, ammoId],
           prompts: newPrompts,
         };
-        s = gainAmmoX10(s, seat, 1);
+        s = gainAmmoCard(s, seat, 1, 'discard', 30);
         return s;
+      }
+
+      if (kind === 'am007Choose') {
+        // AM-007: the player chooses whether the Ammunition goes to the top of
+        // the Inventory. Declining leaves it in the Play Area (it is then
+        // discarded with the rest of the unused cards).
+        const chosen = prompt.options[option];
+        const ammoId = String(prompt.payload?.ammoInstanceId ?? '');
+        const seatPlayer = state.seats[seat] as PlayerState;
+        let base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        // Declined: latch it so the "ask again" pass does not re-offer the
+        // SAME copy forever. The card stays in the Play Area and is discarded.
+        if (chosen !== 'Move to Inventory' && ammoId !== '' && seatPlayer.playArea.includes(ammoId)) {
+          base = {
+            ...base,
+            seats: base.seats.map(x => (x.seat === seat
+              ? { ...x, am007Declined: [...(x.am007Declined ?? []), ammoId] }
+              : x)),
+          };
+        }
+        if (chosen === 'Move to Inventory' && ammoId !== '' && seatPlayer.playArea.includes(ammoId)) {
+          base = {
+            ...base,
+            seats: base.seats.map(x => (x.seat === seat
+              ? { ...x, playArea: x.playArea.filter(id => id !== ammoId), inventory: [ammoId, ...x.inventory] }
+              : x)),
+            cards: (() => {
+              const inst = base.cards[ammoId];
+              if (inst === undefined) return base.cards;
+              return { ...base.cards, [ammoId]: { ...inst, location: { zone: 'inventory', index: 0, seat } } };
+            })(),
+          };
+        }
+        // Another copy still waiting? Ask again rather than silently moving it.
+        const nextPrompt = recycleAmmoPrompt(base, seat);
+        if (nextPrompt !== undefined) {
+          return { ...base, prompts: [...base.prompts, nextPrompt] };
+        }
+        return applyEndOfTurn(base, seat, { version: nextBase.version, log: nextBase.log });
       }
 
       if (kind === 'ac043ChoosePlayer') {
