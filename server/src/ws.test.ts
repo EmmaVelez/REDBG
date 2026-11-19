@@ -87,6 +87,31 @@ describe('game server over WebSocket', () => {
     c.ws.close();
   });
 
+  it('createRoom carries usherMode/clockMode through to the started game', async () => {
+    const server = startServer({ tokenSeq: ['tok-mode'] });
+    const c = connect(server);
+    await open(c);
+    await c.next(); // welcome
+    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false, usherMode: true, clockMode: true });
+    const roomState = await c.next();
+    expect(roomState.kind).toBe('roomState');
+    if (roomState.kind === 'roomState') {
+      expect(roomState.room.usherMode).toBe(true);
+      expect(roomState.room.clockMode).toBe(true);
+    }
+    c.send({ kind: 'startGame' });
+    const started = await c.next();
+    expect(started.kind).toBe('gameStarted');
+    const sync = await c.next();
+    expect(sync.kind).toBe('stateSync');
+    if (sync.kind === 'stateSync') {
+      // Usher: 3 face-up locations from turn 1 (the create-form flags used to
+      // be dropped by the ws createRoom handler, so online games got none).
+      expect(sync.view.state.locations?.length).toBe(3);
+    }
+    c.ws.close();
+  });
+
   it('joinRoom broadcasts to both players', async () => {
     const server = startServer({ tokenSeq: ['tok-a', 'tok-b'] });
     const host = connect(server);

@@ -1,5 +1,25 @@
 # HANDOFF — resume here
 
+**USHER/CLOCK ONLINE CREATE-FORM FIX (2026-11-19):** Manny: "in usher mode, no
+LOC cards are displaying at the start of the game or at all". TWO causes:
+1. REAL BUG: the ws.ts `createRoom` handler forwards room options POSITIONALLY
+   and stopped at mercenariesBasicResources — `msg.usherMode`/`msg.clockMode`
+   were DROPPED, so online rooms made via the create form always had both
+   flags false (the in-room setUsherMode/setClockMode toggles worked; hotseat
+   worked — which is why the earlier live check missed it). Fixed: append both
+   args. Regression: ws.test.ts "createRoom carries usherMode/clockMode through
+   to the started game" (flags in roomState + 3 locations in the first
+   stateSync). LESSON: rooms.test calls the store directly and hotseat bypasses
+   ws — every new room flag needs a ws-layer test, not just store/UI tests.
+2. STALE SERVERS: the local dev servers on 1725/1726 had been running since
+   2026-11-18 (before the modes existed) — old engine in memory + freshly built
+   client/dist = checkboxes that do nothing. Killed both, relaunched from
+   server/ with current code. LESSON: tsx does not hot-reload; after engine
+   changes, restart long-running dev servers before blaming the code.
+- Gates: typecheck x3 clean, server 113/113. Live-verified ONLINE create form →
+  fill bots → start: 3 face-up GLOBAL locations turn 1 (Large Gallery,
+  Keeper's Room, Library).
+
 **THE HOUSE WITH A CLOCK IN ITS WALLS GAME MODE (2026-11-19):** Manny: a second
 location mode, checkbox under the Usher one on all three lobby surfaces.
 X = ceil(Mansion deck size / 15) RANDOM Locations are shuffled INTO the Mansion
