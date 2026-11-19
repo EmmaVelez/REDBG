@@ -39,9 +39,15 @@ export function Board({ state, mySeat, onAction, disabled = false, overlayOpen =
             const topId = pile.cards[0];
             const def = defForInstance(state, topId);
             const count = pile.cards.length;
+            // Bar (loc-022) XP tokens: a circular #xp badge crowns the pile.
+            const xpCount = (state.xpTokens ?? []).filter(t => t === pile.pileId).length;
+            const xpBadge = xpCount > 0
+              ? <span className="xp-token-badge" title="XP token: spend 1 XP to buy from this pile (2 XP also removes the token)">{xpCount}xp</span>
+              : null;
             if (def === null) {
               return (
                 <div key={pile.pileId} className="market-pile">
+                  {xpBadge}
                   <span>Empty</span> <span className="pile-count">{count}</span>
                 </div>
               );
@@ -56,8 +62,9 @@ export function Board({ state, mySeat, onAction, disabled = false, overlayOpen =
                 data-anim-zone={`market-${pile.pileId}`}
                 onClick={() => clickable && onAction({ type: 'buy', seat: mySeat, pileId: pile.pileId })}
                 disabled={!clickable}
-                title={`Buy ${def.name} for ${costText(def)} gold`}
+                title={`Buy ${def.name} for ${costText(def)} gold${xpCount > 0 ? ' — XP token: spend 1 XP first (2 XP also removes the token)' : ''}`}
               >
+                {xpBadge}
                 <HoverCard def={def}>
                   <CardView def={def} compact artOnly />
                 </HoverCard>

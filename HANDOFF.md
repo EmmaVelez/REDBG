@@ -1,5 +1,26 @@
 # HANDOFF — resume here
 
+**XP-TOKEN PILE BADGES (2026-11-19):** Manny: "for locations that add xp to
+piles or areas, add #xp in a circle to the top of that pile or area, # =
+how much xp is on that stack." The Bar (loc-022, `onexAddXpTokenToPile`) is
+the only location that places XP tokens — `state.xpTokens` (one per pile,
+dedup-guarded in addXpTokenToPile; buying costs 1 XP first, 2 XP strips the
+token via buyXpChoice). The tokens were INVISIBLE in the UI. Board.tsx now
+crowns each tokenized Resource Area pile with a circular gold `.xp-token-badge`
+reading `<count>xp` (count = occurrences of the pileId in xpTokens, so stacked
+tokens show the total); empty piles get it too; the pile tooltip explains the
+XP spend. CSS: .market-pile position:relative + the badge circle (landed in
+HEAD via the other session's cb2c0e0, which absorbed the shared styles.css —
+the Board/test hunks are this session's commit). Test: LocationsRow.test.tsx
+"crowns XP-token piles" (1xp/2xp/placement/no-token) RED→GREEN. Verified
+visually with a throwaway real-Board + real-CSS probe page rendered to
+scratch/xp-badge-probe.html and read by the LOCAL Ollama vision model
+(gemma4:e2b): clean centered circles, readable, no art overlap. Live gameplay
+route abandoned: First Timer has no Ammo x20, so Bar's 20g Use is unreachable
+on turn 1 — the probe is the deterministic visual gate. Gates: typecheck x3
+clean, client 278/278 (incl. the other session's lobby-collapse cb2c0e0),
+build OK.
+
 **CE-009 ECLIPTIC EXPRESS ON-DEFEAT WINDOW FIXED (2026-11-19):** Manny: "does
 ce-009 trigger correctly when in play and a player defeats an infected — they
 should be prompted to trash a card in their discard pile if they choose to".

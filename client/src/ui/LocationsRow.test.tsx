@@ -38,6 +38,20 @@ function revealOnly(s: GameState, cardId: string): GameState {
 }
 
 describe('LocationsRow', () => {
+  it('crowns XP-token piles with a circular #xp badge (Bar, loc-022)', () => {
+    const s = stateWithLocations();
+    const pileId = Object.keys(s.marketPiles)[0]!;
+    const html = renderToStaticMarkup(<Board state={{ ...s, xpTokens: [pileId] }} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('xp-token-badge');
+    expect(html).toContain('1xp');
+    // the badge rides on the tokenized pile, not another one
+    expect(html.match(new RegExp(`data-pile="${pileId}"[^>]*>[\\s\\S]*?xp-token-badge`))).not.toBeNull();
+    // stacked tokens show the total on the stack
+    const stacked = renderToStaticMarkup(<Board state={{ ...s, xpTokens: [pileId, pileId] }} mySeat={0} onAction={() => {}} />);
+    expect(stacked).toContain('2xp');
+    // no tokens -> no badge
+    expect(renderToStaticMarkup(<Board state={s} mySeat={0} onAction={() => {}} />)).not.toContain('xp-token-badge');
+  });
   it('wraps revealed locations in a HoverCard (full-art popup on hover)', () => {
     const s = revealOnly(stateWithLocations(), 'loc-008');
     const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
