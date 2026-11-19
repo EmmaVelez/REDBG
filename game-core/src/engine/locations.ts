@@ -417,6 +417,35 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
   return { ...s, prompts };
 }
 
+/**
+ * "The House with a Clock in Its Walls": a Location drawn from the Mansion
+ * deck immediately goes into play. The caller has ALREADY popped it from the
+ * deck. Only the combat-timing flags are applied here (the explore's battle
+ * math must see them); the On Reveal seat effects + prompts are applied by
+ * the caller to the FINAL explore state via applyRevealEffects — these three
+ * kinds are pure setters, so the second application is idempotent.
+ */
+export function clockLocationIntoPlay(state: GameState, instanceId: string, seat: number): GameState {
+  const inst = state.cards[instanceId];
+  const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+  if (inst === undefined || def === undefined) return state;
+  let s: GameState = {
+    ...state,
+    locations: [...(state.locations ?? []), { instanceId, cubes: {}, revealedBy: seat }],
+    cards: { ...state.cards, [instanceId]: { ...inst, location: { zone: 'supply', index: 0 } } },
+  };
+  for (const effect of def.locationRevealEffects ?? []) {
+    if (effect.kind === 'revealInfectedHpReductionThisTurn') {
+      s = { ...s, infectedHpReductionThisTurn: { amount: effect.amount, min: effect.min } };
+    } else if (effect.kind === 'revealInfectedHpBonusThisTurn') {
+      s = { ...s, infectedHpBonusThisTurn: effect.amount };
+    } else if (effect.kind === 'revealBlockMansionRevealThisTurn') {
+      s = { ...s, mansionRevealBlockedSeat: seat };
+    }
+  }
+  return s;
+}
+
 /** Ongoing invest effects for a seat (from locations they have cubed). */
 export function investEffectsFor(state: GameState, seat: number): readonly LocationEffect[] {
   const out: LocationEffect[] = [];

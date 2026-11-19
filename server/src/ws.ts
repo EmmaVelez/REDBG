@@ -466,6 +466,28 @@ export function createGameServer(options: GameServerOptions = {}): GameServer {
         return;
       }
 
+      case 'setUsherMode': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setUsherMode(session.roomCode, session.clientId, msg.usherMode);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
+      case 'setClockMode': {
+        if (session.roomCode === null || session.clientId === null) return;
+        try {
+          roomStore.setClockMode(session.roomCode, session.clientId, msg.clockMode);
+          broadcastRoomState(session.roomCode);
+        } catch (e) {
+          send(ws, { kind: 'error', message: (e as Error).message });
+        }
+        return;
+      }
+
       case 'setCharacterSelection': {
         if (session.roomCode === null || session.clientId === null) return;
         try {

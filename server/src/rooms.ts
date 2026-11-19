@@ -28,12 +28,16 @@ export interface Room {
   readonly mansionAttachmentMode: 1 | 2;
   /** Swap the scenario's basic resources for the Mercenaries set's (ammo/pistol/knife). */
   readonly mercenariesBasicResources: boolean;
+  /** Fall of the House of Usher: 3 random fan Locations start face-up in play. */
+  readonly usherMode: boolean;
+  /** The House with a Clock in Its Walls: random Locations hide in the Mansion deck. */
+  readonly clockMode: boolean;
 }
 
 export interface RoomStore {
   readonly rooms: ReadonlyMap<string, Room>;
   /** Create a room; the creator becomes host seated at 0. Returns the new room. */
-  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean, mainCharacterId?: string, partnerCharacterId?: string, skillSystem?: boolean, customCards?: readonly string[], mansionAttachmentMode?: 1 | 2, mercenariesBasicResources?: boolean): Room;
+  createRoom(clientId: string, name: string, scenario?: ScenarioId, partnerMode?: boolean, mainCharacterId?: string, partnerCharacterId?: string, skillSystem?: boolean, customCards?: readonly string[], mansionAttachmentMode?: 1 | 2, mercenariesBasicResources?: boolean, usherMode?: boolean, clockMode?: boolean): Room;
   /** Add an unseated player (seat -1) to a lobby room. */
   joinRoom(roomCode: string, clientId: string, name: string): Room;
   /** Remove a player; host leaves -> lowest-seat remaining becomes host;
@@ -57,6 +61,10 @@ export interface RoomStore {
   setMansionAttachmentMode(roomCode: string, hostClientId: string, mansionAttachmentMode: 1 | 2): Room;
   /** Host only, lobby only: swap the scenario's basic resources for the Mercenaries set's. */
   setMercenariesBasicResources(roomCode: string, hostClientId: string, mercenariesBasicResources: boolean): Room;
+  /** Host only, lobby only: enable/disable Fall of the House of Usher. */
+  setUsherMode(roomCode: string, hostClientId: string, usherMode: boolean): Room;
+  /** Host only, lobby only: enable/disable The House with a Clock in Its Walls. */
+  setClockMode(roomCode: string, hostClientId: string, clockMode: boolean): Room;
   /** Host only, lobby only: set host character selection. */
   setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room;
   /** Host only, lobby only: flip phase to 'playing'. */
@@ -150,7 +158,7 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
   return {
     rooms,
 
-    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string, skillSystem: boolean = false, customCards: readonly string[] = [], mansionAttachmentMode: 1 | 2 = 1, mercenariesBasicResources: boolean = false): Room {
+    createRoom(clientId: string, name: string, scenario: ScenarioId = 'firstTimer', partnerMode: boolean = false, mainCharacterId?: string, partnerCharacterId?: string, skillSystem: boolean = false, customCards: readonly string[] = [], mansionAttachmentMode: 1 | 2 = 1, mercenariesBasicResources: boolean = false, usherMode: boolean = false, clockMode: boolean = false): Room {
       requireLegalPartner(partnerCharacterId);
       const roomCode = allocateCode();
       const room: Room = {
@@ -164,6 +172,8 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         customCards,
         mansionAttachmentMode,
         mercenariesBasicResources,
+        usherMode,
+        clockMode,
       };
       save(roomCode, room);
       hosts.set(roomCode, clientId);
@@ -331,6 +341,20 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
       return save(roomCode, { ...room, mercenariesBasicResources });
     },
 
+    setUsherMode(roomCode: string, hostClientId: string, usherMode: boolean): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      return save(roomCode, { ...room, usherMode });
+    },
+
+    setClockMode(roomCode: string, hostClientId: string, clockMode: boolean): Room {
+      const room = requireRoom(roomCode);
+      requireLobby(room);
+      requireHost(roomCode, hostClientId);
+      return save(roomCode, { ...room, clockMode });
+    },
+
     setCharacterSelection(roomCode: string, hostClientId: string, mainCharacterId?: string, partnerCharacterId?: string): Room {
       const room = requireRoom(roomCode);
       requireLobby(room);
@@ -380,6 +404,8 @@ export function createRoomStore(rand: () => number = Math.random): RoomStore {
         customCards: room.customCards,
         mansionAttachmentMode: room.mansionAttachmentMode,
         mercenariesBasicResources: room.mercenariesBasicResources,
+        usherMode: room.usherMode,
+        clockMode: room.clockMode,
       };
     },
   };

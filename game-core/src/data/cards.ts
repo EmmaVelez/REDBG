@@ -786,9 +786,9 @@ export function isExpansionScenario(id: ScenarioId): boolean {
  * to live as a duplicated inline copy in both the server and the client.
  * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
  */
-export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean }): ReadonlyArray<CardDef> {
+export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean }): ReadonlyArray<CardDef> {
   const base = isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
-  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true) {
+  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true && opts?.usherMode !== true && opts?.clockMode !== true) {
     return base;
   }
   const known = new Set(base.map(c => c.id));
@@ -822,6 +822,15 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
       // the Mansion, so that def must exist even when the room did not tick it.
       const def = CUSTOM_CARDS.find(c => c.id === cardId) ?? ALL_CARDS.find(c => c.id === cardId);
       if (def !== undefined && !known.has(def.id)) extras.push(def);
+    }
+  }
+  // Fall of the House of Usher / The House with a Clock in Its Walls: setup
+  // picks random Locations, so EVERY fan Location def must be in the pool
+  // regardless of the custom-card selection (the picker no longer offers
+  // them individually).
+  if (opts?.usherMode === true || opts?.clockMode === true) {
+    for (const c of CUSTOM_CARDS) {
+      if (c.type === 'location' && !known.has(c.id) && !extras.some(e => e.id === c.id)) extras.push(c);
     }
   }
   if (opts?.skillSystem === true) {

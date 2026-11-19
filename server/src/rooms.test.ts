@@ -191,6 +191,8 @@ describe('createRoomStore', () => {
       customCards: [],
       mansionAttachmentMode: 1,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     });
   });
 
@@ -221,6 +223,36 @@ describe('createRoomStore', () => {
     expect(() => store.setMercenariesBasicResources(room.roomCode, 'stranger', true)).toThrow('not the host');
     store.startGame(room.roomCode, 'c1');
     expect(() => store.setMercenariesBasicResources(room.roomCode, 'c1', true)).toThrow('game already started');
+  });
+
+  it('setUsherMode records the flag; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, [], 1, false, true);
+    expect(room.usherMode).toBe(true);
+    expect(store.toSnapshot(room).usherMode).toBe(true);
+
+    const changed = store.setUsherMode(room.roomCode, 'c1', false);
+    expect(changed.usherMode).toBe(false);
+    expect(store.toSnapshot(changed).usherMode).toBe(false);
+
+    expect(() => store.setUsherMode(room.roomCode, 'stranger', true)).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setUsherMode(room.roomCode, 'c1', true)).toThrow('game already started');
+  });
+
+  it('setClockMode records the flag; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, [], 1, false, false, true);
+    expect(room.clockMode).toBe(true);
+    expect(store.toSnapshot(room).clockMode).toBe(true);
+
+    const changed = store.setClockMode(room.roomCode, 'c1', false);
+    expect(changed.clockMode).toBe(false);
+    expect(store.toSnapshot(changed).clockMode).toBe(false);
+
+    expect(() => store.setClockMode(room.roomCode, 'stranger', true)).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setClockMode(room.roomCode, 'c1', true)).toThrow('game already started');
   });
 
   it('rejects a main-only character (ch-008) as a partner', () => {

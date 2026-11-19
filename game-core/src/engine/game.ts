@@ -741,7 +741,46 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       register(id, c.id, 'mansionDeck');
     }
   }
-  const mansionDeck = rngShuffle(mansionIds);
+  // "The House with a Clock in Its Walls": X = ceil(Mansion size / 15) random
+  // Locations hide in the Mansion deck (X is computed BEFORE they are added).
+  // Shuffle until no two Locations are adjacent; a deterministic interleave
+  // is the fallback (X <= ceil(N/15) always leaves enough gaps).
+  const clockPool = setup.clockMode === true ? cards.filter(c => c.type === 'location') : [];
+  const clockWant = Math.min(Math.ceil(mansionIds.length / 15), clockPool.length);
+  const clockPicked = clockWant > 0 ? rngShuffle(clockPool.map(c => c.id)).slice(0, clockWant) : [];
+  const clockIds = clockPicked.map(cardId => {
+    const id = `${cardId}#clock1`;
+    register(id, cardId, 'mansionDeck');
+    return id;
+  });
+  let mansionDeck: readonly string[];
+  if (clockIds.length > 0) {
+    const all = [...mansionIds, ...clockIds];
+    const locSet = new Set(clockIds);
+    const adjacent = (ids: readonly string[]): boolean =>
+      ids.some((id, i) => i > 0 && locSet.has(id) && locSet.has(ids[i - 1]!));
+    let shuffled = rngShuffle(all);
+    let tries = 0;
+    while (adjacent(shuffled) && tries < 100) {
+      shuffled = rngShuffle(all);
+      tries += 1;
+    }
+    if (adjacent(shuffled)) {
+      const non = shuffled.filter(id => !locSet.has(id));
+      const locs = shuffled.filter(id => locSet.has(id));
+      const out: string[] = [];
+      let li = 0;
+      for (const nid of non) {
+        out.push(nid);
+        if (li < locs.length) { out.push(locs[li]!); li += 1; }
+      }
+      while (li < locs.length) { out.push(locs[li]!); li += 1; }
+      shuffled = out;
+    }
+    mansionDeck = shuffled;
+  } else {
+    mansionDeck = rngShuffle(mansionIds);
+  }
 
   // Market piles
   const marketPiles: Record<string, { pileId: string; cards: readonly string[] }> = {};
@@ -826,6 +865,20 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   }
   const shuffledLocations = locationIds.length > 0 ? rngShuffle(locationIds) : [];
 
+  // Fall of the House of Usher (opt-in game mode): 3 RANDOM fan Locations
+  // start face-up in play — no location deck, no On Reveal effects. The rooms
+  // are already set up: GLOBAL effects are live for everyone, invest effects
+  // still need cubes, 1X uses still cost gold + a Buy. revealedBy -1 = no
+  // revealer, so revealer-scoped On Reveal grants (Large Library's draw)
+  // never apply.
+  const usherPool = setup.usherMode === true ? cards.filter(c => c.type === 'location') : [];
+  const usherPicked = usherPool.length > 0 ? rngShuffle(usherPool.map(c => c.id)).slice(0, 3) : [];
+  const usherLocations = usherPicked.map(cardId => {
+    const id = `${cardId}#usher1`;
+    register(id, cardId, 'supply');
+    return { instanceId: id, cubes: {} as Readonly<Record<number, number>>, revealedBy: -1 };
+  });
+
   const baseState: GameState = {
     version: 1,
     seed: setup.seed,
@@ -836,7 +889,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     seats: drawnHands,
     marketPiles,
     mansionDeck,
-    ...(shuffledLocations.length > 0 ? { locationDeck: shuffledLocations, locations: [] } : {}),
+    ...(shuffledLocations.length > 0 ? { locationDeck: shuffledLocations } : {}),
+    ...(shuffledLocations.length > 0 || usherLocations.length > 0 ? { locations: usherLocations } : {}),
     removed: [],
     cards: instances,
     cardDefs,

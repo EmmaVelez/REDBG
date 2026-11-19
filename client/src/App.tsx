@@ -325,7 +325,7 @@ export function App(): JSX.Element {
         room={room}
         clientId={clientId}
         status={status}
-        onCreateRoom={(name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources })}
+        onCreateRoom={(name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode) => dispatchClient({ kind: 'createRoom', playerName: name, scenario, partnerMode, mainCharacterId, partnerCharacterId, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode })}
         onJoinRoom={(code, name) => dispatchClient({ kind: 'joinRoom', roomCode: code, playerName: name })}
         onSelectSeat={seat => dispatchClient({ kind: 'selectSeat', seat })}
         onAddBot={seat => dispatchClient({ kind: 'addBot', seat })}
@@ -334,11 +334,13 @@ export function App(): JSX.Element {
         onSetPartnerMode={partnerMode => dispatchClient({ kind: 'setPartnerMode', partnerMode })}
         onSetSkillSystem={skillSystem => dispatchClient({ kind: 'setSkillSystem', skillSystem })}
         onSetMercenariesBasicResources={mercenariesBasicResources => dispatchClient({ kind: 'setMercenariesBasicResources', mercenariesBasicResources })}
+        onSetUsherMode={usherMode => dispatchClient({ kind: 'setUsherMode', usherMode })}
+        onSetClockMode={clockMode => dispatchClient({ kind: 'setClockMode', clockMode })}
         onSetCustomCards={customCards => dispatchClient({ kind: 'setCustomCards', customCards })}
         onSetMansionAttachmentMode={mansionAttachmentMode => dispatchClient({ kind: 'setMansionAttachmentMode', mansionAttachmentMode })}
         onSetCharacterSelection={(main?: string, partner?: string) => dispatchClient({ kind: 'setCharacterSelection', mainCharacterId: main, partnerCharacterId: partner })}
         onStart={() => dispatchClient({ kind: 'startGame' })}
-        onStartHotseat={(names, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsMode) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsMode })}
+        onStartHotseat={(names, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode) => useGameStore.getState().startHotseat(names, Math.floor(Date.now() % 2 ** 31), scenario, { skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode })}
       />
     );
   }

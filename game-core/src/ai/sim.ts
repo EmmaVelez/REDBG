@@ -27,6 +27,10 @@ export interface SimConfig {
   readonly partnerMode?: boolean;
   /** Fan Locations: deal the location deck (opt-in). */
   readonly locationsMode?: boolean;
+  /** Fall of the House of Usher: 3 random Locations start face-up in play. */
+  readonly usherMode?: boolean;
+  /** The House with a Clock in Its Walls: random Locations hide in the Mansion. */
+  readonly clockMode?: boolean;
   /** Called with each applied action; can be used for live telemetry or
    *  unit tests that assert action sequences. */
   readonly onAction?: (action: Action, stateBefore: GameState) => void;
@@ -56,7 +60,7 @@ function rngFromSeed(seed: number): () => number {
  */
 export function playBotGame(config: SimConfig): SimResult {
   const scenario = config.scenario ?? 'firstTimer';
-  const cards = config.cards ?? cardsForScenario(scenario);
+  const cards = config.cards ?? cardsForScenario(scenario, { usherMode: config.usherMode, clockMode: config.clockMode });
   const piles = config.piles ?? pilesForScenario(scenario);
   const scenarioDef = SCENARIOS.find(s => s.id === scenario);
   const mansionCards =
@@ -79,6 +83,8 @@ export function playBotGame(config: SimConfig): SimResult {
     outbreakMode: config.outbreakMode ?? scenario === 'outbreak',
     partnerMode: config.partnerMode,
     locationsMode: config.locationsMode,
+    usherMode: config.usherMode,
+    clockMode: config.clockMode,
   };
 
   const initialState = setup(setupConfig, cards, piles, mansionCards, winInfectedCardId);

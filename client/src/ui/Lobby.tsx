@@ -26,7 +26,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -37,9 +37,11 @@ export interface LobbyProps {
   readonly onSetCustomCards: (customCards: readonly string[]) => void;
   readonly onSetMansionAttachmentMode: (mansionAttachmentMode: 1 | 2) => void;
   readonly onSetMercenariesBasicResources: (mercenariesBasicResources: boolean) => void;
+  readonly onSetUsherMode: (usherMode: boolean) => void;
+  readonly onSetClockMode: (clockMode: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, locationsMode: boolean) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -107,10 +109,10 @@ function CustomCardsPicker(props: {
   );
   // Mercenaries Skill cards join the Skill deck when the Skill System is on.
   const skills = CUSTOM_CARDS.filter(c => c.type === 'skill' && !bundled.has(c.id));
-  // Fan Locations live on the board (revealed by an Explore), not in a
-  // market pile, so they get their own section.
-  const locations = CUSTOM_CARDS.filter(c => c.type === 'location' && !bundled.has(c.id));
-  const allCustomCardIds = CUSTOM_CARDS.filter(c => !bundled.has(c.id)).map(c => c.id);
+  // Fan Locations are NOT individually selectable: they enter play only via
+  // the "Fall of the House of Usher" / "The House with a Clock in Its Walls"
+  // game-mode checkboxes.
+  const allCustomCardIds = CUSTOM_CARDS.filter(c => !bundled.has(c.id) && c.type !== 'location').map(c => c.id);
 
   const allSelected = allCustomCardIds.every(id => props.selected.includes(id));
   const toggleAll = (checked: boolean): void => {
@@ -282,25 +284,6 @@ function CustomCardsPicker(props: {
         ))}
       </details>
 
-      {/* Locations */}
-      {locations.length > 0 && (
-        <details className="custom-card-section">
-          <summary className="custom-card-section-title">🏠 Locations</summary>
-          {locations.map(c => (
-            <label key={c.id} className="custom-card-row">
-              <input
-                type="checkbox"
-                checked={props.selected.includes(c.id)}
-                disabled={props.disabled === true}
-                onChange={e => toggle(c.id, e.target.checked)}
-                data-testid={`custom-card-${c.id}`}
-              />
-              <span>{c.id.toUpperCase()} {c.name} ({c.type})</span>
-            </label>
-          ))}
-        </details>
-      )}
-
       {/* Poison Bundle */}
       <label className="custom-card-row custom-card-row-bundle">
         <input
@@ -317,7 +300,7 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, locationsMode: boolean) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
@@ -326,11 +309,8 @@ function PassAndPlay(props: {
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
   const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
-  const [locationsMode, setLocationsMode] = useState(false);
-  // A location card can only matter when the mode is on, so selecting one
-  // switches it on (and the toggle selects/clears the whole set).
-  const locationCardIds = CUSTOM_CARDS.filter(c => c.type === 'location').map(c => c.id);
-  const locationsOn = locationsMode || locationCardIds.some(id => customCards.includes(id));
+  const [usherMode, setUsherMode] = useState(false);
+  const [clockMode, setClockMode] = useState(false);
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
   };
@@ -369,16 +349,22 @@ function PassAndPlay(props: {
       <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
         <input
           type="checkbox"
-          checked={locationsOn}
-          onChange={e => {
-            setLocationsMode(e.target.checked);
-            setCustomCards(e.target.checked
-              ? [...new Set([...customCards, ...locationCardIds])]
-              : customCards.filter(id => !locationCardIds.includes(id)));
-          }}
-          data-testid="hotseat-locations-toggle"
+          checked={usherMode}
+          onChange={e => setUsherMode(e.target.checked)}
+          data-testid="hotseat-usher-toggle"
+          title="3 random Locations start face-up in play — no On Reveal effects"
         />
-        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Locations (fan room cards)</span>
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Fall of the House of Usher</span>
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={clockMode}
+          onChange={e => setClockMode(e.target.checked)}
+          data-testid="hotseat-clock-toggle"
+          title="Random Locations hide in the Mansion deck — an Explore puts them into play and reveals the next card instead"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>The House with a Clock in Its Walls</span>
       </label>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {hasAttachmentCards && (
@@ -424,7 +410,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, locationsOn)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode)}
       >
         Start pass &amp; play
       </button>
@@ -447,6 +433,8 @@ export function Lobby({
   onSetCustomCards,
   onSetMansionAttachmentMode,
   onSetMercenariesBasicResources,
+  onSetUsherMode,
+  onSetClockMode,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -510,6 +498,30 @@ export function Lobby({
                     data-testid="mercenaries-basic-resources-toggle"
                   />
                   {' '}Mercenaries Basic Resources
+                </label>
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.usherMode}
+                    onChange={e => onSetUsherMode(e.target.checked)}
+                    data-testid="usher-toggle"
+                    title="3 random Locations start face-up in play — no On Reveal effects"
+                  />
+                  {' '}Fall of the House of Usher
+                </label>
+              </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.clockMode}
+                    onChange={e => onSetClockMode(e.target.checked)}
+                    data-testid="clock-toggle"
+                    title="Random Locations hide in the Mansion deck — an Explore puts them into play and reveals the next card instead"
+                  />
+                  {' '}The House with a Clock in Its Walls
                 </label>
               </div>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
@@ -609,7 +621,7 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
@@ -618,6 +630,8 @@ function RoomEntry(props: {
   const [customCards, setCustomCards] = useState<readonly string[]>([]);
   const [mansionAttachmentMode, setMansionAttachmentMode] = useState<1 | 2>(1);
   const [mercenariesBasicResources, setMercenariesBasicResources] = useState(false);
+  const [usherMode, setUsherMode] = useState(false);
+  const [clockMode, setClockMode] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   const allianceChars = [...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS].filter(c => c.type === 'character');
@@ -625,7 +639,7 @@ function RoomEntry(props: {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -670,6 +684,26 @@ function RoomEntry(props: {
             data-testid="create-mercenaries-basic-resources-toggle"
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Mercenaries Basic Resources</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={usherMode}
+            onChange={e => setUsherMode(e.target.checked)}
+            data-testid="create-usher-toggle"
+            title="3 random Locations start face-up in play — no On Reveal effects"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Fall of the House of Usher</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={clockMode}
+            onChange={e => setClockMode(e.target.checked)}
+            data-testid="create-clock-toggle"
+            title="Random Locations hide in the Mansion deck — an Explore puts them into play and reveals the next card instead"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>The House with a Clock in Its Walls</span>
         </label>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
         {customCards.some(id => {

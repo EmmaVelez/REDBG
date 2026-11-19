@@ -1475,6 +1475,8 @@ describe('Lobby (T08)', () => {
     onSetCustomCards: () => {},
     onSetMansionAttachmentMode: () => {},
     onSetMercenariesBasicResources: () => {},
+    onSetUsherMode: () => {},
+    onSetClockMode: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -1510,6 +1512,8 @@ describe('Lobby (T08)', () => {
       customCards: [],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -1536,9 +1540,70 @@ describe('Lobby (T08)', () => {
       customCards: [] as string[],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: true,
+      usherMode: false,
+      clockMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="mercenaries-basic-resources-toggle"');
+    // the host toggle reflects the room's value
+    expect(inRoom).toContain('checked=""');
+  });
+
+  it('offers the Fall of the House of Usher toggle in every lobby surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(noRoom).toContain('data-testid="create-usher-toggle"');
+    expect(noRoom).toContain('data-testid="hotseat-usher-toggle"');
+    expect(noRoom).toContain('Fall of the House of Usher');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: true,
+      clockMode: false,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="usher-toggle"');
+    // the host toggle reflects the room's value
+    expect(inRoom).toContain('checked=""');
+  });
+
+  it('hides the LOC location cards from the custom card picker', () => {
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(html).not.toContain('data-testid="custom-card-loc-001"');
+    expect(html).not.toContain('data-testid="custom-card-loc-023"');
+    expect(html).not.toContain('🏠 Locations');
+  });
+
+  it('offers the Clock in Its Walls toggle in every lobby surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(noRoom).toContain('data-testid="create-clock-toggle"');
+    expect(noRoom).toContain('data-testid="hotseat-clock-toggle"');
+    expect(noRoom).toContain('The House with a Clock in Its Walls');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: true,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="clock-toggle"');
     // the host toggle reflects the room's value
     expect(inRoom).toContain('checked=""');
   });
@@ -1620,6 +1685,8 @@ describe('Lobby (T08)', () => {
       customCards: ['mx-001'],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
@@ -1638,6 +1705,8 @@ describe('Lobby (T08)', () => {
       customCards: [] as string[],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     };
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
@@ -1665,6 +1734,8 @@ describe('Lobby (T08)', () => {
       customCards: [] as string[],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Chris
@@ -1689,6 +1760,8 @@ describe('Lobby (T08)', () => {
       customCards: ['fch-008'],
       mansionAttachmentMode: 1 as const,
       mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Sherry

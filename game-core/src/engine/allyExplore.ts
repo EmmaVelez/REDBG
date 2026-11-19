@@ -7,6 +7,7 @@ import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explo
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
 import { ammoX10CountInDiscard, saddlerAmmoGrantPerPlayer, trashHighestDamageUsedWeapons } from './customInfected';
 import { gainAmmoCard } from './mercenaries';
+import { clockLocationIntoPlay, applyRevealEffects } from './locations';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   const inst = instanceId === undefined ? undefined : state.cards[instanceId];
@@ -79,12 +80,26 @@ export function resolveAllyExplore(
   const target = state.seats[targetSeat];
   if (sherry === undefined || target === undefined) return state;
 
+  // Clock mode: Locations on top enter play first (the TARGET is exploring);
+  // they never consume the forced explore. Their On Reveal effects are
+  // applied to the final state via applyClock below.
+  const clockIds: string[] = [];
+  let pre = state;
+  while (pre.mansionDeck.length > 0 && cardDef(pre, pre.mansionDeck[0])?.type === 'location') {
+    const locId = pre.mansionDeck[0]!;
+    clockIds.push(locId);
+    pre = clockLocationIntoPlay({ ...pre, mansionDeck: pre.mansionDeck.slice(1) }, locId, targetSeat);
+  }
+  const applyClock = (s: GameState): GameState =>
+    clockIds.reduce((acc, id) => applyRevealEffects(acc, id, targetSeat), s);
+  if (pre.mansionDeck.length === 0) return applyClock(pre);
+
   // An empty arsenal is NOT a no-op: the card says Sherry forces the explore,
   // so the target still reveals the Mansion (unarmed) and takes the hit. The
   // old `if (weaponIds.length === 0) return state` made the ability silently do
   // nothing whenever neither hand held a weapon.
 
-  const rev = revealTop({ deck: state.mansionDeck });
+  const rev = revealTop({ deck: pre.mansionDeck });
   const revealedId = rev.revealedInstanceId;
   const revealedDef = cardDef(state, revealedId);
   let mansionDeck = rev.mansion.deck;
@@ -110,7 +125,7 @@ export function resolveAllyExplore(
   const bonusDamage = target.weaponDamageBonusThisTurn + abilityDamage;
 
   const outcome: ExploreOutcome = resolveExplore({
-    infectedHpReduction: state.infectedHpReductionThisTurn,
+    infectedHpReduction: pre.infectedHpReductionThisTurn,
     weapons,
     ammo: combinedAmmo,
     bonusDamage,
@@ -129,7 +144,7 @@ export function resolveAllyExplore(
     exploringCharacterMaxHp: target.maxHp,
   });
 
-  if (outcome.kind === 'insufficientAmmo') return state;
+  if (outcome.kind === 'insufficientAmmo') return applyClock(pre);
 
   // Weapons leave their owner's hand and join that owner's play area.
   const targetWeapons = usedWeaponIds.filter(id => target.hand.includes(id));
@@ -139,8 +154,12 @@ export function resolveAllyExplore(
 
   const ammoSpent = weapons.reduce((sum, w) => sum + w.ammoReq, 0);
   let next: GameState = {
-    ...state,
-    seats: state.seats.map(s => {
+    ...pre,
+    // The revealed card was popped by revealTop above; the combat branches
+    // below must start from the POPPED deck (the old code left it in the deck
+    // and the not-defeated branch appended a second copy at the bottom).
+    mansionDeck,
+    seats: pre.seats.map(s => {
       if (s.seat === targetSeat) return stripWeapons({ ...s, playArea: [...s.playArea, ...targetWeapons] });
       if (s.seat === sherrySeat) return stripWeapons({ ...s, playArea: [...s.playArea, ...sherryWeapons] });
       return s;
@@ -163,10 +182,10 @@ export function resolveAllyExplore(
       // EV-002 Nemesis Pursuit: removed from the game; the exploring
       // character (Sherry's target) must explore again and every Infected
       // gets +10 Health / +20 Damage for the rest of the turn.
-      return applyNemesisPursuit({
+      return applyClock(applyNemesisPursuit({
         ...next,
         removed: [...next.removed, revealedId],
-      }, targetSeat);
+      }, targetSeat));
     }
     // EV-001 Zombie Grab: its OWN reveal branch (same contract as a normal
     // explore) — trash a weapon from the target's POST-explore hand or
@@ -178,7 +197,7 @@ export function resolveAllyExplore(
         ...(next.seats[targetSeat]?.hand ?? []),
         ...(next.seats[targetSeat]?.discard ?? []),
       ].filter(id => cardDef(state, id)?.type === 'weapon');
-      return {
+      return applyClock({
         ...next,
         mansionDeck,
         prompts: [...next.prompts, {
@@ -188,10 +207,10 @@ export function resolveAllyExplore(
           options: [...grabWeapons, 'Take 20 damage'],
           payload: { kind: 'zombieGrab', amount: '20', instanceId: revealedId },
         }],
-      };
+      });
     }
     // The exploring player decides, exactly as in a normal explore.
-    return {
+    return applyClock({
       ...next,
       mansionDeck,
       prompts: [...next.prompts, {
@@ -201,7 +220,7 @@ export function resolveAllyExplore(
         options: ['Take', 'Send to bottom of Mansion'],
         payload: { kind: 'takeOrBottom', instanceId: revealedId },
       }],
-    };
+    });
   }
 
   const damageTaken = outcome.kind === 'notDefeated' ? outcome.damageTaken : 0;
@@ -273,5 +292,5 @@ export function resolveAllyExplore(
     };
   }
 
-  return next;
+  return applyClock(next);
 }

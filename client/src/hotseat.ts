@@ -47,6 +47,10 @@ export interface HotseatOptions {
   readonly mercenariesBasicResources?: boolean;
   /** Fan Locations: deal the location cards on top of the Mansion (opt-in). */
   readonly locationsMode?: boolean;
+  /** Fall of the House of Usher: 3 random Locations start face-up in play. */
+  readonly usherMode?: boolean;
+  /** The House with a Clock in Its Walls: random Locations hide in the Mansion. */
+  readonly clockMode?: boolean;
 }
 
 export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
@@ -59,7 +63,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode, mercenariesBasicResources: opts.mercenariesBasicResources, locationsMode: opts.locationsMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), pilesForScenario(scenario, { customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode, mercenariesBasicResources: opts.mercenariesBasicResources, locationsMode: opts.locationsMode, usherMode: opts.usherMode, clockMode: opts.clockMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources, usherMode: opts.usherMode, clockMode: opts.clockMode }), pilesForScenario(scenario, { customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

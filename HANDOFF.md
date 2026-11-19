@@ -1,5 +1,144 @@
 # HANDOFF — resume here
 
+**THE HOUSE WITH A CLOCK IN ITS WALLS GAME MODE (2026-11-19):** Manny: a second
+location mode, checkbox under the Usher one on all three lobby surfaces.
+X = ceil(Mansion deck size / 15) RANDOM Locations are shuffled INTO the Mansion
+deck at setup (X computed before they are added); reshuffle until no two LOCs
+are adjacent (100 tries, then a deterministic interleave fallback). RULING
+(asked): unlike Usher, On Reveal effects DO fire — a drawn Location goes into
+play immediately (standard reveal, revealedBy = the explorer) and the next card
+is revealed INSTEAD; Locations never consume Explore slots, single or multi.
+- Engine: `GameSetup.clockMode` / `SimConfig.clockMode`; `cardsForScenario`
+  pulls all 23 LOC defs for either mode. `setup` registers `<id>#clock1` into
+  the deck. The explore case's `drawMansion(deck, fromBottom)` wrapper replaces
+  EVERY combat draw (initial single/multi, Crow chain, MA-039/MA-072
+  expansions, both single-path branches, WE-019 bottom reveal): a drawn LOC
+  goes to `state.locations` via `clockLocationIntoPlay` (locations.ts), which
+  applies ONLY the combat-timing flags (Mirror Corridor / Attic Landing /
+  Bedroom — pure setters) so the battle math sees them; the full
+  `applyRevealEffects` (seat effects + prompts) runs in the case's IIFE post-
+  processing on the FINAL state, because every branch rebuilds the acting seat
+  from a pre-explore snapshot. Double-applying the flags is idempotent.
+  Helena's peek skips leading LOCs. Deck-exhausted-by-LOCs returns '' and the
+  explore is consumed without a battle; '' guards on the chain pushes and the
+  MA-039/072 shuffle-backs. Ally explore (Sherry) peels top LOCs first
+  (revealedBy = target) and applies their reveals via applyClock at every
+  return. Usher + Clock compose (3 on the board + X in the deck).
+- LATENT BUG FIXED (allyExplore, pre-existing at HEAD): the combat branches
+  never wrote the POPPED deck back into `next` — the revealed card stayed in
+  the deck and the not-defeated branch appended a SECOND copy at the bottom.
+  `next` now starts from `mansionDeck` (the popped local).
+- Plumbing mirrors usherMode exactly: RoomSnapshot.clockMode, createRoom
+  param, `setClockMode` (protocol + rooms + ws), host/hotseat/sim. Testids:
+  create-clock-toggle / clock-toggle / hotseat-clock-toggle.
+- Tests: customClock.test.ts 13 (pool, X + non-adjacency over 10 seeds,
+  determinism, compose-with-Usher, single replacement + heal on final seats,
+  multi replacement, Crow-chain replacement, Mirror/Attic combat timing,
+  Gallery prompt, Bedroom blocks the NEXT explore, LOC-only deck, ally
+  explore). hotseat +1, ui +1, rooms +1, protocol +1.
+- RECOVERY NOTE: the ~11:53 tree gutting (see the AC-018 entry below) lost
+  every uncommitted hunk OUTSIDE the shared files. Correction to that entry's
+  "neither commit touched your files": 17cdac7 DID absorb the clock hunks in
+  actions.ts and the GameSetup flags in types.ts (both sessions edit those
+  files; staging them stages the merged content). Everything else was
+  re-applied verbatim from the session record and both new test files
+  rewritten; verified typecheck x3 clean, targeted 105/105, client 272/272,
+  server 112/112. LESSON: commit verified work promptly in this shared tree.
+- Gates: typecheck clean x3, client 272/272, server 112/112, targeted 105/105,
+  FULL game-core 88 files / 1394 tests ALL GREEN (the soak alliance orphan is
+  fixed by the AC-018 entry's explore-entry guard, as that entry predicted),
+  vite build OK. Live-verified pass & play: both checkboxes in order, deck
+  41 = 38 + ceil(38/15), no Locations row at start, and a Large Library
+  surfaced mid-explore into the Locations row (GLOBAL, active for everyone)
+  while the battle continued. Committed 9083944 (not pushed).
+
+**AC-018 + REACTIVE-WINDOW GUARD LANDED (2026-11-19, commits fa29737 + 17cdac7):** the
+four "you can / you may" prompts Manny asked for are DONE and pushed — b4mc-ch-008 L2
+(`chrisL2TopChoose`), MA-070 (`ma070Choose`), SK-004 (`medicHealBonusChoose`), AC-018
+(`uroborosInjection`). AC-018 was NOT the "~5 lines" the audit guessed: the +20 Health
+has to change the combat OUTCOME, so the explore is now DEFERRED (`shouldDefer` +
+`ac018WindowOffered`) and re-resolved from `pendingExplore.exploreParams` (new exported
+`ExploreParams`) with `autoDefeat` preserved; a flipped outcome recomputes
+`damageTaken` / `decorationDelta`. Shared resumption extracted to
+`applyPendingExploreOutcome`. Two extra defects fixed on the way: (1) a "you may trash"
+window needs a `Decline` option, and `'Decline'` is a LABEL — AC-042 was pushing it into
+`removed` as if it were a card instance; (2) a deferred explore whose prompts went
+unanswered was silently OVERWRITTEN by the next explore, orphaning the revealed Infected
+(soak alliance/1: ma-036/082/084/056) — the `explore` case now resolves any outstanding
+`pendingExplore` first. That guard is a PRE-EXISTING bug in the shared AC-042 / Las Plagas
+mechanism, not AC-018 specific.
+**Your Usher note's "the ONLY red is the soak alliance/1 conservation orphan" is now
+GREEN** — re-run the soak before attributing any red to usherMode. Gates at 17cdac7:
+typecheck x3 clean, game-core 87 files / 1381 tests, client 267/267, server 108/108.
+**SHARED TREE:** the working tree was briefly gutted (547 files showing as deleted); it is
+back to 17cdac7 + your Usher WIP. Stage only your own paths — neither of this session's
+commits touched your files, and `git restore .` right now would throw away live edits.
+
+**FALL OF THE HOUSE OF USHER GAME MODE (2026-11-19):** Manny: remove the LOC
+cards from the custom-card menu and tie them to a game-mode rule — a "Fall of
+the House of Usher" checkbox under Mercenaries Basic Resources on all three
+lobby surfaces. RULING (asked; two readings): the 3 random Locations are set up
+AT GAME START — face-up in play from turn 1, GLOBAL effects live for everyone,
+invest effects still need gold cubes, 1X uses still cost gold + a Buy, and On
+Reveal effects NEVER fire. They mark the mansion; they are NOT shuffled into
+the deck and no Explore is consumed by them.
+- Engine: `GameSetup.usherMode` + `SimConfig.usherMode`; `cardsForScenario`
+  pulls ALL 23 LOC defs when on; `setup` rngShuffles the loc ids, takes 3,
+  registers `<id>#usher1` and puts them straight into `state.locations`
+  (`cubes: {}`, `revealedBy: -1`, no applyRevealEffects, no locationDeck).
+  -1 = no revealer, so Large Library's revealer-scoped On Reveal draw stays
+  inactive for everyone. The old `locationsMode` engine path is UNCHANGED (its
+  tests still pass) but no longer exposed in the UI.
+- Plumbing mirrors mercenariesBasicResources: RoomSnapshot.usherMode,
+  createRoom param, `setUsherMode` host message (protocol + rooms + ws),
+  host.ts / hotseat.ts pass it to setup + cardsForScenario (pilesForScenario
+  needs nothing — locations never pile).
+- UI: CustomCardsPicker drops the Locations section AND excludes loc ids from
+  "Add All"; the hotseat "Locations" toggle is REPLACED by the Usher checkbox
+  (testids create-usher-toggle / usher-toggle / hotseat-usher-toggle).
+  LocationsRow renders the 3 rooms unchanged (Invest/Use read state.locations).
+- Tests: customUsher.test.ts 11 (pool pull, 3 distinct face-up / no deck / no
+  prompts, determinism, On Reveal never fires, GLOBAL score + ongoing live at
+  turn 1, revealer-scoped grant inactive, invest cube gate, 1X gold+Buy gate,
+  explore hits the Mansion directly, locationsMode regression). hotseat +1,
+  ui +2, rooms +1, protocol +1; RoomSnapshot/Room literals in store.test /
+  ui.test / host.test / protocol.test / rooms.test gained usherMode: false.
+- PITFALLS hit: (1) a seed scan for the random pick MUST use the fixture's
+  exact character picks — explicit characterCardId skips the random-deal
+  nextInt calls and deals DIFFERENT locations. (2) Ammo x20 grants +20 Gold
+  too, so Attic Landing's net gold is cost-20+20. (3) the art-exists tests use
+  existsSync relative to the LAUNCH cwd — run vitest from game-core/, not
+  `--root game-core` from the repo root, or they false-red.
+- Live-verified (pass & play, local build): no LOC rows in either picker;
+  started game shows 3 face-up rooms (1X Use buttons, GLOBAL note), no
+  face-down card, no reveal prompt, turn 1.
+- Gates: typecheck clean x3, client 270/270, server 110/110, location suites
+  84/84, vite build OK; full game-core 1380/1381 — the ONLY red is the soak
+  alliance/1 conservation orphan (ma-036/082/084/056), the other session's
+  in-flight AC-018 deferred-explore WIP: it was already red (ma-025) BEFORE
+  this feature, and usherMode is opt-in — the soak never enables it, and with
+  the flag off setup consumes no RNG and deals nothing. The earlier
+  uroborosInjection red went green mid-run as that session landed its wiring.
+  UNCOMMITTED (shared tree).
+
+**BO-001 BILL GATES CORRECTED TO 0/5 (2026-11-19):** Manny: the card reads Level 1
+at 0 Decorations and Level 2 at 5 — not the implemented 10/25. An 8x crop of JUST
+the shield emblems on BO-001.png confirms the digits INSIDE the shields are 0 and
+5; the batch-2 "three reads agreed on 10/25" was the level digit OUTSIDE the
+shield merged with the gate digit ("1"+"0", "2"+"5") — the exact merge bug the
+2026-11-16 vision gotcha below warned about. `custom.ts` bo-001 level1At 10->0 /
+level2At 25->5 + RULING comment rewritten; `customZoeyBill.test.ts` docstring +
+new gate regression test (Bill starts at L1; 4 Decorations -> L1, 5 -> L2). Bill
+now levels much earlier in play. Gates: typecheck clean x3, customZoeyBill 5/5,
+characters 11/11, client 267/267, server 108/108; full game-core 1369/1371 — the
+2 reds are the OTHER session's in-flight AC-018 Uroboros work
+(uroborosInjection.test.ts expects the +20-HP re-resolve their actions.ts WIP is
+mid-way through; soak alliance/1 ma-025#1 orphan they are DBGORPH-debugging).
+Neither failing test's card pool contains bo-001 (uroboros: PREMIER+ALLIANCE
+only; soak: no customCards opt -> cardsForScenario returns the base set), so the
+gate change cannot reach them. UNCOMMITTED: the tree holds the AC-018 WIP, so
+rebase/push is blocked until it lands.
+
 **ZO-001 ZOEY + BO-001 BILL OVERBECK (2026-11-16, batch 2):** two more custom
 characters from Manny's scans. Printed codes still not legible -> provisional
 ids zo-001 / bo-001 (rename when codes are known). Both 70 HP.

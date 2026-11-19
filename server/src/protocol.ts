@@ -49,6 +49,10 @@ export interface RoomSnapshot {
   readonly mansionAttachmentMode: 1 | 2;
   /** Swap the scenario's basic resources for the Mercenaries set's (ammo/pistol/knife). */
   readonly mercenariesBasicResources: boolean;
+  /** Fall of the House of Usher: 3 random fan Locations start face-up in play. */
+  readonly usherMode: boolean;
+  /** The House with a Clock in Its Walls: random Locations hide in the Mansion deck. */
+  readonly clockMode: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +60,7 @@ export interface RoomSnapshot {
 // ---------------------------------------------------------------------------
 
 export type ClientMessage =
-  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mansionAttachmentMode?: 1 | 2; readonly mercenariesBasicResources?: boolean }
+  | { readonly kind: 'createRoom'; readonly playerName: string; readonly scenario: ScenarioId; readonly partnerMode: boolean; readonly mainCharacterId?: string; readonly partnerCharacterId?: string; readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mansionAttachmentMode?: 1 | 2; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean }
   | { readonly kind: 'joinRoom'; readonly roomCode: string; readonly playerName: string }
   | { readonly kind: 'reconnect'; readonly token: string }
   | { readonly kind: 'leaveRoom' }
@@ -79,6 +83,10 @@ export type ClientMessage =
   | { readonly kind: 'setMansionAttachmentMode'; readonly mansionAttachmentMode: 1 | 2 }
   /** Host control: swap the scenario's basic resources for the Mercenaries set's. */
   | { readonly kind: 'setMercenariesBasicResources'; readonly mercenariesBasicResources: boolean }
+  /** Host control: enable/disable Fall of the House of Usher (3 random Locations in play). */
+  | { readonly kind: 'setUsherMode'; readonly usherMode: boolean }
+  /** Host control: enable/disable The House with a Clock in Its Walls (Locations in the Mansion). */
+  | { readonly kind: 'setClockMode'; readonly clockMode: boolean }
   | { readonly kind: 'setCharacterSelection'; readonly mainCharacterId?: string; readonly partnerCharacterId?: string }
   /** Host control: start the game from the lobby. */
   | { readonly kind: 'startGame' }
@@ -162,7 +170,7 @@ export function validateMessage(value: unknown): DecodeResult {
 
   // Client kinds
   if (k === 'createRoom') {
-    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown; mansionAttachmentMode?: unknown; mercenariesBasicResources?: unknown };
+    const m = value as { kind: string; playerName?: unknown; scenario?: unknown; partnerMode?: unknown; skillSystem?: unknown; customCards?: unknown; mansionAttachmentMode?: unknown; mercenariesBasicResources?: unknown; usherMode?: unknown; clockMode?: unknown };
     if (typeof m.playerName !== 'string') {
       return { ok: false, error: 'createRoom requires a playerName string' };
     }
@@ -183,6 +191,12 @@ export function validateMessage(value: unknown): DecodeResult {
     }
     if (m.mercenariesBasicResources !== undefined && typeof m.mercenariesBasicResources !== 'boolean') {
       return { ok: false, error: 'createRoom requires a mercenariesBasicResources boolean when present' };
+    }
+    if (m.usherMode !== undefined && typeof m.usherMode !== 'boolean') {
+      return { ok: false, error: 'createRoom requires an usherMode boolean when present' };
+    }
+    if (m.clockMode !== undefined && typeof m.clockMode !== 'boolean') {
+      return { ok: false, error: 'createRoom requires a clockMode boolean when present' };
     }
     return { ok: true, msg: value as WireMessage };
   }
@@ -225,6 +239,20 @@ export function validateMessage(value: unknown): DecodeResult {
     const m = value as { kind: string; mercenariesBasicResources?: unknown };
     if (typeof m.mercenariesBasicResources !== 'boolean') {
       return { ok: false, error: 'setMercenariesBasicResources requires a mercenariesBasicResources boolean' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setUsherMode') {
+    const m = value as { kind: string; usherMode?: unknown };
+    if (typeof m.usherMode !== 'boolean') {
+      return { ok: false, error: 'setUsherMode requires an usherMode boolean' };
+    }
+    return { ok: true, msg: value as WireMessage };
+  }
+  if (k === 'setClockMode') {
+    const m = value as { kind: string; clockMode?: unknown };
+    if (typeof m.clockMode !== 'boolean') {
+      return { ok: false, error: 'setClockMode requires a clockMode boolean' };
     }
     return { ok: true, msg: value as WireMessage };
   }

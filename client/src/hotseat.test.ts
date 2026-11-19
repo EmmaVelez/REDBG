@@ -19,6 +19,24 @@ describe('createHotseatGame', () => {
     expect(createHotseatGame(['A', 'B', 'C', 'D'], 1).seats.length).toBe(4);
   });
 
+  it('usherMode deals 3 face-up Locations and no location deck', () => {
+    const s = createHotseatGame(['A', 'B'], 1, 'firstTimer', { usherMode: true });
+    expect(s.locations?.length).toBe(3);
+    expect(s.locationDeck).toBeUndefined();
+    const plain = createHotseatGame(['A', 'B'], 1);
+    expect(plain.locations ?? []).toEqual([]);
+    expect(plain.locationDeck).toBeUndefined();
+  });
+
+  it('clockMode hides ceil(mansion/15) Locations in the Mansion deck', () => {
+    const s = createHotseatGame(['A', 'B'], 1, 'firstTimer', { clockMode: true });
+    const locIds = s.mansionDeck.filter(id => s.cardDefs[s.cards[id]?.cardId ?? '']?.type === 'location');
+    const base = s.mansionDeck.length - locIds.length;
+    expect(locIds.length).toBe(Math.ceil(base / 15));
+    expect(s.locations ?? []).toEqual([]);
+    expect(s.locationDeck).toBeUndefined();
+  });
+
   it('rejects fewer than 2 or more than 4 players', () => {
     expect(() => createHotseatGame(['Solo'], 1)).toThrow();
     expect(() => createHotseatGame(['A', 'B', 'C', 'D', 'E'], 1)).toThrow();

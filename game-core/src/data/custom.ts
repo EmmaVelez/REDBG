@@ -575,8 +575,10 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
   // + bo-001 Bill Overbeck. Printed codes NOT legible -> provisional two-letter
   // ids (rename when the codes are known). Both 70 HP.
   // RULING (verify on the physical cards): gates were read from the scans'
-  // level-box emblems — zo-001 L1=0 / L2=7 (two vision models agreed), bo-001
-  // L1=10 / L2=25 (three reads of the box-left emblems agreed).
+  // level-box emblems — zo-001 L1=0 / L2=7 (two vision models agreed).
+  // bo-001 L1=0 / L2=5 (Manny's correction 2026-11-19, confirmed by an 8x crop
+  // of JUST the shields: the earlier 10/25 read was the level digit OUTSIDE the
+  // shield merged with the gate digit inside it — "1"+"0" and "2"+"5").
   {
     id: 'zo-001',
     name: 'Zoey',
@@ -606,8 +608,8 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     text: 'Level 1: Infected deal an additional 10 damage to Bill when he does not defeat them.\nLevel 2: Bill gets an additional 10 damage during your turn for every unused action you have available to you.',
     copies: 1,
     maxHp: 70,
-    level1At: 10,
-    level2At: 25,
+    level1At: 0,
+    level2At: 5,
     levels: [
       { level: 1, text: 'Infected deal an additional 10 damage to Bill when he does not defeat them.' },
       { level: 2, text: 'Bill gets an additional 10 damage during your turn for every unused action you have available to you.' },

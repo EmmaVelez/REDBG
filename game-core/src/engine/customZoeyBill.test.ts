@@ -4,6 +4,7 @@ import { setup, startTurn } from './game';
 import { applyAction } from './actions';
 import { exploreDamage } from './explore';
 import { ammoReqForWeapon, seatAbilities } from './abilities';
+import { levelForDecorations } from './characters';
 import { CUSTOM_CARDS } from '../data/custom';
 import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK } from '../data/cards';
 
@@ -15,7 +16,7 @@ import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK } from '../data
  *     L1: Zoey can't use shotguns.
  *     L2: All pistol and rifle weapons Zoey is using require -10 ammo and do
  *         +10 damage.
- *   BO-001 Bill Overbeck 70 HP, gates 10 / 25
+ *   BO-001 Bill Overbeck 70 HP, gates 0 / 5
  *     L1: Infected deal an additional 10 damage to Bill when he does not
  *         defeat them.
  *     L2: Bill gets an additional 10 damage during your turn for every unused
@@ -71,6 +72,15 @@ describe('zo-001 Zoey', () => {
 });
 
 describe('bo-001 Bill Overbeck', () => {
+  it('gates: Level 1 at 0 Decorations, Level 2 at 5 (printed shield digits)', () => {
+    const def = CUSTOM_CARDS.find(c => c.id === 'bo-001');
+    expect(def).toEqual(expect.objectContaining({ level1At: 0, level2At: 5 }));
+    // Gate 0 -> Bill starts the game at Level 1 (the old 10/25 misread started him at 0).
+    expect(game('bo-001').seats[0]?.level).toBe(1);
+    expect(levelForDecorations(def?.level1At, def?.level2At, 4)).toBe(1);
+    expect(levelForDecorations(def?.level1At, def?.level2At, 5)).toBe(2);
+  });
+
   it('L2: +10 damage per unused Action in the preview', () => {
     const s = hand(game('bo-001', { level: 2, actionsLeft: 3, turnAmmo: 50 }), ['we-004']);
     const knife = s.seats[0]!.hand[0]!;
