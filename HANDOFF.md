@@ -1,5 +1,19 @@
 # HANDOFF — resume here
 
+**CE MODE SHOWS THE ATTACHMENT-MODE SELECTOR (2026-11-19):** Manny: checking
+Random CE Events should also trigger the Mansion Attachment Mode selector.
+The selector was gated on attachable events in the CUSTOM PICKER only, but
+ceMode injects CE-001..012 engine-side — so with CE mode on and nothing picked
+the selector stayed hidden even though the mode governs those events
+(state.mansionAttachmentMode overrides every attachment's own mode at attach
+time). Fix: OR ceMode into the gate on all three surfaces (hotseat
+`hasAttachmentCards || ceMode`, room `room.ceMode ||`, create `ceMode ||`).
+Test: ui.test.tsx "shows the Mansion Attachment Mode selector when CE events
+mode is on" (room surface, on→shown / off→hidden) RED→GREEN; live-verified
+create + hotseat toggles reveal the selector. Gates: typecheck x3 clean,
+client 279/279, build OK. styles.css + overlayOrder.test.ts dirty in the tree
+are the OTHER session's WIP — left unstaged.
+
 **XP-TOKEN PILE BADGES (2026-11-19):** Manny: "for locations that add xp to
 piles or areas, add #xp in a circle to the top of that pile or area, # =
 how much xp is on that stack." The Bar (loc-022, `onexAddXpTokenToPile`) is

@@ -1639,6 +1639,31 @@ describe('Lobby (T08)', () => {
     expect(inRoom).toContain('checked=""');
   });
 
+  it('shows the Mansion Attachment Mode selector when CE events mode is on', () => {
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: true,
+    };
+    // CE events attach when revealed, so the mode selector must be offered
+    // even though no attachable event was picked in the custom-card picker.
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="mansion-attachment-mode"');
+    // off + no attachable custom events -> hidden
+    const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: { ...room, ceMode: false }, clientId: 'c1' })} />);
+    expect(off).not.toContain('data-testid="mansion-attachment-mode"');
+  });
+
   it('groups the mode toggles in an "Optional modes" collapsible on every surface', () => {
     const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     // create-room form + pass & play

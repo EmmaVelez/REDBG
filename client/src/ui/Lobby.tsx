@@ -384,7 +384,7 @@ function PassAndPlay(props: {
       </label>
       </details>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
-      {hasAttachmentCards && (
+      {(hasAttachmentCards || ceMode) && (
         <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>Mansion Attachment Mode:</span>
@@ -559,10 +559,10 @@ export function Lobby({
               </div>
               </details>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
-              {room.customCards.some(id => {
+              {(room.ceMode || room.customCards.some(id => {
                 const card = CUSTOM_CARDS.find(c => c.id === id);
                 return card?.type === 'event' && card?.attachmentMode !== undefined;
-              }) && (
+              })) && (
                 <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>Mansion Attachment Mode:</span>
@@ -754,10 +754,10 @@ function RoomEntry(props: {
         </label>
         </details>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
-        {customCards.some(id => {
+        {(ceMode || customCards.some(id => {
           const card = CUSTOM_CARDS.find(c => c.id === id);
           return card?.type === 'event' && card?.attachmentMode !== undefined;
-        }) && (
+        })) && (
           <div className="mansion-attachment-mode" style={{ marginTop: '8px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>Mansion Attachment Mode:</span>
