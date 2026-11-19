@@ -245,24 +245,47 @@ describe('CH-008 L1: +10 Damage once an Infected has dealt Damage this round', (
 // CH-008 L2 — not-defeated Infected goes on top of the Mansion
 // ---------------------------------------------------------------------------
 
-describe('CH-008 L2: a not-defeated Infected goes on top of the Mansion', () => {
-  it('puts the survivor on top of the deck', () => {
+describe('CH-008 L2: a not-defeated Infected may go on top of the Mansion', () => {
+  it('asks before putting the survivor on top, and moving it consumes the offer', () => {
     const s = clearTurnStartPrompts(turn(CH008, { level: 2, decorations: 7, hp: 90, turnAmmo: 0 }));
     const { state: withKnife, id: knife } = addCard(s, 0, 'we-004'); // 5 < 25 HP
     const { state: topped, ids } = setMansionTop(withKnife, ['ma-004']);
     const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
-    expect(next.mansionDeck[0]).toBe(ids[0]);
+    const p = next.prompts.find(x => x.payload?.kind === 'chrisL2TopChoose');
+    expect(p).toBeDefined();
+    // Held: the survivor already took the normal not-defeated disposition.
+    expect(next.mansionDeck).toContain(ids[0]);
     expect(next.seats[0]?.hp).toBe(70); // 90 - 20
+
+    const moved = applyAction(next, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 0 });
+    expect(moved.mansionDeck[0]).toBe(ids[0]);
+    // insertAt SPLICES IN A COPY — the old occurrence must be gone.
+    expect(moved.mansionDeck.filter(id => id === ids[0])).toHaveLength(1);
   });
 
-  it('only does it once per round (a second survivor goes to the bottom)', () => {
+  it('declining leaves the survivor where the normal disposition put it', () => {
+    const s = clearTurnStartPrompts(turn(CH008, { level: 2, decorations: 7, hp: 90, turnAmmo: 0 }));
+    const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
+    const { state: topped, ids } = setMansionTop(withKnife, ['ma-004']);
+    const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
+    const p = next.prompts.find(x => x.payload?.kind === 'chrisL2TopChoose')!;
+    const declined = applyAction(next, { type: 'chooseOption', seat: 0, promptId: p.id, option: 1 });
+    expect(declined.mansionDeck[0]).not.toBe(ids[0]);
+    expect(declined.mansionDeck.filter(id => id === ids[0])).toHaveLength(1);
+    expect(declined.prompts.some(x => x.payload?.kind === 'chrisL2TopChoose')).toBe(false);
+  });
+
+  it('only offers once per round (a second survivor is not offered)', () => {
     const s = clearTurnStartPrompts(turn(CH008, { level: 2, decorations: 7, hp: 90, turnAmmo: 0, exploresLeft: 2 }));
     const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
     const { state: topped, ids } = setMansionTop(withKnife, ['ma-004', 'ma-004']);
     const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 2 });
-    // Exactly one of the two survivors is on top (the first revealed).
-    expect(next.mansionDeck[0]).toBe(ids[0]);
-    expect(next.mansionDeck[1]).not.toBe(ids[1]);
+    const offers = next.prompts.filter(x => x.payload?.kind === 'chrisL2TopChoose');
+    expect(offers).toHaveLength(1);
+    expect(offers[0]?.payload?.instanceId).toBe(ids[0]);
+    const moved = applyAction(next, { type: 'chooseOption', seat: 0, promptId: offers[0]!.id, option: 0 });
+    expect(moved.mansionDeck[0]).toBe(ids[0]);
+    expect(moved.prompts.some(x => x.payload?.kind === 'chrisL2TopChoose')).toBe(false);
   });
 
   it('is not offered below level 2', () => {

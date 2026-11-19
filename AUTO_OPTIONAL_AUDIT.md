@@ -130,6 +130,18 @@ zone when the choice is offered".
 
 ## D2. The NEXT 3 easiest (after the four above)
 
+> **UPDATE 2026-11-19 — all three are DONE.**
+> `b4mc-ch-008` L2 → `chrisL2TopChoose`; `ma-070` → `ma070Choose`; `sk-004` →
+> `medicHealBonusChoose`. Details in the implementation notes at the bottom.
+>
+> **ac-018 is NOT a 5-line fix.** The "+20 health to a revealed infected" has to
+> change the combat OUTCOME, so it needs the explore DEFERRED (the AC-042 /
+> Flash-Grenade mechanism): `shouldDefer` must include it, `pendingExplore` must
+> capture the `resolveExplore` params, and the handler must re-resolve with
+> `hp + 20` before resuming. The explore currently completes before the prompt is
+> answered, so the +20 has no meaningful target. That is a ~100-line change in the
+> most delicate reducer, not a quick one.
+
 1. **b4mc-ch-008 Chris L2** — "you can put it on top of the Mansion (even if it's
    the BOSS)". The exact analog of ah-001. `chrisL2Top` is already computed at
    both explore sites (`actions.ts:5056` single, `actions.ts:3328` multi, inside
@@ -152,9 +164,23 @@ prompt at an atomic reducer; ch-023 decides while the explore's weapon list is
 being built; ce-008 decides at weapon-use time inside `exploreWeapons`.
 `ac-040`'s unlimited actions is a grant, not a real either/or.
 
-Cheap adjacent fix (not a prompt): **ac-018 Uroboros Injection** — the trash
-prompt already exists, only the printed "+20 health to a revealed infected" is
-missing (`actions.ts:7042`). ~5 lines.
+---
+
+### Implementation notes (2026-11-19)
+
+- **`chrisL2TopChoose`** — the auto-insert was removed from BOTH explore paths
+  (single and the multi `undefeatedEntries` loop); the survivor takes the normal
+  not-defeated disposition and the handler moves it to index 0. The once-per-round
+  mark is consumed when the offer is MADE. The offer is skipped if the survivor
+  never reached the Mansion deck.
+- **`ma070Choose`** — the auto-attach branch was deleted from `takeOrBottom`; the
+  normal-take return now raises the offer when the taken item carries
+  `attachThenRemoveForCardsAndGold`. Declining leaves it in the discard. The
+  "you may remove" half was already a real button (`removeAttachedItem`).
+- **`medicHealBonusChoose`** — the base heal lands WITHOUT the bonus and the offer
+  is chained after it (and after SK-005's trash offer). Only offered when the
+  +N would actually change a Health total. The handler only moves Health, so the
+  heal's own side effects do not double-fire.
 
 ---
 

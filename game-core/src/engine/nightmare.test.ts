@@ -546,12 +546,15 @@ describe('Nightmare infected', () => {
 // ---------------------------------------------------------------------------
 
 describe('Nightmare items and event', () => {
-  it('MA-070 Treasure Map: attach on reveal, then remove for +3 cards and +20 gold', () => {
+  it('MA-070 Treasure Map: asks to attach on reveal, then remove for +3 cards and +20 gold', () => {
     const s = nmGame('ch-035');
     const withItem = mansionTop(s, 'ma-070');
     let next = explore(withItem, 0, [findHand(withItem, 'we-004')]);
     const takePrompt = findPrompt(next, 'takeOrBottom');
     next = choose(next, 0, takePrompt, 0); // Take
+    const attachPrompt = findPrompt(next, 'ma070Choose');
+    expect(attachPrompt).toBeDefined();
+    next = choose(next, 0, attachPrompt, 0); // Attach
     const mapId = next.seats[0]?.attached.find(id => next.cards[id]?.cardId === 'ma-070');
     expect(mapId).toBeDefined();
     const before = next.seats[0]?.hand.length ?? 0;
@@ -559,6 +562,18 @@ describe('Nightmare items and event', () => {
     expect(removed.seats[0]?.hand.length).toBe(before + 3);
     expect(removed.seats[0]?.turnGold).toBe(20);
     expect(removed.removed.some(id => id === mapId)).toBe(true);
+  });
+
+  it('MA-070: declining the attach offer leaves the map in the discard', () => {
+    const s = nmGame('ch-035');
+    const withItem = mansionTop(s, 'ma-070');
+    let next = explore(withItem, 0, [findHand(withItem, 'we-004')]);
+    next = choose(next, 0, findPrompt(next, 'takeOrBottom'), 0); // Take
+    const attachPrompt = findPrompt(next, 'ma070Choose')!;
+    next = choose(next, 0, attachPrompt, 1); // Leave in Discard
+    expect(next.seats[0]?.attached.some(id => next.cards[id]?.cardId === 'ma-070')).toBe(false);
+    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'ma-070')).toBe(true);
+    expect(next.prompts.some(p => p.payload?.kind === 'ma070Choose')).toBe(false);
   });
 
   it('MA-071 Hidden Treasure: +30 gold and +1 buy, then removed', () => {

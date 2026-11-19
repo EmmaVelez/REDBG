@@ -3320,16 +3320,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ],
           payload: { kind: 'zombieGrab', amount: '20', instanceId: id },
         }));
+        let chrisL2Candidate: string | undefined;
         for (const id of undefeatedEntries.map(e => e.id)) {
           const def = cardDef(state, id);
           const effects = def?.infectedEffects ?? [];
-          // B4MC-CH-008 Chris L2: once per round, the first not-defeated
-          // Infected on his own turn goes on TOP of the Mansion.
+          // B4MC-CH-008 Chris L2: once per round, the first not-defeated Infected
+          // on his own turn may go on TOP of the Mansion. A CHOICE, so mark it
+          // used and let the normal disposition stand; chrisL2TopChoose moves it.
           if (chrisL2TopOfMansion(state, seat)) {
             state = markChrisL2TopUsed(state, seat);
-            const topInserted = insertAt({ deck: mDeck }, id, 1);
-            mDeck = topInserted.deck;
-            continue;
+            chrisL2Candidate = id;
           }
           // MA-078 shuffles ITSELF back inside applyMercenariesNotDefeatedEffects
           // (it sets infectedShuffledBack), so the disposition pass must leave it
@@ -3375,6 +3375,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           mansionDeck: mDeck,
         };
         const defeatFxPrompts: Prompt[] = [];
+        // B4MC-CH-008 Chris L2: offer the "put it on top" choice for the recorded
+        // survivor (only if it actually reached the Mansion deck).
+        if (chrisL2Candidate !== undefined && mDeck.includes(chrisL2Candidate)) {
+          defeatFxPrompts.push({
+            id: `chrisL2-${seat}-${chrisL2Candidate}-v${state.version}`,
+            seat,
+            text: 'Chris Redfield L2: put this Infected on top of the Mansion?',
+            options: ['Put on top', 'Leave it'],
+            payload: { kind: 'chrisL2TopChoose', instanceId: chrisL2Candidate },
+          });
+        }
         for (const { id, def } of infectedEntries) {
           const ctx = { seat, revealedInstanceId: id, revealedDef: def, weapons, handAfter, attachedInfectedCount: player.attached.length, characterXp: player.xp ?? 0 };
           if (defeated) {
@@ -5052,13 +5063,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // below). The Boss takes the normal not-defeated disposition for now.
       const isBoss = state.endInfectedCardId !== undefined && revealedDef?.id === state.endInfectedCardId;
       // B4MC-CH-008 Chris L2: once per round, the first not-defeated Infected
-      // on his own turn goes on TOP of the Mansion (even the BOSS).
+      // on his own turn may go on TOP of the Mansion (even the BOSS). A CHOICE,
+      // so mark it used now and offer chrisL2TopChoose after the normal
+      // disposition — the handler moves it to the top.
       const chrisL2Top = outcome.kind === 'notDefeated' && chrisL2TopOfMansion(state, seat);
       if (chrisL2Top) state = markChrisL2TopUsed(state, seat);
-      if (chrisL2Top) {
-        const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 1);
-        mansionDeck = inserted.deck;
-      } else if (insertPosition !== undefined) {
+      if (insertPosition !== undefined) {
         const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, insertPosition);
         mansionDeck = inserted.deck;
       } else if (outcome.shuffleBack) {
@@ -5085,6 +5095,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         : undefined;
 
+      // B4MC-CH-008 Chris L2: "you can put it on top of the Mansion" — a CHOICE.
+      const chrisL2Prompt: Prompt | undefined = chrisL2Top && mansionDeck.includes(revealedInstanceId)
+        ? {
+          id: `chrisL2-${seat}-${revealedInstanceId}-v${state.version}`,
+          seat,
+          text: 'Chris Redfield L2: put this Infected on top of the Mansion?',
+          options: ['Put on top', 'Leave it'],
+          payload: { kind: 'chrisL2TopChoose', instanceId: revealedInstanceId },
+        }
+        : undefined;
+
       // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
       const zombieBNotDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
 
@@ -5100,7 +5121,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         rngState: state.rngState,
         ...(outcome.kind === 'notDefeated' && (revealedDef?.attack ?? 0) > 0 ? { infectedDamageThisRound: true } : {}),
         prompts: [...state.prompts, ...resuscitatePrompts, ...zombieBNotDefeatedPrompts,
-          ...(ah001Prompt !== undefined ? [ah001Prompt] : [])],
+          ...(ah001Prompt !== undefined ? [ah001Prompt] : []),
+          ...(chrisL2Prompt !== undefined ? [chrisL2Prompt] : [])],
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
@@ -9296,6 +9318,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 player.hand.some(id => isGreenHerb(state, id)) ? [20, 60] : [20];
               const healSeat = targets[Math.floor(option / amounts.length)] ?? 'main';
               const healAmount = amounts[option % amounts.length] ?? 20;
+              // SK-004 Medic LV.1 is a CHOICE ("you can Heal that amount, plus 10
+              // instead"), so the bonus is NOT applied here — the base heal lands
+              // and medicHealBonusChoose offers the +N afterwards.
               const healSeats = (extra?: Partial<PlayerState>): readonly PlayerState[] =>
                 state.seats.map(s => {
                   if (s.seat !== seat) return s;
@@ -9303,46 +9328,67 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     ...s,
                     ...extra,
                     hp: healSeat === 'main'
-                      ? Math.min(s.hp + healAmount + healBonus, s.maxHp)
+                      ? Math.min(s.hp + healAmount, s.maxHp)
                       : s.hp,
                     ...(healSeat === 'partner' && s.partnerInstanceId !== undefined
                       ? {
                           partnerHp: Math.min(
-                            (s.partnerHp ?? s.hp) + healAmount + healBonus,
+                            (s.partnerHp ?? s.hp) + healAmount,
                             s.partnerMaxHp ?? s.maxHp,
                           ),
                         }
                       : {}),
                   };
                 });
+              // Chain the SK-004 offer after the heal (and after SK-005's trash
+              // offer). Only when the +N would actually change a Health total.
+              const withMedicBonusPrompt = (base: readonly Prompt[], healedSeats: readonly PlayerState[]): readonly Prompt[] => {
+                if (healBonus <= 0) return base;
+                const healed = healedSeats.find(s => s.seat === seat);
+                if (healed === undefined) return base;
+                const wouldMatter = healSeat === 'main'
+                  ? healed.hp < healed.maxHp
+                  : (healed.partnerHp ?? 0) < (healed.partnerMaxHp ?? healed.maxHp);
+                if (!wouldMatter) return base;
+                return [...base, {
+                  id: `medic-bonus-${seat}-v${state.version}`,
+                  seat,
+                  text: `Medic LV.1: Heal ${healBonus} more?`,
+                  options: [`Heal +${healBonus}`, 'Skip'],
+                  payload: { kind: 'medicHealBonusChoose', amount: String(healBonus), target: healSeat },
+                }];
+              };
               if (healAmount === 20) {
+                const healed = healSeats({
+                  turnGold: player.turnGold + joshGold,
+                  healedFirstTimeThisTurn: true,
+                });
                 return {
                   ...state,
                   ...nextBase,
-                  seats: healSeats({
-                    turnGold: player.turnGold + joshGold,
-                    healedFirstTimeThisTurn: true,
-                  }),
-                  prompts: withHealPrompts(newPrompts),
+                  seats: healed,
+                  prompts: withMedicBonusPrompt(withHealPrompts(newPrompts), healed),
                 };
               }
               // Heal 60 requires a second Green Herb in hand; both the played
               // herb (already in removed) and the hand herb are trashed.
               const otherHerb = player.hand.find(id => isGreenHerb(state, id));
               if (otherHerb === undefined) {
+                const healed = healSeats();
                 return {
                   ...state,
                   ...nextBase,
-                  seats: healSeats(),
-                  prompts: withHealPrompts(newPrompts),
+                  seats: healed,
+                  prompts: withMedicBonusPrompt(withHealPrompts(newPrompts), healed),
                 };
               }
+              const healed = healSeats({ hand: player.hand.filter(id => id !== otherHerb) });
               return {
                 ...state,
                 ...nextBase,
-                seats: healSeats({ hand: player.hand.filter(id => id !== otherHerb) }),
+                seats: healed,
                 removed: [...state.removed, otherHerb],
-                prompts: withHealPrompts(newPrompts),
+                prompts: withMedicBonusPrompt(withHealPrompts(newPrompts), healed),
               };
             }
 
@@ -9494,19 +9540,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     prompts: newPrompts,
                   };
                 }
-                // Nightmare: MA-070 Treasure Map — attach to the character
-                // instead of the discard pile.
-                const attachEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'attachThenRemoveForCardsAndGold');
-                if (attachEffect !== undefined && attachEffect.kind === 'attachThenRemoveForCardsAndGold') {
-                  return {
-                    ...state,
-                    ...nextBase,
-                    seats: state.seats.map(s =>
-                      s.seat === seat ? { ...player, attached: [...player.attached, instanceId] } : s,
-                    ),
-                    prompts: newPrompts,
-                  };
-                }
+                // Nightmare: MA-070 Treasure Map — "you may attach this card to
+                // your character". A CHOICE: the take lands in the discard and the
+                // normal-take return below offers ma070Choose.
                 // Nightmare: MA-071 Hidden Treasure — +gold +buy, then remove.
                 const treasureEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'gainGoldAndBuyThenRemove');
                 if (treasureEffect !== undefined && treasureEffect.kind === 'gainGoldAndBuyThenRemove') {
@@ -9537,7 +9573,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }
                 // Outbreak: MA-055o Antivirus is resolved on reveal (see the
                 // non-Infected reveal branch above), never through Take.
-                return {
+                const taken: GameState = {
                   ...state,
                   ...nextBase,
                   seats: state.seats.map(s =>
@@ -9545,6 +9581,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   ),
                   prompts: newPrompts,
                 };
+                // Nightmare: MA-070 Treasure Map — the printed "you may attach
+                // this card to your character" is a CHOICE, offered now that the
+                // card is actually taken.
+                if ((takenDef?.itemEffects ?? []).some(e => e.kind === 'attachThenRemoveForCardsAndGold')) {
+                  return {
+                    ...taken,
+                    prompts: [...taken.prompts, {
+                      id: `ma070-${seat}-${instanceId}-v${state.version}`,
+                      seat,
+                      text: 'Treasure Map: attach this card to your character?',
+                      options: ['Attach', 'Leave in Discard'],
+                      payload: { kind: 'ma070Choose', instanceId },
+                    }],
+                  };
+                }
+                return taken;
               }
               if (option === 1 && instanceId !== undefined) {
                 return {
@@ -10409,6 +10461,62 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         const inserted = insertAt({ deck: base.mansionDeck.filter(id => id !== instanceId) }, instanceId, 10);
         return { ...base, mansionDeck: inserted.deck };
+      }
+
+      if (kind === 'chrisL2TopChoose') {
+        // B4MC-CH-008 Chris L2: move the not-defeated Infected to the TOP of the
+        // Mansion. `insertAt` splices in a copy, so drop the existing occurrence
+        // first — the normal disposition already put the card in the deck.
+        const chosen = prompt.options[option];
+        const instanceId = String(prompt.payload?.instanceId ?? '');
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen !== 'Put on top' || instanceId === '' || !base.mansionDeck.includes(instanceId)) {
+          return base;
+        }
+        const inserted = insertAt({ deck: base.mansionDeck.filter(id => id !== instanceId) }, instanceId, 1);
+        return { ...base, mansionDeck: inserted.deck };
+      }
+
+      if (kind === 'ma070Choose') {
+        // MA-070 Treasure Map: attach the taken card to the character, or leave
+        // it in the discard.
+        const chosen = prompt.options[option];
+        const instanceId = String(prompt.payload?.instanceId ?? '');
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        const seatPlayer = base.seats[seat];
+        if (chosen !== 'Attach' || instanceId === '' || seatPlayer === undefined
+          || !seatPlayer.discard.includes(instanceId)) {
+          return base;
+        }
+        const inst = base.cards[instanceId];
+        return {
+          ...base,
+          cards: inst === undefined
+            ? base.cards
+            : { ...base.cards, [instanceId]: { ...inst, location: { zone: 'attached', index: 0, seat } } },
+          seats: base.seats.map(x => (x.seat === seat
+            ? { ...x, discard: x.discard.filter(id => id !== instanceId), attached: [...x.attached, instanceId] }
+            : x)),
+        };
+      }
+
+      if (kind === 'medicHealBonusChoose') {
+        // SK-004 Medic LV.1: apply the offered +N on top of the base heal. The
+        // heal's own side effects (SK-005's trash, Josh's gold, the first-heal
+        // tracker) already fired, so this only moves Health.
+        const chosen = prompt.options[option];
+        const amount = Number(prompt.payload?.amount ?? '0');
+        const target = prompt.payload?.target === 'partner' ? 'partner' as const : 'main' as const;
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen === undefined || chosen === 'Skip' || amount <= 0) return base;
+        return {
+          ...base,
+          seats: base.seats.map(x => (x.seat !== seat
+            ? x
+            : target === 'main'
+              ? { ...x, hp: Math.min(x.hp + amount, x.maxHp) }
+              : { ...x, partnerHp: Math.min((x.partnerHp ?? x.hp) + amount, x.partnerMaxHp ?? x.maxHp) })),
+        };
       }
 
       if (kind === 'ac043ChoosePlayer') {
