@@ -1104,9 +1104,16 @@ h1, h2 { margin: 0 0 8px; }
 }
 .mansion-piles { display: flex; gap: 18px; align-items: flex-end; }
 
-/* Mansion attachments hover card — shows attached cards to the right of the mansion pile */
+/* Mansion attachments hover card — shows attached cards to the right of the mansion pile.
+   z-index is load-bearing: the popup is anchored at the pile's TOP and is taller
+   than the pile, so with the opponent panels collapsed it reaches down into the
+   location area / Your table below. Those later-in-DOM `position: relative`
+   cards would otherwise paint over it (tree order decides between
+   z-index:auto boxes), which is the reported "obstructed by the location area".
+   130 keeps it above the other in-board popups (.zone-pile-fan 120,
+   .hover-card-pop 100) and below the card-flight layer (500) and overlays. */
 .mansion-pile-hover-target { position: relative; }
-.mansion-attachments-hover { position: absolute; left: 100%; top: 0; margin-left: 8px; display: none; }
+.mansion-attachments-hover { position: absolute; left: 100%; top: 0; margin-left: 8px; display: none; z-index: 130; }
 .mansion-pile-hover-target:hover .mansion-attachments-hover { display: block; }
 .mansion-attachment-badge {
   position: absolute;
