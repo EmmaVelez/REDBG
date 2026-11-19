@@ -725,7 +725,7 @@ export function recycleAmmoPrompt(state: GameState, seat: number): Prompt | unde
   const player = state.seats[seat];
   if (player === undefined) return undefined;
   if (player.exploredOrAttackedThisTurn === true) return undefined;
-  const declined = new Set(player.am007Declined ?? []);
+  const declined = new Set(player.recallDeclined ?? []);
   const ammoId = player.playArea.find(id => {
     if (declined.has(id)) return false;
     const inst = state.cards[id];

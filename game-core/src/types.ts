@@ -1015,9 +1015,10 @@ export interface PlayerState {
    *  has already been used this turn ("this type of effect can only be applied
    *  once during your turn"). Cleared at the start of the player's next turn. */
   readonly ammoX10UpgradeUsedThisTurn?: boolean;
-  /** AM-007: copies this seat DECLINED to recycle at the end of this turn.
-   *  Without it the end-of-turn prompt re-offers the same card forever. */
-  readonly am007Declined?: readonly string[];
+  /** End-of-turn recall choices (AM-007 Ammo x30, CW-025 Elephant Killer):
+   *  copies this seat DECLINED to recycle at the end of this turn. Without it
+   *  the end-of-turn prompt re-offers the same card forever. */
+  readonly recallDeclined?: readonly string[];
   /** B4MC-CH-005 L1: the "pay 1 Action to charge" Stun Rod effect is active for
    *  the rest of this turn (her Stun Rod explores get +10 Damage). */
   readonly stunRodCharged?: boolean;

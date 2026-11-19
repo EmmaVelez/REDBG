@@ -125,18 +125,34 @@ describe('Zombicide fan weapon sheet — data', () => {
 });
 
 describe('CW-025 Elephant Killer — recall an unused weapon', () => {
-  it('moves an unused play-area copy to the top of the Inventory at end of turn', () => {
+  it('asks before moving an unused play-area copy at end of turn', () => {
     const { state, id } = place(game({ level: 1 }), 0, 'cw-025', 'playArea');
     const ended = applyAction(state, { type: 'endTurn', seat: 0 });
-    const p = ended.seats[0];
-    expect(p?.playArea).not.toContain(id);
-    expect(p?.discard).not.toContain(id);
+    const p = ended.prompts.find(x => x.payload?.kind === 'cw025Choose');
+    expect(p).toBeDefined();
+    // The turn is HELD: the card is still in the Play Area.
+    expect(ended.seats[0]?.playArea).toContain(id);
+    expect(ended.activeSeat).toBe(0);
+
+    const moved = applyAction(ended, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 0 });
+    expect(moved.seats[0]?.playArea).not.toContain(id);
+    expect(moved.seats[0]?.discard).not.toContain(id);
     // end of turn draws a fresh hand from the Inventory, so the recalled weapon
     // (placed on top) is the first card drawn.
-    expect(p?.hand).toContain(id);
+    expect(moved.seats[0]?.hand).toContain(id);
   });
 
-  it('does NOT recall a copy that was used while Exploring', () => {
+  it('declining leaves the weapon in the Play Area, so it is discarded', () => {
+    const { state, id } = place(game({ level: 1 }), 0, 'cw-025', 'playArea');
+    const ended = applyAction(state, { type: 'endTurn', seat: 0 });
+    const p = ended.prompts.find(x => x.payload?.kind === 'cw025Choose');
+    const declined = applyAction(ended, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 1 });
+    expect(declined.seats[0]?.playArea).not.toContain(id);
+    expect(declined.seats[0]?.discard).toContain(id);
+    expect(declined.prompts.some(x => x.payload?.kind === 'cw025Choose')).toBe(false);
+  });
+
+  it('does NOT offer a copy that was used while Exploring', () => {
     let s = game({ level: 1, hp: 80, turnAmmo: 120, exploresLeft: 1 });
     const w = place(s, 0, 'cw-025');   // hand — an explore is how a weapon is played
     s = w.state;
@@ -145,8 +161,24 @@ describe('CW-025 Elephant Killer — recall an unused weapon', () => {
     // The weapon is now in the play area and WAS used this turn.
     expect(explored.seats[0]?.playArea).toContain(w.id);
     const ended = applyAction(explored, { type: 'endTurn', seat: 0 });
+    expect(ended.prompts.some(x => x.payload?.kind === 'cw025Choose')).toBe(false);
     expect(ended.seats[0]?.hand).not.toContain(w.id);
     expect(ended.seats[0]?.discard).toContain(w.id);
+  });
+
+  it('asks about two copies one at a time', () => {
+    const a = place(game({ level: 1 }), 0, 'cw-025', 'playArea');
+    const b = place(a.state, 0, 'cw-025', 'playArea');
+    const ended = applyAction(b.state, { type: 'endTurn', seat: 0 });
+    const firstPrompt = ended.prompts.find(x => x.payload?.kind === 'cw025Choose')!;
+    const first = applyAction(ended, { type: 'chooseOption', seat: 0, promptId: firstPrompt.id, option: 0 });
+    // The second copy still gets its own choice rather than being moved silently.
+    expect(first.prompts.some(x => x.payload?.kind === 'cw025Choose')).toBe(true);
+    const secondPrompt = first.prompts.find(x => x.payload?.kind === 'cw025Choose')!;
+    const second = applyAction(first, { type: 'chooseOption', seat: 0, promptId: secondPrompt.id, option: 1 });
+    expect(second.prompts.some(x => x.payload?.kind === 'cw025Choose')).toBe(false);
+    expect(second.seats[0]?.hand).toContain(a.id);
+    expect(second.seats[0]?.discard).toContain(b.id);
   });
 
   it('is reachable today only via a play-area copy no explore used', () => {

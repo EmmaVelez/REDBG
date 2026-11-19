@@ -455,23 +455,12 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
         }
       }
 
-      // CW-025 Elephant Killer: an unused weapon in the Play Area moves to
-      // the top of the Inventory instead of being discarded. The printed
-      // "you can" is resolved automatically — taking it is never worse than
-      // discarding it, and the play area is emptied either way.
-      const recalledIds = player.playArea.filter(id => {
-        const d = cardDef(state, id);
-        return d?.type === 'weapon'
-          && (d.weaponEffects ?? []).some(e => e.kind === 'recallToInventoryTopAtTurnEnd')
-          && weaponUsesThisTurn(state, seat, id) === 0;
-      });
-      const recalledSet = new Set(recalledIds);
-
-      // AM-007 Ammo x30 used to be recycled automatically here. It is a
-      // "you can" CHOICE, so the endTurn case asks the player instead (see
-      // recycleAmmoPrompt); declining leaves the card in the Play Area and it
-      // is discarded like any other unused card.
-      const recalledOrRecycled = new Set(recalledSet);
+      // End-of-turn recall choices (AM-007 Ammo x30, CW-025 Elephant Killer)
+      // used to be applied automatically here. They are printed "you can"
+      // CHOICES, so endTurnWithRecallChoice asks the player instead; declining
+      // leaves the card in the Play Area and it is discarded like any other
+      // unused card.
+      const recalledOrRecycled = new Set<string>();
 
       const dh = discardHand({ hand: player.hand.filter(id => !keptIds.includes(id)), discard: player.discard });
       const dh2 = discardHand({ hand: player.playArea.filter(id => !recalledOrRecycled.has(id)), discard: dh.discard });
@@ -487,7 +476,7 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
 
       // Mansion attachment effects at end of turn (e.g., Rampage trashing
       // inventory cards). Applied to the active player's inventory.
-      let currentInventory = [...recalledIds, ...player.inventory];
+      let currentInventory = [...player.inventory];
       let currentRemoved = removedAfterTrash;
       let currentTrashCounts = { ...(state.attachmentTrashCounts ?? {}) };
       let currentAttachments = [...(state.mansionAttachments ?? [])];
@@ -679,24 +668,90 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
 }
 
 /**
- * Finish a seat's turn, offering AM-007's "you can move this Ammunition to the
- * top of your Inventory" choice first. Shared by the `endTurn` case and every
- * other path that ends a turn (CAC-013's resolver) — without it the Ammunition
+ * CW-025 Elephant Killer: "At the end of your turn, if this card is in your
+ * Play Area and was not used while Exploring during this turn, you can move
+ * this Weapon to the top of your Inventory." A CHOICE, so the end of the turn
+ * asks instead of moving it automatically. Returns the prompt for the FIRST
+ * eligible, not-yet-declined copy.
+ *
+ * Lives here rather than beside `recycleAmmoPrompt` in mercenaries.ts because
+ * the eligibility test needs `weaponUsesThisTurn`, and mercenaries importing
+ * weaponReuse would close a cycle (weaponReuse -> game -> actions ->
+ * mercenaries).
+ */
+function recycleWeaponPrompt(state: GameState, seat: number): Prompt | undefined {
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  const declined = new Set(player.recallDeclined ?? []);
+  const weaponId = player.playArea.find(id => {
+    if (declined.has(id)) return false;
+    const inst = state.cards[id];
+    const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+    return def?.type === 'weapon'
+      && (def.weaponEffects ?? []).some(e => e.kind === 'recallToInventoryTopAtTurnEnd')
+      && weaponUsesThisTurn(state, seat, id) === 0;
+  });
+  if (weaponId === undefined) return undefined;
+  const inst = state.cards[weaponId];
+  const def = inst === undefined ? undefined : state.cardDefs[inst.cardId];
+  return {
+    id: `cw025-${seat}-${weaponId}-v${state.version}`,
+    seat,
+    text: `${def?.name ?? 'Elephant Killer'}: move this Weapon to the top of your Inventory?`,
+    options: ['Move to Inventory', 'Leave in Play Area'],
+    payload: { kind: 'cw025Choose', weaponInstanceId: weaponId },
+  };
+}
+
+/**
+ * Apply one end-of-turn recall answer: move the instance to the top of the
+ * Inventory, or latch it as declined so the "ask again" pass does not re-offer
+ * the same copy. Shared by the AM-007 Ammunition and CW-025 Weapon choices.
+ */
+function applyRecallAnswer(base: GameState, seat: number, instanceId: string, accept: boolean): GameState {
+  const player = base.seats[seat];
+  if (instanceId === '' || player === undefined || !player.playArea.includes(instanceId)) return base;
+  if (!accept) {
+    return {
+      ...base,
+      seats: base.seats.map(x => (x.seat === seat
+        ? { ...x, recallDeclined: [...(x.recallDeclined ?? []), instanceId] }
+        : x)),
+    };
+  }
+  return {
+    ...base,
+    seats: base.seats.map(x => (x.seat === seat
+      ? { ...x, playArea: x.playArea.filter(id => id !== instanceId), inventory: [instanceId, ...x.inventory] }
+      : x)),
+    cards: (() => {
+      const inst = base.cards[instanceId];
+      return inst === undefined
+        ? base.cards
+        : { ...base.cards, [instanceId]: { ...inst, location: { zone: 'inventory', index: 0, seat } } };
+    })(),
+  };
+}
+
+/**
+ * Finish a seat's turn, offering the end-of-turn recall choices first
+ * (AM-007's Ammunition, then CW-025's Weapon). Shared by the `endTurn` case and
+ * every other path that ends a turn (CAC-013's resolver) — without it the card
  * is silently discarded and the printed "you can" never happens.
  */
-function endTurnOrAmmoChoice(
+function endTurnWithRecallChoice(
   state: GameState,
   seat: number,
   nextBase: { version: number; log: GameState['log'] },
 ): GameState {
   // The decline latch is per-turn, so clear it as this turn closes.
-  const cleared: GameState = state.seats[seat]?.am007Declined === undefined
+  const cleared: GameState = state.seats[seat]?.recallDeclined === undefined
     ? state
-    : { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, am007Declined: undefined } : x)) };
+    : { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, recallDeclined: undefined } : x)) };
   if (!cleared.prompts.some(p => p.seat === seat)) {
-    const am007Prompt = recycleAmmoPrompt(cleared, seat);
-    if (am007Prompt !== undefined) {
-      return { ...cleared, ...nextBase, prompts: [...cleared.prompts, am007Prompt] };
+    const recallPrompt = recycleAmmoPrompt(cleared, seat) ?? recycleWeaponPrompt(cleared, seat);
+    if (recallPrompt !== undefined) {
+      return { ...cleared, ...nextBase, prompts: [...cleared.prompts, recallPrompt] };
     }
   }
   return applyEndOfTurn(cleared, seat, nextBase);
@@ -1860,6 +1915,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               seats: seatsAfterEffects.map(s => applyArchrival(s)),
               prompts: finalPrompts,
               rngState: rngAfterEffects,
+              // AH-001 Abandon All Hope: armed by PLAYING the action. (This
+              // spread used to sit in the playItem case, where an item's
+              // `actionEffects` is always undefined — so the card never armed.)
+              ...((state.storyModeBossShuffleActive || (def.actionEffects ?? []).some(e => e.kind === 'storyModeBossShuffleToTop10'))
+                ? { storyModeBossShuffleActive: true }
+                : {}),
             };
           
 
@@ -2095,9 +2156,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         cards: cleared.cards,
         prompts,
         rngState: played.rngState,
-        ...((state.storyModeBossShuffleActive || (def.actionEffects ?? []).some(e => e.kind === 'storyModeBossShuffleToTop10'))
-          ? { storyModeBossShuffleActive: true }
-          : {}),
       };
           }
 
@@ -4989,18 +5047,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const insertPosition = !infectedEffectNegated && insertEffect !== undefined && insertEffect.kind === 'onNotDefeatedInsertIntoMansionAt'
         ? insertEffect.position
         : undefined;
-      // AH-001 Abandon All Hope: if active and this is the Boss, insert at top 10
+      // AH-001 Abandon All Hope: if active and this is the Boss, the player is
+      // asked afterwards whether to shuffle it into the top 10 (ah001Choose
+      // below). The Boss takes the normal not-defeated disposition for now.
       const isBoss = state.endInfectedCardId !== undefined && revealedDef?.id === state.endInfectedCardId;
-      const bossShuffleToTop10 = state.storyModeBossShuffleActive === true && isBoss && outcome.kind === 'notDefeated';
       // B4MC-CH-008 Chris L2: once per round, the first not-defeated Infected
       // on his own turn goes on TOP of the Mansion (even the BOSS).
       const chrisL2Top = outcome.kind === 'notDefeated' && chrisL2TopOfMansion(state, seat);
       if (chrisL2Top) state = markChrisL2TopUsed(state, seat);
       if (chrisL2Top) {
         const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 1);
-        mansionDeck = inserted.deck;
-      } else if (bossShuffleToTop10) {
-        const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, 10);
         mansionDeck = inserted.deck;
       } else if (insertPosition !== undefined) {
         const inserted = insertAt({ deck: mansionDeck }, revealedInstanceId, insertPosition);
@@ -5012,6 +5068,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const bottomed = sendToBottom({ deck: mansionDeck }, revealedInstanceId);
         mansionDeck = bottomed.deck;
       }
+
+      // AH-001 Abandon All Hope: "you can shuffle it into the top 10 cards of
+      // the Mansion instead" — a CHOICE, so offer it once the Boss has taken
+      // the normal disposition. The handler moves it to the top 10.
+      const ah001Prompt: Prompt | undefined = state.storyModeBossShuffleActive === true
+        && isBoss
+        && outcome.kind === 'notDefeated'
+        && mansionDeck.includes(revealedInstanceId)
+        ? {
+          id: `ah001-${seat}-${revealedInstanceId}-v${state.version}`,
+          seat,
+          text: 'Abandon All Hope: shuffle the Boss into the top 10 cards of the Mansion?',
+          options: ['Shuffle to top 10', 'Leave it'],
+          payload: { kind: 'ah001Choose', instanceId: revealedInstanceId },
+        }
+        : undefined;
 
       // CH-032 Zombie B reacts to any Infection Level rise this explore caused.
       const zombieBNotDefeatedPrompts = zombieBAffected.flatMap(seatIdx => zombieBPrompts(state, seatIdx, state.version));
@@ -5027,7 +5099,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         mansionDeck,
         rngState: state.rngState,
         ...(outcome.kind === 'notDefeated' && (revealedDef?.attack ?? 0) > 0 ? { infectedDamageThisRound: true } : {}),
-        prompts: [...state.prompts, ...resuscitatePrompts, ...zombieBNotDefeatedPrompts],
+        prompts: [...state.prompts, ...resuscitatePrompts, ...zombieBNotDefeatedPrompts,
+          ...(ah001Prompt !== undefined ? [ah001Prompt] : [])],
         ...(resuscitatePending ? { pendingResuscitate: { seat } } : {}),
         ...(state.infectionDeck !== undefined ? { infectionDeck: outbreakDeck } : {}),
       };
@@ -5184,7 +5257,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       }
 
       // Fan Location (Terrace): the first action card bought from a market pile
-      // this turn is played immediately and for free (costs 1 Action).
+      // this turn may be played immediately and for free (costs 1 Action). The
+      // printed "you may play it" is a CHOICE, so ask; answering yes arms
+      // `pendingFreeActionInstanceId`, which the applyAction wrapper plays.
       if (hasFreeActionPlay(s, seat)
         && (boughtDef?.type === 'action')
         && (s.seats[seat] as PlayerState).actionsLeft >= 1) {
@@ -5198,9 +5273,20 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               hand: inDiscard ? [...x.hand, boughtInstanceId] : x.hand,
               discard: inDiscard ? x.discard.filter(id => id !== boughtInstanceId) : x.discard,
               freeActionPlayAvailable: false,
-              pendingFreeActionInstanceId: boughtInstanceId,
             }
             : x)),
+        };
+        const ver = s.version + 1;
+        s = {
+          ...s,
+          version: ver,
+          prompts: [...s.prompts, {
+            id: `loc014-${seat}-${boughtInstanceId}-v${ver}`,
+            seat,
+            text: `${boughtDef?.name ?? 'Action card'}: play it for free?`,
+            options: ['Play it', 'Leave in Hand'],
+            payload: { kind: 'loc014Choose', instanceId: boughtInstanceId },
+          }],
         };
       }
 
@@ -6103,7 +6189,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // AM-007 Ammo x30: "you can move this Ammunition to the top of your
       // Inventory" — a CHOICE, so ask BEFORE the turn ends (the Play Area is
       // still populated). The resolver finishes the turn.
-      return endTurnOrAmmoChoice(state, seat, nextBase);
+      return endTurnWithRecallChoice(state, seat, nextBase);
     }
 
     case 'moveXp': {
@@ -8345,7 +8431,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetOpt = prompt.options[option];
         if (targetOpt === undefined || targetOpt === 'Decline' || actionInstanceId === '') {
           // Declined (or nothing to target): the turn ends with no effect.
-          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+          return endTurnWithRecallChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8353,7 +8439,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const targetSeat = Number(targetOpt);
         const target = state.seats[targetSeat];
         if (target === undefined || target.dead || target.downed || target.hand.length === 0) {
-          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
+          return endTurnWithRecallChoice({ ...state, ...nextBase, prompts: newPrompts }, seat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8379,7 +8465,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const actionInstanceId = String(prompt.payload?.actionInstanceId ?? '');
         const origin = state.seats[fromSeat];
         if (chosen === undefined || origin === undefined || actionInstanceId === '') {
-          return endTurnOrAmmoChoice({ ...state, ...nextBase, prompts: newPrompts }, fromSeat, {
+          return endTurnWithRecallChoice({ ...state, ...nextBase, prompts: newPrompts }, fromSeat, {
             version: nextBase.version,
             log: nextBase.log,
           });
@@ -8412,7 +8498,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }),
           prompts: newPrompts,
         };
-        return endTurnOrAmmoChoice(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
+        return endTurnWithRecallChoice(afterMove, fromSeat, { version: nextBase.version, log: nextBase.log });
       }
 
       if (kind === 'locTrashSecondGain') {
@@ -10242,43 +10328,87 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         return s;
       }
 
-      if (kind === 'am007Choose') {
-        // AM-007: the player chooses whether the Ammunition goes to the top of
-        // the Inventory. Declining leaves it in the Play Area (it is then
-        // discarded with the rest of the unused cards).
+      if (kind === 'am007Choose' || kind === 'cw025Choose') {
+        // AM-007 Ammo x30 / CW-025 Elephant Killer: the player chooses whether
+        // the card goes to the top of the Inventory. Declining leaves it in the
+        // Play Area (it is then discarded with the rest of the unused cards).
         const chosen = prompt.options[option];
-        const ammoId = String(prompt.payload?.ammoInstanceId ?? '');
-        const seatPlayer = state.seats[seat] as PlayerState;
+        const instanceId = String(prompt.payload?.ammoInstanceId ?? prompt.payload?.weaponInstanceId ?? '');
         let base: GameState = { ...state, ...nextBase, prompts: newPrompts };
-        // Declined: latch it so the "ask again" pass does not re-offer the
-        // SAME copy forever. The card stays in the Play Area and is discarded.
-        if (chosen !== 'Move to Inventory' && ammoId !== '' && seatPlayer.playArea.includes(ammoId)) {
-          base = {
-            ...base,
-            seats: base.seats.map(x => (x.seat === seat
-              ? { ...x, am007Declined: [...(x.am007Declined ?? []), ammoId] }
-              : x)),
-          };
-        }
-        if (chosen === 'Move to Inventory' && ammoId !== '' && seatPlayer.playArea.includes(ammoId)) {
-          base = {
-            ...base,
-            seats: base.seats.map(x => (x.seat === seat
-              ? { ...x, playArea: x.playArea.filter(id => id !== ammoId), inventory: [ammoId, ...x.inventory] }
-              : x)),
-            cards: (() => {
-              const inst = base.cards[ammoId];
-              if (inst === undefined) return base.cards;
-              return { ...base.cards, [ammoId]: { ...inst, location: { zone: 'inventory', index: 0, seat } } };
-            })(),
-          };
-        }
+        base = applyRecallAnswer(base, seat, instanceId, chosen === 'Move to Inventory');
         // Another copy still waiting? Ask again rather than silently moving it.
-        const nextPrompt = recycleAmmoPrompt(base, seat);
+        const nextPrompt = recycleAmmoPrompt(base, seat) ?? recycleWeaponPrompt(base, seat);
         if (nextPrompt !== undefined) {
           return { ...base, prompts: [...base.prompts, nextPrompt] };
         }
         return applyEndOfTurn(base, seat, { version: nextBase.version, log: nextBase.log });
+      }
+
+      if (kind === 'cac004Choose') {
+        // CAC-004 Resupply: move the already-gained Item from the discard to the
+        // Hand, or leave it. The offer is consumed either way (gainCard clears
+        // nextItemToHand when it raises the prompt).
+        const chosen = prompt.options[option];
+        const ids = String(prompt.payload?.instanceIds ?? '').split(',').filter(x => x !== '');
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen !== 'Put in Hand' || ids.length === 0) return base;
+        const moved = { ...base.cards };
+        for (const id of ids) {
+          const inst = moved[id];
+          if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'hand', index: 0, seat } };
+        }
+        return {
+          ...base,
+          cards: moved,
+          seats: base.seats.map(p => (p.seat === seat
+            ? { ...p, discard: p.discard.filter(id => !ids.includes(id)), hand: [...p.hand, ...ids] }
+            : p)),
+        };
+      }
+
+      if (kind === 'loc014Choose') {
+        // loc-014 Terrace: "you may play it". Answering yes arms the free play,
+        // which the applyAction wrapper performs. Declining returns the card to
+        // the discard — its normal buy destination.
+        const chosen = prompt.options[option];
+        const instanceId = String(prompt.payload?.instanceId ?? '');
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        const seatPlayer = instanceId === '' ? undefined : base.seats[seat];
+        if (seatPlayer === undefined) return base;
+        if (chosen === 'Play it') {
+          return {
+            ...base,
+            seats: base.seats.map(x => (x.seat === seat
+              ? { ...x, pendingFreeActionInstanceId: instanceId }
+              : x)),
+          };
+        }
+        if (!seatPlayer.hand.includes(instanceId)) return base;
+        const inst = base.cards[instanceId];
+        return {
+          ...base,
+          cards: inst === undefined
+            ? base.cards
+            : { ...base.cards, [instanceId]: { ...inst, location: { zone: 'discard', index: 0, seat } } },
+          seats: base.seats.map(x => (x.seat === seat
+            ? { ...x, hand: x.hand.filter(id => id !== instanceId), discard: [...x.discard, instanceId] }
+            : x)),
+        };
+      }
+
+      if (kind === 'ah001Choose') {
+        // AH-001 Abandon All Hope: move the Boss into the top 10 of the Mansion.
+        // `insertAt` SPLICES IN A COPY, so drop the existing occurrence first —
+        // the Boss is already in the deck from the normal not-defeated
+        // disposition, and leaving it would duplicate the instance.
+        const chosen = prompt.options[option];
+        const instanceId = String(prompt.payload?.instanceId ?? '');
+        const base: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen !== 'Shuffle to top 10' || instanceId === '' || !base.mansionDeck.includes(instanceId)) {
+          return base;
+        }
+        const inserted = insertAt({ deck: base.mansionDeck.filter(id => id !== instanceId) }, instanceId, 10);
+        return { ...base, mansionDeck: inserted.deck };
       }
 
       if (kind === 'ac043ChoosePlayer') {

@@ -89,7 +89,17 @@ describe("CAC-001 Can't Let Go", () => {
 });
 
 describe('CAC-004 Resupply', () => {
-  it('routes the next gained Item to Hand', () => {
+  function itemPileOf(s: GameState): string {
+    const itemPile = Object.entries(s.marketPiles).find(([, p]) => {
+      const top = p.cards[0];
+      const d = top === undefined ? undefined : s.cardDefs[s.cards[top]?.cardId ?? ''];
+      return d?.type === 'item';
+    });
+    expect(itemPile).toBeDefined();
+    return itemPile![0];
+  }
+
+  function armed(): { s: GameState; before: number } {
     let s = game({ level: 1, actionsLeft: 2, turnGold: 100, buysLeft: 2 });
     const played = place(s, 0, 'cac-004');
     s = applyAction(played.state, { type: 'playActionCard', seat: 0, instanceId: played.id });
@@ -97,20 +107,32 @@ describe('CAC-004 Resupply', () => {
     // Its own bonuses: +20 Gold, +2 Cards, +1 Buy.
     expect((s.seats[0] as PlayerState).turnGold).toBe(120);
     expect((s.seats[0] as PlayerState).buysLeft).toBe(3);
+    return { s, before: (s.seats[0] as PlayerState).discard.length };
+  }
 
-    // Gain an ITEM from the market.
-    const itemPile = Object.entries(s.marketPiles).find(([, p]) => {
-      const top = p.cards[0];
-      const d = top === undefined ? undefined : s.cardDefs[s.cards[top]?.cardId ?? ''];
-      return d?.type === 'item';
-    });
-    expect(itemPile).toBeDefined();
-    const before = (s.seats[0] as PlayerState).discard.length;
-    const after = applyAction(s, { type: 'buy', seat: 0, pileId: itemPile![0] });
+  it('offers to route the next gained Item to Hand, and moving it consumes the offer', () => {
+    const { s, before } = armed();
+    const after = applyAction(s, { type: 'buy', seat: 0, pileId: itemPileOf(s) });
     const seat = after.seats[0] as PlayerState;
+    const p = after.prompts.find(x => x.payload?.kind === 'cac004Choose');
+    expect(p).toBeDefined();
+    // The offer is consumed when MADE; the Item is still sitting in the discard.
     expect(seat.nextItemToHand).toBe(false);
-    expect(seat.discard.length).toBe(before);
-    expect(seat.hand.length).toBeGreaterThan((s.seats[0] as PlayerState).hand.length);
+    expect(seat.discard.length).toBe(before + 1);
+
+    const moved = applyAction(after, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 0 });
+    const mseat = moved.seats[0] as PlayerState;
+    expect(mseat.discard.length).toBe(before);
+    expect(mseat.hand.length).toBeGreaterThan((s.seats[0] as PlayerState).hand.length);
+  });
+
+  it('declining leaves the Item in the discard', () => {
+    const { s, before } = armed();
+    const after = applyAction(s, { type: 'buy', seat: 0, pileId: itemPileOf(s) });
+    const p = after.prompts.find(x => x.payload?.kind === 'cac004Choose')!;
+    const declined = applyAction(after, { type: 'chooseOption', seat: 0, promptId: p.id, option: 1 });
+    expect(declined.seats[0]?.discard.length).toBe(before + 1);
+    expect(declined.prompts.some(x => x.payload?.kind === 'cac004Choose')).toBe(false);
   });
 });
 

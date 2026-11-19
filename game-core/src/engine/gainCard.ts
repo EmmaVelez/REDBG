@@ -147,24 +147,28 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     };
   }
 
-  // CAC-004 Resupply: the next Item gain this turn goes to Hand instead of
-  // the Discard Pile. `dest` is already computed, so re-route here.
-  if (player.nextItemToHand === true
-    && (s.cardDefs[req.cardId]?.type === 'item')
-    && (dest === 'discard' || dest === 'hand')) {
+  // CAC-004 Resupply: "The next time you Gain an Item this turn, you can put it
+  // into your Hand instead of your Discard Pile." The Item has already landed in
+  // the discard, so the prompt only has to move it. The flag is consumed when the
+  // offer is MADE (not when it is answered) so a second Item gained in the same
+  // action cannot raise a colliding prompt.
+  if (player.nextItemToHand === true && (s.cardDefs[req.cardId]?.type === 'item')) {
     const ids = [...gainedIds];
-    const moved = { ...s.cards };
-    for (const id of ids) {
-      const inst = moved[id];
-      if (inst !== undefined) moved[id] = { ...inst, location: { zone: 'hand', index: 0, seat } };
+    s = { ...s, seats: s.seats.map(p => (p.seat === seat ? { ...p, nextItemToHand: false } : p)) };
+    if (dest === 'discard') {
+      const ver = s.version + 1;
+      s = {
+        ...s,
+        version: ver,
+        prompts: [...s.prompts, {
+          id: `cac004-${seat}-${ids[0] ?? 'item'}-v${ver}`,
+          seat,
+          text: 'Resupply: put this Item into your Hand instead of your Discard Pile?',
+          options: ['Put in Hand', 'Leave in Discard'],
+          payload: { kind: 'cac004Choose', instanceIds: ids.join(',') },
+        }],
+      };
     }
-    s = {
-      ...s,
-      cards: moved,
-      seats: s.seats.map(p => (p.seat === seat
-        ? { ...p, nextItemToHand: false, discard: p.discard.filter(id => !ids.includes(id)), hand: [...p.hand, ...ids] }
-        : p)),
-    };
   }
 
   // CAC-005 Combat Medic: the FIRST gain of the turn offers a 10 Health heal.

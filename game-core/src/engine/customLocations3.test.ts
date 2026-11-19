@@ -112,20 +112,41 @@ describe('Tiger Statue Room — buy discount', () => {
 });
 
 describe('Terrace — free play + item reveal', () => {
-  it('plays the first action card bought from a market pile for free', () => {
+  it('asks before playing the first action card bought, then plays it for free', () => {
     let s = game({ level: 1 });
     s = invest(s, 'loc-014');
     expect(hasFreeActionPlay(s, 0)).toBe(true);
     const handBefore = (s.seats[0] as PlayerState).hand.length;
     const after = applyAction(s, { type: 'buy', seat: 0, pileId: 'foyer' });
     const seat = after.seats[0] as PlayerState;
+    const p = after.prompts.find(x => x.payload?.kind === 'loc014Choose');
+    expect(p).toBeDefined();
+    // The turn is HELD: nothing played yet, the bought card is in hand.
+    expect(seat.playArea).toEqual([]);
+    expect(seat.freeActionPlayAvailable).toBe(false);
+
+    const played = applyAction(after, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 0 });
+    const pseat = played.seats[0] as PlayerState;
     // ac-001 was played: it is in the play area, an Action was spent, and the
     // free play is consumed.
-    expect(seat.playArea.length).toBeGreaterThan(0);
-    expect(seat.actionsLeft).toBe(0);
-    expect(seat.freeActionPlayAvailable).toBe(false);
+    expect(pseat.playArea.length).toBeGreaterThan(0);
+    expect(pseat.actionsLeft).toBe(0);
+    expect(pseat.freeActionPlayAvailable).toBe(false);
     // ...and its +2 Cards bonus fired.
-    expect(seat.hand.length).toBe(handBefore + 2);
+    expect(pseat.hand.length).toBe(handBefore + 2);
+  });
+
+  it('declining leaves the action card in the discard', () => {
+    let s = game({ level: 1 });
+    s = invest(s, 'loc-014');
+    const after = applyAction(s, { type: 'buy', seat: 0, pileId: 'foyer' });
+    const p = after.prompts.find(x => x.payload?.kind === 'loc014Choose')!;
+    const instanceId = String(p.payload?.instanceId);
+    const declined = applyAction(after, { type: 'chooseOption', seat: 0, promptId: p.id, option: 1 });
+    const seat = declined.seats[0] as PlayerState;
+    expect(seat.playArea).toEqual([]);
+    expect(seat.hand).not.toContain(instanceId);
+    expect(seat.discard).toContain(instanceId);
   });
 
   it('does not free-play when no Action is available', () => {
@@ -135,14 +156,17 @@ describe('Terrace — free play + item reveal', () => {
     const seat = after.seats[0] as PlayerState;
     expect(seat.playArea).toEqual([]);
     expect(seat.freeActionPlayAvailable).toBeUndefined();
+    expect(after.prompts.some(x => x.payload?.kind === 'loc014Choose')).toBe(false);
   });
 
   it('refreshes the free play on the next turn', () => {
     let s = game({ level: 1 });
     s = invest(s, 'loc-014');
     expect(hasFreeActionPlay(s, 0)).toBe(true);
-    s = applyAction(s, { type: 'buy', seat: 0, pileId: 'foyer' });
-    expect(hasFreeActionPlay(s, 0)).toBe(false);
+    const after = applyAction(s, { type: 'buy', seat: 0, pileId: 'foyer' });
+    expect(hasFreeActionPlay(after, 0)).toBe(false);
+    const p = after.prompts.find(x => x.payload?.kind === 'loc014Choose')!;
+    s = applyAction(after, { type: 'chooseOption', seat: 0, promptId: p.id, option: 1 });
     const ended = applyAction(s, { type: 'endTurn', seat: 0 });
     const next = startTurn(ended);
     expect(hasFreeActionPlay(next, 0)).toBe(true);
