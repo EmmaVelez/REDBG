@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { GameState, Action } from '@re/game-core';
 import { CardView } from './CardView';
+import { HoverCard } from './HoverCard';
 import { defForInstance } from './cards';
 
 /**
@@ -64,7 +65,8 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
           const canUse = canAct && kind === 'onex' && !capped
             && (me?.turnGold ?? 0) >= (def.locationCost ?? 0) && (me?.buysLeft ?? 0) >= 1;
           return (
-            <div key={loc.instanceId} className={`location-card location-kind-${kind ?? 'invest'}`}>
+            <HoverCard key={loc.instanceId} def={def}>
+            <div className={`location-card location-kind-${kind ?? 'invest'}`}>
               <div className="location-kind-badge">{kindLabel(kind)}</div>
               <CardView def={def} compact artOnly />
               <div className="location-name">{def.name}</div>
@@ -117,6 +119,7 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                 {kind === 'global' && <span className="location-global-note">active for everyone</span>}
               </div>
             </div>
+            </HoverCard>
           );
         })}
         {(state.locationDeck ?? []).length > 0 && (

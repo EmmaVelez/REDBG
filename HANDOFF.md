@@ -1,5 +1,24 @@
 # HANDOFF — resume here
 
+**LESSON SPACE ART + LOCATION HOVER CARDS (2026-11-19):** Manny sent the
+LOC-008 Lesson Space render (822x1122 JPEG). Normalized to the LOC batch
+convention — 320x436 palette PNG, FULL card render WITH printed text, exactly
+like LOC-009..023 (cardArt.ts's "art only" docstring is stale for this batch) —
+saved as CARD-ART/LOC-008.png; the vite glob picks it up with no manifest.
+The loc-008 def already matched the print (GLOBAL, costs [20],
+scorePerDuplicateActionName, revealLoseHealth 5) — no engine change.
+LocationsRow tiles now ride inside HoverCard (the Hand.tsx pattern): hover
+shows the enlarged full-art CardView popup. CSS keeps the flex row's stretch
+through the wrapper (.locations-row > .hover-card { display:flex }).
+Tests: art-exists (customLocations2) + hover-wrapper (LocationsRow.test).
+Gates: typecheck x3 clean, client 273/273, location suites 32/32, build OK.
+Live-verified ONLINE: Usher room dealt Lesson Space, thumbnail data-has-art,
+hover popup = full loc-008 card served from /assets/LOC-008-*.png.
+NOTE: batch-1 LOC-001..007 still have no art files (only 008 was supplied).
+Browser-harness note: rapid reload loops can leave the client stuck in
+"Connecting…" on a stale localStorage reconnect token — localStorage.clear()
++ reload recovers; the server ws layer was healthy throughout (node probe).
+
 **USHER/CLOCK ONLINE CREATE-FORM FIX (2026-11-19):** Manny: "in usher mode, no
 LOC cards are displaying at the start of the game or at all". TWO causes:
 1. REAL BUG: the ws.ts `createRoom` handler forwards room options POSITIONALLY

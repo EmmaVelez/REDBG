@@ -38,6 +38,14 @@ function revealOnly(s: GameState, cardId: string): GameState {
 }
 
 describe('LocationsRow', () => {
+  it('wraps revealed locations in a HoverCard (full-art popup on hover)', () => {
+    const s = revealOnly(stateWithLocations(), 'loc-008');
+    const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
+    // the tile rides inside the hover wrapper, thumbnail art present
+    expect(html).toContain('hover-card');
+    expect(html).toContain('location-card');
+    expect(html).toContain('data-card-id="loc-008"');
+  });
   it('renders nothing when no location has been revealed or dealt', () => {
     const s = startTurn(setup({ seed: 11, players: [{ name: 'Me', controller: 'human' }, { name: 'Bot', controller: 'bot' }] }, PREMIER_CARDS, FIRST_TIMER_PILES));
     expect(renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />)).toBe('');

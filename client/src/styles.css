@@ -3081,6 +3081,11 @@ h1, h2 { margin: 0 0 8px; }
   align-items: stretch;
 }
 
+/* Location tiles ride inside a HoverCard wrapper (full-art popup on hover);
+   keep the flex row's stretch behaviour through the span. */
+.locations-row > .hover-card { display: flex; }
+.locations-row > .hover-card > .location-card { flex: 1; }
+
 .location-card {
   position: relative;
   width: 118px;

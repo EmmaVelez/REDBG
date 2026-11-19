@@ -71,6 +71,12 @@ describe('Locations batch 2 — data', () => {
     }
   });
 
+  it('ships card art for Lesson Space (loc-008)', () => {
+    // Batch-1 art drop (2026-11-19): normalized to the LOC convention,
+    // 320x436 palette PNG like LOC-009..023.
+    expect(existsSync('src/data/CARD-ART/LOC-008.png')).toBe(true);
+  });
+
   it('keeps every location id unique', () => {
     for (const id of NEW_IDS) {
       expect(CUSTOM_CARDS.filter(c => c.id === id)).toHaveLength(1);
