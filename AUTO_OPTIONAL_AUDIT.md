@@ -208,3 +208,48 @@ being built; ce-008 decides at weapon-use time inside `exploreWeapons`.
   a choice.
 - **ac-040 / sk-004 / ce-008**: grants/permissions whose "may" is not a real
   either/or.
+
+---
+
+## F. Remaining backlog (re-verified 2026-11-19)
+
+Everything from A/B still outstanding after the D / D2 work, re-checked against
+the current tree (line numbers differ from the tables above).
+
+### F1. Still auto-resolved — these need a prompt
+
+| Card | Printed wording | Where the engine decides for you |
+|---|---|---|
+| ch-045 HUNK (Merc.) | "you can lower that Damage by 20. In that case, Gain 1 'Ammo x10'" | reduction summed at 7 damage sites (`actions.ts:2997, 3011, 3340, 3753, 3767, 4510`, `mercenaries.ts:119`); the Ammo comes from a post-action hook (`actions.ts:1219`) |
+| ch-049 Albert Wesker (Merc.) | "you may lower that damage by 10 for every card in your hand" | explore only: `amount * handAfter.length` (`actions.ts:3341`, `4511`) |
+| b4mc-ch-007 Chris L1 | "you can lower that Damage's number by 10. In that case, Gain 1 'Ammo x10'" | `chrisL1DamageReduction` (`abilities.ts:1195`) folded into the damage total (`actions.ts:3344`, `4535`); Ammo + once-per-round latch (`3716`, `5203`) |
+| ma-054o Kevlar Jacket | "you may move this card to the bottom of the mansion. If you do, that character receives no damage during this turn" | `applyDamageWithKevlar` (`outbreak.ts`) always fires |
+| in-004 Slough Armor | "you may discard this card from your hand. If you do, reduce the damage of one weapon being used by 20" | `actions.ts:6270-6292` auto-discards it from the hand |
+| ch-023 David King L2 | "they can take one [Knife] from their discard pile and let David use it as well" | the FIRST knife in the discard is silently added to the explore weapon list (`explore.ts:224`, `actions.ts:2656`) |
+
+Why these are hard: five of the six are decided inside an ATOMIC damage
+reducer, so the damage has to be HELD across a prompt (the AC-018 `pendingExplore`
+deferral pattern) and the reducer re-run. ch-023 is decided while the explore's
+weapon list is still being built.
+
+### F2. Still not implemented at all
+
+| Card | Printed wording | State |
+|---|---|---|
+| ch-015 Hunk L1 (Alliance) | "Whenever Hunk would take damage, you may redirect it to his partner instead" | the redirect is NEVER applied. `damageRedirectToPartner` has exactly one reader (`actions.ts:4972`) and it only gates Ada's lethal-damage override (`4977`). The comment at `actions.ts:4969` says "Automatic redirect when a partner is present" — aspirational, no code does it. |
+| ac-012 Struggle for Survival | "May discard from hand to set the damage of 1 Weapon (cost 40 or less) being used to 0" | explicit v1 reactive no-op (`actions.ts:1549`, `cards.ts:94`) |
+| cw-013 Pump-Action Shotgun | "you can take 20 Damage if you do this Weapon gains the type 'Melee' and +10 Damage" | only `grantExplores` is read; `optionalSelfDamageForDamageAndType` (`custom.ts:939`) is never referenced by the engine |
+
+### F3. Half-implemented
+
+| Card | Printed wording | State |
+|---|---|---|
+| ac-040 Vengeful Intention | "Each time you play another action this turn, your character takes 10 damage" | `damagePerAdditionalActionThisTurn` is WRITTEN (`actions.ts:1780`) and initialised (`game.ts:689/1221/1446`) but has no reader. The other half ("you may play as many actions as you like") works. |
+
+### F4. Deliberately automatic — leave alone
+
+- **ce-008 Low on Ammo** — implemented: pistols cost 0 ammo (`actions.ts:2641`)
+  and are trashed at end of turn (`actions.ts:3672`). "if they do Trash them"
+  is the cost of the free use, not a choice.
+- **ac-040's unlimited actions / sk-004's +10 heal** — "may" as a grant. (sk-004's
+  heal is now a real prompt anyway; see D2.)
