@@ -134,13 +134,16 @@ zone when the choice is offered".
 > `b4mc-ch-008` L2 → `chrisL2TopChoose`; `ma-070` → `ma070Choose`; `sk-004` →
 > `medicHealBonusChoose`. Details in the implementation notes at the bottom.
 >
-> **ac-018 is NOT a 5-line fix.** The "+20 health to a revealed infected" has to
-> change the combat OUTCOME, so it needs the explore DEFERRED (the AC-042 /
-> Flash-Grenade mechanism): `shouldDefer` must include it, `pendingExplore` must
-> capture the `resolveExplore` params, and the handler must re-resolve with
-> `hp + 20` before resuming. The explore currently completes before the prompt is
-> answered, so the +20 has no meaningful target. That is a ~100-line change in the
-> most delicate reducer, not a quick one.
+> **ac-018 is DONE too** — it was NOT a 5-line fix, exactly as suspected: the
+> "+20 health to a revealed infected" has to change the combat OUTCOME, so the
+> explore is now DEFERRED for it (the AC-042 / Flash-Grenade mechanism).
+> `shouldDefer` includes `ac018Eligible`, `pendingExplore` carries the
+> `resolveExplore` params (`ExploreParams`, now an exported type) plus
+> `autoDefeat`, and the handler re-resolves with `hp + 20` and recomputes the
+> flipped outcome's Damage/Decoration delta. The shared outcome application was
+> extracted to `applyPendingExploreOutcome` so AC-042 and AC-018 stop duplicating
+> it. It also gained the missing `Decline` option (the card says "you may"), and
+> AC-042's handler no longer trash-labels `Decline` into `removed`.
 
 1. **b4mc-ch-008 Chris L2** — "you can put it on top of the Mansion (even if it's
    the BOSS)". The exact analog of ah-001. `chrisL2Top` is already computed at
@@ -181,6 +184,17 @@ being built; ce-008 decides at weapon-use time inside `exploreWeapons`.
   is chained after it (and after SK-005's trash offer). Only offered when the
   +N would actually change a Health total. The handler only moves Health, so the
   heal's own side effects do not double-fire.
+- **`uroborosInjection` (AC-018)** — the explore is deferred while the reactive
+  window is open; trashing re-resolves with `revealed.hp + 20` and applies the
+  new outcome. Declining resolves with the base outcome. An unconditional
+  auto-defeat (Rocket Launcher / Crossbow) always wins. The resumption shared with
+  AC-042 now lives in `applyPendingExploreOutcome`.
+- **Explore entry guard** — a deferred explore whose reactive prompts were never
+  answered used to be silently overwritten by the next explore, orphaning the
+  revealed Infected (the soak's conservation check caught it). The `explore` case
+  now resolves any outstanding `pendingExplore` with its base outcome before
+  revealing again. This is a pre-existing defect in the shared AC-042 / Las Plagas
+  mechanism that AC-018 simply made easy to hit.
 
 ---
 

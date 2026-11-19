@@ -1282,6 +1282,13 @@ export interface GameState {
     /** The weapons the exploring player used, so a deferred resolution can
      *  still apply "on defeat with weapon tag" abilities. */
     readonly weaponIds?: readonly string[];
+    /** The exact arguments the explore was resolved with. A deferred explore
+     *  must be able to RE-RESOLVE — AC-018 Uroboros Injection changes the
+     *  revealed Infected's Health by +20, which can flip the outcome. */
+    readonly exploreParams?: import('./engine/explore').ExploreParams;
+    /** True when the explore was an unconditional auto-defeat (Rocket
+     *  Launcher / Crossbow). A re-resolve must not flip that. */
+    readonly autoDefeat?: boolean;
   };
   readonly log: readonly LoggedAction[];
 
@@ -1421,6 +1428,16 @@ export interface GameSetup {
   /** Fan Locations: deal the location cards into the face-down location deck
    *  on top of the Mansion. Opt-in — the user introduces the rule separately. */
   readonly locationsMode?: boolean;
+  /** Fall of the House of Usher: 3 RANDOM fan Locations start face-up in play
+   *  at setup — no location deck, no On Reveal effects. GLOBAL effects are
+   *  live for everyone; invest effects still need cubes, 1X uses still cost
+   *  gold + a Buy. Opt-in game mode. */
+  readonly usherMode?: boolean;
+  /** The House with a Clock in Its Walls: ceil(Mansion size / 15) random
+   *  Locations hide in the Mansion deck (never adjacent at setup). An Explore
+   *  that draws one puts it into play immediately (standard On Reveal) and
+   *  reveals the next card instead — Locations never consume Explore slots. */
+  readonly clockMode?: boolean;
 }
 
 /**

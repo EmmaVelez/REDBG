@@ -311,6 +311,24 @@ describe('Mercenaries actions', () => {
     expect(resolved.removed.some(id => resolved.cards[id]?.cardId === 'ac-042')).toBe(true);
   });
 
+  it('AC-042: declining trashes nothing (Decline is a label, not a card)', () => {
+    const s = mercGame('ch-044');
+    const withCard0 = addCard(s, 1, 'ac-042');
+    const withInfected = mansionTop(withCard0, 'ma-078');
+    const weapon = findHand(withInfected, 'we-050');
+    const tuned = tune(withInfected, { hp: 50 });
+    const next = explore(tuned, 0, weapon);
+    const promptId = findPrompt(next, 'fightOrFlight');
+    const declineIndex = next.prompts.find(p => p.id === promptId)?.options.indexOf('Decline') ?? -1;
+    const resolved = choose(next, 1, promptId, declineIndex);
+    expect(resolved.removed).not.toContain('Decline');
+    expect(resolved.seats[1]?.hand.some(id => resolved.cards[id]?.cardId === 'ac-042')).toBe(true);
+  });
+
+  it('AC-018 Uroboros Injection: covered in uroborosInjection.test.ts (alliance card)', () => {
+    // ac-018 lives in the Alliance set, so it needs a fixture that registers it.
+  });
+
   it('AC-043 The Mercenaries: discard a weapon from another player\'s hand for +X damage', () => {
     const s = mercGame('ch-044');
     const withAction = addCard(s, 0, 'ac-043');
