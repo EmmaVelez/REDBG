@@ -71,10 +71,14 @@ describe('Locations batch 2 — data', () => {
     }
   });
 
-  it('ships card art for Lesson Space (loc-008)', () => {
+  it('ships card art for all of batch 1 (loc-001..008)', () => {
     // Batch-1 art drop (2026-11-19): normalized to the LOC convention,
-    // 320x436 palette PNG like LOC-009..023.
-    expect(existsSync('src/data/CARD-ART/LOC-008.png')).toBe(true);
+    // 320x436 palette PNGs like LOC-009..023. Titles verified with the
+    // local Ollama vision model (gemma4:e2b) against the printed cards.
+    for (let i = 1; i <= 8; i++) {
+      const p = `src/data/CARD-ART/LOC-00${i}.png`;
+      expect(existsSync(p), p).toBe(true);
+    }
   });
 
   it('keeps every location id unique', () => {

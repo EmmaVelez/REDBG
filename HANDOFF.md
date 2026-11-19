@@ -1,5 +1,16 @@
 # HANDOFF — resume here
 
+**LOC BATCH-1 ART COMPLETE (2026-11-19):** Manny sent the 7 missing batch-1
+renders (Library, Arklay Laboratory, Keeper's Room, Kitchen, Large Art Room,
+Large Gallery, Large Library). Titles + printed costs verified with the LOCAL
+Ollama vision model gemma4:e2b (Manny: use the local LLM for vision tasks —
+/api/generate with images:[base64], ~4s/card; it is multimodal and fast).
+All matched the defs (Arklay 1X/30, Keeper's+Kitchen 10, the three Large 20,
+Library GLOBAL). Normalized to the LOC convention (320x436 palette PNG) ->
+LOC-001..007.png. ALL 23 LOC cards now ship art. Art test widened to
+loc-001..008. Gates: typecheck x3 clean, location+mode suites 74/74, client
+273/273, build OK. Live-verified: Large Library tile serves LOC-007.png.
+
 **LESSON SPACE ART + LOCATION HOVER CARDS (2026-11-19):** Manny sent the
 LOC-008 Lesson Space render (822x1122 JPEG). Normalized to the LOC batch
 convention — 320x436 palette PNG, FULL card render WITH printed text, exactly
@@ -14,7 +25,7 @@ Tests: art-exists (customLocations2) + hover-wrapper (LocationsRow.test).
 Gates: typecheck x3 clean, client 273/273, location suites 32/32, build OK.
 Live-verified ONLINE: Usher room dealt Lesson Space, thumbnail data-has-art,
 hover popup = full loc-008 card served from /assets/LOC-008-*.png.
-NOTE: batch-1 LOC-001..007 still have no art files (only 008 was supplied).
+NOTE: batch-1 LOC-001..007 art landed later the same day (see the entry above) — all 23 LOC cards now have art.
 Browser-harness note: rapid reload loops can leave the client stuck in
 "Connecting…" on a stale localStorage reconnect token — localStorage.clear()
 + reload recovers; the server ws layer was healthy throughout (node probe).
