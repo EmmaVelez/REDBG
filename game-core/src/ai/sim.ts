@@ -134,8 +134,12 @@ export function playBotGameFrom(
     // 2e. Increment actions
     actions += 1;
 
-    // 2f. Advance turn if action was endTurn
-    if (action.type === 'endTurn') {
+    // 2f. Advance turn if action was endTurn AND the turn actually ended.
+    // A "you can ... at the end of your turn" card (AM-007 Ammo x30, CAC-013,
+    // Jill's keep) returns from the endTurn case with a prompt still open and
+    // the turn NOT advanced — the prompt's resolver finishes the turn. Calling
+    // startTurn here would re-start the SAME seat and drop its Play Area.
+    if (action.type === 'endTurn' && current.prompts.length === 0) {
       current = startTurn(current);
     }
   }
