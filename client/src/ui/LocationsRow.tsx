@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import type { GameState, Action } from '@re/game-core';
+import { cardXp } from '@re/game-core';
 import { CardView } from './CardView';
 import { HoverCard } from './HoverCard';
 import { defForInstance } from './cards';
@@ -116,6 +117,17 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     onClick={() => onAction({ type: 'storeroomRearrangeStart', seat: mySeat })}
                   >
                     Rearrange (1 cube)
+                  </button>
+                )}
+                {kind === 'invest' && (def.locationInvestEffects ?? []).some(e => e.kind === 'ongoingGreenhouseForfeit') && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    disabled={!canAct || (me?.buysLeft ?? 0) < 1 || cardXp(state, loc.instanceId) < 1}
+                    title="Greenhouse: forfeit a Buy and discard 1 XP from this card for +20 damage on your first explore this turn"
+                    onClick={() => onAction({ type: 'forfeitBuy', seat: mySeat })}
+                  >
+                    Forfeit Buy (+20 dmg)
                   </button>
                 )}
                 {kind === 'onex' && (

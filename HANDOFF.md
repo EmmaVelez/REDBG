@@ -1,5 +1,55 @@
 # HANDOFF — resume here
 
+**LOC BATCH 10 — SIX NEW ROOMS (2026-11-19):** Manny sent 6 renders:
+loc-040 Firearms Room (GLOBAL), loc-041 Garden (invest 0), loc-042 Greenhouse
+(invest 10), loc-043 Helipad Lookout (invest 30), loc-044 Hidden Library
+(GLOBAL), loc-045 Exhibition Room (GLOBAL). Art LOC-040..045.png (320x436,
+titles verified with local gemma4:e2b). Tests in `customLocations10.test.ts`
+(15). Introduces XP-STORED-ON-CARD pools, Setup-on-reveal effects, and a
+forfeitBuy action.
+RULINGS (Manny): Setup XP fires when the room is revealed / enters play;
+Greenhouse/Helipad are invest rooms whose abilities spend the CARD's XP pool
+(available to investors); Exhibition takes ALL card XP on >20 explore damage;
+Garden is a 0-cost invest room spending PERSONAL XP.
+- New state: GameState.locationXp (Record<instanceId, number> — XP on cards),
+  GameState.greenhouseDamageBonus {seat, amount}; CardDef.locationSetupEffects
+  (LocationSetupEffect: setupAddXpPerPlayer{perPlayer}, setupXpOnActionWeaponPiles).
+  Helpers: cardXp/addCardXp/removeCardXp, locationInstanceId, applySetupEffects.
+- applySetupEffects runs in revealLocation AND in setup() for Usher face-up
+  rooms (baseState made `let`). setupAddXpPerPlayer adds perPlayer x seatCount;
+  setupXpOnActionWeaponPiles adds an xpToken to every action/weapon pile.
+- Firearms Room (GLOBAL): scorePenaltyPerNon10Ammo — -1 per ammunition card
+  except am-001 (type is 'ammunition', NOT 'ammo').
+- Garden (invest 0): applyGardenHook post-buy (turnGold >= 30 + xp >= 1) offers
+  gardenOffer -> gardenTarget (give Infection to a chosen seat via gainInfections,
+  or remove top infection from self).
+- Greenhouse (invest 10): new `forfeitBuy` action (validate + enumerate +
+  turnHistory + LocationsRow "Forfeit Buy (+20 dmg)" button) spends 1 Buy; if
+  invested + card XP >= 1, removes 1 card XP and arms greenhouseDamageBonus.
+  The +amount is added to ALL FOUR explore bonusDamage sums (search
+  `mazeDamagePenalty(state, player.playArea...`) and consumed by the seat's
+  first explore (cleared in the wrapper) or at the turn boundary.
+- Helipad Lookout (invest 30): applyHelipadHook diffs attached for a defeated
+  Infected by an investor with card XP -> helipadOffer (+30 Gold / Skill +
+  Infection / Decline); spends 1 card XP, random catalogue skill + gainInfections.
+- Hidden Library (GLOBAL): scoreHiddenLibrary — +5 if 4 knife-tag weapons OR 4
+  pistol-tag weapons OR 10 am-001 cards (weaponTags). On Reveal
+  revealEachOtherPlayerMayDiscardAndDraw{5}: every OTHER player may discard hand
+  and draw 5 (hiddenLibraryDraw handler). NOTE: revealOnly auto-answers prompts,
+  so the test reveals manually to inspect the choice prompt.
+- Exhibition Room (GLOBAL): Setup tokens action/weapon piles. The BUY GATE
+  (before the Bar gate) moves a tokened pile's XP to the card on an action/weapon
+  buy (no personal XP cost); validate buy exempts the XP requirement when
+  exhibitionInPlay. applyExhibitionDamageTake: explore hp loss > 20 takes ALL
+  card XP as personal XP (card empties). Explore damage = infected ATTACK (not
+  hp) — use ma-006 Licker (attack 30) to exceed 20 in tests.
+- POOL 39 -> 45: re-scanned Usher seeds (probe usher-seeds10.ts, deleted):
+  seed 368 Library+Lesson Space, seed 49 Library scoring, seed 57 Kitchen,
+  seed 25 Large Library, seed 100 Tiger (first), seed 20 Attic (first). LOC_IDS
+  extended to loc-045. scoreEffectValue gained a `default: return 0`.
+- Gates: typecheck x3 clean, client 282/282, server 115/115, build OK (6 hashed
+  LOC assets), location suites 147/147, full game-core soak loc10-final-full.log.
+
 **LOC BATCH 9 — FIVE NEW ROOMS (2026-11-19):** Manny sent 6 renders; Terrace
 was already loc-014 (skipped). Implemented loc-035 Tea Room (30/30/30),
 loc-036 Study (100), loc-037 Stuffed Deer Room (60), loc-038 Suspended Ceiling

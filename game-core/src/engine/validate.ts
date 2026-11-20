@@ -2,7 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested, statueCorridorInvested, storeroomRearrangeInvested } from './locations';
+import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested, statueCorridorInvested, storeroomRearrangeInvested, exhibitionInPlay } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -466,7 +466,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'buy: no buys left' };
       }
       // Fan Location (Bar): a token on the pile costs 1 XP (2 to remove it).
-      if (pileHasXpToken(state, action.pileId) && (player.xp ?? 0) < 1) {
+      // Exhibition Room (loc-045) moves the pile's XP to itself instead, so the
+      // buyer owes no personal XP.
+      if (pileHasXpToken(state, action.pileId) && (player.xp ?? 0) < 1 && !exhibitionInPlay(state)) {
         return { ok: false, reason: 'buy: that pile carries an XP token and you have no XP' };
       }
       const pile = state.marketPiles[action.pileId];
@@ -843,6 +845,14 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'forfeitBuy': {
+      if (state.phase !== 'main') return { ok: false, reason: 'forfeitBuy: not in main phase' };
+      if (player === undefined) return { ok: false, reason: `forfeitBuy: unknown seat: ${action.seat}` };
+      if (player.dead || player.downed) return { ok: false, reason: 'forfeitBuy: player is downed' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'forfeitBuy: not your turn' };
+      if (player.buysLeft < 1) return { ok: false, reason: 'forfeitBuy: no buys left' };
+      return { ok: true };
+    }
     case 'storeroomRearrangeStart': {
       if (state.phase !== 'main') return { ok: false, reason: 'storeroomRearrangeStart: not in main phase' };
       if (player === undefined) return { ok: false, reason: `storeroomRearrangeStart: unknown seat: ${action.seat}` };

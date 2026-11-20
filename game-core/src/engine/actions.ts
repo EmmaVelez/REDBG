@@ -99,7 +99,7 @@ import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus, checkWinBase } from './game';
-import { storeroomInvestors, suspendedCeilingInvested } from './locations';
+import { storeroomInvestors, suspendedCeilingInvested, gardenInvested, greenhouseInvested, helipadInvested, exhibitionInPlay, cardXp, addCardXp, removeCardXp, locationInstanceId, gainInfections } from './locations';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -945,6 +945,14 @@ export function applyAction(state: GameState, action: Action): GameState {
   // hooks produced (Leon's trash chains into the Shed offer, etc.).
   const windows = applyPassageShedHook(state, applyParlorBuyHook(state, applyPillarShuffleHook(state, leon, action), action));
   let final = applySuspendedCeilingHook(state, applyStairwayHook(state, windows));
+  final = applyGardenHook(state, final, action);
+  final = applyHelipadHook(state, final);
+  final = applyExhibitionDamageTake(state, final, action);
+  // Greenhouse (loc-042): the +damage bonus is consumed by the seat's first
+  // explore after the forfeit-buy.
+  if (action.type === 'explore' && final.greenhouseDamageBonus?.seat === action.seat) {
+    final = { ...final, greenhouseDamageBonus: undefined };
+  }
   // Storeroom (loc-030): when a turn advances past a living investor while the
   // base game is over, record their final extra turn as taken (checkWin holds
   // the game open until every investor is recorded).
@@ -1009,6 +1017,66 @@ function applyHealthLossCap(state: GameState): GameState {
     ...state,
     seats: state.seats.map(x => (x.seat === cap.seat ? { ...x, hp: floor, dead: false, downed: false } : x)),
   };
+}
+
+/** Garden (loc-041): after a buy leaving 30+ gold, an invested player with XP
+ *  may spend 1 XP to give an Infection to a chosen player or remove one from
+ *  themselves. */
+function applyGardenHook(prev: GameState, next: GameState, action: Action): GameState {
+  if (action.type !== 'buy') return next;
+  const seat = action.seat;
+  const p = next.seats[seat];
+  if (p === undefined || p.dead || p.downed) return next;
+  if (!gardenInvested(next, seat) || (p.turnGold ?? 0) < 30 || (p.xp ?? 0) < 1) return next;
+  if (next.prompts.some(x => x.seat === seat && x.payload?.kind === 'gardenOffer')) return next;
+  return { ...next, prompts: [...next.prompts, {
+    id: `garden-${seat}-v${next.version}`,
+    seat,
+    text: 'Garden: spend 1 XP to give an Infection to a player, or remove one from yourself?',
+    options: ['Spend 1 XP', 'Decline'],
+    payload: { kind: 'gardenOffer' },
+  }] };
+}
+
+/** Helipad Lookout (loc-043): when an invested player defeats an Infected and
+ *  the card has XP, they may discard 1 card XP for +30 gold or a skill+infection. */
+function applyHelipadHook(prev: GameState, next: GameState): GameState {
+  const hpId = locationInstanceId(next, 'loc-043');
+  if (hpId === undefined || cardXp(next, hpId) < 1) return next;
+  let out = next;
+  for (let d = 0; d < next.seats.length; d++) {
+    const beforeAtt = new Set(prev.seats[d]?.attached ?? []);
+    const defeated = (next.seats[d]?.attached ?? []).some(id => !beforeAtt.has(id) && next.cardDefs[next.cards[id]?.cardId ?? '']?.type === 'infected');
+    if (!defeated) continue;
+    const p = out.seats[d];
+    if (p === undefined || p.dead || p.downed || !helipadInvested(out, d)) continue;
+    if (out.prompts.some(x => x.seat === d && x.payload?.kind === 'helipadOffer')) continue;
+    out = { ...out, prompts: [...out.prompts, {
+      id: `helipad-${d}-v${out.version}`,
+      seat: d,
+      text: 'Helipad Lookout: discard 1 XP from this card for +30 Gold, or a Skill and an Infection?',
+      options: ['+30 Gold', 'Skill + Infection', 'Decline'],
+      payload: { kind: 'helipadOffer' },
+    }] };
+  }
+  return out;
+}
+
+/** Exhibition Room (loc-045): taking more than 20 damage from exploring takes
+ *  ALL the XP stored on the card as personal XP (the card empties). */
+function applyExhibitionDamageTake(prev: GameState, next: GameState, action: Action): GameState {
+  if (action.type !== 'explore') return next;
+  if (!exhibitionInPlay(next)) return next;
+  const exId = locationInstanceId(next, 'loc-045');
+  if (exId === undefined) return next;
+  const stored = cardXp(next, exId);
+  if (stored < 1) return next;
+  const seat = action.seat;
+  const before = prev.seats[seat]?.hp ?? 0;
+  const after = next.seats[seat]?.hp ?? 0;
+  if (before - after <= 20) return next;
+  const out = removeCardXp(next, exId, stored);
+  return { ...out, seats: out.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + stored } : x)) };
 }
 
 /**
@@ -3334,7 +3402,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const damage = computeDamage({
           weapons: exploreWeapons,
           ammo: ammoForEffects,
-          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
           knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
           ammoCardsInPlayArea,
           inventoryCount: player.inventory.length,
@@ -4221,7 +4289,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (revealedDef && false) {}
         // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
         const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
-        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
@@ -4310,7 +4378,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
-        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         let ricHp = player.hp;
         if (evDamage >= 80) {
           const ricBarrel = applyRicardoDamage(state, seat, player.hp, 30);
@@ -4752,7 +4820,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         infectedHpBonus: locationInfectedHpBonus(state),
         revealBonus: player.helenaRevealBonus ?? 0,
         ammo: ammoForEffects,
-        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length),
+        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
         ammoCardsInPlayArea,
         ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
         revealed: {
@@ -5615,6 +5683,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         });
         return out;
       };
+
+      // Exhibition Room (loc-045): buying an action/weapon from a tokened pile
+      // moves that XP onto the Exhibition card (no personal XP cost, no Bar
+      // choice). Runs before the Bar gate so the token is gone before it checks.
+      if (exhibitionInPlay(state) && pileHasXpToken(state, pileId) && (boughtDef?.type === 'action' || boughtDef?.type === 'weapon')) {
+        const exId = locationInstanceId(state, 'loc-045');
+        if (exId !== undefined) {
+          state = addCardXp(state, exId, 1);
+          state = { ...state, xpTokens: (state.xpTokens ?? []).filter(id => id !== pileId) };
+        }
+      }
 
       // Fan Location (Bar): a token on the pile makes the buyer expend XP —
       // 1 XP to buy with the token still on the next card, 2 XP to strip it.
@@ -6748,6 +6827,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'forfeitBuy': {
+      // Greenhouse (loc-042): forfeit a Buy; if invested and the card has XP,
+      // discard 1 card XP and arm +20 damage for the first explore this turn.
+      const { seat } = action;
+      let next: GameState = {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(s => (s.seat === seat ? { ...s, buysLeft: s.buysLeft - 1 } : s)),
+      };
+      const ghId = locationInstanceId(next, 'loc-042');
+      if (ghId !== undefined && greenhouseInvested(next, seat) && cardXp(next, ghId) >= 1) {
+        next = removeCardXp(next, ghId, 1);
+        next = { ...next, greenhouseDamageBonus: { seat, amount: 20 } };
+      }
+      return next;
+    }
     case 'storeroomRearrangeStart': {
       // Storeroom (loc-030): remove an investment cube to rearrange a weapon
       // pile (choose its new top card) before buying.
@@ -8469,6 +8564,76 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? { ...s, xp: (s.xp ?? 0) - cost, hand: s.hand.filter(id => id !== chosen), discard: s.discard.filter(id => id !== chosen) }
             : s)),
           removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'gardenOffer') {
+        // Garden (loc-041): spend 1 XP, then choose to give an Infection to a
+        // player or remove one from yourself.
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (chosen !== 'Spend 1 XP' || p === undefined || (p.xp ?? 0) < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        const paid: GameState = { ...state, ...nextBase, seats: state.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) - 1 } : x)), prompts: newPrompts };
+        const others = paid.seats.filter(x => x.seat !== seat && !x.dead).map(x => String(x.seat));
+        return { ...paid, prompts: [...paid.prompts, {
+          id: `garden-target-${seat}-v${state.version}`,
+          seat,
+          text: 'Garden: give an Infection to which player, or remove one from yourself?',
+          options: [...others, 'Remove from self'],
+          payload: { kind: 'gardenTarget' },
+        }] };
+      }
+
+      if (kind === 'gardenTarget') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen === 'Remove from self') {
+          return { ...state, ...nextBase, seats: state.seats.map(x => (x.seat === seat ? { ...x, infectionCards: (x.infectionCards ?? []).slice(0, -1) } : x)), prompts: newPrompts };
+        }
+        const target = Number(chosen);
+        if (Number.isNaN(target) || state.seats[target] === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return { ...gainInfections({ ...state, ...nextBase, prompts: newPrompts }, target, 1) };
+      }
+
+      if (kind === 'helipadOffer') {
+        // Helipad Lookout (loc-043): discard 1 card XP for +30 Gold or a random
+        // catalogue Skill plus an Infection.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const hpId = locationInstanceId(state, 'loc-043');
+        if (hpId === undefined || cardXp(state, hpId) < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        let out = removeCardXp({ ...state, ...nextBase, prompts: newPrompts }, hpId, 1);
+        if (chosen === '+30 Gold') {
+          return { ...out, seats: out.seats.map(x => (x.seat === seat ? { ...x, turnGold: (x.turnGold ?? 0) + 30 } : x)) };
+        }
+        // Skill + Infection
+        const skillDefs = MERCENARIES_CARDS.filter(c => c.type === 'skill');
+        if (skillDefs.length > 0) {
+          const roll = nextInt(makeRng(out.rngState), skillDefs.length);
+          const def = skillDefs[roll.value]!;
+          const id = `${def.id}#helipad-${out.version}-${seat}`;
+          out = {
+            ...out, rngState: roll.rng.s,
+            cardDefs: { ...out.cardDefs, [def.id]: def },
+            cards: { ...out.cards, [id]: { instanceId: id, cardId: def.id, location: { zone: 'skillArea', index: 0 } } },
+            seats: out.seats.map(x => (x.seat === seat ? { ...x, skills: [...(x.skills ?? []), id] } : x)),
+          };
+        }
+        return gainInfections(out, seat, 1);
+      }
+
+      if (kind === 'hiddenLibraryDraw') {
+        // Hidden Library (loc-044): discard your hand and draw `draw` cards.
+        const chosen = prompt.options[option];
+        if (chosen !== 'Discard & Draw') return { ...state, ...nextBase, prompts: newPrompts };
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const count = Number(prompt.payload?.draw ?? 5);
+        const d = drawWithReshuffle({ deck: p.inventory, discard: [...p.discard, ...p.hand], count, rngState: state.rngState });
+        return {
+          ...state, ...nextBase, rngState: d.rngState,
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, hand: d.hand, inventory: d.deck, discard: d.discard } : x)),
           prompts: newPrompts,
         };
       }

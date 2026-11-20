@@ -159,6 +159,7 @@ export interface CardDef {
   readonly locationRevealEffects?: readonly LocationEffect[];
   /** Machine-readable "When scoring" effect (feeds the end-game ranking). */
   readonly locationScoreEffects?: readonly LocationScoreEffect[];
+  readonly locationSetupEffects?: readonly LocationSetupEffect[];
   /** Ongoing investment effects, unlocked per cube (GLOBAL cards use these
    *  with no cubes). */
   readonly locationInvestEffects?: readonly LocationEffect[];
@@ -554,7 +555,19 @@ export type LocationEffect =
   /** On Reveal: the revealer cannot lose more than `cap` health this turn. */
   | { readonly kind: 'revealHealthLossCapThisTurn'; readonly cap: number }
   /** On Reveal: the revealer cannot play more action cards this turn. */
-  | { readonly kind: 'revealBlockActionPlaysThisTurn' };
+  | { readonly kind: 'revealBlockActionPlaysThisTurn' }
+  /** Garden: post-buy with 30+ gold left, spend 1 XP to give/remove an Infection. */
+  | { readonly kind: 'ongoingGardenOnBuy' }
+  /** Greenhouse: forfeit a buy + spend 1 card XP for +20 first-explore damage. */
+  | { readonly kind: 'ongoingGreenhouseForfeit' }
+  /** Helipad Lookout: on defeat spend 1 card XP for +30 gold or a skill+infection. */
+  | { readonly kind: 'ongoingHelipadOnDefeat' }
+  /** Exhibition Room: buying an action/weapon moves its pile XP to this card. */
+  | { readonly kind: 'ongoingExhibitionBuyMoveXp' }
+  /** Exhibition Room: taking >20 explore damage takes all this card's XP. */
+  | { readonly kind: 'ongoingExhibitionDamageTakeXp' }
+  /** On Reveal: every OTHER player may discard their hand and draw `draw`. */
+  | { readonly kind: 'revealEachOtherPlayerMayDiscardAndDraw'; readonly draw: number };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -564,6 +577,10 @@ export type LocationScoreEffect =
   | { readonly kind: 'scorePerDistinctInventoryName'; readonly perName: number }
   | { readonly kind: 'scorePerDuplicateActionName'; readonly perName: number }
   | { readonly kind: 'scorePerActionCard'; readonly perCard: number }
+  /** Firearms Room: -1 decoration per ammo card other than 10 ammo. */
+  | { readonly kind: 'scorePenaltyPerNon10Ammo'; readonly perCard: number }
+  /** Hidden Library: +decorations if 4 knives OR 4 pistols OR 10 ammo-x10 cards. */
+  | { readonly kind: 'scoreHiddenLibrary'; readonly decorations: number }
   | { readonly kind: 'scoreLowHpInfectedWorth'; readonly hpThreshold: number; readonly decorations: number }
   /** Lounge: per card the seat holds that came from a now-empty supply pile. */
   | { readonly kind: 'scorePerCardFromEmptyPile'; readonly perCard: number }
@@ -573,6 +590,14 @@ export type LocationScoreEffect =
   | { readonly kind: 'scorePenaltyPerInventoryOver'; readonly freeCards: number; readonly perCard: number }
   /** Mirror Corridor: −1 per Inventory card the seat holds exactly one copy of. */
   | { readonly kind: 'scorePenaltyPerSingletonInInventory'; readonly perCard: number };
+
+/** "Setup" effects: applied when the Location enters play (revealed, or dealt
+ *  face-up in Usher mode). They seed XP pools, not On Reveal triggers. */
+export type LocationSetupEffect =
+  /** Greenhouse / Helipad Lookout: add `perPlayer` XP per player to this card. */
+  | { readonly kind: 'setupAddXpPerPlayer'; readonly perPlayer: number }
+  /** Exhibition Room: put 1 XP token on every action and weapon supply pile. */
+  | { readonly kind: 'setupXpOnActionWeaponPiles' };
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -1215,6 +1240,11 @@ export interface GameState {
   /** Suspended Ceiling Room (loc-038): the revealer's per-turn health-loss cap
    *  (baseline HP at reveal; cumulative loss clamped to `cap`). */
   readonly healthLossCapThisTurn?: { readonly seat: number; readonly baseline: number; readonly cap: number };
+  /** Batch 10: XP stored ON location cards (Greenhouse/Helipad/Exhibition),
+   *  keyed by location instance id. Seeded by Setup effects on reveal. */
+  readonly locationXp?: Readonly<Record<string, number>>;
+  /** Greenhouse (loc-042): +damage armed for the seat's FIRST explore this turn. */
+  readonly greenhouseDamageBonus?: { readonly seat: number; readonly amount: number };
   /** Fan Location (Bedroom): the seat that may not reveal Mansion cards
    *  this turn (the card says "You", so it is seat-scoped). */
   readonly mansionRevealBlockedSeat?: number;
@@ -1429,6 +1459,7 @@ export type Action =
   | { readonly type: "investLocation"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "readingRoomPeek"; readonly seat: number }
   | { readonly type: "storeroomRearrangeStart"; readonly seat: number }
+  | { readonly type: "forfeitBuy"; readonly seat: number }
   /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
   | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
   /** Fan Location (Underground Passage): start the trash-and-upgrade chain. */

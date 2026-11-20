@@ -6,7 +6,7 @@ import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../e
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
-import { canInvest, readingRoomInvested, storeroomRearrangeInvested } from '../engine/locations';
+import { canInvest, readingRoomInvested, storeroomRearrangeInvested, greenhouseInvested, cardXp } from '../engine/locations';
 import { exploreAmmoReq } from '../engine/ammo';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
@@ -313,6 +313,9 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
     if (def.id === 'loc-030' && storeroomRearrangeInvested(state, seat)) {
       generatedActions.push({ type: 'storeroomRearrangeStart', seat });
+    }
+    if (def.id === 'loc-042' && greenhouseInvested(state, seat) && player.buysLeft >= 1 && cardXp(state, loc.instanceId) >= 1) {
+      generatedActions.push({ type: 'forfeitBuy', seat });
     }
     if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1) {
       const used = (player.locationUsesThisTurn ?? []).filter(x => x === loc.instanceId).length;

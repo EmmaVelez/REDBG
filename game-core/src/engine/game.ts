@@ -11,7 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
-import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus } from './locations';
+import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus, applySetupEffects } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
 
@@ -903,7 +903,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     return { instanceId: id, cubes: {} as Readonly<Record<number, number>>, revealedBy: -1 };
   });
 
-  const baseState: GameState = {
+  let baseState: GameState = {
     version: 1,
     seed: setup.seed,
     rngState: rng.s,
@@ -928,6 +928,12 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     mansionAttachmentMode: setup.mansionAttachmentMode ?? 1,
     attachmentTrashCounts: {},
   };
+
+  // Usher mode deals Locations face-up at setup, so their Setup effects (XP
+  // pools) fire here just as they would on a normal reveal.
+  for (const loc of usherLocations) {
+    baseState = applySetupEffects(baseState, loc.instanceId);
+  }
 
   // Turn 1 has to go through startTurn just like every later turn: it is what
   // applies the turn-start pools (CR-001's +1 Buy, Carlos's Gold, Ada's
@@ -1811,6 +1817,8 @@ function startTurnInternal(state: GameState): GameState {
       mansionRevealBlockedSeat: undefined,
       // Suspended Ceiling Room (loc-038): the health-loss cap lasts one turn.
       healthLossCapThisTurn: undefined,
+      // Greenhouse (loc-042): an unused first-explore bonus expires at the boundary.
+      greenhouseDamageBonus: undefined,
       ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
     };
 }

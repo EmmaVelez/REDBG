@@ -165,6 +165,10 @@ function scoreEffectValue(state: GameState, seat: number, effect: LocationScoreE
       return duplicateActionNames(state, seat) * effect.perName;
     case 'scorePerActionCard':
       return actionCardCount(state, seat) * effect.perCard;
+    case 'scorePenaltyPerNon10Ammo':
+      return -non10AmmoCount(state, seat) * effect.perCard;
+    case 'scoreHiddenLibrary':
+      return hiddenLibraryQualifies(state, seat) ? effect.decorations : 0;
     case 'scorePerCardFromEmptyPile':
       return cardsFromEmptyPiles(state, seat) * effect.perCard;
     case 'scorePerCopyOfSecondMostCommonWeapon':
@@ -189,6 +193,8 @@ function scoreEffectValue(state: GameState, seat: number, effect: LocationScoreE
       }
       return total;
     }
+    default:
+      return 0;
   }
 }
 
@@ -262,7 +268,29 @@ export function addCube(state: GameState, instanceId: string, seat: number): Gam
 export function revealLocation(state: GameState, instanceId: string, seat: number): GameState {
   const deck = (state.locationDeck ?? []).filter(id => id !== instanceId);
   const locations = [...(state.locations ?? []), { instanceId, cubes: {}, revealedBy: seat }];
-  return applyRevealEffects({ ...state, locationDeck: deck, locations }, instanceId, seat);
+  return applySetupEffects(applyRevealEffects({ ...state, locationDeck: deck, locations }, instanceId, seat), instanceId);
+}
+
+/** Apply a location's Setup effects when it enters play (seed XP pools). */
+export function applySetupEffects(state: GameState, instanceId: string): GameState {
+  const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
+  if (def === undefined) return state;
+  let s = state;
+  for (const effect of def.locationSetupEffects ?? []) {
+    switch (effect.kind) {
+      case 'setupAddXpPerPlayer':
+        s = addCardXp(s, instanceId, effect.perPlayer * s.seats.length);
+        break;
+      case 'setupXpOnActionWeaponPiles':
+        for (const pile of Object.values(s.marketPiles)) {
+          const top = pile.cards[0];
+          const t = top !== undefined ? s.cardDefs[s.cards[top]?.cardId ?? '']?.type : undefined;
+          if (t === 'action' || t === 'weapon') s = addXpTokenToPile(s, pile.pileId);
+        }
+        break;
+    }
+  }
+  return s;
 }
 
 /** Apply a location's On Reveal effects. Returns the new state (and any
@@ -447,6 +475,20 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, blockedActionPlaysThisTurn: true } : x)) };
         break;
       }
+      case 'revealEachOtherPlayerMayDiscardAndDraw': {
+        // Hidden Library: every OTHER living player may discard their hand and
+        // draw `draw` cards.
+        for (const other of s.seats.filter(x => x.seat !== seat && !x.dead && !x.downed)) {
+          prompts = [...prompts, {
+            id: `hiddenlib-${other.seat}-${s.version}`,
+            seat: other.seat,
+            text: `Hidden Library: discard your hand and draw ${effect.draw} cards?`,
+            options: ['Discard & Draw', 'Decline'],
+            payload: { kind: 'hiddenLibraryDraw', draw: String(effect.draw) },
+          }];
+        }
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'ongoingParlorSkillOnBuy':
@@ -465,6 +507,11 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'ongoingStuffedDeerTurnStart':
       case 'ongoingDrawOnOtherDefeat':
       case 'ongoingTurnStartPlusAction':
+      case 'ongoingGardenOnBuy':
+      case 'ongoingGreenhouseForfeit':
+      case 'ongoingHelipadOnDefeat':
+      case 'ongoingExhibitionBuyMoveXp':
+      case 'ongoingExhibitionDamageTakeXp':
       case 'onexGainAmmoAndDamagePerCardGained':
       case 'onexLookThroughDiscard':
       case 'onexGainBuyAndAmmo':
@@ -686,6 +733,71 @@ export function taxidermyActionBonus(state: GameState, seat: number): number {
     if (e.kind === 'ongoingTurnStartPlusAction') n += e.amount;
   }
   return n;
+}
+
+/** Batch 10: XP stored on a location card. */
+export function cardXp(state: GameState, instanceId: string): number {
+  return state.locationXp?.[instanceId] ?? 0;
+}
+export function addCardXp(state: GameState, instanceId: string, n: number): GameState {
+  return { ...state, locationXp: { ...(state.locationXp ?? {}), [instanceId]: (state.locationXp?.[instanceId] ?? 0) + n } };
+}
+export function removeCardXp(state: GameState, instanceId: string, n: number): GameState {
+  return { ...state, locationXp: { ...(state.locationXp ?? {}), [instanceId]: Math.max(0, (state.locationXp?.[instanceId] ?? 0) - n) } };
+}
+
+/** The location instance id of a revealed room by def id (first match). */
+export function locationInstanceId(state: GameState, cardId: string): string | undefined {
+  for (const loc of revealedLocations(state)) {
+    if (loc.def.id === cardId) return loc.instanceId;
+  }
+  return undefined;
+}
+
+/** Firearms Room (loc-040): ammo cards held other than 10 ammo (am-001). */
+export function non10AmmoCount(state: GameState, seat: number): number {
+  const p = state.seats[seat];
+  if (p === undefined) return 0;
+  let n = 0;
+  for (const id of [...p.hand, ...p.discard, ...p.playArea, ...p.inventory]) {
+    const def = state.cardDefs[state.cards[id]?.cardId ?? ''];
+    if (def?.type === 'ammunition' && def.id !== 'am-001') n++;
+  }
+  return n;
+}
+
+/** Hidden Library (loc-044): 4 knives OR 4 pistols OR 10 ammo-x10 cards. */
+export function hiddenLibraryQualifies(state: GameState, seat: number): boolean {
+  const p = state.seats[seat];
+  if (p === undefined) return false;
+  let knives = 0, pistols = 0, ammo10 = 0;
+  for (const id of [...p.hand, ...p.discard, ...p.playArea, ...p.inventory]) {
+    const def = state.cardDefs[state.cards[id]?.cardId ?? ''];
+    if (def === undefined) continue;
+    if (def.type === 'weapon') {
+      if ((def.weaponTags ?? []).includes('knife')) knives++;
+      if ((def.weaponTags ?? []).includes('pistol')) pistols++;
+    }
+    if (def.id === 'am-001') ammo10++;
+  }
+  return knives >= 4 || pistols >= 4 || ammo10 >= 10;
+}
+
+/** Garden (loc-041): post-buy infection choice. */
+export function gardenInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingGardenOnBuy');
+}
+/** Greenhouse (loc-042): forfeit-buy damage bonus. */
+export function greenhouseInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingGreenhouseForfeit');
+}
+/** Helipad Lookout (loc-043): on-defeat reward. */
+export function helipadInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingHelipadOnDefeat');
+}
+/** Exhibition Room (loc-045): GLOBAL XP bank (in play for everyone). */
+export function exhibitionInPlay(state: GameState): boolean {
+  return revealedLocations(state).some(l => l.def.id === 'loc-045');
 }
 
 /** Gain `amount` Infection from the Infection deck (Outbreak convention:
