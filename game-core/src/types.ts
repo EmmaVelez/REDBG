@@ -540,7 +540,21 @@ export type LocationEffect =
   /** On Reveal: the revealing player loses `amount` XP. */
   | { readonly kind: 'revealLoseXp'; readonly amount: number }
   /** On Reveal: every OTHER player loses `amount` XP. */
-  | { readonly kind: 'revealEachOtherPlayerLosesXp'; readonly amount: number };
+  | { readonly kind: 'revealEachOtherPlayerLosesXp'; readonly amount: number }
+  /** Tea Room: turn start once remove 1 cube to draw 2, or 2 cubes for a skill. */
+  | { readonly kind: 'ongoingTeaRoomTurnStart' }
+  /** Stuffed Deer Room: turn start reveal top Inventory; if action, play free. */
+  | { readonly kind: 'ongoingStuffedDeerTurnStart' }
+  /** Suspended Ceiling Room: when another player defeats an Infected, draw 1. */
+  | { readonly kind: 'ongoingDrawOnOtherDefeat' }
+  /** Taxidermy Room: turn start +`amount` Action. */
+  | { readonly kind: 'ongoingTurnStartPlusAction'; readonly amount: number }
+  /** On Reveal: every living player gains `amount` Gold. */
+  | { readonly kind: 'revealGainGold'; readonly amount: number }
+  /** On Reveal: the revealer cannot lose more than `cap` health this turn. */
+  | { readonly kind: 'revealHealthLossCapThisTurn'; readonly cap: number }
+  /** On Reveal: the revealer cannot play more action cards this turn. */
+  | { readonly kind: 'revealBlockActionPlaysThisTurn' };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -549,6 +563,7 @@ export type LocationScoreEffect =
   | { readonly kind: 'scorePerXp'; readonly perXp: number }
   | { readonly kind: 'scorePerDistinctInventoryName'; readonly perName: number }
   | { readonly kind: 'scorePerDuplicateActionName'; readonly perName: number }
+  | { readonly kind: 'scorePerActionCard'; readonly perCard: number }
   | { readonly kind: 'scoreLowHpInfectedWorth'; readonly hpThreshold: number; readonly decorations: number }
   /** Lounge: per card the seat holds that came from a now-empty supply pile. */
   | { readonly kind: 'scorePerCardFromEmptyPile'; readonly perCard: number }
@@ -1084,6 +1099,12 @@ export interface PlayerState {
   /** Fan Location (Terrace): the free play of the first action card gained
    *  from a market pile is still unused this turn. */
   readonly freeActionPlayAvailable?: boolean;
+  /** Taxidermy Room (loc-039): the revealer may not play action cards for the
+   *  rest of this turn (cleared at the next turn boundary). */
+  readonly blockedActionPlaysThisTurn?: boolean;
+  /** Stuffed Deer Room (loc-037): a revealed top-Inventory action card armed
+   *  for a free auto-play (no Action). Consumed by the applyAction wrapper. */
+  readonly pendingStuffedDeerPlayId?: string;
   /** Fan Location (Terrace): an action card just bought that should be
    *  played immediately and for free. Consumed by applyAction. */
   readonly pendingFreeActionInstanceId?: string;
@@ -1191,6 +1212,9 @@ export interface GameState {
   /** Storeroom (loc-030): investors who have taken their final extra turn
    *  after the base game ended (the game holds open until all are recorded). */
   readonly storeroomFinalTurnsTaken?: readonly number[];
+  /** Suspended Ceiling Room (loc-038): the revealer's per-turn health-loss cap
+   *  (baseline HP at reveal; cumulative loss clamped to `cap`). */
+  readonly healthLossCapThisTurn?: { readonly seat: number; readonly baseline: number; readonly cap: number };
   /** Fan Location (Bedroom): the seat that may not reveal Mansion cards
    *  this turn (the card says "You", so it is seat-scoped). */
   readonly mansionRevealBlockedSeat?: number;
@@ -1373,7 +1397,7 @@ export interface LoggedAction {
 
 export type Action = 
   | { readonly type: "startGame"; readonly setup: GameSetup } 
-  | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string; readonly isFreeRepeat?: boolean }
+  | { readonly type: "playActionCard"; readonly seat: number; readonly instanceId: string; readonly isFreeRepeat?: boolean; readonly isFreePlay?: boolean }
   | { readonly type: "playItem"; readonly seat: number; readonly instanceId: string; readonly healTarget?: "main" | "partner" }
   | { readonly type: "playAmmo"; readonly seat: number; readonly instanceId: string } 
   | { readonly type: "explore"; readonly seat: number; readonly weapons: readonly string[]; readonly exploreCount: number; readonly ammoByWeapon?: Readonly<Record<string, number>>; readonly discardedPistols?: readonly string[]; readonly leader?: "main" | "partner"; /** FCH-008 Sherry: the seat whose ability forced this explore (absent for a normal explore). */ readonly forcedBy?: number; /** ENGINE-FILLED, never client-sent: the instance ids this explore revealed, in reveal order. A CI-002 Crow chain or a MA-039 / MA-072 expansion reveals more cards than `exploreCount`, and the client cannot recover the extra ones from the deck diff — returned cards are shuffled back in, so they look like ordinary deck cards. Absent on logs written before this field existed (the client falls back to the top-`exploreCount` prefix). */ readonly revealedInstanceIds?: readonly string[] }

@@ -1,5 +1,51 @@
 # HANDOFF — resume here
 
+**LOC BATCH 9 — FIVE NEW ROOMS (2026-11-19):** Manny sent 6 renders; Terrace
+was already loc-014 (skipped). Implemented loc-035 Tea Room (30/30/30),
+loc-036 Study (100), loc-037 Stuffed Deer Room (60), loc-038 Suspended Ceiling
+Room (60), loc-039 Taxidermy Room (80). Art LOC-035..039.png (320x436, titles
+verified with local gemma4:e2b). Tests in `customLocations9.test.ts` (13).
+RULINGS (Manny): Stuffed Deer plays the revealed action for FREE (no Action);
+Tea Room's skill is a RANDOM Mercenaries catalogue skill (like Parlor).
+- Tea Room (invest [30,30,30]): turn-start teaRoomChoice prompt (options gated
+  on cube count: Draw 2 remove 1 / Gain skill remove 2 / Decline). Handler
+  removes cubes from loc-035 and draws 2 or registers a random catalogue skill.
+- Study (invest [100]): locationScoreEffects scorePerActionCard{perCard:1}
+  (actionCardCount across hand/discard/playArea/inventory, investor-only via
+  the locationScore invest gate). On Reveal revealGainGold{20} — every living
+  player +20 Gold (subject-less "Gain", mirrors revealGainHealth).
+- Stuffed Deer Room (invest [60]): startTurn reads the POST-DRAW Inventory top;
+  if action, moves it to hand + arms PlayerState.pendingStuffedDeerPlayId. The
+  applyAction wrapper CAPTURES the pending ids early (the hook chain rebuilds
+  seats and drops the field) and PLAYS them last via applyActionInternal
+  playActionCard{isFreePlay:true} (after every hook, so end-turn seat
+  reconstruction cannot revert it). New playActionCard.isFreePlay flag skips
+  the Action cost in reducer + validate. On Reveal revealLoseHealth{10} (every
+  player). NOTE: applyAction(endTurn) does NOT call startTurn (the host loop
+  does) — tests must call startTurn directly then trigger the wrapper.
+- Suspended Ceiling Room (invest [60]): applySuspendedCeilingHook diffs each
+  seat's attached for newly defeated Infected (type 'infected'); every OTHER
+  living investor draws 1 per defeat. On Reveal revealHealthLossCapThisTurn{10}
+  sets GameState.healthLossCapThisTurn{seat,baseline,cap}; applyHealthLossCap
+  clamps the revealer's HP to baseline-cap post-hoc in the wrapper (damage has
+  no choke point), reviving damage-death when the cap fully protects. Cleared
+  at the turn boundary.
+- Taxidermy Room (invest [80]): startTurn +1 Action (taxidermyActionBonus added
+  to actionsLeft). On Reveal revealBlockActionPlaysThisTurn sets
+  PlayerState.blockedActionPlaysThisTurn on the revealer; validate playActionCard
+  rejects (isFreePlay exempt). Cleared at the turn boundary.
+- New kinds: ongoingTeaRoomTurnStart, ongoingStuffedDeerTurnStart,
+  ongoingDrawOnOtherDefeat, ongoingTurnStartPlusAction, revealGainGold,
+  revealHealthLossCapThisTurn, revealBlockActionPlaysThisTurn, scorePerActionCard.
+  Helpers: actionCardCount, teaRoomInvested, teaRoomCubes, stuffedDeerInvested,
+  suspendedCeilingInvested, taxidermyActionBonus.
+- POOL 34 -> 39: re-scanned Usher seeds (probe usher-seeds9.ts, deleted):
+  seed 4 Library+Lesson Space (also Library scoring), seed 5 Kitchen, seed 2
+  Large Library, seed 20 Attic Landing (first), seed 18 Tiger (first). LOC_IDS
+  extended to loc-039.
+- Gates: typecheck x3 clean, client 282/282, server 115/115, build OK (5 hashed
+  LOC assets), location suites 132/132, full game-core soak loc9-final-full.log.
+
 **LOC BATCH 8 — SIX NEW ROOMS (2026-11-19):** Manny sent 6 renders:
 loc-029 Statue Corridor (70), loc-030 Storeroom (50), loc-031 Researcher's
 Private Room (40), loc-032 Shed (40), loc-033 Small Dining Room (30),

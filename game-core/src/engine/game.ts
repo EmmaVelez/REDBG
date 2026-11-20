@@ -11,7 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
-import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors } from './locations';
+import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
 
@@ -1746,6 +1746,36 @@ function startTurnInternal(state: GameState): GameState {
     }
   }
 
+  // Tea Room (loc-035): once per turn, remove 1 cube to draw 2, or 2 for a skill.
+  const teaCubes = teaRoomCubes(state, player.seat);
+  if (teaRoomInvested(state, player.seat) && teaCubes >= 1 && !turnPlayer.dead && !turnPlayer.downed) {
+    const teaOptions: string[] = [];
+    if (teaCubes >= 1) teaOptions.push('Draw 2 (remove 1)');
+    if (teaCubes >= 2) teaOptions.push('Gain skill (remove 2)');
+    teaOptions.push('Decline');
+    abilityPrompts.push({
+      id: `tea-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: 'Tea Room: remove an investment to draw 2 cards, or two to gain a skill?',
+      options: teaOptions,
+      payload: { kind: 'teaRoomChoice' },
+    });
+  }
+
+  // Stuffed Deer Room (loc-037): reveal the top Inventory card; if it is an
+  // action, arm a free auto-play (the applyAction wrapper plays it, no Action).
+  let stuffedPendingId: string | undefined;
+  let stuffedHand = turnPlayer.hand;
+  let stuffedInv = turnPlayer.inventory;
+  if (stuffedDeerInvested(state, player.seat) && !turnPlayer.dead && !turnPlayer.downed) {
+    const top = turnPlayer.inventory[0];
+    if (top !== undefined && state.cardDefs[state.cards[top]?.cardId ?? '']?.type === 'action') {
+      stuffedPendingId = top;
+      stuffedHand = [...turnPlayer.hand, top];
+      stuffedInv = turnPlayer.inventory.slice(1);
+    }
+  }
+
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
   return {
@@ -1757,7 +1787,20 @@ function startTurnInternal(state: GameState): GameState {
         const refresh = terraceInvested(state, s.seat)
           ? { freeActionPlayAvailable: true }
           : { freeActionPlayAvailable: undefined };
-        return i === state.activeSeat ? { ...turnPlayer, ...refresh } : { ...s, ...refresh };
+        if (i === state.activeSeat) {
+          return {
+            ...turnPlayer,
+            ...refresh,
+            hand: stuffedHand,
+            inventory: stuffedInv,
+            pendingStuffedDeerPlayId: stuffedPendingId,
+            // Taxidermy Room (loc-039): +Action at turn start.
+            actionsLeft: turnPlayer.actionsLeft + taxidermyActionBonus(state, player.seat),
+            // Taxidermy reveal block expires at the turn boundary.
+            blockedActionPlaysThisTurn: undefined,
+          };
+        }
+        return { ...s, ...refresh };
       }),
       prompts: turnStartPrompts.length > 0 ? [...state.prompts, ...turnStartPrompts] : state.prompts,
       // Fan Location (Mirror Corridor): the Health reduction lasts one turn.
@@ -1766,6 +1809,8 @@ function startTurnInternal(state: GameState): GameState {
       infectedHpBonusThisTurn: undefined,
       // Fan Location (Bedroom): the reveal block lasts one turn.
       mansionRevealBlockedSeat: undefined,
+      // Suspended Ceiling Room (loc-038): the health-loss cap lasts one turn.
+      healthLossCapThisTurn: undefined,
       ...(state.infectionDeck !== undefined ? { infectionDeck: turnInfectionDeck } : {}),
     };
 }

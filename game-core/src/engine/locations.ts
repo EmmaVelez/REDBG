@@ -163,6 +163,8 @@ function scoreEffectValue(state: GameState, seat: number, effect: LocationScoreE
       return distinctInventoryNames(state, seat) * effect.perName;
     case 'scorePerDuplicateActionName':
       return duplicateActionNames(state, seat) * effect.perName;
+    case 'scorePerActionCard':
+      return actionCardCount(state, seat) * effect.perCard;
     case 'scorePerCardFromEmptyPile':
       return cardsFromEmptyPiles(state, seat) * effect.perCard;
     case 'scorePerCopyOfSecondMostCommonWeapon':
@@ -427,6 +429,24 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         s = { ...s, seats: s.seats.map(x => (x.seat !== seat && !x.dead ? { ...x, xp: Math.max(0, (x.xp ?? 0) - effect.amount) } : x)) };
         break;
       }
+      case 'revealGainGold': {
+        // Study: every living player gains Gold (subject-less "Gain", like
+        // revealGainHealth).
+        s = { ...s, seats: s.seats.map(x => (!x.dead ? { ...x, turnGold: (x.turnGold ?? 0) + effect.amount } : x)) };
+        break;
+      }
+      case 'revealHealthLossCapThisTurn': {
+        // Suspended Ceiling Room: the revealer's cumulative health loss this
+        // turn is clamped to `cap` (baseline captured at reveal).
+        const hp = s.seats[seat]?.hp ?? 0;
+        s = { ...s, healthLossCapThisTurn: { seat, baseline: hp, cap: effect.cap } };
+        break;
+      }
+      case 'revealBlockActionPlaysThisTurn': {
+        // Taxidermy Room: the revealer may not play action cards this turn.
+        s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, blockedActionPlaysThisTurn: true } : x)) };
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'ongoingParlorSkillOnBuy':
@@ -441,6 +461,10 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'ongoingShedAmmoDraw':
       case 'ongoingTurnStartDiscardForXp':
       case 'ongoingStairwayOnActionGain':
+      case 'ongoingTeaRoomTurnStart':
+      case 'ongoingStuffedDeerTurnStart':
+      case 'ongoingDrawOnOtherDefeat':
+      case 'ongoingTurnStartPlusAction':
       case 'onexGainAmmoAndDamagePerCardGained':
       case 'onexLookThroughDiscard':
       case 'onexGainBuyAndAmmo':
@@ -618,6 +642,50 @@ export function diningXp(state: GameState, seat: number): number | undefined {
 /** Stairway (loc-034): on action gain, spend 1 XP to reveal + free-invest. */
 export function stairwayInvested(state: GameState, seat: number): boolean {
   return investEffectsFor(state, seat).some(e => e.kind === 'ongoingStairwayOnActionGain');
+}
+
+/** Study (loc-036): total action cards the seat holds across all zones. */
+export function actionCardCount(state: GameState, seat: number): number {
+  const p = state.seats[seat];
+  if (p === undefined) return 0;
+  let n = 0;
+  for (const id of [...p.hand, ...p.discard, ...p.playArea, ...p.inventory]) {
+    if (state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action') n++;
+  }
+  return n;
+}
+
+/** Tea Room (loc-035): turn-start remove cubes for cards or a skill. */
+export function teaRoomInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingTeaRoomTurnStart');
+}
+
+/** Tea Room (loc-035): the seat's cube count on the room. */
+export function teaRoomCubes(state: GameState, seat: number): number {
+  let n = 0;
+  for (const loc of revealedLocations(state)) {
+    if (loc.def.id === 'loc-035') n += loc.cubes[seat] ?? 0;
+  }
+  return n;
+}
+
+/** Stuffed Deer Room (loc-037): turn-start reveal top Inventory, play actions free. */
+export function stuffedDeerInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingStuffedDeerTurnStart');
+}
+
+/** Suspended Ceiling Room (loc-038): draw when another player defeats an Infected. */
+export function suspendedCeilingInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingDrawOnOtherDefeat');
+}
+
+/** Taxidermy Room (loc-039): turn-start +Action bonus. */
+export function taxidermyActionBonus(state: GameState, seat: number): number {
+  let n = 0;
+  for (const e of investEffectsFor(state, seat)) {
+    if (e.kind === 'ongoingTurnStartPlusAction') n += e.amount;
+  }
+  return n;
 }
 
 /** Gain `amount` Infection from the Infection deck (Outbreak convention:

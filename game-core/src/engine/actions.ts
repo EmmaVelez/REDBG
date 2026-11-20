@@ -99,7 +99,7 @@ import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus, checkWinBase } from './game';
-import { storeroomInvestors } from './locations';
+import { storeroomInvestors, suspendedCeilingInvested } from './locations';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -860,6 +860,16 @@ export function applyAction(state: GameState, action: Action): GameState {
     };
     internal = applyActionInternal(internal, { type: 'playActionCard', seat: pendingSeat, instanceId: pendingId });
   }
+  // Stuffed Deer Room (loc-037): capture the armed free-play ids NOW (the hook
+  // chain below rebuilds seats and drops the pending field); play them LAST.
+  const stuffedPending: { seat: number; id: string }[] = [];
+  for (let st = 0; st < internal.seats.length; st++) {
+    const sid = internal.seats[st]?.pendingStuffedDeerPlayId;
+    if (sid !== undefined) stuffedPending.push({ seat: st, id: sid });
+  }
+  if (stuffedPending.length > 0) {
+    internal = { ...internal, seats: internal.seats.map(x => ({ ...x, pendingStuffedDeerPlayId: undefined })) };
+  }
   // Fan Location (Trevor's Tomb): the first action card the investor plays
   // each turn is played again afterwards, for free. Armed here so EVERY
   // play path counts (the playActionCard case has several returns).
@@ -934,7 +944,7 @@ export function applyAction(state: GameState, action: Action): GameState {
   // Location windows last so they see every trash/gain/shuffle the earlier
   // hooks produced (Leon's trash chains into the Shed offer, etc.).
   const windows = applyPassageShedHook(state, applyParlorBuyHook(state, applyPillarShuffleHook(state, leon, action), action));
-  const final = applyStairwayHook(state, windows);
+  let final = applySuspendedCeilingHook(state, applyStairwayHook(state, windows));
   // Storeroom (loc-030): when a turn advances past a living investor while the
   // base game is over, record their final extra turn as taken (checkWin holds
   // the game open until every investor is recorded).
@@ -944,10 +954,61 @@ export function applyAction(state: GameState, action: Action): GameState {
     if (prevPlayer !== undefined && !prevPlayer.dead
       && storeroomInvestors(state).includes(prevSeat)
       && !(state.storeroomFinalTurnsTaken ?? []).includes(prevSeat)) {
-      return { ...final, storeroomFinalTurnsTaken: [...(state.storeroomFinalTurnsTaken ?? []), prevSeat] };
+      final = { ...final, storeroomFinalTurnsTaken: [...(state.storeroomFinalTurnsTaken ?? []), prevSeat] };
     }
   }
+  // Suspended Ceiling Room (loc-038): clamp the revealer's cumulative health
+  // loss this turn (post-hoc, since damage has no single choke point).
+  final = applyHealthLossCap(final);
+  // Stuffed Deer Room (loc-037): play the captured free-play ids LAST (after
+  // every hook) so the end-turn seat reconstruction cannot revert them.
+  for (const { seat: st, id } of stuffedPending) {
+    final = applyActionInternal(final, { type: 'playActionCard', seat: st, instanceId: id, isFreePlay: true });
+  }
   return final;
+}
+
+/**
+ * Suspended Ceiling Room (loc-038): "When another player defeats an infected,
+ * draw a card." Detect newly attached Infected on each seat (the defeater) and
+ * draw 1 for every OTHER living investor, per Infected defeated.
+ */
+function applySuspendedCeilingHook(prev: GameState, next: GameState): GameState {
+  let out = next;
+  for (let d = 0; d < next.seats.length; d++) {
+    const beforeAtt = new Set(prev.seats[d]?.attached ?? []);
+    const newInfected = (next.seats[d]?.attached ?? []).filter(id =>
+      !beforeAtt.has(id) && next.cardDefs[next.cards[id]?.cardId ?? '']?.type === 'infected');
+    if (newInfected.length === 0) continue;
+    for (let s = 0; s < out.seats.length; s++) {
+      if (s === d) continue;
+      const p = out.seats[s];
+      if (p === undefined || p.dead || p.downed || !suspendedCeilingInvested(out, s)) continue;
+      const dr = drawWithReshuffle({ deck: p.inventory, discard: p.discard, count: newInfected.length, rngState: out.rngState });
+      out = {
+        ...out,
+        rngState: dr.rngState,
+        seats: out.seats.map(x => (x.seat === s ? { ...x, hand: [...x.hand, ...dr.hand], inventory: dr.deck, discard: dr.discard } : x)),
+      };
+    }
+  }
+  return out;
+}
+
+/** Suspended Ceiling Room (loc-038): clamp cumulative health loss to the cap.
+ *  When the cap fully protects (baseline - cap > 0), undo damage-induced
+ *  death/downed so the revealer survives at the floor. */
+function applyHealthLossCap(state: GameState): GameState {
+  const cap = state.healthLossCapThisTurn;
+  if (cap === undefined) return state;
+  const p = state.seats[cap.seat];
+  if (p === undefined) return state;
+  const floor = cap.baseline - cap.cap;
+  if (floor <= 0 || p.hp >= floor) return state;
+  return {
+    ...state,
+    seats: state.seats.map(x => (x.seat === cap.seat ? { ...x, hp: floor, dead: false, downed: false } : x)),
+  };
 }
 
 /**
@@ -1527,13 +1588,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const freeRepeat = action.isFreeRepeat === true;
       // Statue Corridor (loc-029): gold-icon action cards cost no actions.
       const freeGoldAction = statueCorridorInvested(state, seat) && (def.bonuses?.gold ?? 0) > 0;
+      // Stuffed Deer Room (loc-037): the revealed action plays for free.
+      const freePlay = action.isFreePlay === true;
       const played = withBonusesAndDraws(
               {
                 ...player,
                 hand: player.hand.filter(id => id !== instanceId),
                 playArea: [...player.playArea, instanceId],
                 // A free repeat resolves the card again WITHOUT spending an Action.
-                actionsLeft: (freeRepeat || freeGoldAction) ? player.actionsLeft : player.actionsLeft - 1,
+                actionsLeft: (freeRepeat || freeGoldAction || freePlay) ? player.actionsLeft : player.actionsLeft - 1,
               },
               def,
               state.rngState,
@@ -8408,6 +8471,43 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           removed: [...state.removed, chosen],
           prompts: newPrompts,
         };
+      }
+
+      if (kind === 'teaRoomChoice') {
+        // Tea Room (loc-035): once per turn remove 1 cube to draw 2, or 2 cubes
+        // for a RANDOM Mercenaries catalogue skill (RULING Manny, like Parlor).
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined || chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const loc = (state.locations ?? []).find(l => state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.id === 'loc-035');
+        if (loc === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const cubes = loc.cubes[seat] ?? 0;
+        const removeCubes = (n: number) => (state.locations ?? []).map(l => (l.instanceId === loc.instanceId ? { ...l, cubes: { ...l.cubes, [seat]: (l.cubes[seat] ?? 0) - n } } : l));
+        if (chosen === 'Draw 2 (remove 1)') {
+          if (cubes < 1) return { ...state, ...nextBase, prompts: newPrompts };
+          const dr = drawWithReshuffle({ deck: p.inventory, discard: p.discard, count: 2, rngState: state.rngState });
+          return {
+            ...state, ...nextBase, rngState: dr.rngState, locations: removeCubes(1),
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, hand: [...x.hand, ...dr.hand], inventory: dr.deck, discard: dr.discard } : x)),
+            prompts: newPrompts,
+          };
+        }
+        if (chosen === 'Gain skill (remove 2)') {
+          if (cubes < 2) return { ...state, ...nextBase, prompts: newPrompts };
+          const skillDefs = MERCENARIES_CARDS.filter(c => c.type === 'skill');
+          if (skillDefs.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+          const roll = nextInt(makeRng(state.rngState), skillDefs.length);
+          const def = skillDefs[roll.value]!;
+          const id = `${def.id}#tea-${state.version}-${seat}`;
+          return {
+            ...state, ...nextBase, rngState: roll.rng.s, locations: removeCubes(2),
+            cardDefs: { ...state.cardDefs, [def.id]: def },
+            cards: { ...state.cards, [id]: { instanceId: id, cardId: def.id, location: { zone: 'skillArea', index: 0 } } },
+            seats: state.seats.map(x => (x.seat === seat ? { ...x, skills: [...(x.skills ?? []), id] } : x)),
+            prompts: newPrompts,
+          };
+        }
+        return { ...state, ...nextBase, prompts: newPrompts };
       }
 
       if (kind === 'parlorSkillOffer') {

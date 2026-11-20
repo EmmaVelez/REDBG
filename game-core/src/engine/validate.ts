@@ -107,7 +107,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       // (loc-029) likewise frees gold-icon action cards from the Action cost.
       const playDef = state.cardDefs[state.cards[action.instanceId]?.cardId ?? ''];
       const freeGoldAction = statueCorridorInvested(state, action.seat) && playDef?.type === 'action' && (playDef?.bonuses?.gold ?? 0) > 0;
-      if (action.isFreeRepeat !== true && !freeGoldAction && player.actionsLeft < 1) {
+      // Taxidermy Room (loc-039): the revealer may not play actions this turn.
+      if (player.blockedActionPlaysThisTurn === true && action.isFreePlay !== true) {
+        return { ok: false, reason: 'playActionCard: Taxidermy Room blocks action plays this turn' };
+      }
+      if (action.isFreeRepeat !== true && action.isFreePlay !== true && !freeGoldAction && player.actionsLeft < 1) {
         return { ok: false, reason: 'playActionCard: no actions left' };
       }
       if (!player.hand.includes(action.instanceId) && !player.playArea.includes(action.instanceId)) {
