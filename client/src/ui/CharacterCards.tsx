@@ -62,7 +62,13 @@ export function CharacterCards({ state, seat }: CharacterCardsProps): JSX.Elemen
   // Damage flash for both character and partner cards.  The hook fires when HP
   // drops below the previous render's value.  Poison-only detection (no HP
   // drop) is handled separately via the hasPoison flag above.
-  const { flash: charFlash, animHp: charAnimHp } = useDamageEffect(hp, maxHp, `${seat}-char`);
+  //
+  // Each card watches its OWN Health: `hp`/`maxHp` below are the PARTNER's
+  // (falling back to the Main's when the seat has no partner), so the Main card
+  // must not reuse them. Passing the partner's HP here made the Main gauge
+  // display — and animate — the partner's Health (verified: hp 80 / partnerHp 30
+  // rendered `30/100` on the Main card).
+  const { flash: charFlash, animHp: charAnimHp } = useDamageEffect(player.hp, player.maxHp, `${seat}-char`);
   const { flash: partnerFlash, animHp: partnerAnimHp } = useDamageEffect(hp, maxHp, `${seat}-partner`);
 
   // FACE-DOWN state. The flip is driven by a TRANSITION of the seat's

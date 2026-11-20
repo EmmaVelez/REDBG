@@ -645,6 +645,24 @@ describe('CharacterCards (action bar)', () => {
     expect(html).not.toContain('Attached ');
   });
 
+  it("tracks each character's OWN Health on its own gauge", () => {
+    // Regression: the Main card used to be driven by the PARTNER's HP
+    // (`partnerHp ?? hp`), so with hp 80 / partnerHp 30 the Main gauge rendered
+    // 30/100 — the partner's Health against the Main's max — and its damage
+    // animation followed the partner instead.
+    const base = withPartner();
+    const state = {
+      ...base,
+      seats: base.seats.map((s, i) => (i === 0
+        ? { ...s, hp: 80, maxHp: 100, partnerHp: 30, partnerMaxHp: 90 }
+        : s)),
+    };
+    const html = renderToStaticMarkup(<CharacterCards state={state} seat={0} />);
+    const gauges = [...html.matchAll(/data-hp="(\d+)"[^>]*data-max-hp="(\d+)"/g)]
+      .map(m => `${m[1]}/${m[2]}`);
+    expect(gauges).toEqual(['80/100', '30/90']);
+  });
+
   it("levels the Partner card from the Main character's Decorations", () => {
     // Alliance Partner Modification: "Your Partner's level is determined by the
     // total Decorations attached to your Main Character." Both cards therefore

@@ -3,7 +3,6 @@ import type { GameState, PlayerState } from '@re/game-core';
 import { CardView } from './CardView';
 import { CharacterCards } from './CharacterCards';
 import { CharacterSkills } from './CharacterSkills';
-import { HealthRing } from './HealthRing';
 import { defForInstance } from './cards';
 
 /**
