@@ -94,11 +94,12 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
-  beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked, applyRevealEffects, clockLocationIntoPlay, parlorGoldCost, shedXpCost, pillarInvested, readingRoomInvested } from './locations';
+  beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked, applyRevealEffects, clockLocationIntoPlay, parlorGoldCost, shedXpCost, pillarInvested, readingRoomInvested, statueCorridorInvested, stairwayInvested, storeroomRearrangeInvested } from './locations';
 import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
-import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
+import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus, checkWinBase } from './game';
+import { storeroomInvestors } from './locations';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -932,7 +933,49 @@ export function applyAction(state: GameState, action: Action): GameState {
   const leon = applyLeonTrashHook(state, hooked, action);
   // Location windows last so they see every trash/gain/shuffle the earlier
   // hooks produced (Leon's trash chains into the Shed offer, etc.).
-  return applyPassageShedHook(state, applyParlorBuyHook(state, applyPillarShuffleHook(state, leon, action), action));
+  const windows = applyPassageShedHook(state, applyParlorBuyHook(state, applyPillarShuffleHook(state, leon, action), action));
+  const final = applyStairwayHook(state, windows);
+  // Storeroom (loc-030): when a turn advances past a living investor while the
+  // base game is over, record their final extra turn as taken (checkWin holds
+  // the game open until every investor is recorded).
+  if (final.activeSeat !== state.activeSeat && checkWinBase(state).gameOver) {
+    const prevSeat = state.activeSeat;
+    const prevPlayer = state.seats[prevSeat];
+    if (prevPlayer !== undefined && !prevPlayer.dead
+      && storeroomInvestors(state).includes(prevSeat)
+      && !(state.storeroomFinalTurnsTaken ?? []).includes(prevSeat)) {
+      return { ...final, storeroomFinalTurnsTaken: [...(state.storeroomFinalTurnsTaken ?? []), prevSeat] };
+    }
+  }
+  return final;
+}
+
+/**
+ * Stairway (loc-034): "When you gain an action card, expend an xp to discover
+ * or invest in a room you are not currently in." Post-gain window: detect a
+ * newly gained ACTION card via gainedThisTurn, offer the 1-XP reveal+invest.
+ */
+function applyStairwayHook(prev: GameState, next: GameState): GameState {
+  const before = new Set(prev.seats.flatMap(s => s.gainedThisTurn ?? []));
+  let out = next;
+  for (let seat = 0; seat < next.seats.length; seat++) {
+    const p = next.seats[seat];
+    if (p === undefined || p.dead || p.downed) continue;
+    const gainedAction = (p.gainedThisTurn ?? []).some(id => !before.has(id) && next.cardDefs[next.cards[id]?.cardId ?? '']?.type === 'action');
+    if (!gainedAction) continue;
+    if (!stairwayInvested(out, seat) || (p.xp ?? 0) < 1) continue;
+    const hasRoom = (out.locationDeck ?? []).length > 0 || (out.locations ?? []).some(l => (l.cubes[seat] ?? 0) === 0);
+    if (!hasRoom) continue;
+    if (out.prompts.some(x => x.seat === seat && x.payload?.kind === 'stairwayOffer')) continue;
+    out = { ...out, prompts: [...out.prompts, {
+      id: `stairway-${seat}-v${out.version}`,
+      seat,
+      text: 'Stairway: spend 1 XP to discover/invest in a room you are not in?',
+      options: ['Spend 1 XP', 'Decline'],
+      payload: { kind: 'stairwayOffer' },
+    }] };
+  }
+  return out;
 }
 
 /**
@@ -1482,13 +1525,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const def = cardDef(state, instanceId) as CardDef;
 
       const freeRepeat = action.isFreeRepeat === true;
+      // Statue Corridor (loc-029): gold-icon action cards cost no actions.
+      const freeGoldAction = statueCorridorInvested(state, seat) && (def.bonuses?.gold ?? 0) > 0;
       const played = withBonusesAndDraws(
               {
                 ...player,
                 hand: player.hand.filter(id => id !== instanceId),
                 playArea: [...player.playArea, instanceId],
                 // A free repeat resolves the card again WITHOUT spending an Action.
-                actionsLeft: freeRepeat ? player.actionsLeft : player.actionsLeft - 1,
+                actionsLeft: (freeRepeat || freeGoldAction) ? player.actionsLeft : player.actionsLeft - 1,
               },
               def,
               state.rngState,
@@ -6640,6 +6685,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'storeroomRearrangeStart': {
+      // Storeroom (loc-030): remove an investment cube to rearrange a weapon
+      // pile (choose its new top card) before buying.
+      const { seat } = action;
+      const loc = (state.locations ?? []).find(l => state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.id === 'loc-030' && (l.cubes[seat] ?? 0) > 0);
+      if (loc === undefined) return { ...state, ...nextBase };
+      const weaponPiles = Object.values(state.marketPiles).filter(pile =>
+        pile.cards.length >= 2 && pile.cards.every(id => cardDef(state, id)?.type === 'weapon'));
+      if (weaponPiles.length === 0) return { ...state, ...nextBase };
+      return {
+        ...state,
+        ...nextBase,
+        locations: (state.locations ?? []).map(l => (l.instanceId === loc.instanceId ? { ...l, cubes: { ...l.cubes, [seat]: (l.cubes[seat] ?? 0) - 1 } } : l)),
+        prompts: [...state.prompts, {
+          id: `storeroom-pile-${seat}-v${state.version}`,
+          seat,
+          text: 'Storeroom: choose a weapon pile to rearrange.',
+          options: weaponPiles.map(p => p.pileId),
+          payload: { kind: 'storeroomChoosePile' },
+        }],
+      };
+    }
     case 'readingRoomPeek': {
       // Reading Room (loc-027): forfeit a buy to look at the top Mansion card
       // (private peek through the log's reveals channel, like Ada's look).
@@ -8419,6 +8486,165 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ...state,
           ...nextBase,
           seats: state.seats.map(s => (s.seat === seat ? { ...s, hand: remaining, inventory: [...nowPicked, ...s.inventory] } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'researchersBuyOrExplore') {
+        // Researcher's Private Room (loc-031): +1 Buy or +1 Explore.
+        const chosen = prompt.options[option];
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, buysLeft: s.buysLeft + (chosen === '+1 Buy' ? 1 : 0), exploresLeft: s.exploresLeft + (chosen === '+1 Explore' ? 1 : 0) }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'diningDiscardForXp') {
+        // Small Dining Room (loc-033): discard a card for XP.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const gain = Number(prompt.payload?.xp ?? 1);
+        const p = state.seats[seat];
+        if (p === undefined || !p.hand.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, hand: s.hand.filter(id => id !== chosen), discard: [...s.discard, chosen], xp: (s.xp ?? 0) + gain }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'shedAmmoChoose') {
+        // Shed (loc-032): stage Ammo x10 picks; on Done discard them and draw
+        // that many, then offer a one-time 1-XP repeat.
+        const chosen = prompt.options[option];
+        const picked = String(prompt.payload?.picked ?? '').split(',').filter(x => x.length > 0);
+        const repeated = String(prompt.payload?.repeated ?? '0') === '1';
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen !== 'Done' && chosen !== undefined && p.hand.includes(chosen) && !picked.includes(chosen) && state.cards[chosen]?.cardId === 'am-001') {
+          const nowPicked = [...picked, chosen];
+          const remaining = p.hand.filter(id => state.cards[id]?.cardId === 'am-001' && !nowPicked.includes(id));
+          return {
+            ...state,
+            ...nextBase,
+            prompts: [...newPrompts, {
+              id: `shed-${seat}-v${state.version}`,
+              seat,
+              text: 'Shed: pick more Ammo x10 to discard, or Done.',
+              options: [...remaining, 'Done'],
+              payload: { kind: 'shedAmmoChoose', picked: nowPicked.join(','), repeated: repeated ? '1' : '0' },
+            }],
+          };
+        }
+        // Done (or no valid pick): discard the staged ammo, draw that many.
+        if (picked.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+        const discarded = p.hand.filter(id => !picked.includes(id));
+        const d = drawWithReshuffle({ deck: p.inventory, discard: [...p.discard, ...picked], count: picked.length, rngState: state.rngState });
+        let out: GameState = {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, hand: [...discarded, ...d.hand], inventory: d.deck, discard: d.discard } : s)),
+          prompts: newPrompts,
+        };
+        // One-time repeat offer (spend 1 XP), only on the first pass.
+        if (!repeated && (out.seats[seat]?.xp ?? 0) >= 1) {
+          out = { ...out, prompts: [...out.prompts, {
+            id: `shed-repeat-${seat}-v${state.version}`,
+            seat,
+            text: 'Shed: spend 1 XP to repeat the ammo discard once?',
+            options: ['Repeat (1 XP)', 'Decline'],
+            payload: { kind: 'shedRepeatOffer' },
+          }] };
+        }
+        return out;
+      }
+
+      if (kind === 'shedRepeatOffer') {
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (chosen !== 'Repeat (1 XP)' || p === undefined || (p.xp ?? 0) < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        const ammoInHand = p.hand.filter(id => state.cards[id]?.cardId === 'am-001');
+        const paid: GameState = { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? { ...s, xp: (s.xp ?? 0) - 1 } : s)), prompts: newPrompts };
+        if (ammoInHand.length === 0) return paid;
+        return { ...paid, prompts: [...paid.prompts, {
+          id: `shed-${seat}-v${state.version}`,
+          seat,
+          text: 'Shed (repeat): discard Ammo x10 cards to draw that many.',
+          options: [...ammoInHand, 'Done'],
+          payload: { kind: 'shedAmmoChoose', picked: '', repeated: '1' },
+        }] };
+      }
+
+      if (kind === 'stairwayOffer') {
+        // Stairway (loc-034): spend 1 XP to reveal the top Location, then
+        // optionally free-invest in a revealed room not yet cubed.
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (chosen !== 'Spend 1 XP' || p === undefined || (p.xp ?? 0) < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        let out: GameState = { ...state, ...nextBase, seats: state.seats.map(s => (s.seat === seat ? { ...s, xp: (s.xp ?? 0) - 1 } : s)), prompts: newPrompts };
+        const top = (out.locationDeck ?? [])[0];
+        if (top !== undefined) out = revealLocation(out, top, seat);
+        const investable = (out.locations ?? []).filter(l => (l.cubes[seat] ?? 0) === 0).map(l => l.instanceId);
+        if (investable.length > 0) {
+          out = { ...out, prompts: [...out.prompts, {
+            id: `stairway-invest-${seat}-v${state.version}`,
+            seat,
+            text: 'Stairway: invest in a room you are not in (free, no Buy)?',
+            options: [...investable, 'Decline'],
+            payload: { kind: 'stairwayInvestChoice' },
+          }] };
+        }
+        return out;
+      }
+
+      if (kind === 'stairwayInvestChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const loc = (state.locations ?? []).find(l => l.instanceId === chosen);
+        if (loc === undefined || (loc.cubes[seat] ?? 0) > 0) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          locations: (state.locations ?? []).map(l => (l.instanceId === chosen ? { ...l, cubes: { ...l.cubes, [seat]: (l.cubes[seat] ?? 0) + 1 } } : l)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'storeroomChoosePile') {
+        // Storeroom (loc-030): pick a weapon pile to rearrange.
+        const chosen = prompt.options[option];
+        const pile = chosen === undefined ? undefined : state.marketPiles[chosen];
+        if (pile === undefined || pile.cards.length < 2) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `storeroom-top-${seat}-v${state.version}`,
+            seat,
+            text: 'Storeroom: pick the card to put on top of this weapon pile.',
+            options: [...pile.cards],
+            payload: { kind: 'storeroomChooseTop', pileId: String(chosen) },
+          }],
+        };
+      }
+
+      if (kind === 'storeroomChooseTop') {
+        const chosen = prompt.options[option];
+        const pileId = String(prompt.payload?.pileId ?? '');
+        const pile = state.marketPiles[pileId];
+        if (chosen === undefined || pile === undefined || !pile.cards.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          marketPiles: { ...state.marketPiles, [pileId]: { ...pile, cards: [chosen, ...pile.cards.filter(id => id !== chosen)] } },
           prompts: newPrompts,
         };
       }

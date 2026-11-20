@@ -11,7 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
-import { scoreTotal, revealedLocations, muralCubes } from './locations';
+import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
 
@@ -1709,6 +1709,43 @@ function startTurnInternal(state: GameState): GameState {
     });
   }
 
+  // Researcher's Private Room (loc-031): choose +1 Buy or +1 Explore.
+  if (researcherInvested(state, player.seat) && !turnPlayer.dead && !turnPlayer.downed) {
+    abilityPrompts.push({
+      id: `researcher-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: "Researcher's Private Room: +1 Buy or +1 Explore?",
+      options: ['+1 Buy', '+1 Explore'],
+      payload: { kind: 'researchersBuyOrExplore' },
+    });
+  }
+
+  // Small Dining Room (loc-033): may discard a card for XP.
+  const diningGain = diningXp(state, player.seat);
+  if (diningGain !== undefined && turnPlayer.hand.length > 0 && !turnPlayer.dead && !turnPlayer.downed) {
+    abilityPrompts.push({
+      id: `dining-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: `Small Dining Room: discard a card to gain ${diningGain} XP?`,
+      options: [...turnPlayer.hand, 'Decline'],
+      payload: { kind: 'diningDiscardForXp', xp: String(diningGain) },
+    });
+  }
+
+  // Shed (loc-032): discard any number of Ammo x10 from hand, draw that many.
+  if (shedInvested(state, player.seat) && !turnPlayer.dead && !turnPlayer.downed) {
+    const ammoInHand = turnPlayer.hand.filter(id => state.cards[id]?.cardId === 'am-001');
+    if (ammoInHand.length > 0) {
+      abilityPrompts.push({
+        id: `shed-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: 'Shed: discard Ammo x10 cards to draw that many (pick any number, then Done).',
+        options: [...ammoInHand, 'Done'],
+        payload: { kind: 'shedAmmoChoose', picked: '', repeated: '0' },
+      });
+    }
+  }
+
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
   return {
@@ -1753,6 +1790,21 @@ export function sherrySeat(state: GameState): number | undefined {
 }
 
 export function checkWin(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' | 'sherryLastAlive' } {
+  const base = checkWinBase(state);
+  if (!base.gameOver) return base;
+  // Storeroom (loc-030): each living investor gets one final extra turn after
+  // the base game ends. Hold the game open until every investor has taken it
+  // (recorded in the applyAction wrapper when their turn ends).
+  const taken = new Set(state.storeroomFinalTurnsTaken ?? []);
+  const owed = storeroomInvestors(state).filter(seat => {
+    const p = state.seats[seat];
+    return p !== undefined && !p.dead && !taken.has(seat);
+  });
+  if (owed.length > 0) return { gameOver: false, winners: [] };
+  return base;
+}
+
+export function checkWinBase(state: GameState): { gameOver: boolean; winners: readonly number[]; endReason?: 'uroborosDefeated' | 'allPlayersDead' | 'scenarioInfectedDefeated' | 'sherryLastAlive' } {
   // Scenario trigger (Outbreak: Tyrant T-002) - ends the game as soon as that
   // Infected is Defeated and attached to a Character.
   if (state.endInfectedCardId !== undefined) {

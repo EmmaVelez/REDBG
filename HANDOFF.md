@@ -1,5 +1,58 @@
 # HANDOFF — resume here
 
+**LOC BATCH 8 — SIX NEW ROOMS (2026-11-19):** Manny sent 6 renders:
+loc-029 Statue Corridor (70), loc-030 Storeroom (50), loc-031 Researcher's
+Private Room (40), loc-032 Shed (40), loc-033 Small Dining Room (30),
+loc-034 Stairway (10). All implemented + art shipped (LOC-029..034.png,
+320x436 palette, titles/costs verified with local gemma4:e2b). Tests live in
+`customLocations8.test.ts` (17) — NOT customLocations7.test.ts, which is a
+stale-named file already covering loc-022 Bar / loc-023 Bedroom.
+RULINGS (Manny): Storeroom rearrange = look through a weapon pile and choose
+its new TOP card; Storeroom extra turn = one final turn per LIVING investor
+after the base game ends; Stairway = spend 1 XP to reveal the top Location
+then free-invest any revealed room not yet cubed (no Buy).
+- Statue Corridor (invest 70): gold-icon action cards (bonuses.gold > 0) cost
+  no actions — `freeGoldAction` in the playActionCard reducer + validate gate
+  (exempt like isFreeRepeat); enumerate already offers all hand actions, so no
+  enumerate change. On Reveal: revealer loses 3 XP (revealLoseXp, floor 0).
+- Storeroom (invest 50): new `storeroomRearrangeStart` action removes one cube
+  then offers storeroomChoosePile (weapon piles with >=2 cards) ->
+  storeroomChooseTop (move chosen to front). LocationsRow "Rearrange (1 cube)"
+  button. Extra turn: checkWin wraps checkWinBase — while the base game is over
+  but a living investor is not in `storeroomFinalTurnsTaken`, returns
+  gameOver:false; the applyAction wrapper records the ending seat when a turn
+  advances past a living investor while checkWinBase(state).gameOver. Dead
+  investors are excluded (can't take a turn). GameState.storeroomFinalTurnsTaken.
+- Researcher's Private Room (invest 40): turn-start researchersBuyOrExplore
+  prompt (+1 Buy / +1 Explore). On Reveal: every OTHER player gains an
+  Infection (reuses revealEachOtherPlayerGainsInfection).
+- Shed (invest 40): turn-start shedAmmoChoose (CSV-staged am-001 picks from
+  hand + Done); Done discards staged ammo and draws that many; if XP >= 1 and
+  not yet repeated, offers shedRepeatOffer (Repeat 1 XP / Decline); Repeat
+  re-raises shedAmmoChoose with repeated:'1' (once per turn).
+- Small Dining Room (invest 30): turn-start diningDiscardForXp (discard a hand
+  card for 1 XP / Decline). On Reveal: every OTHER player loses 2 XP
+  (revealEachOtherPlayerLosesXp, floor 0).
+- Stairway (invest 10): applyStairwayHook (post-gain, gainedThisTurn grew with
+  an ACTION card) offers stairwayOffer (Spend 1 XP / Decline); Spend reveals the
+  top Location (revealLocation, On Reveal fires) then stairwayInvestChoice
+  (free cube on any revealed room not yet cubed, no Buy/gold).
+- New LocationEffect kinds: ongoingFreeGoldActions, ongoingStoreroomRearrange,
+  ongoingStoreroomFinalTurn, ongoingTurnStartBuyOrExplore, ongoingShedAmmoDraw,
+  ongoingTurnStartDiscardForXp, ongoingStairwayOnActionGain, revealLoseXp,
+  revealEachOtherPlayerLosesXp. Helpers in locations.ts: statueCorridorInvested,
+  storeroomRearrangeInvested, storeroomInvestors, researcherInvested,
+  shedInvested, diningXp, stairwayInvested.
+- POOL 28 -> 34: re-scanned the Usher seed map (probe usher-seeds8.ts, deleted):
+  seed 4 Library, seed 2 Kitchen, seed 3 Large Library, seed 71 Attic Landing
+  (first), seed 30 Tiger (first), seed 112 Library+Lesson Space. LOC_IDS in
+  customLocations.test.ts extended to loc-034. Fixed the fragile Pillar
+  inventory-reshuffle test (customLocations6): control seat 0 hand:[] + 6-card
+  discard, and pick a prompt option that REMAINS in the inventory after the
+  draw (the handler no-ops for cards already drawn into hand).
+- Gates: typecheck x3 clean, client 282/282, server 115/115, build OK (6 hashed
+  LOC assets), location suites 119/119, full game-core soak loc8-final-full.log.
+
 **LOC BATCH 6 — FIVE NEW ROOMS (2026-11-19):** Manny sent 5 renders:
 loc-024 Parlor, loc-025 Passage to the Shed, loc-026 Pillar Corridor,
 loc-027 Reading Room, loc-028 Mural Corridor. All implemented + art shipped

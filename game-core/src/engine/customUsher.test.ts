@@ -17,11 +17,11 @@ import {
  * cards are no longer individually selectable in the custom-card picker.
  *
  * Deterministic seeds (2 human seats, ch-002 / ch-003, firstTimer):
- *   seed 1: loc-017, loc-016, loc-011   seed 4: loc-004, loc-005, loc-006
- *   seed 7: loc-028, loc-020, loc-001   seed 13: loc-020, loc-011, loc-028
- *   seed 23: loc-007, loc-011, loc-028  seed 39: loc-001, loc-025, loc-008
- *   seed 44: loc-015, loc-014, loc-006
- * (28-card pool after batch 6; the old 23-card seed map is stale.)
+ *   seed 4: loc-005, loc-009, loc-001   seed 2: loc-033, loc-015, loc-004
+ *   seed 3: loc-002, loc-010, loc-007   seed 71: loc-020, loc-018, loc-030
+ *   seed 30: loc-015, loc-027, loc-019  seed 112: loc-024, loc-001, loc-008
+ * (34-card pool after batch 8; the seed map is POOL-SIZE-DEPENDENT — re-scan
+ * with a setup probe whenever a Location is added.)
  */
 
 const LOC_IDS = CUSTOM_CARDS.filter(c => c.type === 'location').map(c => c.id);
@@ -86,8 +86,8 @@ describe('Fall of the House of Usher — setup', () => {
     expect(JSON.stringify(a.locations)).not.toBe(JSON.stringify(c.locations));
   });
 
-  it('On Reveal effects NEVER fire (seed 39 deals Library heal + Lesson Space -5 HP)', () => {
-    const s = usherGame(39);
+  it('On Reveal effects NEVER fire (seed 112 deals Library heal + Lesson Space -5 HP)', () => {
+    const s = usherGame(112);
     const ids = (s.locations ?? []).map(l => s.cards[l.instanceId]?.cardId);
     expect(ids).toContain('loc-001'); // On Reveal: Gain 10 health
     expect(ids).toContain('loc-008'); // On Reveal: Lose 5 health
@@ -115,20 +115,20 @@ describe('Fall of the House of Usher — setup', () => {
 });
 
 describe('Fall of the House of Usher — effects live at setup', () => {
-  it('GLOBAL scoring counts from turn 1 (seed 7 Library: 3 per ammo set)', () => {
-    const s = hand(usherGame(7), ['am-001', 'am-002', 'am-003']);
+  it('GLOBAL scoring counts from turn 1 (seed 4 Library: 3 per ammo set)', () => {
+    const s = hand(usherGame(4), ['am-001', 'am-002', 'am-003']);
     expect(locationScore(s, 0)).toBe(3); // one 10/20/30 set
     expect(locationScore(s, 1)).toBe(0); // no ammo
   });
 
-  it('GLOBAL ongoing applies to EVERY seat (seed 4 Kitchen trash-on-2nd-gain)', () => {
-    const s = usherGame(4);
+  it('GLOBAL ongoing applies to EVERY seat (seed 2 Kitchen trash-on-2nd-gain)', () => {
+    const s = usherGame(2);
     expect(hasTrashOnSecondGain(s, 0)).toBe(true);
     expect(hasTrashOnSecondGain(s, 1)).toBe(true);
   });
 
-  it('a revealer-scoped On Reveal grant stays inactive (seed 23 Large Library draw)', () => {
-    const s = usherGame(23);
+  it('a revealer-scoped On Reveal grant stays inactive (seed 3 Large Library draw)', () => {
+    const s = usherGame(3);
     const ids = (s.locations ?? []).map(l => s.cards[l.instanceId]?.cardId);
     expect(ids).toContain('loc-007');
     // "On Reveal: Draw two cards at the end of your turn" — no revealer in
@@ -137,8 +137,8 @@ describe('Fall of the House of Usher — effects live at setup', () => {
     expect(locationEndOfTurnDraws(s, 1)).toBe(0);
   });
 
-  it('invest effects still need a gold cube (seed 44 Tiger Statue Room)', () => {
-    const s = usherGame(44, { turnGold: 100, buysLeft: 1 });
+  it('invest effects still need a gold cube (seed 30 Tiger Statue Room)', () => {
+    const s = usherGame(30, { turnGold: 100, buysLeft: 1 });
     expect(locationBuyCostReduction(s, 0)).toBe(0);
     const out = applyAction(s, { type: 'investLocation', seat: 0, instanceId: 'loc-015#usher1' });
     expect(cubesOn(out, 'loc-015#usher1', 0)).toBe(1);
@@ -148,8 +148,8 @@ describe('Fall of the House of Usher — effects live at setup', () => {
     expect(locationBuyCostReduction(out, 1)).toBe(0); // not invested
   });
 
-  it('1X uses still cost gold + a Buy (seed 13 Attic Landing: +1 Buy, Ammo x20)', () => {
-    const s = usherGame(13, { turnGold: 50, buysLeft: 1, turnAmmo: 0 });
+  it('1X uses still cost gold + a Buy (seed 71 Attic Landing: +1 Buy, Ammo x20)', () => {
+    const s = usherGame(71, { turnGold: 50, buysLeft: 1, turnAmmo: 0 });
     const out = applyAction(s, { type: 'useLocation', seat: 0, instanceId: 'loc-020#usher1' });
     // 50 - 20 use cost + 20 Gold from the gained Ammo x20's own bonus = 50.
     expect(out.seats[0]?.turnGold).toBe(50);

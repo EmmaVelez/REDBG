@@ -107,6 +107,17 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     Peek (1 Buy)
                   </button>
                 )}
+                {kind === 'invest' && (def.locationInvestEffects ?? []).some(e => e.kind === 'ongoingStoreroomRearrange') && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    disabled={!canAct || (loc.cubes[mySeat] ?? 0) < 1}
+                    title="Storeroom: remove an investment here to rearrange a weapon pile's top card"
+                    onClick={() => onAction({ type: 'storeroomRearrangeStart', seat: mySeat })}
+                  >
+                    Rearrange (1 cube)
+                  </button>
+                )}
                 {kind === 'onex' && (
                   <button
                     type="button"

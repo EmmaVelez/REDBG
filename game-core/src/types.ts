@@ -522,7 +522,25 @@ export type LocationEffect =
   /** On Reveal: the revealing player gains `amount` Infection. */
   | { readonly kind: 'revealGainInfection'; readonly amount: number }
   /** On Reveal: every OTHER player gains `amount` Infection. */
-  | { readonly kind: 'revealEachOtherPlayerGainsInfection'; readonly amount: number };
+  | { readonly kind: 'revealEachOtherPlayerGainsInfection'; readonly amount: number }
+  /** Statue Corridor: gold-icon action cards cost no actions to play. */
+  | { readonly kind: 'ongoingFreeGoldActions' }
+  /** Storeroom: remove a cube to reorder a weapon pile's top before buying. */
+  | { readonly kind: 'ongoingStoreroomRearrange' }
+  /** Storeroom: an extra turn after the game ends while invested. */
+  | { readonly kind: 'ongoingStoreroomFinalTurn' }
+  /** Researcher's Private Room: turn start choose +1 buy or +1 explore. */
+  | { readonly kind: 'ongoingTurnStartBuyOrExplore' }
+  /** Shed: turn start discard ammo x10 to draw, spend 1 XP to repeat once. */
+  | { readonly kind: 'ongoingShedAmmoDraw' }
+  /** Small Dining Room: turn start may discard a card for `xp` XP. */
+  | { readonly kind: 'ongoingTurnStartDiscardForXp'; readonly xp: number }
+  /** Stairway: on gaining an action card, spend 1 XP to reveal + free-invest a room. */
+  | { readonly kind: 'ongoingStairwayOnActionGain' }
+  /** On Reveal: the revealing player loses `amount` XP. */
+  | { readonly kind: 'revealLoseXp'; readonly amount: number }
+  /** On Reveal: every OTHER player loses `amount` XP. */
+  | { readonly kind: 'revealEachOtherPlayerLosesXp'; readonly amount: number };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -1170,6 +1188,9 @@ export interface GameState {
   readonly postTurnTrashIds?: readonly string[];
   /** Fan Location (Bar): Resource Area piles carrying an XP token. */
   readonly xpTokens?: readonly string[];
+  /** Storeroom (loc-030): investors who have taken their final extra turn
+   *  after the base game ended (the game holds open until all are recorded). */
+  readonly storeroomFinalTurnsTaken?: readonly number[];
   /** Fan Location (Bedroom): the seat that may not reveal Mansion cards
    *  this turn (the card says "You", so it is seat-scoped). */
   readonly mansionRevealBlockedSeat?: number;
@@ -1383,6 +1404,7 @@ export type Action =
    *  an investment cube). */
   | { readonly type: "investLocation"; readonly seat: number; readonly instanceId: string }
   | { readonly type: "readingRoomPeek"; readonly seat: number }
+  | { readonly type: "storeroomRearrangeStart"; readonly seat: number }
   /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
   | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
   /** Fan Location (Underground Passage): start the trash-and-upgrade chain. */

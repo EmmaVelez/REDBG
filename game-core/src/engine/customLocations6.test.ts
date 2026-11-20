@@ -203,19 +203,24 @@ describe('Passage to the Shed (loc-025)', () => {
 describe('Pillar Corridor (loc-026)', () => {
   it('offers a pick-to-top when the Inventory reshuffles while drawing', () => {
     let s = putLocation(game(), 'loc-026', { 0: 1 });
-    // Seat 0: tiny inventory + a discard, so the next turn-start draw reshuffles.
+    // Seat 0: empty hand + tiny inventory + a controlled discard, so the next
+    // turn-start draw (to 5) reshuffles once and leaves cards to reorder.
     s = reg(s, 'x#i1', 'am-001', 'inventory', 0);
-    for (const [i, cid] of ['am-001', 'am-002', 'ac-001'].entries()) {
+    const disc = ['am-001', 'am-002', 'ac-001', 'am-001', 'am-002', 'ac-001'];
+    for (const [i, cid] of disc.entries()) {
       s = reg(s, `x#d${i}`, cid, 'discard', 0);
     }
-    s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, inventory: ['x#i1'], discard: ['x#d0', 'x#d1', 'x#d2'] } : p)) };
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, hand: [], inventory: ['x#i1'], discard: disc.map((_, i) => `x#d${i}`), playArea: [] } : p)) };
     // Round trip: seat 1 plays a turn, then seat 0's turn start reshuffles.
     s = applyAction(s, { type: 'endTurn', seat: 0 });
     s = applyAction(s, { type: 'endTurn', seat: 1 });
     const p = byKind(s, 'pillarShuffleTop').find(x => x.seat === 0 && x.payload?.deck === 'inventory');
     expect(p).toBeDefined();
-    const chosen = p!.options[0]!;
-    const out = applyAction(s, { type: 'chooseOption', seat: 0, promptId: p!.id, option: 0 });
+    // Pick a card that REMAINS in the Inventory after the draw (some shuffled
+    // cards were drawn into hand; the handler only reorders cards still there).
+    const chosen = p!.options.find(o => o !== 'Decline' && s.seats[0]!.inventory.includes(o))!;
+    const optIdx = p!.options.indexOf(chosen);
+    const out = applyAction(s, { type: 'chooseOption', seat: 0, promptId: p!.id, option: optIdx });
     expect(out.seats[0]?.inventory[0]).toBe(chosen);
     expect(out.seats[0]?.inventory.filter(id => id === chosen).length).toBe(1);
   });

@@ -2,7 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested } from './locations';
+import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested, statueCorridorInvested, storeroomRearrangeInvested } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -103,8 +103,11 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'playActionCard: not your turn' };
       }
       // A free repeat (Trevor's Tomb) costs no Action and re-resolves the card
-      // from the PLAY AREA, so it is exempt from both checks.
-      if (action.isFreeRepeat !== true && player.actionsLeft < 1) {
+      // from the PLAY AREA, so it is exempt from both checks. Statue Corridor
+      // (loc-029) likewise frees gold-icon action cards from the Action cost.
+      const playDef = state.cardDefs[state.cards[action.instanceId]?.cardId ?? ''];
+      const freeGoldAction = statueCorridorInvested(state, action.seat) && playDef?.type === 'action' && (playDef?.bonuses?.gold ?? 0) > 0;
+      if (action.isFreeRepeat !== true && !freeGoldAction && player.actionsLeft < 1) {
         return { ok: false, reason: 'playActionCard: no actions left' };
       }
       if (!player.hand.includes(action.instanceId) && !player.playArea.includes(action.instanceId)) {
@@ -836,6 +839,14 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'storeroomRearrangeStart': {
+      if (state.phase !== 'main') return { ok: false, reason: 'storeroomRearrangeStart: not in main phase' };
+      if (player === undefined) return { ok: false, reason: `storeroomRearrangeStart: unknown seat: ${action.seat}` };
+      if (player.dead || player.downed) return { ok: false, reason: 'storeroomRearrangeStart: player is downed' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'storeroomRearrangeStart: not your turn' };
+      if (!storeroomRearrangeInvested(state, action.seat)) return { ok: false, reason: 'storeroomRearrangeStart: no Storeroom investment' };
+      return { ok: true };
+    }
     case 'readingRoomPeek': {
       // Reading Room (loc-027): forfeit a buy to peek at the top Mansion card.
       if (state.phase !== 'main') return { ok: false, reason: 'readingRoomPeek: not in main phase' };

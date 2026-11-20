@@ -415,6 +415,18 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         }
         break;
       }
+      case 'revealLoseXp': {
+        // Statue Corridor: the revealing player loses XP (floor 0).
+        if (seat >= 0) {
+          s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, xp: Math.max(0, (x.xp ?? 0) - effect.amount) } : x)) };
+        }
+        break;
+      }
+      case 'revealEachOtherPlayerLosesXp': {
+        // Small Dining Room: every OTHER living player loses XP (floor 0).
+        s = { ...s, seats: s.seats.map(x => (x.seat !== seat && !x.dead ? { ...x, xp: Math.max(0, (x.xp ?? 0) - effect.amount) } : x)) };
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'ongoingParlorSkillOnBuy':
@@ -422,6 +434,13 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'ongoingPickTopOnShuffle':
       case 'ongoingBuyForMansionPeek':
       case 'ongoingMuralDrawAndStow':
+      case 'ongoingFreeGoldActions':
+      case 'ongoingStoreroomRearrange':
+      case 'ongoingStoreroomFinalTurn':
+      case 'ongoingTurnStartBuyOrExplore':
+      case 'ongoingShedAmmoDraw':
+      case 'ongoingTurnStartDiscardForXp':
+      case 'ongoingStairwayOnActionGain':
       case 'onexGainAmmoAndDamagePerCardGained':
       case 'onexLookThroughDiscard':
       case 'onexGainBuyAndAmmo':
@@ -556,6 +575,49 @@ export function muralCubes(state: GameState, seat: number): number {
     if (loc.def.id === 'loc-028') n += loc.cubes[seat] ?? 0;
   }
   return n;
+}
+
+/** Statue Corridor (loc-029): gold-icon action cards cost no actions. */
+export function statueCorridorInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingFreeGoldActions');
+}
+
+/** Storeroom (loc-030): may remove a cube to rearrange a weapon pile. */
+export function storeroomRearrangeInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingStoreroomRearrange');
+}
+
+/** Storeroom (loc-030): seats holding an investment (owed a final extra turn). */
+export function storeroomInvestors(state: GameState): number[] {
+  const out: number[] = [];
+  for (const loc of revealedLocations(state)) {
+    if (loc.def.id !== 'loc-030') continue;
+    for (const [seat, n] of Object.entries(loc.cubes)) {
+      if (n > 0) out.push(Number(seat));
+    }
+  }
+  return out;
+}
+
+/** Researcher's Private Room (loc-031): turn-start +1 buy or +1 explore. */
+export function researcherInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingTurnStartBuyOrExplore');
+}
+
+/** Shed (loc-032): turn-start discard ammo x10 to draw, repeat once for 1 XP. */
+export function shedInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingShedAmmoDraw');
+}
+
+/** Small Dining Room (loc-033): XP gained for the turn-start discard. */
+export function diningXp(state: GameState, seat: number): number | undefined {
+  const e = investEffectsFor(state, seat).find(x => x.kind === 'ongoingTurnStartDiscardForXp');
+  return e !== undefined && e.kind === 'ongoingTurnStartDiscardForXp' ? e.xp : undefined;
+}
+
+/** Stairway (loc-034): on action gain, spend 1 XP to reveal + free-invest. */
+export function stairwayInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingStairwayOnActionGain');
 }
 
 /** Gain `amount` Infection from the Infection deck (Outbreak convention:
