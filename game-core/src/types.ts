@@ -522,6 +522,13 @@ export type LocationEffect =
   | { readonly kind: 'ongoingMuralDrawAndStow' }
   /** On Reveal: the revealing player gains `amount` Infection. */
   | { readonly kind: 'revealGainInfection'; readonly amount: number }
+  // --- Fan Locations batch 11 (loc-046..048, from Manny's scans 2026-11-20) ---
+  | { readonly kind: 'onexGainInfectionThenTrash' } // loc-046 Birdcage Corridor 1X use: gain an infection; if you do, trash a hand card
+  | { readonly kind: 'onexFirstExploreDamagePer10Cost'; readonly per10: number } // loc-046: +per10 damage per 10 of the location cost, first explore this turn
+  | { readonly kind: 'onexGainHealthOrRemoveInfection'; readonly health: number } // loc-047 Boiler Storage Area 1X use
+  | { readonly kind: 'onexCemeteryCosts'; readonly hp: number; readonly ammo: number } // loc-048 Cemetery 1X use
+  | { readonly kind: 'revealEachOtherPlayerMayGainActionAtMost'; readonly maxCost: number } // loc-047 reveal
+  | { readonly kind: 'revealInventoryTopPeek' } // loc-048 reveal
   /** On Reveal: every OTHER player gains `amount` Infection. */
   | { readonly kind: 'revealEachOtherPlayerGainsInfection'; readonly amount: number }
   /** Statue Corridor: gold-icon action cards cost no actions to play. */
@@ -1118,6 +1125,10 @@ export interface PlayerState {
    *  the first explore" is armed once the ammo is actually gained. Cleared at
    *  turn start and after the explore that consumes it. */
   readonly arklayArmed?: boolean;
+  /** loc-046 Birdcage Corridor: +Damage for the FIRST explore this turn
+   *  (armed by onexFirstExploreDamagePer10Cost, consumed and cleared by that
+   *  explore, also cleared at turn start). */
+  readonly firstExploreDamageBonus?: number;
   /** Fan Locations (1X): which location instances this seat has already paid
    *  for this turn — enforces a card's "Max: once per turn". */
   readonly locationUsesThisTurn?: readonly string[];

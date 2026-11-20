@@ -3402,7 +3402,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const damage = computeDamage({
           weapons: exploreWeapons,
           ammo: ammoForEffects,
-          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
           knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
           ammoCardsInPlayArea,
           inventoryCount: player.inventory.length,
@@ -4289,7 +4289,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (revealedDef && false) {}
         // Treat the two revealed cards; if either is infected, battle combined with current explore damage.
         const infectedTargets = [revealedDef, secondDef].filter(d => d?.type === 'infected');
-        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const exploreDmg = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         // resolve combined battle
         const multiResult = resolveMultiExplore({
           damage: exploreDmg,
@@ -4378,7 +4378,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (revealedDef?.type === 'event' && revealedDef.id === 'ma-038') {
         // Explosive Barrel: if total damage >= 80, each exploring char takes 30;
         // otherwise +30 damage collectively and +1 Explore. Then remove card.
-        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
+        const evDamage = computeDamage({ weapons: exploreWeapons, ammo: ammoForEffects, bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + pendingSkillDamage - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0), knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat) });
         let ricHp = player.hp;
         if (evDamage >= 80) {
           const ricBarrel = applyRicardoDamage(state, seat, player.hp, 30);
@@ -4820,7 +4820,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         infectedHpBonus: locationInfectedHpBonus(state),
         revealBonus: player.helenaRevealBonus ?? 0,
         ammo: ammoForEffects,
-        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
+        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
         ammoCardsInPlayArea,
         ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
         revealed: {
@@ -5592,7 +5592,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           for (const locId of clockRevealed) clockFinal = applyRevealEffects(clockFinal, locId, seat);
           return arklayWasArmed
             ? { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, arklayArmed: undefined } : s)) }
-            : clockFinal;
+            : (clockFinal.seats.some(s => s.seat === seat && s.firstExploreDamageBonus !== undefined)
+              ? { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, firstExploreDamageBonus: undefined } : s)) }
+              : clockFinal);
         }
 
     case 'removeAttachedItem': {
@@ -7321,6 +7323,56 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }],
             };
           }
+        } else if (effect.kind === 'onexGainInfectionThenTrash') {
+          // Birdcage Corridor: choose whether to gain an infection; if yes, a
+          // hand card must be trashed (second prompt, chain resolved in
+          // chooseOption).
+          s = {
+            ...s,
+            prompts: [...s.prompts, {
+              id: `birdcage-inf-${seat}-v${s.version}`,
+              seat,
+              text: `${def.name}: gain an infection?`,
+              options: ['Gain', 'Decline'],
+              payload: { kind: 'birdcageInfectionChoice' },
+            }],
+          };
+        } else if (effect.kind === 'onexFirstExploreDamagePer10Cost') {
+          // Birdcage Corridor: arm +10 damage per 10 of the location's cost
+          // for the FIRST explore this turn (consumed by that explore).
+          const bonus = Math.floor((def.locationCost ?? 0) / 10) * effect.per10;
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, firstExploreDamageBonus: (x.firstExploreDamageBonus ?? 0) + bonus }
+              : x)),
+          };
+        } else if (effect.kind === 'onexGainHealthOrRemoveInfection') {
+          // Boiler Storage Area: heal `health` or remove one of your own
+          // infections.
+          s = {
+            ...s,
+            prompts: [...s.prompts, {
+              id: `boiler-cur-${seat}-v${s.version}`,
+              seat,
+              text: `${def.name}: gain ${effect.health} health or remove an infection?`,
+              options: [`Gain ${effect.health} Health`, 'Remove an Infection'],
+              payload: { kind: 'boilerHealthOrCure', health: String(effect.health) },
+            }],
+          };
+        } else if (effect.kind === 'onexCemeteryCosts') {
+          // Cemetery: lose hp, gain an infection, gain ammo.
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? {
+                ...x,
+                hp: Math.max(0, x.hp - effect.hp),
+                turnAmmo: x.turnAmmo + effect.ammo,
+              }
+              : x)),
+          };
+          s = gainInfections(s, seat, 1);
         }
       }
       return s;
@@ -9509,6 +9561,131 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         };
         out = gainCard(out, { seat, cardId: state.cards[chosen]?.cardId ?? '', instanceId: chosen, destination: 'discard', reason: 'hook' });
         return { ...out, prompts: newPrompts };
+      }
+
+      if (kind === 'birdcageInfectionChoice') {
+        // loc-046 Birdcage Corridor: gain an infection, then trash a hand card.
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined || chosen !== 'Gain') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let s0: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        s0 = gainInfections(s0, seat, 1);
+        const gained = s0.seats[seat];
+        if (gained !== undefined && gained.hand.length > 0) {
+          s0 = {
+            ...s0,
+            prompts: [...newPrompts, {
+              id: `birdcage-trash-${seat}-v${state.version}`,
+              seat,
+              text: 'Birdcage Corridor: choose a card in your hand to trash.',
+              options: gained.hand,
+              payload: { kind: 'birdcageTrashPick' },
+            }],
+          };
+        }
+        return s0;
+      }
+      if (kind === 'birdcageTrashPick') {
+        const chosenId = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined || chosenId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? { ...s, hand: s.hand.filter(id => id !== chosenId), discard: [...s.discard, chosenId] }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
+      }
+      if (kind === 'boilerHealthOrCure') {
+        const health = Number(prompt.payload?.health ?? 20);
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen === `Gain ${health} Health`) {
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s =>
+              s.seat === seat ? { ...s, hp: Math.min(s.maxHp, s.hp + health) } : s,
+            ),
+            prompts: newPrompts,
+          };
+        }
+        if (chosen === 'Remove an Infection') {
+          const infected = p.infectionCards ?? [];
+          const removedId = infected[infected.length - 1];
+          if (removedId === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+          const cards = { ...state.cards };
+          delete cards[removedId];
+          return {
+            ...state,
+            ...nextBase,
+            cards,
+            seats: state.seats.map(s =>
+              s.seat === seat ? { ...s, infectionCards: infected.slice(0, -1) } : s,
+            ),
+            prompts: newPrompts,
+          };
+        }
+        return { ...state, ...nextBase, prompts: newPrompts };
+      }
+      // loc-047 Boiler Storage Area reveal: gain an action card costing up to
+      // maxCost as a grant — shares bedroomGainChoice's grant mechanics.
+      if (kind === 'locGainActionAtMostChoice') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const pile = Object.values(state.marketPiles).find(p => p.cards[0] === chosen);
+        if (pile === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        let out: GameState = {
+          ...state,
+          ...nextBase,
+          marketPiles: {
+            ...state.marketPiles,
+            [pile.pileId]: { pileId: pile.pileId, cards: pile.cards.slice(1) },
+          },
+        };
+        out = gainCard(out, {
+          seat,
+          cardId: state.cards[chosen]?.cardId ?? '',
+          instanceId: chosen,
+          destination: 'discard',
+          reason: 'hook',
+        });
+        return { ...out, prompts: newPrompts };
+      }
+      if (kind === 'locInventoryTopPeek') {
+        // loc-048 Cemetery reveal: discard the top Inventory card, or pass.
+        const chosen = prompt.options[option];
+        const p = state.seats[seat];
+        if (p === undefined || chosen === undefined || chosen === 'Put Back') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          cards: (() => {
+            const moved = { ...state.cards };
+            const inst = moved[chosen];
+            if (inst !== undefined) moved[chosen] = { ...inst, location: { zone: 'discard', index: 0, seat } };
+            return moved;
+          })(),
+          seats: state.seats.map(s =>
+            s.seat === seat
+              ? { ...s, inventory: s.inventory.filter(id => id !== chosen), discard: [...s.discard, chosen] }
+              : s,
+          ),
+          prompts: newPrompts,
+        };
       }
 
       if (kind === 'locDiscardForXpChoice') {

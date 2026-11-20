@@ -388,6 +388,40 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         // Bedroom: the revealing seat may not reveal Mansion cards this turn.
         s = { ...s, mansionRevealBlockedSeat: seat };
         break;
+      case 'revealEachOtherPlayerMayGainActionAtMost': {
+        // Boiler Storage Area: every OTHER living player may gain an action
+        // card costing up to `maxCost` from the Resource Area. The revealing
+        // seat is not offered the choice.
+        const options = affordableMarketActions(s, effect.maxCost);
+        if (options.length > 0) {
+          for (const other of s.seats.filter(x => !x.dead && !x.downed && x.seat !== seat)) {
+            prompts = [...prompts, {
+              id: `loc-action-${other.seat}-${s.version}`,
+              seat: other.seat,
+              text: `${def.name}: gain an action card costing up to ${effect.maxCost}?`,
+              options: [...options, 'Decline'],
+              payload: { kind: 'locGainActionAtMostChoice', maxCost: String(effect.maxCost) },
+            }];
+          }
+        }
+        break;
+      }
+      case 'revealInventoryTopPeek': {
+        // Cemetery: the revealing seat may look at the top card of their
+        // Inventory and discard it or put it back.
+        const inv = s.seats.find(x => x.seat === seat)?.inventory ?? [];
+        const top = inv.length > 0 ? inv[0] : undefined;
+        if (top !== undefined) {
+          prompts = [...prompts, {
+            id: `loc-peek-${seat}-${s.version}`,
+            seat,
+            text: `${def.name}: the top card of your Inventory is being looked at — discard it or put it back?`,
+            options: [top, 'Put Back'],
+            payload: { kind: 'locInventoryTopPeek' },
+          }];
+        }
+        break;
+      }
       case 'revealEachPlayerMayGainItem': {
         // Terrace: every living player may take one item from the Resource Area.
         for (const other of s.seats.filter(x => !x.dead && !x.downed)) {

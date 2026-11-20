@@ -17,11 +17,11 @@ import {
  * cards are no longer individually selectable in the custom-card picker.
  *
  * Deterministic seeds (2 human seats, ch-002 / ch-003, firstTimer):
- *   seed 368: loc-008, loc-023, loc-001  seed 49: loc-001, loc-014, loc-044
- *   seed 57: loc-017, loc-004, loc-022   seed 25: loc-007, loc-015, loc-040
- *   seed 100: loc-015, loc-020, loc-013  seed 20: loc-020, loc-001, loc-009
- * (45-card pool after batch 10; the seed map is POOL-SIZE-DEPENDENT — re-scan
- * with a setup probe whenever a Location is added.)
+  *   seed 67: loc-016, loc-001, loc-008  seed 49: loc-001, loc-014, loc-044
+  *   seed 57: loc-017, loc-004, loc-022   seed 4:  loc-017, loc-007, loc-009
+  *   seed 100: loc-015, loc-020, loc-013  seed 7:  loc-001, loc-020, loc-027
+  * (48-card pool after batch 11; the seed map is POOL-SIZE-DEPENDENT — re-scan
+  * with a setup probe whenever a Location is added.)
  */
 
 const LOC_IDS = CUSTOM_CARDS.filter(c => c.type === 'location').map(c => c.id);
@@ -86,8 +86,8 @@ describe('Fall of the House of Usher — setup', () => {
     expect(JSON.stringify(a.locations)).not.toBe(JSON.stringify(c.locations));
   });
 
-  it('On Reveal effects NEVER fire (seed 368 deals Library heal + Lesson Space -5 HP)', () => {
-    const s = usherGame(368);
+  it('On Reveal effects NEVER fire (seed 67 deals Library heal + Lesson Space -5 HP)', () => {
+      const s = usherGame(67);
     const ids = (s.locations ?? []).map(l => s.cards[l.instanceId]?.cardId);
     expect(ids).toContain('loc-001'); // On Reveal: Gain 10 health
     expect(ids).toContain('loc-008'); // On Reveal: Lose 5 health
@@ -127,8 +127,8 @@ describe('Fall of the House of Usher — effects live at setup', () => {
     expect(hasTrashOnSecondGain(s, 1)).toBe(true);
   });
 
-  it('a revealer-scoped On Reveal grant stays inactive (seed 25 Large Library draw)', () => {
-    const s = usherGame(25);
+  it('a revealer-scoped On Reveal grant stays inactive (seed 4 Large Library draw)', () => {
+      const s = usherGame(4);
     const ids = (s.locations ?? []).map(l => s.cards[l.instanceId]?.cardId);
     expect(ids).toContain('loc-007');
     // "On Reveal: Draw two cards at the end of your turn" — no revealer in
@@ -148,8 +148,8 @@ describe('Fall of the House of Usher — effects live at setup', () => {
     expect(locationBuyCostReduction(out, 1)).toBe(0); // not invested
   });
 
-  it('1X uses still cost gold + a Buy (seed 20 Attic Landing: +1 Buy, Ammo x20)', () => {
-    const s = usherGame(20, { turnGold: 50, buysLeft: 1, turnAmmo: 0 });
+  it('1X uses still cost gold + a Buy (seed 7 Attic Landing: +1 Buy, Ammo x20)', () => {
+      const s = usherGame(7, { turnGold: 50, buysLeft: 1, turnAmmo: 0 });
     const out = applyAction(s, { type: 'useLocation', seat: 0, instanceId: 'loc-020#usher1' });
     // 50 - 20 use cost + 20 Gold from the gained Ammo x20's own bonus = 50.
     expect(out.seats[0]?.turnGold).toBe(50);

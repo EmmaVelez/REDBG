@@ -253,7 +253,8 @@ export function exploreDamage(
     exploreDamagePerHealedCharacter(abilities, (state.healedCharactersThisTurn ?? []).length) +
     actionDiscardDamage(abilities, player.actionsDiscardedThisTurn ?? 0) +
     emptyHandDamage(abilities, player.hand.filter(id => !weaponIds.includes(id)).length) +
-    plusDamagePerUnusedAction(abilities, player.actionsLeft);
+    plusDamagePerUnusedAction(abilities, player.actionsLeft) +
+    (player.firstExploreDamageBonus ?? 0);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;

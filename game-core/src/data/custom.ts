@@ -2172,6 +2172,57 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     locationInvestEffects: [{ kind: 'ongoingExhibitionBuyMoveXp' }, { kind: 'ongoingExhibitionDamageTakeXp' }],
     locationSetupEffects: [{ kind: 'setupXpOnActionWeaponPiles' }],
   },
+  // ── Fan Locations batch 11 (loc-046..048) — read from Manny's scans with
+  // the local Ollama vision model (2026-11-20); two verbatim passes agreed on
+  // every line. No printed codes on the scans -> sequential loc ids.
+  {
+    id: 'loc-046',
+    copies: 1,
+    name: 'Birdcage Corridor',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'onex',
+    locationCost: 40,
+    locationMaxPerTurn: 1,
+    text: '1X\nGain an infection. If you do, trash a card in your hand.\n+10 damage for each 10 it cost the first time you explore this turn.\nMax: once per turn.',
+    locationLevels: [{ cubes: 1, text: 'Gain an infection. If you do, trash a card in your hand. +10 damage for each 10 it cost the first time you explore this turn. Max: once per turn.' }],
+    locationRevealEffects: [
+      { kind: 'onexGainInfectionThenTrash' },
+      { kind: 'onexFirstExploreDamagePer10Cost', per10: 10 },
+    ],
+  },
+  {
+    id: 'loc-047',
+    copies: 1,
+    name: 'Boiler Storage Area',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'onex',
+    locationCost: 50,
+    locationMaxPerTurn: 1,
+    text: '1X\nGain 20 health or Remove an infection.\nOn Reveal: Every other player may gain an action card costing 50 or less.\nMax: once per turn.',
+    locationLevels: [{ cubes: 1, text: 'Gain 20 health or Remove an infection. On Reveal: Every other player may gain an action card costing 50 or less. Max: once per turn.' }],
+    locationRevealEffects: [
+      { kind: 'onexGainHealthOrRemoveInfection', health: 20 },
+      { kind: 'revealEachOtherPlayerMayGainActionAtMost', maxCost: 50 },
+    ],
+  },
+  {
+    id: 'loc-048',
+    copies: 1,
+    name: 'Cemetery',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'onex',
+    locationCost: 40,
+    locationMaxPerTurn: 1,
+    text: '1X\nLose 10 health.\nGain an infection.\nGain a 30 ammo.\nOn Reveal: You may look at the top card of your inventory and discard it or put it back.\nMax: once per turn.',
+    locationLevels: [{ cubes: 1, text: 'Lose 10 health. Gain an infection. Gain a 30 ammo. On Reveal: You may look at the top card of your inventory and discard it or put it back. Max: once per turn.' }],
+    locationRevealEffects: [
+      { kind: 'onexCemeteryCosts', hp: 10, ammo: 30 },
+      { kind: 'revealInventoryTopPeek' },
+    ],
+  },
 ];
 
 /**
