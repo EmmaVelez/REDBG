@@ -1,6 +1,7 @@
 import type { CardDef, GameState, LocationEffect, LocationScoreEffect, PlayerState } from '../types';
 import { makeRng, shuffle } from '../util/rng';
 import { draw } from './deck';
+import { characterAbilities, isImmuneToInfectionEffects } from './abilities';
 
 /**
  * Fan "Locations" line — GLOBAL / 1X / investment room cards.
@@ -400,8 +401,27 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         }
         break;
       }
+      case 'revealGainInfection': {
+        // Passage to the Shed / Pillar Corridor: the revealing player gains
+        // Infection. No Infection deck outside Outbreak -> no-op (the same
+        // convention every other infection effect follows).
+        if (seat >= 0) s = gainInfections(s, seat, effect.amount);
+        break;
+      }
+      case 'revealEachOtherPlayerGainsInfection': {
+        // Reading Room: every OTHER living player gains Infection.
+        for (const other of s.seats.filter(x => x.seat !== seat && !x.dead)) {
+          s = gainInfections(s, other.seat, effect.amount);
+        }
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
+      case 'ongoingParlorSkillOnBuy':
+      case 'ongoingXpTrashOnTrash':
+      case 'ongoingPickTopOnShuffle':
+      case 'ongoingBuyForMansionPeek':
+      case 'ongoingMuralDrawAndStow':
       case 'onexGainAmmoAndDamagePerCardGained':
       case 'onexLookThroughDiscard':
       case 'onexGainBuyAndAmmo':
@@ -505,6 +525,56 @@ export function locationBuyCostReduction(state: GameState, seat: number): number
     if (effect.kind === 'ongoingBuyCostReduction') total += effect.amount;
   }
   return total;
+}
+
+/** Parlor (loc-024): the gold price of the post-buy skill offer, if invested. */
+export function parlorGoldCost(state: GameState, seat: number): number | undefined {
+  const e = investEffectsFor(state, seat).find(x => x.kind === 'ongoingParlorSkillOnBuy');
+  return e !== undefined && e.kind === 'ongoingParlorSkillOnBuy' ? e.gold : undefined;
+}
+
+/** Passage to the Shed (loc-025): the XP price of the on-trash window, if invested. */
+export function shedXpCost(state: GameState, seat: number): number | undefined {
+  const e = investEffectsFor(state, seat).find(x => x.kind === 'ongoingXpTrashOnTrash');
+  return e !== undefined && e.kind === 'ongoingXpTrashOnTrash' ? e.xp : undefined;
+}
+
+/** Pillar Corridor (loc-026): invested -> every shuffle offers a pick-to-top. */
+export function pillarInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingPickTopOnShuffle');
+}
+
+/** Reading Room (loc-027): invested -> may forfeit a buy to peek the Mansion. */
+export function readingRoomInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingBuyForMansionPeek');
+}
+
+/** Mural Corridor (loc-028): the seat's investment cubes (turn-start draw count). */
+export function muralCubes(state: GameState, seat: number): number {
+  let n = 0;
+  for (const loc of revealedLocations(state)) {
+    if (loc.def.id === 'loc-028') n += loc.cubes[seat] ?? 0;
+  }
+  return n;
+}
+
+/** Gain `amount` Infection from the Infection deck (Outbreak convention:
+ *  no deck -> no-op; immunity respected). Used by the location On Reveal
+ *  infection effects. */
+export function gainInfections(state: GameState, seat: number, amount: number): GameState {
+  const p = state.seats[seat];
+  if (p === undefined || p.dead || amount <= 0) return state;
+  if (isImmuneToInfectionEffects(characterAbilities(state, seat), p.infectionCards)) return state;
+  const deck = state.infectionDeck;
+  if (deck === undefined || deck.length === 0) return state;
+  const take = Math.min(amount, deck.length);
+  return {
+    ...state,
+    infectionDeck: deck.slice(take),
+    seats: state.seats.map(x => (x.seat === seat
+      ? { ...x, infectionCards: [...(x.infectionCards ?? []), ...deck.slice(0, take)] }
+      : x)),
+  };
 }
 
 /** Terrace: the investor may still free-play the first action gained this turn.

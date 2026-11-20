@@ -508,7 +508,21 @@ export type LocationEffect =
   /** Bedroom: the revealing seat may not reveal Mansion cards this turn. */
   | { readonly kind: 'revealBlockMansionRevealThisTurn' }
   /** Bedroom: gain `ammoCount` Ammo x`ammo` cards, then choose a card up to `maxCost`. */
-  | { readonly kind: 'onexGainAmmoAndChooseCard'; readonly ammo: number; readonly ammoCount: number; readonly maxCost: number };
+  | { readonly kind: 'onexGainAmmoAndChooseCard'; readonly ammo: number; readonly ammoCount: number; readonly maxCost: number }
+  /** Parlor: after a buy that gained a card, may pay `gold` to gain a random skill. */
+  | { readonly kind: 'ongoingParlorSkillOnBuy'; readonly gold: number }
+  /** Passage to the Shed: when you trash a card, may spend `xp` to trash a hand/discard card. */
+  | { readonly kind: 'ongoingXpTrashOnTrash'; readonly xp: number }
+  /** Pillar Corridor: when you shuffle, may pick one of the shuffled cards to go on top. */
+  | { readonly kind: 'ongoingPickTopOnShuffle' }
+  /** Reading Room: may forfeit a buy to look at the top of the Mansion deck. */
+  | { readonly kind: 'ongoingBuyForMansionPeek' }
+  /** Mural Corridor: turn start +1 draw per cube, then stow that many hand cards onto the Inventory top. */
+  | { readonly kind: 'ongoingMuralDrawAndStow' }
+  /** On Reveal: the revealing player gains `amount` Infection. */
+  | { readonly kind: 'revealGainInfection'; readonly amount: number }
+  /** On Reveal: every OTHER player gains `amount` Infection. */
+  | { readonly kind: 'revealEachOtherPlayerGainsInfection'; readonly amount: number };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -1368,6 +1382,7 @@ export type Action =
   /** Fan Locations: invest in a GLOBAL-less location (spend 1 Buy + gold, place
    *  an investment cube). */
   | { readonly type: "investLocation"; readonly seat: number; readonly instanceId: string }
+  | { readonly type: "readingRoomPeek"; readonly seat: number }
   /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
   | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
   /** Fan Location (Underground Passage): start the trash-and-upgrade chain. */

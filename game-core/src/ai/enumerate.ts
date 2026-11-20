@@ -6,7 +6,7 @@ import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../e
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
-import { canInvest } from '../engine/locations';
+import { canInvest, readingRoomInvested } from '../engine/locations';
 import { exploreAmmoReq } from '../engine/ammo';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
@@ -307,6 +307,9 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     if (def === undefined) continue;
     if (def.locationKind === 'invest' && canInvest(state, loc.instanceId, seat)) {
       generatedActions.push({ type: 'investLocation', seat, instanceId: loc.instanceId });
+    }
+    if (def.id === 'loc-027' && readingRoomInvested(state, seat) && player.buysLeft >= 1 && state.mansionDeck.length > 0) {
+      generatedActions.push({ type: 'readingRoomPeek', seat });
     }
     if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1) {
       const used = (player.locationUsesThisTurn ?? []).filter(x => x === loc.instanceId).length;

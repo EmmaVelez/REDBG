@@ -1,5 +1,57 @@
 # HANDOFF — resume here
 
+**LOC BATCH 6 — FIVE NEW ROOMS (2026-11-19):** Manny sent 5 renders:
+loc-024 Parlor, loc-025 Passage to the Shed, loc-026 Pillar Corridor,
+loc-027 Reading Room, loc-028 Mural Corridor. All implemented + art shipped
+(LOC-024..028.png, 320x436, titles/costs verified with local gemma4:e2b).
+RULINGS (Manny): Parlor gains a RANDOM skill from the full Mercenaries
+catalogue; Pillar triggers on ANY shuffle incl. the Mansion; Mural's stow is
+chosen in pick order.
+- Parlor (invest 30): post-buy hook (gainedThisTurn grew + gold >= 40) offers
+  Pay/Decline; Pay spends 40 and registers a random skill instance in
+  skillArea + seat.skills (cardDefs extended if the pool lacked skills).
+- Passage to the Shed (invest 30): post-action removed-diff hook offers the
+  OWNER of each trashed card a spend-1-XP trash of a hand/discard card;
+  chains while XP lasts (each trash is a new trigger). On Reveal: revealer
+  gains an Infection.
+- Pillar Corridor (invest 30): centralized shuffle DETECTOR in the wrapper
+  (no choke point exists): inventory reshuffle = whole prev discard now in
+  inventory/hand and gone from discard; Mansion shuffle = same membership,
+  different order. Offers pick-to-top of the shuffled deck; handler drops
+  the existing occurrence first (insertAt copy trap). Generous edges
+  (explicit discard->inventory moves also offer) accepted for an optional
+  window. NOTE: send-to-bottom is NOT a shuffle (no RNG) — the test uses the
+  MA-000 ooze shuffle-back (a real whole-deck shuffle in one action).
+  On Reveal: revealer gains an Infection.
+- Reading Room (invest 50): new `readingRoomPeek` action (validate +
+  enumerate + turnHistory verb + LocationsRow "Peek (1 Buy)" button) spends
+  1 Buy and privately reveals the top Mansion card via recordCardReveals
+  (entry.reveals, NOT action.reveals). On Reveal: every OTHER player gains
+  an Infection.
+- Mural Corridor (invest 30/70/100): startTurn draws +1 per cube (after all
+  other turn-start draws, covers both startTurn branches) then prompts
+  muralStowChoose: pick N hand cards in order (payload.picked CSV staging),
+  placed [...picked, ...inventory] on the last pick.
+- Infection convention: gainInfections pops state.infectionDeck, respects
+  isImmuneToInfectionEffects, no deck (non-Outbreak) -> no-op, like every
+  other infection effect.
+- Hooks run LAST in the applyAction wrapper (after Leon's trash hook) so
+  they see every trash/gain/shuffle the earlier hooks produced.
+- Tests: customLocations6.test.ts 17 (data, art, 3 Mural, 3 Reading, 3 Shed,
+  3 Pillar, 3 Parlor) + LocationsRow Peek-button test. Fixture lessons:
+  locationsMode's location deck INTERCEPTS every explore — empty it for
+  Mansion-combat tests; a single explore grants +1 XP unconditionally (Shed
+  math: 2+1-1=2); reveals ride on logEntry.reveals.
+- Gates: typecheck x3 clean, client 282/282, server 115/115, build OK (5
+  hashed LOC assets in dist). First full run: 1425/1431 — the 6 reds were
+  STALE assertions from the pool growing 23->28 (customLocations deck-count
+  list; 5 Usher seed deals shifted). Re-pointed: LOC_IDS extended to 028;
+  Usher seeds 8->39, 12->4, 2->23, 16->44, 11->13 (new map in the test
+  docstring). Location suites 61/61 after; FINAL full game-core 1431/1431 ALL
+  GREEN (soak included), EXIT=0.
+  LESSON: adding locations shifts every Usher/Clock seed deal — re-scan the
+  seed map (usher-seeds probe) whenever the LOC pool grows.
+
 **TIGER STATUE ROOM DISCOUNT — UI FIX (2026-11-19):** Manny asked if the
 loc-015 buy discount works when invested. ENGINE: yes — buy case + validate
 + the XP-token buy path all subtract locationBuyCostReduction (engine test

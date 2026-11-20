@@ -41,6 +41,7 @@ const VERBS: Record<Action['type'], string> = {
   useActionAbility: 'used an action effect',
   usePreExploreXpAbility: 'paid XP to empower a weapon',
   investLocation: 'invested in a location',
+  readingRoomPeek: 'peeked at the Mansion (Reading Room)',
   useLocation: 'used a location',
   passageStart: 'used the Underground Passage',
   passageChooseAction: 'chose an action to trash',

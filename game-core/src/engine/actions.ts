@@ -94,7 +94,8 @@ import { applyMercenariesRevealEffects, applyMercenariesDefeatEffects, applyMerc
 
 import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmareNotDefeatedEffects, nightmareWeaponGains, nightmareWeaponPrompts, applyMindControlCopy } from './nightmare';
 import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
-  beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked, applyRevealEffects, clockLocationIntoPlay } from './locations';
+  beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked, applyRevealEffects, clockLocationIntoPlay, parlorGoldCost, shedXpCost, pillarInvested, readingRoomInvested } from './locations';
+import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus } from './game';
@@ -928,7 +929,126 @@ export function applyAction(state: GameState, action: Action): GameState {
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
   const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action)))));
-  return applyLeonTrashHook(state, hooked, action);
+  const leon = applyLeonTrashHook(state, hooked, action);
+  // Location windows last so they see every trash/gain/shuffle the earlier
+  // hooks produced (Leon's trash chains into the Shed offer, etc.).
+  return applyPassageShedHook(state, applyParlorBuyHook(state, applyPillarShuffleHook(state, leon, action), action));
+}
+
+/**
+ * Pillar Corridor (loc-026): "When you shuffle, you may pick one of the cards
+ * to go on top" (RULING Manny 2026-11-19: ANY shuffle, including the Mansion).
+ * Shuffling has no single choke point, so detect it by DIFF: an inventory
+ * reshuffle folds the whole discard into inventory/hand; a Mansion shuffle
+ * keeps the same membership but changes the order. Generous edges (explicit
+ * discard->inventory moves also offer) are acceptable for an optional window.
+ */
+function applyPillarShuffleHook(prev: GameState, next: GameState, action: Action): GameState {
+  let out = next;
+  const offer = (seat: number, deck: 'inventory' | 'mansion', cards: readonly string[]): void => {
+    if (cards.length < 2) return;
+    if (!pillarInvested(out, seat)) return;
+    const p = out.seats[seat];
+    if (p === undefined || p.dead || p.downed) return;
+    if (out.prompts.some(x => x.seat === seat && x.payload?.kind === 'pillarShuffleTop')) return;
+    out = {
+      ...out,
+      prompts: [...out.prompts, {
+        id: `pillar-top-${seat}-${deck}-v${out.version}`,
+        seat,
+        text: `Pillar Corridor: pick a card to go on top of the ${deck === 'inventory' ? 'Inventory' : 'Mansion'}?`,
+        options: [...cards, 'Decline'],
+        payload: { kind: 'pillarShuffleTop', deck },
+      }],
+    };
+  };
+  for (let seat = 0; seat < next.seats.length; seat++) {
+    const before = prev.seats[seat];
+    const after = next.seats[seat];
+    if (before === undefined || after === undefined || before.discard.length === 0) continue;
+    const inv = new Set(after.inventory);
+    const hand = new Set(after.hand);
+    const stillDiscarded = new Set(after.discard);
+    if (before.discard.every(id => (inv.has(id) || hand.has(id)) && !stillDiscarded.has(id))) {
+      offer(seat, 'inventory', before.discard);
+    }
+  }
+  const pm = prev.mansionDeck;
+  const nm = next.mansionDeck;
+  if (pm.length === nm.length && pm.length > 1 && pm.some((id, i) => nm[i] !== id)) {
+    const sp = [...pm].sort();
+    const sn = [...nm].sort();
+    if (sp.every((id, i) => sn[i] === id)) {
+      const seat = (action as { seat?: number }).seat;
+      if (seat !== undefined) offer(seat, 'mansion', nm);
+    }
+  }
+  return out;
+}
+
+/**
+ * Parlor (loc-024): "At the end of a buy during which you gained a card, you
+ * may pay 40 gold to gain a skill." Post-buy window; the gain is tracked via
+ * gainedThisTurn (gainCard records every buy's gain).
+ */
+function applyParlorBuyHook(prev: GameState, next: GameState, action: Action): GameState {
+  if (action.type !== 'buy') return next;
+  const seat = action.seat;
+  const before = prev.seats[seat];
+  const p = next.seats[seat];
+  if (before === undefined || p === undefined || p.dead || p.downed) return next;
+  if ((p.gainedThisTurn?.length ?? 0) <= (before.gainedThisTurn?.length ?? 0)) return next;
+  const cost = parlorGoldCost(next, seat);
+  if (cost === undefined || p.turnGold < cost) return next;
+  if (next.prompts.some(x => x.seat === seat && x.payload?.kind === 'parlorSkillOffer')) return next;
+  return {
+    ...next,
+    prompts: [...next.prompts, {
+      id: `parlor-skill-${seat}-v${next.version}`,
+      seat,
+      text: `Parlor: pay ${cost} gold to gain a skill?`,
+      options: ['Pay', 'Decline'],
+      payload: { kind: 'parlorSkillOffer', gold: String(cost) },
+    }],
+  };
+}
+
+/**
+ * Passage to the Shed (loc-025): "When you trash a card, you may expend an xp
+ * to trash a card in your hand or discard." Trashing has no choke point — diff
+ * `removed` and offer the OWNER of each newly trashed card (same pattern as
+ * the Lord Spencer's Study XP hook). Resolving the window trashes again, so
+ * the offer chains while XP lasts (each trash is a new trigger).
+ */
+function applyPassageShedHook(prev: GameState, next: GameState): GameState {
+  const already = new Set(prev.removed);
+  const owners = new Set<number>();
+  for (const id of next.removed) {
+    if (already.has(id)) continue;
+    const seat = next.cards[id]?.location.seat;
+    if (seat !== undefined) owners.add(seat);
+  }
+  let out = next;
+  for (const seat of owners) {
+    const p = out.seats[seat];
+    if (p === undefined || p.dead || p.downed) continue;
+    const cost = shedXpCost(out, seat);
+    if (cost === undefined || (p.xp ?? 0) < cost) continue;
+    const pool = [...p.hand, ...p.discard];
+    if (pool.length === 0) continue;
+    if (out.prompts.some(x => x.seat === seat && x.payload?.kind === 'passageShedTrash')) continue;
+    out = {
+      ...out,
+      prompts: [...out.prompts, {
+        id: `passage-shed-${seat}-v${out.version}`,
+        seat,
+        text: `Passage to the Shed: spend ${cost} XP to trash a card from your hand or discard?`,
+        options: [...pool, 'Decline'],
+        payload: { kind: 'passageShedTrash', xp: String(cost) },
+      }],
+    };
+  }
+  return out;
 }
 
 /**
@@ -6520,6 +6640,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'readingRoomPeek': {
+      // Reading Room (loc-027): forfeit a buy to look at the top Mansion card
+      // (private peek through the log's reveals channel, like Ada's look).
+      const { seat } = action;
+      const top = state.mansionDeck[0];
+      if (top === undefined) return { ...state, ...nextBase };
+      recordCardReveals([{ instanceId: top, pile: 'mansion' }]);
+      return {
+        ...state,
+        ...nextBase,
+        seats: state.seats.map(s => (s.seat === seat ? { ...s, buysLeft: s.buysLeft - 1 } : s)),
+      };
+    }
     case 'investLocation': {
       // Fan Locations: spend 1 Buy + the printed gold to place an investment
       // cube on a revealed location. Each cube is a separate buy.
@@ -8187,6 +8320,105 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             ? { ...s, discard: s.discard.filter(id => id !== chosen) }
             : s)),
           removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'passageShedTrash') {
+        // Passage to the Shed (loc-025): spend XP to trash a hand/discard card.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const cost = Number(prompt.payload?.xp ?? 1);
+        const p = state.seats[seat];
+        if (p === undefined || (p.xp ?? 0) < cost) return { ...state, ...nextBase, prompts: newPrompts };
+        if (!p.hand.includes(chosen) && !p.discard.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, xp: (s.xp ?? 0) - cost, hand: s.hand.filter(id => id !== chosen), discard: s.discard.filter(id => id !== chosen) }
+            : s)),
+          removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'parlorSkillOffer') {
+        // Parlor (loc-024): pay gold to gain a RANDOM skill from the full
+        // Mercenaries catalogue (RULING Manny 2026-11-19). The skill instance
+        // lives in the skillArea and joins seat.skills like a drafted one.
+        const chosen = prompt.options[option];
+        if (chosen !== 'Pay') return { ...state, ...nextBase, prompts: newPrompts };
+        const cost = Number(prompt.payload?.gold ?? 40);
+        const p = state.seats[seat];
+        if (p === undefined || p.turnGold < cost) return { ...state, ...nextBase, prompts: newPrompts };
+        const skillDefs = MERCENARIES_CARDS.filter(c => c.type === 'skill');
+        if (skillDefs.length === 0) return { ...state, ...nextBase, prompts: newPrompts };
+        const roll = nextInt(makeRng(state.rngState), skillDefs.length);
+        const def = skillDefs[roll.value]!;
+        const id = `${def.id}#parlor-${state.version}-${seat}`;
+        return {
+          ...state,
+          ...nextBase,
+          rngState: roll.rng.s,
+          cardDefs: { ...state.cardDefs, [def.id]: def },
+          cards: { ...state.cards, [id]: { instanceId: id, cardId: def.id, location: { zone: 'skillArea', index: 0 } } },
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...s, turnGold: s.turnGold - cost, skills: [...(s.skills ?? []), id] }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'pillarShuffleTop') {
+        // Pillar Corridor (loc-026): move the chosen shuffled card to the top
+        // of its deck. Drop the existing occurrence first (insertAt splices a
+        // copy — a duplicate placement is a soak conservation failure).
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        if (prompt.payload?.deck === 'mansion') {
+          if (!state.mansionDeck.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+          return { ...state, ...nextBase, mansionDeck: [chosen, ...state.mansionDeck.filter(id => id !== chosen)], prompts: newPrompts };
+        }
+        const p = state.seats[seat];
+        if (p === undefined || !p.inventory.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, inventory: [chosen, ...s.inventory.filter(id => id !== chosen)] } : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'muralStowChoose') {
+        // Mural Corridor (loc-028): pick `needed` hand cards in order; they go
+        // on top of the Inventory in pick order once the last one is chosen.
+        const chosen = prompt.options[option];
+        const needed = Number(prompt.payload?.needed ?? 0);
+        const picked = String(prompt.payload?.picked ?? '').split(',').filter(x => x.length > 0);
+        const p = state.seats[seat];
+        if (chosen === undefined || p === undefined || !p.hand.includes(chosen) || picked.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const nowPicked = [...picked, chosen];
+        const remaining = p.hand.filter(id => !nowPicked.includes(id));
+        if (nowPicked.length < needed && remaining.length > 0) {
+          return {
+            ...state,
+            ...nextBase,
+            prompts: [...newPrompts, {
+              id: `mural-stow-${seat}-v${state.version}`,
+              seat,
+              text: `Mural Corridor: pick ${needed - nowPicked.length} more card(s) to put on top of your Inventory.`,
+              options: remaining,
+              payload: { kind: 'muralStowChoose', needed: String(needed), picked: nowPicked.join(',') },
+            }],
+          };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === seat ? { ...s, hand: remaining, inventory: [...nowPicked, ...s.inventory] } : s)),
           prompts: newPrompts,
         };
       }

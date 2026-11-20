@@ -38,6 +38,21 @@ function revealOnly(s: GameState, cardId: string): GameState {
 }
 
 describe('LocationsRow', () => {
+  it('Reading Room offers a Peek button that forfeits a buy', () => {
+    const base = stateWithLocations();
+    const s: GameState = {
+      ...base,
+      cards: { ...base.cards, ['loc-027#rr']: { instanceId: 'loc-027#rr', cardId: 'loc-027', location: { zone: 'supply', index: 0 } } },
+      locations: [{ instanceId: 'loc-027#rr', cubes: { 0: 1 }, revealedBy: 0 }],
+      seats: base.seats.map((p, i) => (i === 0 ? { ...p, buysLeft: 1 } : p)),
+    };
+    const html = renderToStaticMarkup(<LocationsRow state={s} mySeat={0} onAction={() => {}} />);
+    expect(html).toContain('Peek (1 Buy)');
+    // no buys left -> disabled
+    const noBuys = renderToStaticMarkup(<LocationsRow state={{ ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, buysLeft: 0 } : p)) }} mySeat={0} onAction={() => {}} />);
+    const peekTag = noBuys.match(/<button[^>]*title="Reading Room[^"]*"[^>]*>/)?.[0] ?? '';
+    expect(peekTag).toContain('disabled');
+  });
   it('Tiger Statue Room investment discounts the buy button and price label', () => {
     const base = stateWithLocations();
     // Seat 0 has invested in Tiger Statue Room (loc-015, -10 gold on buys).

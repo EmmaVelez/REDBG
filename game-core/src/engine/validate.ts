@@ -2,7 +2,7 @@ import type { GameState, Action, CardDef, ValidationResult } from '../types';
 import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost, locationBuyCostReduction, pileHasXpToken } from './locations';
+import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -836,6 +836,17 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'readingRoomPeek': {
+      // Reading Room (loc-027): forfeit a buy to peek at the top Mansion card.
+      if (state.phase !== 'main') return { ok: false, reason: 'readingRoomPeek: not in main phase' };
+      if (player === undefined) return { ok: false, reason: `readingRoomPeek: unknown seat: ${action.seat}` };
+      if (player.dead || player.downed) return { ok: false, reason: 'readingRoomPeek: player is downed' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'readingRoomPeek: not your turn' };
+      if (player.buysLeft < 1) return { ok: false, reason: 'readingRoomPeek: no buys left' };
+      if (!readingRoomInvested(state, action.seat)) return { ok: false, reason: 'readingRoomPeek: Reading Room not invested' };
+      if (state.mansionDeck.length === 0) return { ok: false, reason: 'readingRoomPeek: Mansion deck is empty' };
+      return { ok: true };
+    }
     case 'investLocation': {
       // Fan Locations: invest in a revealed location (1 Buy + printed gold).
       if (state.phase !== 'main') {

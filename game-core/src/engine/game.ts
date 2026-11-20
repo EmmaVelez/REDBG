@@ -11,7 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
-import { scoreTotal, revealedLocations } from './locations';
+import { scoreTotal, revealedLocations, muralCubes } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
 
@@ -1579,6 +1579,15 @@ function startTurnInternal(state: GameState): GameState {
     nextRng = d.rngState;
   }
 
+  // Mural Corridor (loc-028): +1 card per investment cube at turn start.
+  // The stow choice (hand -> Inventory top, in pick order) prompts below.
+  const muralN = muralCubes(state, player.seat);
+  if (muralN > 0 && !turnPlayer.dead) {
+    const md = drawWithReshuffle({ deck: turnPlayer.inventory, discard: turnPlayer.discard, count: muralN, rngState: nextRng });
+    nextRng = md.rngState;
+    turnPlayer = { ...turnPlayer, hand: [...turnPlayer.hand, ...md.hand], inventory: md.deck, discard: md.discard };
+  }
+
   // "At beginning of your turn, may ..." character abilities prompt here —
   // before anything else can be played (the prompt-immediate gate blocks
   // other actions while it is open).
@@ -1684,6 +1693,19 @@ function startTurnInternal(state: GameState): GameState {
       text: 'Helena Harper: get +1 card?',
       options: ['Draw +1 card', 'Decline'],
       payload: { kind: 'helenaLowHpDrawChoice' },
+    });
+  }
+
+  // Mural Corridor: stow the same number of hand cards onto the Inventory
+  // top, chosen in pick order (fewer if the hand runs short).
+  const muralStow = Math.min(muralN, turnPlayer.hand.length);
+  if (muralStow > 0) {
+    abilityPrompts.push({
+      id: `mural-stow-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: `Mural Corridor: put ${muralStow} card(s) from your hand on top of your Inventory, in the order you pick them.`,
+      options: [...turnPlayer.hand],
+      payload: { kind: 'muralStowChoose', needed: String(muralStow), picked: '' },
     });
   }
 

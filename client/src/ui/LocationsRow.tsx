@@ -96,6 +96,17 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     Invest{nextCost !== undefined ? ` ${nextCost}g` : ''}
                   </button>
                 )}
+                {kind === 'invest' && (def.locationInvestEffects ?? []).some(e => e.kind === 'ongoingBuyForMansionPeek') && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    disabled={!canAct || (me?.buysLeft ?? 0) < 1 || state.mansionDeck.length === 0}
+                    title="Reading Room: forfeit 1 Buy to look at the top Mansion card"
+                    onClick={() => onAction({ type: 'readingRoomPeek', seat: mySeat })}
+                  >
+                    Peek (1 Buy)
+                  </button>
+                )}
                 {kind === 'onex' && (
                   <button
                     type="button"
