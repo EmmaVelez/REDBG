@@ -1658,9 +1658,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const freeGoldAction = statueCorridorInvested(state, seat) && (def.bonuses?.gold ?? 0) > 0;
       // Stuffed Deer Room (loc-037): the revealed action plays for free.
       const freePlay = action.isFreePlay === true;
+      // AC-040 Vengeful Intention: once its "Each time you play another action
+      // this turn" damage is armed, every further Action card played this turn
+      // deals that much damage. Read from the PRE-play player, so the card that
+      // arms the effect is never charged for itself. Automatic (no prompt):
+      // the printed text is a cost, not a choice.
+      const vengefulDamage = player.damagePerAdditionalActionThisTurn ?? 0;
+      let vengefulHp = player.hp;
+      if (vengefulDamage > 0) {
+        const ric = applyRicardoDamage(state, seat, player.hp, vengefulDamage);
+        state = ric.state;
+        vengefulHp = ric.hp;
+      }
       const played = withBonusesAndDraws(
               {
                 ...player,
+                hp: vengefulHp,
                 hand: player.hand.filter(id => id !== instanceId),
                 playArea: [...player.playArea, instanceId],
                 // A free repeat resolves the card again WITHOUT spending an Action.
