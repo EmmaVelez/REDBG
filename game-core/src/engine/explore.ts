@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount, effectiveWeaponTags } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { revealTop } from './mansion';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
@@ -216,7 +216,7 @@ export function exploreDamage(
       damage: (def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : (player.armedLauncherInstanceId === id ? 0 : (def?.damage ?? 0))) + (player.weaponDamageBonusById?.[id ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === id ? coup.amount : 0) + bowBonus + xpBonus + cac015Bonus + cac008Prev + cac009Prev + (def?.id === 'we-028' && player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0),
       ammoReq: def?.xAmmo === true ? Math.min(ammoByWeapon?.[id ?? ''] ?? 0, def.ammoCap ?? Infinity) : exploreAmmoReq(state, seat, id ?? '', weaponIds?.length ?? 1),
       weaponEffects: [...(def?.weaponEffects ?? []), ...copied],
-      tags: def?.weaponTags,
+      tags: id === undefined ? def?.weaponTags : (effectiveWeaponTags(state, seat, id, weaponIds) as readonly WeaponTag[]),
     };
   });
   // David King (Outbreak) L2: when he uses a Knife, one from the discard

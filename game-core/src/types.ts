@@ -1068,6 +1068,10 @@ export interface PlayerState {
   /** Per-weapon damage bonuses this turn (Ibex Standard, Lightning Hawk,
    *  Custom Standard Sidearm, Coup de Grâce, ...). Keyed by instance id. */
   readonly weaponDamageBonusById?: Readonly<Record<string, number>>;
+  /** Extra weapon TYPE tags granted for this turn, keyed by instance id.
+   *  CW-013 Pump-Action Shotgun's "this Weapon gains the type Melee". Cleared
+   *  at turn start. */
+  readonly extraWeaponTags?: Readonly<Record<string, readonly string[]>>;
   /** Weapons that will be Trashed at the end of this turn (Custom Standard
    *  Sidearm, Reliable Blade). */
   readonly trashAtEndOfTurn?: readonly string[];
@@ -1349,7 +1353,7 @@ export interface GameState {
 
   /** Reactive trash window (AC-018, Jill L2, AC-042): pending off-turn reaction. */
   readonly reactiveTrashWindow?: {
-    readonly kind: 'uroborosInjection' | 'jillFlashGrenade' | 'fightOrFlight';
+    readonly kind: 'uroborosInjection' | 'jillFlashGrenade' | 'fightOrFlight' | 'cw013SelfDamage';
     readonly triggeringSeat: number;
     readonly revealedInstanceId: string;
   };

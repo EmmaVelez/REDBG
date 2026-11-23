@@ -972,7 +972,13 @@ export function effectiveWeaponTags(
   playedIds?: readonly string[],
 ): readonly string[] {
   const def = state.cardDefs[state.cards[instanceId]?.cardId ?? ''];
-  const tags = [...(def?.weaponTags ?? [])];
+  const tags: string[] = [...(def?.weaponTags ?? [])];
+  // CW-013 Pump-Action Shotgun: a tag GRANTED for this turn counts everywhere
+  // the printed tag would.
+  const granted = state.seats[seat]?.extraWeaponTags?.[instanceId];
+  if (granted !== undefined) {
+    for (const t of granted) if (!tags.includes(t)) tags.push(t);
+  }
   if (!tags.includes('pistol')) {
     const player = state.seats[seat];
     const inPlayArea = (player?.playArea ?? []).includes(instanceId)

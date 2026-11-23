@@ -1473,6 +1473,7 @@ function startTurnInternal(state: GameState): GameState {
     // clear would wipe the alert before it was ever rendered.
     allWeaponsAmmoDiscountThisTurn: undefined,
     weaponDamageBonusById: undefined,
+    extraWeaponTags: undefined,
     trashAtEndOfTurn: undefined,
     usedWeaponEffectsThisTurn: undefined,
     // B4MC-CH-005 L1: the Stun Rod charge lasts "this turn" only.

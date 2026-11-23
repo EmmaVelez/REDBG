@@ -22,6 +22,28 @@ scan silently misses all 45 fan cards. Any future audit must parse whole objects
 > - **cw-025's auto-recall has been REMOVED** from `applyEndOfTurn`; the Weapon
 >   now takes the normal play-area discard unless the player accepts the prompt.
 
+> **UPDATE 2026-11-23 — F2/F3 items from the backlog are being cleared.**
+> - **ac-040 (F3) DONE** — commit 86f5db9. `playActionCard` reads the armed
+>   `damagePerAdditionalActionThisTurn` from the PRE-play player.
+> - **ch-015 Hunk L1 (F2) DONE** — prompted redirect ("you can give that damage
+>   to your Partner instead"), raised from the post-action damage-diff hook
+>   `applyDamageTakenHooks` so ONE code path covers every damage source.
+>   Accepting restores Hunk's Health and takes it from `partnerHp`; a hit that
+>   empties the Partner kills it. Known gap: a single hit that downs Hunk is not
+>   offered (the down is already applied), and damage applied outside
+>   `applyAction` is not seen.
+> - **cw-013 Pump-Action Shotgun (F2) DONE** — `optionalSelfDamageForDamageAndType`
+>   now prompts on the Infected reveal (`cw013SelfDamage`) and DEFERS the explore
+>   so the +10 / Melee grant applies retroactively to that combat (AC-018
+>   machinery). New `PlayerState.extraWeaponTags` carries the turn-scoped type;
+>   `effectiveWeaponTags` merges it so `computeDamage`, `exploreDamage` and the
+>   tag-scoped bonuses all agree. Known gap: single-explore path only — a
+>   multi-explore batch has no per-reveal deferral, so CW-013 is not offered
+>   there yet.
+>
+> Re-verified against the current tree: F1 (the five atomic-reducer cards) and
+> ac-012 / ch-023 remain outstanding.
+
 ---
 
 ## A. Printed "you can / you may" but the engine decides — no prompt, no button

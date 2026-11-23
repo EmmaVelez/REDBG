@@ -1,9 +1,9 @@
-import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt, CardReveal, TargetReason } from '../types';
+import type { GameState, Action, PlayerState, CardDef, CardInstance, WeaponEffect, Prompt, CardReveal, TargetReason, WeaponTag } from '../types';
 import { validateAction } from './validate';
 import { draw, drawWithReshuffle, discardHand } from './deck';
 import { revealTop, revealBottom, sendToBottom, shuffleBack, insertAt, deckCount } from './mansion';
 import { resolveExplore, computeDamage, resolveMultiExplore, grantedExploresFor } from './explore';
-import type { MultiExploreTarget, ExploreParams } from './explore';
+import type { MultiExploreTarget, ExploreParams, ExploreWeapon } from './explore';
 import { isNemesisPursuit, withNemesisPursuitBuff, applyNemesisPursuit, nemesisPursuitBuff, NEMESIS_PURSUIT_ID } from './nemesisPursuit';
 import { applyOutbreakRevealEffects, outbreakTrapDamage, kevlarJacketPreventsDamage, applyDamageWithKevlar } from './outbreak';
 import { flipDown, levelForDecorations, abilitiesForLevel } from './characters';
@@ -77,6 +77,7 @@ import {
   emptyHandDamage,
   extraDamageTakenWhenNotDefeated,
   plusDamagePerUnusedAction,
+  effectiveWeaponTags,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
 import { advanceTurn } from './turn';
@@ -1511,6 +1512,30 @@ function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
         characterAbilities(prev, seat.seat).some(a => a.kind === 'damageReductionForAmmo')) {
       state = gainAmmoCard(state, seat.seat, 1);
     }
+    // CH-015 Hunk L1 (Alliance): "When Hunk would take any damage, you can give
+    // that damage to your Partner instead." Offered from this post-action diff
+    // hook so ONE code path covers every damage source (explore, poison, trap,
+    // AoE, off-turn). It is a CHOICE, so the damage lands first and the player
+    // may retroactively hand it to the Partner.
+    // Only the MAIN can redirect — Hunk as a Partner has no partner of his own.
+    // A hit that downed him is not offered: the down has already been applied.
+    if (!seat.downed && !seat.dead && seat.partnerInstanceId !== undefined &&
+        (seat.partnerHp ?? 0) > 0 &&
+        characterAbilities(prev, seat.seat).some(a => a.kind === 'damageRedirectToPartner')) {
+      const lost = before.hp - seat.hp;
+      if (lost > 0) {
+        state = {
+          ...state,
+          prompts: [...state.prompts, {
+            id: `hunk-redirect-${seat.seat}-v${state.version}`,
+            seat: seat.seat,
+            text: `Hunk took ${lost} damage — give that damage to your Partner instead?`,
+            options: ['Give the damage to your Partner', 'Decline'],
+            payload: { kind: 'hunkRedirect', lost: String(lost) },
+          }],
+        };
+      }
+    }
     if (seat.seat !== state.activeSeat) continue; // only "during your turn"
     // A downed character has no hand (revive redraws one); drawing here would
     // silently drop the cards at revive, so the trigger is skipped instead.
@@ -2886,8 +2911,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             attachmentDamageByTag.set('machineGun', current + rebeccaMachineGunBonus);
           }
 
-          const exploreWeapons = weaponDefs.map((w, i) => {
+          const exploreWeapons: ExploreWeapon[] = weaponDefs.map((w, i) => {
             const instId = weapons[i];
+            // Includes tags GRANTED for this turn (CW-013 Pump-Action Shotgun's
+            // "this Weapon gains the type Melee"), not just the printed ones.
+            const wTags = instId === undefined ? [] : effectiveWeaponTags(state, seat, instId, weapons);
             const isX = w?.xAmmo === true;
             const assigned = isX ? Math.min(ammoByWeapon?.[instId ?? ''] ?? 0, w?.ammoCap ?? 999) : 0;
             const coup = player.pendingCoupDeGrace;
@@ -2938,16 +2966,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerOtherMeleeUsedThisTurn') as { amount: number }).amount
                 * weapons.filter(id => {
                   if (id === instId) return false;
-                  const d = cardDef(state, id);
-                  return (d?.weaponTags ?? []).includes('melee');
+                  return effectiveWeaponTags(state, seat, id, weapons).includes('melee');
                 }).length
               : 0;
             return {
-              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + arklayBonus + cac008Bonus + cac009Bonus + (w?.id === 'we-028' ? stunRodBonus : 0) + ((w?.weaponTags ?? []).includes('knife') || (w?.weaponTags ?? []).includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && (w?.weaponTags ?? []).map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(w?.weaponTags ?? [], attachmentDamageByTag)),
+              damage: isX ? assigned : ((launcherArmed ? 0 : (w?.damage ?? 0)) + (player.weaponDamageBonusById?.[instId ?? ''] ?? 0) + (coup !== undefined && coup.weaponInstanceId === instId ? coup.amount : 0) + bowBonus + xpBonus + haymakerBonus + cac015Bonus + arklayBonus + cac008Bonus + cac009Bonus + (w?.id === 'we-028' ? stunRodBonus : 0) + (wTags.includes('knife') || wTags.includes('melee') ? (player.knifeMeleeDamageBonusThisTurn ?? 0) : 0) + (player.tacticalAdvanceType !== undefined && wTags.map(t => t.toLowerCase()).includes(player.tacticalAdvanceType) ? (player.tacticalAdvanceBonus ?? 0) : 0) + (player.desperateForcesTypes?.includes(w?.weaponType ?? '') ? 10 : 0) + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerNonItemGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).filter(id => { const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.type !== 'item'; }).length + (w?.weaponEffects?.find(e => e.kind === 'plusDamagePerCardGainedThisTurn')?.amount ?? 0) * (player.gainedThisTurn ?? []).length + ((w?.weaponEffects?.some(e => e.kind === 'plusDamageIfNightTime') && (new Date().getHours() >= 20 || new Date().getHours() <= 6)) ? (w?.weaponEffects?.find(e => e.kind === 'plusDamageIfNightTime') as {amount:number}).amount : 0) + attachmentDamageBonusForTags(wTags, attachmentDamageByTag)),
               ammoReq: isX ? assigned : (() => {
                 const baseReq = exploreAmmoReq(state, seat, instId ?? '', weapons.length, abilities);
                 // Low on Ammo: pistols cost 0 ammo but are trashed at end of turn
-                if (hasFreePistolTrashAtEnd(state) && (w?.weaponTags ?? []).includes('pistol')) {
+                if (hasFreePistolTrashAtEnd(state) && wTags.includes('pistol')) {
                   return 0;
                 }
                 return baseReq;
@@ -2955,7 +2982,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               weaponEffects: (instId !== undefined && player.copiedWeaponEffects?.instanceId === instId)
                 ? [...(w?.weaponEffects ?? []), ...player.copiedWeaponEffects.effects]
                 : w?.weaponEffects,
-              tags: w?.weaponTags,
+              tags: wTags as readonly WeaponTag[],
             };
           });
 
@@ -4668,6 +4695,30 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }];
         }
       }
+      // CW-013 Pump-Action Shotgun: "When you Reveal an Infected you can take
+      // 20 Damage if you do this Weapon gains the type 'Melee' and +10 Damage."
+      // The bonus can change THIS combat's outcome, so the explore is deferred
+      // and re-resolved with the boosted weapon (same machinery as AC-018).
+      // Only when the shotgun was actually used for this explore.
+      // NOTE: single-explore path only — a multi-explore batch reveals several
+      // Infected at once and has no per-reveal deferral, so CW-013 is not
+      // offered there yet.
+      const cw013InstanceId = isAnyInfected
+        ? weapons.find(id => cardDef(state, id)?.id === 'cw-013')
+        : undefined;
+      const cw013WindowOffered = cw013InstanceId !== undefined;
+      if (cw013WindowOffered && reactiveWindow === undefined) {
+        reactiveWindow = { kind: 'cw013SelfDamage', triggeringSeat: seat, revealedInstanceId };
+      }
+      if (cw013WindowOffered) {
+        reactivePrompts = [...reactivePrompts, {
+          id: 'p' + (reactivePrompts.length + 1),
+          seat,
+          text: 'Pump-Action Shotgun: take 20 damage to give it the Melee type and +10 damage?',
+          options: ['Take 20 damage', 'Decline'],
+          payload: { kind: 'cw013SelfDamage', instanceId: cw013InstanceId },
+        }];
+      }
       // Mansion attachment event cards: when revealed, the card attaches to
       // the mansion and its ongoing rules apply. Mode 1 = single attachment
       // (new replaces old); mode 2 = multiple attachments allowed.
@@ -4901,7 +4952,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // Grenade takes over), and deferring with no prompt would park the explore
       // forever.
       const ac018WindowOffered = isAnyInfected && !isLasPlagas && ac018Eligible.length > 0;
-      const shouldDefer = lasPlagasDefer || ac042Eligible.length > 0 || ac018WindowOffered;
+      const shouldDefer = lasPlagasDefer || ac042Eligible.length > 0 || ac018WindowOffered || cw013WindowOffered;
 
       if (shouldDefer) {
         const pendingOutcome = outcome.kind === 'defeated' ? 'defeated' : 'notDefeated';
@@ -5275,15 +5326,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // `count` cards of his Discard Pile. The explore rebuilds the seat below,
       // so the ids are collected here and subtracted from its discard local.
       const jakeTrashed = trashTopFromDiscardIds(state, seat, outcome.damageTaken);
-      // Hunk L1: damageRedirectToPartner — when Hunk would take damage and has
-      // a partner, redirect the damage to his partner instead (partner absorbs
-      // it; Hunk takes none). Automatic redirect when a partner is present.
-      const hasDamageRedirect = abilities.some(a => a.kind === 'damageRedirectToPartner');
       const leadingIsPartner = exploreLeader === 'partner' && !!player.partnerInstanceId;
       const baseLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
       // Ada (Nightmare) L2: lethal damage sets her HP to 10 instead of 0 -
       // only when she is the one taking the damage (never a leading partner).
-      const damageOnAda = !leadingIsPartner && !(hasDamageRedirect && player.partnerInstanceId);
+      // CH-015's redirect is deliberately NOT consulted here: it is a player
+      // CHOICE resolved after the action (applyDamageTakenHooks), so treating it
+      // as automatic would silently suppress another character's ability.
+      const damageOnAda = !leadingIsPartner;
       // Mercenaries: Toughness LV.2 (-10 all damage), Luck LV.1 (lethal hit
       // becomes 10 while at 20+ HP), Giant Killing LV.1 (40+ HP Infected deals 0).
       const damageSkillEffects = activeSkillEffects(state, seat);
@@ -7732,6 +7782,116 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           ),
           prompts: newPrompts,
         };
+      }
+
+      if (kind === 'cw013SelfDamage' && chosenId !== undefined) {
+        // CW-013 Pump-Action Shotgun: pay 20 damage; the shotgun then gains the
+        // Melee type and +10 damage, INCLUDING for the explore that just
+        // revealed — so that explore is re-resolved with the boosted weapon.
+        const decline = chosenId === 'Decline';
+        const cwId = String(prompt.payload?.instanceId ?? '');
+        const pe = state.pendingExplore;
+        if (cwId === '' || pe === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        // `idx` is only meaningful when the boost was accepted.
+        let idx = -1;
+        if (!decline) {
+          const cur = s.seats[pe.seat] as PlayerState | undefined;
+          if (cur === undefined) return s;
+          const ric = applyRicardoDamage(s, pe.seat, cur.hp, 20);
+          s = {
+            ...ric.state,
+            seats: ric.state.seats.map(x => (x.seat === pe.seat ? { ...x, hp: ric.hp } : x)),
+          };
+          // The printed "this turn" buff on the shotgun itself.
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === pe.seat
+              ? {
+                  ...x,
+                  weaponDamageBonusById: { ...(x.weaponDamageBonusById ?? {}), [cwId]: (x.weaponDamageBonusById?.[cwId] ?? 0) + 10 },
+                  extraWeaponTags: { ...(x.extraWeaponTags ?? {}), [cwId]: [...new Set([...(x.extraWeaponTags?.[cwId] ?? []), 'melee'])] },
+                }
+              : x)),
+          };
+          // `pendingExplore.weaponIds` is the SAME ordered array
+          // `exploreParams.weapons` was built from.
+          idx = (pe.weaponIds ?? []).indexOf(cwId);
+        }
+        const remaining = newPrompts.some(p => p.payload?.kind === 'cw013SelfDamage');
+        if (remaining) return s;
+        const reParams = decline || pe.exploreParams === undefined
+          ? pe.exploreParams
+          : {
+            ...pe.exploreParams,
+            weapons: pe.exploreParams.weapons.map((w, i) => (i === idx
+              ? { ...w, damage: w.damage + 10, tags: [...new Set([...(w.tags ?? []), 'melee'] as readonly string[])] as readonly WeaponTag[] }
+              : w)),
+          };
+        const defeated = pe.autoDefeat === true
+          || (reParams !== undefined ? resolveExplore(reParams).kind === 'defeated' : pe.outcome === 'defeated');
+        const revealedDef = cardDef(s, pe.revealedInstanceId);
+        const updated: NonNullable<GameState['pendingExplore']> = {
+          ...pe,
+          outcome: defeated ? 'defeated' : 'notDefeated',
+          // A flipped outcome needs the not-defeated Damage recomputed (it was
+          // stored as 0 while the base outcome said defeated).
+          damageTaken: defeated
+            ? 0
+            : Math.max((revealedDef?.attack ?? 0) + extraDamageTakenWhenNotDefeated(characterAbilities(s, pe.seat)), 0),
+          decorationDelta: defeated ? (revealedDef?.decorations ?? 0) : 0,
+        };
+        const resumed = applyPendingExploreOutcome(s, updated, defeated);
+        const ecl = defeated ? eclipticTrashPromptFor(resumed, pe.seat) : undefined;
+        return { ...resumed, prompts: ecl !== undefined ? [...newPrompts, ecl] : newPrompts };
+      }
+
+      if (kind === 'hunkRedirect' && chosenId !== undefined) {
+        // CH-015 Hunk L1: hand the damage Hunk just took to his Partner.
+        // 'Decline' leaves it where it landed.
+        const decline = chosenId === 'Decline';
+        const lost = Number(prompt.payload?.lost ?? '0');
+        const cur = state.seats[seat] as PlayerState | undefined;
+        if (decline || lost <= 0 || cur === undefined || cur.partnerInstanceId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const partnerHp = cur.partnerHp ?? cur.hp;
+        // The Partner cannot absorb more than its remaining Health; a hit that
+        // takes it to 0 kills it (permanent removal, like a leading Partner).
+        const applied = Math.min(lost, partnerHp);
+        const partnerDied = partnerHp - applied <= 0;
+        let s: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === seat
+            ? {
+                ...x,
+                hp: Math.min((x.hp ?? 0) + lost, x.maxHp),
+                ...(x.partnerInstanceId !== undefined ? { partnerHp: partnerHp - applied } : {}),
+              }
+            : x)),
+          prompts: newPrompts,
+        };
+        if (partnerDied) {
+          s = removePartnerSkill(s, seat);
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? {
+                  ...x,
+                  partnerInstanceId: undefined,
+                  partnerAttached: undefined,
+                  partnerLeading: undefined,
+                  partnerSkillId: undefined,
+                  partnerHp: undefined,
+                  partnerMaxHp: undefined,
+                }
+              : x)),
+          };
+        }
+        return s;
       }
 
       if (kind === 'uroborosInjection' && chosenId !== undefined) {
