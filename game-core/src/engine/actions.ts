@@ -31,6 +31,7 @@ import {
   queueJillNegatePrompt,
   queueHunkReductionPrompt,
   queueWeskerReductionPrompt,
+  queueChrisL1ReductionPrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -71,7 +72,7 @@ import {
   characterSource,
     buyCostAfterReduction,
   isPistolWeapon,
-  chrisL1DamageReduction,
+  leaderInfectedReduction,
   markChrisL1ReductionUsed,
   chrisL2TopOfMansion,
   markChrisL2TopUsed,
@@ -3604,9 +3605,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let downed = false;
         let resuscitatePending = false;
         const resuscitatePrompts: Prompt[] = [];
-        // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he
-        // takes on his own turn is lowered by 10.
-        const chrisL1Reduction = chrisL1DamageReduction(state, seat);
+        // B4MC-CH-007 Chris L1: once per round, the first Infected Damage the
+        // LEADER takes on his own turn is lowered by 10. It is a CHOICE, so it is
+        // NOT folded into `damageReduction` (queued below).
+        const chrisL1Amount = leaderInfectedReduction(state, seat, abilities);
         if (defeated || defeatedEntries.length > 0) {
           for (const { id, def } of defeatedEntries) {
             if (!negatedIds.has(id)) {
@@ -3751,7 +3753,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // ---- Survivors: the LEADING character takes their combined Damage ----
           // CH-045's and CH-049's reductions are CHOICES (queued below), so they
           // are NOT folded in here.
-          const damageReduction = infectedDamageReduction(abilities) + allDamageReduction(abilities) + chrisL1Reduction;
+          const damageReduction = infectedDamageReduction(abilities) + allDamageReduction(abilities);
           const damageSkillEffects = activeSkillEffects(state, seat);
           const negateConsumption = consumeNegateDamage(state, seat);
           state = negateConsumption.state;
@@ -3788,23 +3790,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           // CH-045 HUNK L1 (multi-explore): the -20 is a CHOICE, so the leading
           // character is held at pre-damage Health and the resolver settles it.
+          // At most one of these three reducers can apply to a given leader.
+          let reductionQueued = false;
           const hunkReduceAmount = player.downed || player.dead
             ? 0
             : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
           const hunkHeldLoss = hunkReduceAmount > 0 && kevlar.damage > 0 ? kevlar.damage : 0;
           if (hunkHeldLoss > 0) {
+            reductionQueued = true;
             newLeadingHp = baseLeadingHp;
             state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
           }
           // CH-049 Albert Wesker L1: -10 per card in hand, also a CHOICE.
           const weskerAbility = abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as
             { amount: number } | undefined;
-          if (weskerAbility !== undefined && hunkHeldLoss === 0 && kevlar.damage > 0) {
+          if (!reductionQueued && weskerAbility !== undefined && kevlar.damage > 0) {
             const weskerAmount = weskerAbility.amount * handAfter.length;
             if (weskerAmount > 0) {
+              reductionQueued = true;
               newLeadingHp = baseLeadingHp;
               state = queueWeskerReductionPrompt(state, seat, kevlar.damage, weskerAmount, leadingIsPartner);
             }
+          }
+          // B4MC-CH-007 Chris L1: once-per-round -10 for an Ammo x10, also a CHOICE.
+          if (!reductionQueued && chrisL1Amount > 0 && kevlar.damage > 0) {
+            reductionQueued = true;
+            newLeadingHp = baseLeadingHp;
+            state = queueChrisL1ReductionPrompt(state, seat, kevlar.damage, chrisL1Amount, leadingIsPartner);
           }
           // B4MC-CH-005 Jill Valentine L2: the multi-explore equivalent of the
           // single-explore hold - the leading Character stays at her
@@ -4139,14 +4151,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
         }
         if (oscarTrample) out = trashHighestDamageUsedWeapons(out, weapons);
-        // B4MC-CH-007 Chris L1: the first Infected hit he takes on his own turn
-        // each round is lowered by 10 and grants him one "Ammo x10". Applied to
-        // the FINAL seat: the explore rebuilds the seat from a pre-effect
-        // snapshot, so a mid-branch gain would be dropped.
-        if (!defeated && chrisL1Reduction > 0 && multi.combinedAttack > 0) {
-          out = markChrisL1ReductionUsed(out, seat);
-          out = gainAmmoCard(out, seat, 1);
-        }
+        // B4MC-CH-007 Chris L1's once-per-round -10 / Ammo x10 is a CHOICE now:
+        // offered at the damage site and settled by the `chrisL1DamageReduction`
+        // resolver (which consumes the round latch and pays the Ammo).
         return out;
       }
 
@@ -4961,9 +4968,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         : 0;
       // Mercenaries: CH-045's and CH-049's reductions are CHOICES (queued below),
       // so neither is folded in here.
-      // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he takes
-      // on his own turn is lowered by 10.
-      const chrisL1Reduction = chrisL1DamageReduction(state, seat);
+      // B4MC-CH-007 Chris L1: once per round, the first Infected Damage the
+      // LEADER takes on his own turn is lowered by 10. It is a CHOICE, so it is
+      // NOT folded into `damageReduction` (queued below).
+      const chrisL1Amount = leaderInfectedReduction(state, seat, abilities);
 
       // Kept as a value (not just an inline argument) because a deferred explore
       // has to be able to RE-RESOLVE it: AC-018 Uroboros Injection adds +20
@@ -4982,7 +4990,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           hp: (effectiveRevealed?.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + ((((effectiveRevealed?.hp ?? 0)) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
           attack: (effectiveRevealed?.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
         } as CardDef,
-        damageReduction: infectedDamageReduction(abilities) + chrisL1Reduction,
+        damageReduction: infectedDamageReduction(abilities),
         knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
         damageMultiplier: player.damageMultiplierThisTurn ?? 1,
         attachedInfectedCount: player.attached.length,
@@ -5471,24 +5479,34 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // 'Ammo x10'." The reduction is a CHOICE — hold the leading character at
       // its pre-damage Health (the same mechanism as Jill's hold below) and let
       // the resolver apply the reduced or the full loss. While the prompt is
-      // open the seat still has full Health.
+      // open the seat still has full Health. At most one of these three
+      // reducers can apply to a given leader.
+      let reductionQueued = false;
       const hunkReduceAmount = player.downed || player.dead
         ? 0
         : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
       const hunkHeldLoss = hunkReduceAmount > 0 && kevlar.damage > 0 ? kevlar.damage : 0;
       if (hunkHeldLoss > 0) {
+        reductionQueued = true;
         newLeadingHp = baseLeadingHp;
         state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
       }
       // CH-049 Albert Wesker L1: -10 per card in hand, also a CHOICE.
       const weskerAbility = abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as
         { amount: number } | undefined;
-      if (weskerAbility !== undefined && hunkHeldLoss === 0 && kevlar.damage > 0) {
+      if (!reductionQueued && weskerAbility !== undefined && kevlar.damage > 0) {
         const weskerAmount = weskerAbility.amount * handAfter.length;
         if (weskerAmount > 0) {
+          reductionQueued = true;
           newLeadingHp = baseLeadingHp;
           state = queueWeskerReductionPrompt(state, seat, kevlar.damage, weskerAmount, leadingIsPartner);
         }
+      }
+      // B4MC-CH-007 Chris L1: once-per-round -10 for an Ammo x10, also a CHOICE.
+      if (!reductionQueued && chrisL1Amount > 0 && kevlar.damage > 0) {
+        reductionQueued = true;
+        newLeadingHp = baseLeadingHp;
+        state = queueChrisL1ReductionPrompt(state, seat, kevlar.damage, chrisL1Amount, leadingIsPartner);
       }
       // B4MC-CH-005 Jill Valentine L2: when she would take explore Damage
       // (Main leading), hold the Character at her pre-damage Health and offer
@@ -5670,12 +5688,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       }
 
-      // B4MC-CH-007 Chris L1: the first Infected hit he takes on his own turn
-      // each round is lowered by 10 and grants him one "Ammo x10".
-      if (chrisL1Reduction > 0 && (revealedDef?.attack ?? 0) > 0) {
-        state = markChrisL1ReductionUsed(state, seat);
-        state = gainAmmoCard(state, seat, 1);
-      }
+      // B4MC-CH-007 Chris L1's once-per-round -10 / Ammo x10 is a CHOICE now:
+      // offered at the damage site and settled by the `chrisL1DamageReduction`
+      // resolver (which consumes the round latch and pays the Ammo).
 
       // Nightmare: on-not-defeated infected effects (MA-054 Osmund Saddler).
       const nightmareNotDefeatedFx = applyNightmareNotDefeatedEffects(state, { seat, revealedInstanceId, revealedDef: revealedDef as CardDef, weapons });
@@ -11216,6 +11231,24 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cleared = { ...state, ...nextBase, prompts: newPrompts };
         if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
         return settleHeldDamageLoss(cleared, seat, decline ? loss : Math.max(loss - amount, 0), partnerLead);
+      }
+
+      if (kind === 'chrisL1DamageReduction' && chosenId !== undefined) {
+        // B4MC-CH-007 Chris L1: accepting consumes the once-per-round latch and
+        // pays 1 'Ammo x10'; declining applies the full loss.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const amount = Number(prompt.payload?.amount ?? '0');
+        const partnerLead = prompt.payload?.leader === 'partner';
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
+        let s: GameState = cleared;
+        const applied = decline ? loss : Math.max(loss - amount, 0);
+        if (!decline) {
+          s = markChrisL1ReductionUsed(s, seat);
+          s = gainAmmoCard(s, seat, 1);
+        }
+        return settleHeldDamageLoss(s, seat, applied, partnerLead);
       }
 
       if (kind === 'jillNegateDamage') {

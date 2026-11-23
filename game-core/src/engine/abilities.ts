@@ -1253,11 +1253,48 @@ export function queueWeskerReductionPrompt(
   };
 }
 
-export function chrisL1DamageReduction(state: GameState, seat: number): number {
+/**
+ * B4MC-CH-007 CHRIS REDFIELD L1 (Mercenaries): "Once per round, the first
+ * Infected Damage he takes on his own turn is lowered by 10. In that case, gain
+ * 1 'Ammo x10'." Same hold-and-settle shape; accepting also consumes the once-
+ * per-round latch and pays the Ammo.
+ */
+export function queueChrisL1ReductionPrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  amount: number,
+  partnerLead: boolean,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `chris-l1-reduce-${seat}-v${state.version}`,
+      seat,
+      text: `Chris would take ${loss} damage — lower it by ${amount} and gain 1 'Ammo x10'?`,
+      options: [`Lower by ${amount}`, 'Decline'],
+      payload: { kind: 'chrisL1DamageReduction', loss: String(loss), amount: String(amount), leader: partnerLead ? 'partner' : 'main' },
+    }],
+  };
+}
+
+/**
+ * B4MC-CH-007 Chris Redfield L1 (Mercenaries): "Once per round, the first
+ * Infected Damage he takes on his own turn is lowered by 10. In that case, gain
+ * 1 'Ammo x10'."
+ *
+ * Evaluated against the LEADER's abilities (a partner-led explore can be led by
+ * Chris) and gated on the seat's own turn and the shared round latch.
+ */
+export function leaderInfectedReduction(
+  state: GameState,
+  seat: number,
+  abilities: readonly CharacterAbility[],
+): number {
   const player = state.seats[seat];
   if (player === undefined || player.dead || player.downed) return 0;
   if (!isOwnTurn(state, seat)) return 0;
-  const ability = characterAbilities(state, seat).find(a => a.kind === 'infectedDamageReductionOncePerRoundGainAmmo');
+  const ability = abilities.find(a => a.kind === 'infectedDamageReductionOncePerRoundGainAmmo');
   if (ability === undefined || ability.kind !== 'infectedDamageReductionOncePerRoundGainAmmo') return 0;
   if (player.roundUsedAbilities?.infectedDamageReductionOncePerRoundGainAmmo === true) return 0;
   return ability.amount;

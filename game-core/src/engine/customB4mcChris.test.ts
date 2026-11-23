@@ -299,15 +299,46 @@ describe('CH-008 L2: a not-defeated Infected may go on top of the Mansion', () =
 // ---------------------------------------------------------------------------
 
 describe('CH-007 L1: the first Infected hit each round is lowered by 10', () => {
-  it('lowers the damage and grants an Ammo x10', () => {
+  const chrisPrompt = (s: GameState) => s.prompts.find(p => p.payload?.kind === 'chrisL1DamageReduction');
+  const accept = (s: GameState) => applyAction(s, {
+    type: 'chooseOption', seat: 0, promptId: chrisPrompt(s)!.id, option: 0,
+  });
+  const decline = (s: GameState) => applyAction(s, {
+    type: 'chooseOption', seat: 0, promptId: chrisPrompt(s)!.id, option: 1,
+  });
+
+  it('HOLDS the damage and offers the -10 instead of applying it silently', () => {
     const s = clearTurnStartPrompts(turn(CH007, { level: 1, decorations: 3, hp: 90, turnAmmo: 0 }));
     const { state: withKnife, id: knife } = addCard(s, 0, 'we-004'); // 5 < 25 HP
-    const { state: topped, ids } = setMansionTop(withKnife, ['ma-004']); // 20 attack
+    const { state: topped } = setMansionTop(withKnife, ['ma-004']);   // 20 attack
     const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
-    expect(next.seats[0]?.hp).toBe(80); // 90 - (20 - 10)
-    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-001')).toBe(true);
-    expect(next.seats[0]?.roundUsedAbilities?.infectedDamageReductionOncePerRoundGainAmmo).toBe(true);
-    void ids;
+    expect(next.seats[0]?.hp).toBe(90);
+    const pr = chrisPrompt(next);
+    expect(pr).toBeDefined();
+    expect(pr?.payload?.loss).toBe('20');
+    expect(pr?.payload?.amount).toBe('10');
+  });
+
+  it('accepting lowers the damage, pays an Ammo x10 and consumes the round latch', () => {
+    const s = clearTurnStartPrompts(turn(CH007, { level: 1, decorations: 3, hp: 90, turnAmmo: 0 }));
+    const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
+    const { state: topped } = setMansionTop(withKnife, ['ma-004']);
+    const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
+    const out = accept(next);
+    expect(out.seats[0]?.hp).toBe(80); // 90 - (20 - 10)
+    expect(out.seats[0]?.discard.some(id => out.cards[id]?.cardId === 'am-001')).toBe(true);
+    expect(out.seats[0]?.roundUsedAbilities?.infectedDamageReductionOncePerRoundGainAmmo).toBe(true);
+  });
+
+  it('declining applies the full loss and pays nothing', () => {
+    const s = clearTurnStartPrompts(turn(CH007, { level: 1, decorations: 3, hp: 90, turnAmmo: 0 }));
+    const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
+    const { state: topped } = setMansionTop(withKnife, ['ma-004']);
+    const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
+    const out = decline(next);
+    expect(out.seats[0]?.hp).toBe(70); // full 20
+    expect(out.seats[0]?.discard.some(id => out.cards[id]?.cardId === 'am-001')).toBe(false);
+    expect(out.seats[0]?.roundUsedAbilities?.infectedDamageReductionOncePerRoundGainAmmo).toBeUndefined();
   });
 
   it('does not apply at level 0', () => {
@@ -315,21 +346,22 @@ describe('CH-007 L1: the first Infected hit each round is lowered by 10', () => 
     const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
     const { state: topped } = setMansionTop(withKnife, ['ma-004']);
     const next = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
+    expect(chrisPrompt(next)).toBeUndefined();
     expect(next.seats[0]?.hp).toBe(70); // full 20 damage
-    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-001')).toBe(false);
   });
 
   it('applies only once per round', () => {
     const s = clearTurnStartPrompts(turn(CH007, { level: 1, decorations: 3, hp: 90, turnAmmo: 0, exploresLeft: 2 }));
     const { state: withKnife, id: knife } = addCard(s, 0, 'we-004');
     const { state: topped } = setMansionTop(withKnife, ['ma-004']);
-    const first = applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 });
+    const first = accept(applyAction(topped, { type: 'explore', seat: 0, weapons: [knife], exploreCount: 1 }));
     expect(first.seats[0]?.hp).toBe(80);
 
     const { state: withKnife2, id: knife2 } = addCard(first, 0, 'we-004');
     const { state: reTopped } = setMansionTop(withKnife2, ['ma-004']);
     const second = applyAction(reTopped, { type: 'explore', seat: 0, weapons: [knife2], exploreCount: 1 });
-    expect(second.seats[0]?.hp).toBe(60); // full 20 damage the second time
+    expect(chrisPrompt(second)).toBeUndefined(); // latch already spent
+    expect(second.seats[0]?.hp).toBe(60);        // full 20 damage the second time
   });
 });
 
