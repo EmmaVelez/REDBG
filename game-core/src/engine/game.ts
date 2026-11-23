@@ -323,6 +323,37 @@ function turnStartAbilityPrompts(
     });
   }
 
+  // PR-008 Cindy Lennox L2: at full Health, she deals +amount Damage this turn.
+  const cindyL2 = abilities.find(a => a.kind === 'fullHpDamageBonusAtTurnStart');
+  if (cindyL2 !== undefined && cindyL2.kind === 'fullHpDamageBonusAtTurnStart'
+      && player.hp >= player.maxHp) {
+    prompts.push({
+      id: `ability-${player.seat}-v${newVersion}`,
+      seat: player.seat,
+      text: abilityText('fullHpDamageBonusAtTurnStart'),
+      options: [`+${cindyL2.amount} Damage this turn`, 'Decline'],
+      payload: { kind: 'cindyFullHpDamage', amount: String(cindyL2.amount) },
+    });
+  }
+
+  // PR-003 George Hamilton L2: choose X Herbs from hand, reveal them and draw X.
+  if (abilities.some(a => a.kind === 'revealHerbsForCards')) {
+    const herbIds = player.hand.filter(id =>
+      (state.cardDefs[state.cards[id]?.cardId ?? '']?.name ?? '').includes('Herb'));
+    if (herbIds.length > 0) {
+      prompts.push({
+        id: `ability-${player.seat}-v${newVersion}`,
+        seat: player.seat,
+        text: abilityText('revealHerbsForCards'),
+        options: [
+          ...herbIds.map((_, i) => `Reveal ${i + 1} Herb${i + 1 > 1 ? 's' : ''}`),
+          'Decline',
+        ],
+        payload: { kind: 'georgeRevealHerbs', herbs: herbIds.join(',') },
+      });
+    }
+  }
+
   // HUNK (Outbreak) L1: take 10 Damage at the beginning of the turn for +1 Explore.
   const hunkL1 = abilities.find(a => a.kind === 'turnStartDamageForExplore');
   const hunkAmount = hunkL1?.kind === 'turnStartDamageForExplore' ? hunkL1.amount : 10;

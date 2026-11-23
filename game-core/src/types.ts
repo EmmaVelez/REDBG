@@ -861,6 +861,35 @@ export type CharacterAbility =
   | { readonly kind: "drawOncePerTurnIfHpAtMost"; readonly hpThreshold: number; readonly level: 1 | 2 }
   /** CH-016 L2: when you Defeat an Infected, choose a Player; they get +1 card. */
   | { readonly kind: "choosePlayerOnDefeatForCard"; readonly level: 1 | 2 } // ch-005p Jill Valentine L2: when she would take any Damage, may Trash 1 card to negate the Damage
+  // --- Promo characters (PR-003..PR-008) ---
+  /** PR-003 George Hamilton L1: trash a Herb from hand -> Green: +1 Action, Red: +1 Explore. */
+  | { readonly kind: "herbTrashForActionOrExplore"; readonly level: 1 | 2 }
+  /** PR-003 L2: at turn start, reveal X Herbs from hand and draw X cards. */
+  | { readonly kind: "revealHerbsForCards"; readonly level: 1 | 2 }
+  /** PR-004 Jim Chapman L1: on Explore, flip a coin; heads doubles one weapon's
+   *  damage this turn, tails he takes `amount` damage. */
+  | { readonly kind: "coinFlipOnExplore"; readonly amount: number; readonly level: 1 | 2 }
+  /** PR-004 L2: during your turn, when an Infected is revealed, gain `ammo`
+   *  Ammo x10 and move every revealed Infected to the bottom of the Mansion. */
+  | { readonly kind: "onInfectedRevealedAmmoBottom"; readonly ammo: number; readonly level: 1 | 2 }
+  /** PR-005 Albert Wesker L1: during your turn, if his Maximum Health is at most
+   *  `hpThreshold`, get +1 card (once per turn). */
+  | { readonly kind: "drawOncePerTurnIfMaxHpAtMost"; readonly hpThreshold: number; readonly level: 1 | 2 }
+  /** PR-005 L2: same gate, grants +1 Explore instead. */
+  | { readonly kind: "exploreOncePerTurnIfMaxHpAtMost"; readonly hpThreshold: number; readonly level: 1 | 2 }
+  /** PR-006 Yoko Suzuki L2: when her Health would drop to 0 or less, reduce her
+   *  Maximum Health by `amount` and Heal her to full instead. */
+  | { readonly kind: "lethalReduceMaxHpHealFull"; readonly amount: number; readonly level: 1 | 2 }
+  /** PR-007 Alyssa Ashcroft L1: on Explore with exactly one Weapon, pay
+   *  `ammoCost` Ammo for +`amount` Damage this turn. */
+  | { readonly kind: "payAmmoSingleWeaponExploreBonus"; readonly ammoCost: number; readonly amount: number; readonly level: 1 | 2 }
+  /** PR-007 L2: name a card type, reveal the top of the Inventory; on a match
+   *  draw it and get +1 Explore this turn. */
+  | { readonly kind: "nameTypeRevealInventoryTop"; readonly level: 1 | 2 }
+  /** PR-008 Cindy Lennox L1: whenever you Gain a Herb card, +1 Buy this turn. */
+  | { readonly kind: "buyOnHerbGain"; readonly level: 1 | 2 }
+  /** PR-008 L2: at turn start, if at full Health, +`amount` Damage this turn. */
+  | { readonly kind: "fullHpDamageBonusAtTurnStart"; readonly amount: number; readonly level: 1 | 2 }
 
 
 // ---------------------------------------------------------------------------

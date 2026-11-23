@@ -533,8 +533,21 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                   if (ability.level > charLevel) {
                     return { ok: false, reason: 'useCharacterAbility: ability not unlocked' };
                   }
+      // PR-005 Albert Wesker L1/L2: gated on MAXIMUM Health, not current Health —
+      // the print says "if Albert's Maximum Health is 80 or less".
+      if (ability.kind === 'drawOncePerTurnIfMaxHpAtMost'
+          || ability.kind === 'exploreOncePerTurnIfMaxHpAtMost') {
+        const threshold = (ability as { hpThreshold?: number }).hpThreshold ?? 80;
+        if ((player.maxHp ?? 0) > threshold) {
+          return { ok: false, reason: 'useCharacterAbility: Maximum Health is above the threshold' };
+        }
+      }
+
       switch (ability.kind) {
         case 'plusDamageThisTurn':
+        case 'herbTrashForActionOrExplore':
+        case 'drawOncePerTurnIfMaxHpAtMost':
+        case 'exploreOncePerTurnIfMaxHpAtMost':
         case 'exchangeHandWithInventoryTop':
         case 'revealMansionTopNoEffect':
         case 'revealInventoryTopForAction':

@@ -6051,6 +6051,57 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ),
               };
             }
+            case 'herbTrashForActionOrExplore': {
+              // PR-003 George Hamilton L1: trash a Herb from hand; a Green Herb
+              // gives +1 Action this turn, a Red Herb +1 Explore. Other Herbs are
+              // still legal trashes but grant nothing (the print names only those
+              // two). Once per turn is enforced by validate's log scan.
+              const herbs = player.hand.filter(id =>
+                (cardDef(state, id)?.name ?? '').includes('Herb'));
+              if (herbs.length === 0) return { ...state, ...nextBase };
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'George Hamilton: trash a "Herb" card from your hand?',
+                    options: [...herbs, 'Decline'],
+                    payload: { kind: 'georgeHerbTrash' },
+                  },
+                ],
+              };
+            }
+            case 'drawOncePerTurnIfMaxHpAtMost': {
+              // PR-005 Albert Wesker L1: +1 card. The Maximum-Health gate lives in
+              // validate, which rejects the activation above the threshold.
+              const d = drawWithReshuffle({
+                deck: player.inventory,
+                discard: player.discard,
+                count: 1,
+                rngState: state.rngState,
+              });
+              return {
+                ...state,
+                ...nextBase,
+                rngState: d.rngState,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+                  : s)),
+              };
+            }
+            case 'exploreOncePerTurnIfMaxHpAtMost': {
+              // PR-005 Albert Wesker L2: +1 Explore (same Maximum-Health gate).
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...player, exploresLeft: player.exploresLeft + 1 }
+                  : s)),
+              };
+            }
             case 'stunRodCharge': {
               // B4MC-CH-005 L1: pay 1 Action to charge; for the rest of this turn
               // her Stun Rod explores get +amount Damage. Once per turn is
@@ -11310,6 +11361,71 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
         }
         return applyAction(s, ask.action);
+      }
+
+      if (kind === 'cindyFullHpDamage' && chosenId !== undefined) {
+        // PR-008 Cindy Lennox L2: at full Health, +amount Damage this turn.
+        const decline = chosenId === 'Decline';
+        const amount = Number(prompt.payload?.amount ?? '0');
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (!decline) {
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, weaponDamageBonusThisTurn: x.weaponDamageBonusThisTurn + amount }
+              : x)),
+            usedStartOfTurnAbilities: { ...(s.usedStartOfTurnAbilities ?? {}), fullHpDamageBonusAtTurnStart: true },
+          };
+        }
+        return s;
+      }
+
+      if (kind === 'georgeRevealHerbs' && chosenId !== undefined) {
+        // PR-003 George Hamilton L2: reveal X Herb cards from hand and draw X.
+        // The label carries the player's chosen count ("Reveal 3 Herbs").
+        const herbs = String(prompt.payload?.herbs ?? '').split(',').filter(Boolean);
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (chosenId !== 'Decline') {
+          const m = String(chosenId).match(/[0-9]+/);
+          const n = Math.min(Math.max(m === null ? 0 : parseInt(m[0], 10), 1), herbs.length);
+          recordCardReveals(herbs.slice(0, n).map(instanceId => ({ instanceId, pile: 'hand' as const })));
+          const cur = s.seats[seat] as PlayerState | undefined;
+          if (cur !== undefined) {
+            const d = drawWithReshuffle({ deck: cur.inventory, discard: cur.discard, count: n, rngState: s.rngState });
+            s = {
+              ...s,
+              rngState: d.rngState,
+              seats: s.seats.map(x => (x.seat === seat
+                ? { ...x, hand: [...x.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+                : x)),
+            };
+          }
+        }
+        return s;
+      }
+
+      if (kind === 'georgeHerbTrash') {
+        // PR-003 George Hamilton L1: the chosen Herb leaves hand for the discard;
+        // Green grants +1 Action this turn, Red grants +1 Explore. Other Herbs are
+        // trashed with no bonus, and Decline changes nothing.
+        const decline = chosenId === 'Decline';
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (!decline && chosenId !== '') {
+          const name = cardDef(s, String(chosenId))?.name ?? '';
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? {
+                  ...x,
+                  hand: x.hand.filter(id => id !== chosenId),
+                  discard: [...x.discard, String(chosenId)],
+                  actionsLeft: x.actionsLeft + (name.includes('Green') ? 1 : 0),
+                  exploresLeft: x.exploresLeft + (name.includes('Red') ? 1 : 0),
+                }
+              : x)),
+          };
+        }
+        return s;
       }
 
       if (kind === 'ac012Struggle' && chosenId !== undefined) {

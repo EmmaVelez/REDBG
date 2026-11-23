@@ -129,6 +129,15 @@ export function gainCard(state: GameState, req: GainCardRequest): GameState {
     seats: s.seats.map(p => (p.seat === seat ? newPlayer : p)),
   };
 
+  // PR-008 Cindy Lennox L1: gaining a card with "Herb" in its name grants
+  // +1 Buy this turn. gainCard is the ONE choke point every acquisition path
+  // goes through, so this covers buy / token / grant / explore uniformly.
+  if ((state.cardDefs[req.cardId]?.name ?? '').includes('Herb')
+      && abilities.some(a => a.kind === 'buyOnHerbGain')) {
+    newPlayer = { ...newPlayer, buysLeft: newPlayer.buysLeft + 1 };
+    s = { ...s, seats: s.seats.map(p => (p.seat === seat ? newPlayer : p)) };
+  }
+
   // Hook: Leon S. Kennedy (Nightmare) L2 plusOneCardOnGainCard — draw one card.
   // Only base gains trigger it (the hook's own draw never re-triggers), and
   // the depth cap stops a chain of on-gain effects.
