@@ -120,13 +120,19 @@ describe('Mercenaries characters', () => {
     expect(notLowest.seats[0]?.weaponDamageBonusThisTurn).toBe(0);
   });
 
-  it('CH-045 HUNK: -20 damage and gains 1 Ammo x10 when he takes damage', () => {
+  it('CH-045 HUNK: the -20 is a CHOICE; accepting lowers the hit and gains 1 Ammo x10', () => {
     const s = mercGame('ch-045');
     const withInfected = mansionTop(s, 'ma-078'); // attack 60
     const weapon = findHand(withInfected, 'we-050');
     const next = explore(withInfected, 0, weapon);
-    expect(next.seats[0]?.hp).toBe(90 - 40); // HUNK's max HP is 90
-    expect(next.seats[0]?.discard.some(id => next.cards[id]?.cardId === 'am-005')).toBe(true);
+    // HUNK's max HP is 90; the hit is HELD at pre-damage Health while he decides.
+    expect(next.seats[0]?.hp).toBe(90);
+    const promptId = findPrompt(next, 'hunkDamageReduction');
+    const accepted = choose(next, 0, promptId, 0);
+    expect(accepted.seats[0]?.hp).toBe(90 - 40);
+    expect(accepted.seats[0]?.discard.some(id => accepted.cards[id]?.cardId === 'am-005')).toBe(true);
+    const declined = choose(next, 0, promptId, 1);
+    expect(declined.seats[0]?.hp).toBe(90 - 60);
   });
 
   it('CH-046 Claire: -1 Buy for -10 Ammo Requirement this turn', () => {

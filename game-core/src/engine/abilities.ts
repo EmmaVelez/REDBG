@@ -1198,6 +1198,35 @@ export function queueJillNegatePrompt(
   };
 }
 
+/**
+ * CH-045 HUNK (Mercenaries) L1: "When Hunk would take any Damage, you can lower
+ * that Damage by 20. In that case, Gain 1 'Ammo x10'."
+ *
+ * The reduction is a CHOICE, so the caller HOLDS the leading character at its
+ * pre-damage Health (the same mechanism as Jill's trash-to-negate hold) and
+ * queues this prompt; the resolver applies either the reduced or the full loss.
+ * `leader` records whether the PARTNER was leading, because the loss lands on
+ * `partnerHp` in that case.
+ */
+export function queueHunkReductionPrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  amount: number,
+  partnerLead: boolean,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `hunk-reduce-${seat}-v${state.version}`,
+      seat,
+      text: `Hunk would take ${loss} damage — lower it by ${amount} and gain 1 'Ammo x10'?`,
+      options: [`Lower by ${amount}`, 'Decline'],
+      payload: { kind: 'hunkDamageReduction', loss: String(loss), amount: String(amount), leader: partnerLead ? 'partner' : 'main' },
+    }],
+  };
+}
+
 export function chrisL1DamageReduction(state: GameState, seat: number): number {
   const player = state.seats[seat];
   if (player === undefined || player.dead || player.downed) return 0;

@@ -29,6 +29,7 @@ import {
   plusTagDamage,
   actionDiscardDamage,
   queueJillNegatePrompt,
+  queueHunkReductionPrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -1506,9 +1507,12 @@ function applyDamageTakenHooks(prev: GameState, next: GameState): GameState {
     if (seat === undefined || before === undefined) continue;
     if (seat.hp >= before.hp) continue;          // no damage this action
     // CH-045 HUNK (Mercenaries): "When Hunk would take any Damage, you can lower
-    // that Damage by 20. In that case, Gain 1 'Ammo x10'." The reduction is
-    // applied at the damage site; the gain fires once per damaging action.
+    // that Damage by 20. In that case, Gain 1 'Ammo x10'." On the EXPLORE path
+    // the -20 is now a CHOICE (queueHunkReductionPrompt) and its resolver grants
+    // the Ammo, so the automatic grant is skipped while that prompt is open.
+    // The non-explore damage sites still auto-apply the reduction.
     if (!seat.downed && !seat.dead &&
+        !prev.prompts.some(p => p.payload?.kind === 'hunkDamageReduction') &&
         characterAbilities(prev, seat.seat).some(a => a.kind === 'damageReductionForAmmo')) {
       state = gainAmmoCard(state, seat.seat, 1);
     }
@@ -3673,11 +3677,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         if (undefeatedEntries.length > 0) {
           // ---- Survivors: the LEADING character takes their combined Damage ----
-          const hunkReduction = abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+          // CH-045's -20 is a CHOICE (queued below), so it is NOT folded in here.
           const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
             ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
             : 0;
-          const damageReduction = infectedDamageReduction(abilities) + hunkReduction + weskerReduction + allDamageReduction(abilities) + chrisL1Reduction;
+          const damageReduction = infectedDamageReduction(abilities) + weskerReduction + allDamageReduction(abilities) + chrisL1Reduction;
           const damageSkillEffects = activeSkillEffects(state, seat);
           const negateConsumption = consumeNegateDamage(state, seat);
           state = negateConsumption.state;
@@ -3711,6 +3715,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
             newLeadingHp = baseLeadingHp - Math.max(kevlar.damage - reduce, 0);
             if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+          }
+          // CH-045 HUNK L1 (multi-explore): the -20 is a CHOICE, so the leading
+          // character is held at pre-damage Health and the resolver settles it.
+          const hunkReduceAmount = player.downed || player.dead
+            ? 0
+            : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+          const hunkHeldLoss = hunkReduceAmount > 0 && kevlar.damage > 0 ? kevlar.damage : 0;
+          if (hunkHeldLoss > 0) {
+            newLeadingHp = baseLeadingHp;
+            state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
           }
           // B4MC-CH-005 Jill Valentine L2: the multi-explore equivalent of the
           // single-explore hold - the leading Character stays at her
@@ -4865,9 +4879,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const sameNameAttachedCount = revealedDef?.type === 'infected'
         ? state.seats.reduce((sum, s) => sum + (s.dead ? 0 : s.attached.filter(id => state.cards[id]?.cardId === revealedDef.id).length), 0)
         : 0;
-      // Mercenaries: HUNK (CH-045) reduces all damage he takes; Albert Wesker
-      // (CH-049) reduces explore damage by 10 per card in his hand.
-      const hunkReduction = abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+      // Mercenaries: Albert Wesker (CH-049) reduces explore damage by 10 per
+      // card in his hand. CH-045's -20 is a CHOICE (queued below), so it is NOT
+      // folded in here.
       const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
         ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
         : 0;
@@ -4892,7 +4906,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           hp: (effectiveRevealed?.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + ((((effectiveRevealed?.hp ?? 0)) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
           attack: (effectiveRevealed?.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
         } as CardDef,
-        damageReduction: infectedDamageReduction(abilities) + hunkReduction + weskerReduction + chrisL1Reduction,
+        damageReduction: infectedDamageReduction(abilities) + weskerReduction + chrisL1Reduction,
         knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
         damageMultiplier: player.damageMultiplierThisTurn ?? 1,
         attachedInfectedCount: player.attached.length,
@@ -5376,6 +5390,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const reduce = player.downed || player.dead ? 0 : ricardoReduction(abilities, kevlar.damage);
         newLeadingHp = Math.max(baseLeadingHp - Math.max(kevlar.damage - reduce, 0), 0);
         if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
+      }
+      // CH-045 HUNK L1: "you can lower that Damage by 20. In that case, Gain 1
+      // 'Ammo x10'." The reduction is a CHOICE — hold the leading character at
+      // its pre-damage Health (the same mechanism as Jill's hold below) and let
+      // the resolver apply the reduced or the full loss. While the prompt is
+      // open the seat still has full Health.
+      const hunkReduceAmount = player.downed || player.dead
+        ? 0
+        : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
+      const hunkHeldLoss = hunkReduceAmount > 0 && kevlar.damage > 0 ? kevlar.damage : 0;
+      if (hunkHeldLoss > 0) {
+        newLeadingHp = baseLeadingHp;
+        state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
       }
       // B4MC-CH-005 Jill Valentine L2: when she would take explore Damage
       // (Main leading), hold the Character at her pre-damage Health and offer
@@ -11075,6 +11102,77 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // -------------------------------------------------------------------
       // Mercenaries expansion prompt resolutions
       // -------------------------------------------------------------------
+
+      if (kind === 'hunkDamageReduction' && chosenId !== undefined) {
+        // CH-045 HUNK L1: the explore held the leading character at its
+        // pre-damage Health. Accept applies only the reduced loss and pays the
+        // printed cost (1 'Ammo x10'); Decline applies the full loss. A lethal
+        // result downs a Main, or permanently removes a leading Partner.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const amount = Number(prompt.payload?.amount ?? '0');
+        const partnerLead = prompt.payload?.leader === 'partner';
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        const cur = cleared.seats[seat] as PlayerState | undefined;
+        if (cur === undefined || loss <= 0) return cleared;
+        let s: GameState = cleared;
+        const applied = decline ? loss : Math.max(loss - amount, 0);
+        if (!decline && applied < loss) s = gainAmmoCard(s, seat, 1);
+        if (applied <= 0) return s;
+        if (partnerLead) {
+          const nextHp = Math.max((cur.partnerHp ?? cur.hp) - applied, 0);
+          if (nextHp > 0) {
+            return { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, partnerHp: nextHp } : x)) };
+          }
+          let dead = removePartnerSkill(s, seat);
+          dead = {
+            ...dead,
+            seats: dead.seats.map(x => (x.seat === seat
+              ? {
+                  ...x,
+                  partnerInstanceId: undefined,
+                  partnerAttached: undefined,
+                  partnerLeading: undefined,
+                  partnerSkillId: undefined,
+                  partnerHp: undefined,
+                  partnerMaxHp: undefined,
+                }
+              : x)),
+          };
+          return dead;
+        }
+        const nextHp = Math.max(cur.hp - applied, 0);
+        if (nextHp > 0) {
+          return { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, hp: nextHp } : x)) };
+        }
+        let rng = makeRng(s.rngState);
+        const rngShuffle = (items: readonly string[]): string[] => {
+          const r = shuffle(rng, items);
+          rng = r.rng;
+          return [...r.value];
+        };
+        const flip = flipDown(
+          {
+            hp: 0,
+            maxHp: cur.maxHp,
+            decorations: cur.decorations,
+            level: cur.level,
+            downed: false,
+            dead: false,
+            hand: cur.hand,
+            discard: cur.discard,
+            inventory: cur.inventory,
+          },
+          rngShuffle,
+        );
+        return {
+          ...s,
+          rngState: rng.s,
+          seats: s.seats.map(x => (x.seat === seat
+            ? { ...x, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
+            : x)),
+        };
+      }
 
       if (kind === 'jillNegateDamage') {
         // B4MC-CH-005 Jill Valentine L2: Accept -> Trash the chosen hand card
