@@ -1,5 +1,20 @@
 # HANDOFF — resume here
 
+**CUSTOM WEAPON CW-036 LEVER ACTION RIFLE (2026-11-23):** Manny sent a fan render
+(no printed code): 40 cost / 40 ammoReq / 20 damage, tags gun+rifle, text
+"This weapon gets +5 Damage for every Action you played this turn." Reuses the
+existing `plusDamagePerActionPlayedThisTurn` kind (WE-016 Semi-Automatic Rifle +10;
+cw-020 Riot Shotgun +5) so NO engine change was needed: the count is Action-type
+cards sitting in the Play Area at explore time, applied by the explore reducer and
+mirrored in `exploreDamage` for the picker preview. Art `CW-036.png` (588x800 ->
+320x435 LANCZOS, full-card render) is auto-discovered by the client's Vite glob.
+Pile behaviour is unchanged from the other custom guns: primary tag "gun" folds it
+into the scenario `hg` pile next to cw-013/cw-020 (never a `custom-cw-*` pile).
+Tests: `customLeverActionRifle.test.ts` (preview/resolve 20 -> 45 vs ma-011's 40 HP,
+plus def shape) + `customCards.test.ts` definition and pile-merge assertions.
+Gates: typecheck clean, game-core full suite, server 115, client 286, client build
+emits the CW-036 asset.
+
 **CARD ART COMPLETE — all 304 catalogue ids now ship a PNG (2026-11-23):** the last 100 missing
 cards were pulled from the UGC-named contact sheets in
 `Documents/My Games/Tabletop Simulator/Mods/Images/RE DBG - Expansión 1/` (char sheet,

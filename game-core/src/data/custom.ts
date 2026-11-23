@@ -1637,6 +1637,22 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     weaponTags: ['gun', 'magnum'],
     weaponEffects: [{ kind: 'payXpForFirstRevealedBuff' }],
   },
+  {
+    // Fan weapon (Manny's render; no printed code). Same mechanic as
+    // WE-016 Semi-Automatic Rifle at +5 instead of +10: the count is the
+    // Action cards sitting in the Play Area this turn.
+    id: 'cw-036',
+    name: 'Lever Action Rifle',
+    type: 'weapon',
+    set: 'custom',
+    text: 'This weapon gets +5 Damage for every Action you played this turn.',
+    copies: 1,
+    cost: 40,
+    ammoReq: 40,
+    damage: 20,
+    weaponTags: ['gun', 'rifle'],
+    weaponEffects: [{ kind: 'plusDamagePerActionPlayedThisTurn', amount: 5 }],
+  },
 
   // ── Fan "Locations" line (LOC-001..) ──────────────────────────────
   // Three kinds: GLOBAL (active on reveal, unpurchasable), 1X (a one-shot buy,

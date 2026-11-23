@@ -523,6 +523,22 @@ describe('custom attachment event cards', () => {
     }));
   });
 
+  it('Lever Action Rifle (cw-036) is correctly defined', () => {
+    const c = CUSTOM_CARDS.find(x => x.id === 'cw-036');
+    expect(c).toBeDefined();
+    expect(c).toEqual(expect.objectContaining({
+      id: 'cw-036',
+      name: 'Lever Action Rifle',
+      type: 'weapon',
+      set: 'custom',
+      copies: 1,
+      cost: 40,
+      ammoReq: 40,
+      damage: 20,
+      weaponTags: ['gun', 'rifle'],
+      weaponEffects: [{ kind: 'plusDamagePerActionPlayedThisTurn', amount: 5 }],
+    }));
+  });
   it('Kukri (cw-006) is correctly defined', () => {
     const c = CUSTOM_CARDS.find(x => x.id === 'cw-006');
     expect(c).toBeDefined();
@@ -598,13 +614,18 @@ describe('custom attachment event cards', () => {
   });
 
   it('custom weapons are merged into matching scenario piles instead of getting their own', () => {
-    const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020'] });
+    const piles = pilesForScenario('firstTimer', { customCards: ['cw-005', 'cw-013', 'cw-020', 'cw-036'] });
     // Knife pile should include Combat Knife
     const knifePile = piles.find(p => p.pileId === 'kn');
     expect(knifePile).toBeDefined();
     expect(knifePile!.cardIds).toContain('cw-005');
-    // Shotgun pile should include both shotguns
-    const shotgunPile = piles.find(p => p.cardIds.includes('we-001') || p.cardIds.includes('cw-013'));
+    // Every custom gun's primary tag is "gun", so they fold into the
+    // scenario's handgun pile rather than a pile of their own.
+    const gunPile = piles.find(p => p.cardIds.includes('we-009'));
+    expect(gunPile).toBeDefined();
+    expect(gunPile!.cardIds).toContain('cw-013');
+    expect(gunPile!.cardIds).toContain('cw-020');
+    expect(gunPile!.cardIds).toContain('cw-036');
     // At minimum, no separate custom-cw-* piles should exist for these
     const customWeaponPiles = piles.filter(p => p.pileId.startsWith('custom-cw-'));
     expect(customWeaponPiles).toHaveLength(0);
