@@ -1285,6 +1285,41 @@ export function attachedKevlarId(state: GameState, seat: number): string | undef
   return player.attached.find(id => state.cards[id]?.cardId === 'ma-054o');
 }
 
+/** An AC-012 Struggle for Survival in this seat's hand, if any. */
+export function heldAc012Id(state: GameState, seat: number): string | undefined {
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  return player.hand.find(id => state.cards[id]?.cardId === 'ac-012');
+}
+
+/**
+ * AC-012 STRUGGLE FOR SURVIVAL (Premier): "You can Discard this card from your
+ * Hand to lower the Damage of 1 Weapon being used costing 40 Gold or less to 0."
+ *
+ * A reactive window asked on the seat HOLDING the card while an opponent's
+ * attack is resolving. The target is held at pre-attack Health and the resolver
+ * zeroes the hit (accept) or applies the full loss (decline). `targetSeat` rides
+ * along because the damage lands on a different seat than the one answering.
+ */
+export function queueAc012Prompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  cardId: string,
+  targetSeat: number,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `ac012-${seat}-v${state.version}`,
+      seat,
+      text: `Discard Struggle for Survival to set this weapon's damage to 0?`,
+      options: ['Set damage to 0', 'Decline'],
+      payload: { kind: 'ac012Struggle', loss: String(loss), amount: String(loss), instanceId: cardId, targetSeat: String(targetSeat) },
+    }],
+  };
+}
+
 /**
  * IN-004 SLOUGH ARMOR (Outbreak): "When your infected character is attacked,
  * you may discard this card from your hand. If you do, reduce the damage of one

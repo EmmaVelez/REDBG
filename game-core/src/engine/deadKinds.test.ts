@@ -203,3 +203,47 @@ describe('IN-004 Slough Armor — "When your infected character is attacked, you
     expect(accepted.seats[1]?.discard).toContain('in-004#1');
   });
 });
+
+describe('AC-012 Struggle for Survival — "Discard this card from your Hand to lower the Damage of 1 Weapon being used costing 40 Gold or less to 0"', () => {
+  test('an opponent holding it is ASKED, and only zeroes the hit if accepted', () => {
+    // WE-011 Assault Machine Gun: cost 30 (<= 40), deals 20.
+    const s = withInstances(rigExplore(game(), 0, ['we-011#1']), ['we-011#1', 'ac-012#1']);
+    const rigged: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0
+        ? { ...p, turnAmmo: 40 }
+        : { ...p, hp: 100, hand: [...p.hand, 'ac-012#1'] })),
+    };
+    const asked = applyAction(rigged, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-011#1' });
+    const prompt = asked.prompts.find(p => p.payload?.kind === 'ac012Struggle');
+    expect(prompt).toBeDefined();
+    expect(prompt?.seat).toBe(1);
+    // Held at pre-attack Health, card still in hand while the choice is open.
+    expect(asked.seats[1]?.hp).toBe(100);
+    expect(asked.seats[1]?.hand ?? []).toContain('ac-012#1');
+
+    const declined = applyAction(asked, { type: 'chooseOption', seat: 1, promptId: prompt!.id, option: 1 });
+    expect(declined.seats[1]?.hp).toBe(80); // the full 20
+    expect(declined.seats[1]?.hand ?? []).toContain('ac-012#1');
+
+    const accepted = applyAction(asked, { type: 'chooseOption', seat: 1, promptId: prompt!.id, option: 0 });
+    expect(accepted.seats[1]?.hp).toBe(100); // negated to 0
+    expect(accepted.seats[1]?.hand ?? []).not.toContain('ac-012#1');
+    expect(accepted.seats[1]?.discard).toContain('ac-012#1');
+  });
+
+  test('not offered against a weapon costing more than 40 Gold', () => {
+    // WE-006 Six Shooter: cost 90, deals 50.
+    const s = withInstances(rigExplore(game(), 0, ['we-006#1']), ['we-006#1', 'ac-012#1']);
+    const rigged: GameState = {
+      ...s,
+      seats: s.seats.map((p, i) => (i === 0
+        ? { ...p, turnAmmo: 50 }
+        : { ...p, hp: 100, hand: [...p.hand, 'ac-012#1'] })),
+    };
+    const after = applyAction(rigged, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-006#1' });
+    expect(after.prompts.some(p => p.payload?.kind === 'ac012Struggle')).toBe(false);
+    expect(after.seats[1]?.hp).toBe(50);
+    expect(after.seats[1]?.hand ?? []).toContain('ac-012#1');
+  });
+});

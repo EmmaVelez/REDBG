@@ -33,6 +33,8 @@ import {
   queueWeskerReductionPrompt,
   queueChrisL1ReductionPrompt,
   attachedKevlarId,
+  heldAc012Id,
+  queueAc012Prompt,
   queueKevlarJacketPrompt,
   queueSloughArmorPrompt,
   baseDamageBonusIfHpAtMost,
@@ -6676,6 +6678,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const infectedAttacker = player.isInfectedCharacter === true;
 
           let damage = 0;
+          // AC-012 gate: the cost of the weapon actually being used (Infected
+          // Characters' base damage is not a weapon). Hoisted out of the else
+          // branch because the reactive window lives further down.
+          let attackWeaponCost: number | undefined;
           let newHand = player.hand;
           let newPlayArea = player.playArea;
           let newDiscard = player.discard;
@@ -6707,6 +6713,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (wDef === undefined) {
               throw new Error('applyAction: attack: unknown weapon');
             }
+            attackWeaponCost = wDef?.cost ?? 0;
             const req = wDef.ammoReq ?? 0;
             if (player.turnAmmo < req) {
               throw new Error('applyAction: attack: insufficient ammo');
@@ -6808,6 +6815,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             // Hold at pre-attack Health; the resolver settles the loss.
             newTarget = { ...newTarget, hp: target.hp };
             state = queueSloughArmorPrompt(state, targetSeat, kevlar.damage, sloughReduction, sloughArmorId as string);
+          }
+
+          // AC-012 Struggle for Survival: "You can Discard this card from your
+          // Hand to lower the Damage of 1 Weapon being used costing 40 Gold or
+          // less to 0." Offered to an OPPONENT holding it, and only against a
+          // real weapon (an Infected Character's base damage is not one).
+          const ac012Seat = (attackWeaponCost !== undefined && attackWeaponCost <= 40)
+            ? state.seats.find(o => o.seat !== seat && !o.dead && !o.downed && heldAc012Id(state, o.seat) !== undefined)?.seat
+            : undefined;
+          if (ac012Seat !== undefined && kevlar.damage > 0) {
+            // Hold at pre-attack Health; the resolver zeroes the hit or applies it.
+            newTarget = { ...newTarget, hp: target.hp };
+            state = queueAc012Prompt(state, ac012Seat, kevlar.damage, heldAc012Id(state, ac012Seat) as string, targetSeat);
           }
           let finalPlayer: PlayerState = {
             ...player,
@@ -11246,6 +11266,25 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cleared = { ...state, ...nextBase, prompts: newPrompts };
         if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
         return settleHeldDamageLoss(cleared, seat, decline ? loss : Math.max(loss - amount, 0), partnerLead);
+      }
+
+      if (kind === 'ac012Struggle' && chosenId !== undefined) {
+        // AC-012 Struggle for Survival: accepting discards the card from the
+        // HOLDER's hand and zeroes the attack on the TARGET seat; declining
+        // applies the full loss there.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const cardId = String(prompt.payload?.instanceId ?? '');
+        const targetSeat = Number(prompt.payload?.targetSeat ?? seat);
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if ((cleared.seats[targetSeat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
+        let s: GameState = cleared;
+        if (!decline && cardId !== '') {
+          s = { ...s, seats: s.seats.map(x => (x.seat === seat
+            ? { ...x, hand: x.hand.filter(id => id !== cardId), discard: [...x.discard, cardId] }
+            : x)) };
+        }
+        return settleHeldDamageLoss(s, targetSeat, decline ? loss : 0, false);
       }
 
       if (kind === 'sloughArmor' && chosenId !== undefined) {
