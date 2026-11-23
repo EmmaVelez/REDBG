@@ -170,14 +170,20 @@ describe('Mercenaries characters', () => {
     expect(seat1Turn.seats[1]?.ammoReqIncreaseNextTurn).toBeUndefined();
   });
 
-  it('CH-049 Wesker: explore damage reduced by 10 per card in hand', () => {
+  it('CH-049 Wesker: the -10-per-card reduction is a CHOICE', () => {
     const s = mercGame('ch-049');
     const withInfected = mansionTop(s, 'ma-078'); // attack 60
     const extra1 = addCard(withInfected, 0, 'am-005');
     const weapon = findHand(extra1, 'we-050');
     const next = explore(extra1, 0, weapon);
-    // hand after the weapon leaves = 5 cards -> -50; 60 - 50 = 10
-    expect(next.seats[0]?.hp).toBe(100);
+    // Held at his max HP (110) while he decides; hand after the weapon leaves
+    // is 5 cards, so the offer is -50.
+    expect(next.seats[0]?.hp).toBe(110);
+    const promptId = findPrompt(next, 'weskerDamageReduction');
+    const accepted = choose(next, 0, promptId, 0); // 60 - 50 = 10
+    expect(accepted.seats[0]?.hp).toBe(100);
+    const declined = choose(next, 0, promptId, 1);
+    expect(declined.seats[0]?.hp).toBe(50);
   });
 
   it('CH-050 Rebecca: on buy, may move the bought card to another player\'s discard', () => {

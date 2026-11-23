@@ -30,6 +30,7 @@ import {
   actionDiscardDamage,
   queueJillNegatePrompt,
   queueHunkReductionPrompt,
+  queueWeskerReductionPrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -844,6 +845,77 @@ function applyPendingExploreOutcome(
     removed: defeated ? [...baseState.removed, pe.revealedInstanceId] : baseState.removed,
     mansionDeck: bottomed.deck,
     pendingExplore: undefined,
+  };
+}
+
+/**
+ * Settle a HELD damage loss onto a seat. This is the shared tail of the
+ * "hold at pre-damage Health and ask" windows (B4MC-CH-005 Jill's trash-to-negate,
+ * CH-045 Hunk's -20, CH-049 Wesker's per-card reduction): the caller holds the
+ * character, queues a prompt, and this applies the agreed loss to the CURRENT
+ * Health. A lethal result downs a Main, or permanently removes a leading
+ * Partner (`partnerHp`).
+ */
+function settleHeldDamageLoss(
+  state: GameState,
+  seat: number,
+  applied: number,
+  partnerLead: boolean,
+): GameState {
+  const cur = state.seats[seat] as PlayerState | undefined;
+  if (cur === undefined || applied <= 0) return state;
+  if (partnerLead) {
+    const nextHp = Math.max((cur.partnerHp ?? cur.hp) - applied, 0);
+    if (nextHp > 0) {
+      return { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, partnerHp: nextHp } : x)) };
+    }
+    let dead = removePartnerSkill(state, seat);
+    dead = {
+      ...dead,
+      seats: dead.seats.map(x => (x.seat === seat
+        ? {
+            ...x,
+            partnerInstanceId: undefined,
+            partnerAttached: undefined,
+            partnerLeading: undefined,
+            partnerSkillId: undefined,
+            partnerHp: undefined,
+            partnerMaxHp: undefined,
+          }
+        : x)),
+    };
+    return dead;
+  }
+  const nextHp = Math.max(cur.hp - applied, 0);
+  if (nextHp > 0) {
+    return { ...state, seats: state.seats.map(x => (x.seat === seat ? { ...x, hp: nextHp } : x)) };
+  }
+  let rng = makeRng(state.rngState);
+  const rngShuffle = (items: readonly string[]): string[] => {
+    const r = shuffle(rng, items);
+    rng = r.rng;
+    return [...r.value];
+  };
+  const flip = flipDown(
+    {
+      hp: 0,
+      maxHp: cur.maxHp,
+      decorations: cur.decorations,
+      level: cur.level,
+      downed: false,
+      dead: false,
+      hand: cur.hand,
+      discard: cur.discard,
+      inventory: cur.inventory,
+    },
+    rngShuffle,
+  );
+  return {
+    ...state,
+    rngState: rng.s,
+    seats: state.seats.map(x => (x.seat === seat
+      ? { ...x, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
+      : x)),
   };
 }
 
@@ -3677,11 +3749,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
         if (undefeatedEntries.length > 0) {
           // ---- Survivors: the LEADING character takes their combined Damage ----
-          // CH-045's -20 is a CHOICE (queued below), so it is NOT folded in here.
-          const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
-            ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
-            : 0;
-          const damageReduction = infectedDamageReduction(abilities) + weskerReduction + allDamageReduction(abilities) + chrisL1Reduction;
+          // CH-045's and CH-049's reductions are CHOICES (queued below), so they
+          // are NOT folded in here.
+          const damageReduction = infectedDamageReduction(abilities) + allDamageReduction(abilities) + chrisL1Reduction;
           const damageSkillEffects = activeSkillEffects(state, seat);
           const negateConsumption = consumeNegateDamage(state, seat);
           state = negateConsumption.state;
@@ -3725,6 +3795,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (hunkHeldLoss > 0) {
             newLeadingHp = baseLeadingHp;
             state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
+          }
+          // CH-049 Albert Wesker L1: -10 per card in hand, also a CHOICE.
+          const weskerAbility = abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as
+            { amount: number } | undefined;
+          if (weskerAbility !== undefined && hunkHeldLoss === 0 && kevlar.damage > 0) {
+            const weskerAmount = weskerAbility.amount * handAfter.length;
+            if (weskerAmount > 0) {
+              newLeadingHp = baseLeadingHp;
+              state = queueWeskerReductionPrompt(state, seat, kevlar.damage, weskerAmount, leadingIsPartner);
+            }
           }
           // B4MC-CH-005 Jill Valentine L2: the multi-explore equivalent of the
           // single-explore hold - the leading Character stays at her
@@ -4879,12 +4959,8 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const sameNameAttachedCount = revealedDef?.type === 'infected'
         ? state.seats.reduce((sum, s) => sum + (s.dead ? 0 : s.attached.filter(id => state.cards[id]?.cardId === revealedDef.id).length), 0)
         : 0;
-      // Mercenaries: Albert Wesker (CH-049) reduces explore damage by 10 per
-      // card in his hand. CH-045's -20 is a CHOICE (queued below), so it is NOT
-      // folded in here.
-      const weskerReduction = abilities.some(a => a.kind === 'exploreDamageReductionPerHandCard')
-        ? (abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as { amount: number }).amount * handAfter.length
-        : 0;
+      // Mercenaries: CH-045's and CH-049's reductions are CHOICES (queued below),
+      // so neither is folded in here.
       // B4MC-CH-007 Chris L1: once per round, the first Infected Damage he takes
       // on his own turn is lowered by 10.
       const chrisL1Reduction = chrisL1DamageReduction(state, seat);
@@ -4906,7 +4982,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           hp: (effectiveRevealed?.hp ?? 0) + outbreakRevealFx.revealedHpBonus + nemesisPursuitBuff(state).hp + ((((effectiveRevealed?.hp ?? 0)) <= virusMutatesBonus(state).hpThreshold && virusMutatesBonus(state).hpThreshold > 0) ? virusMutatesBonus(state).hpBonus : 0) + tuaHpBonus,
           attack: (effectiveRevealed?.attack ?? 0) + outbreakRevealFx.revealedAttackBonus + nemesisPursuitBuff(state).attack,
         } as CardDef,
-        damageReduction: infectedDamageReduction(abilities) + weskerReduction + chrisL1Reduction,
+        damageReduction: infectedDamageReduction(abilities) + chrisL1Reduction,
         knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
         damageMultiplier: player.damageMultiplierThisTurn ?? 1,
         attachedInfectedCount: player.attached.length,
@@ -5403,6 +5479,16 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       if (hunkHeldLoss > 0) {
         newLeadingHp = baseLeadingHp;
         state = queueHunkReductionPrompt(state, seat, hunkHeldLoss, hunkReduceAmount, leadingIsPartner);
+      }
+      // CH-049 Albert Wesker L1: -10 per card in hand, also a CHOICE.
+      const weskerAbility = abilities.find(a => a.kind === 'exploreDamageReductionPerHandCard') as
+        { amount: number } | undefined;
+      if (weskerAbility !== undefined && hunkHeldLoss === 0 && kevlar.damage > 0) {
+        const weskerAmount = weskerAbility.amount * handAfter.length;
+        if (weskerAmount > 0) {
+          newLeadingHp = baseLeadingHp;
+          state = queueWeskerReductionPrompt(state, seat, kevlar.damage, weskerAmount, leadingIsPartner);
+        }
       }
       // B4MC-CH-005 Jill Valentine L2: when she would take explore Damage
       // (Main leading), hold the Character at her pre-damage Health and offer
@@ -11113,65 +11199,23 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const amount = Number(prompt.payload?.amount ?? '0');
         const partnerLead = prompt.payload?.leader === 'partner';
         const cleared = { ...state, ...nextBase, prompts: newPrompts };
-        const cur = cleared.seats[seat] as PlayerState | undefined;
-        if (cur === undefined || loss <= 0) return cleared;
+        if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
         let s: GameState = cleared;
         const applied = decline ? loss : Math.max(loss - amount, 0);
         if (!decline && applied < loss) s = gainAmmoCard(s, seat, 1);
-        if (applied <= 0) return s;
-        if (partnerLead) {
-          const nextHp = Math.max((cur.partnerHp ?? cur.hp) - applied, 0);
-          if (nextHp > 0) {
-            return { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, partnerHp: nextHp } : x)) };
-          }
-          let dead = removePartnerSkill(s, seat);
-          dead = {
-            ...dead,
-            seats: dead.seats.map(x => (x.seat === seat
-              ? {
-                  ...x,
-                  partnerInstanceId: undefined,
-                  partnerAttached: undefined,
-                  partnerLeading: undefined,
-                  partnerSkillId: undefined,
-                  partnerHp: undefined,
-                  partnerMaxHp: undefined,
-                }
-              : x)),
-          };
-          return dead;
-        }
-        const nextHp = Math.max(cur.hp - applied, 0);
-        if (nextHp > 0) {
-          return { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, hp: nextHp } : x)) };
-        }
-        let rng = makeRng(s.rngState);
-        const rngShuffle = (items: readonly string[]): string[] => {
-          const r = shuffle(rng, items);
-          rng = r.rng;
-          return [...r.value];
-        };
-        const flip = flipDown(
-          {
-            hp: 0,
-            maxHp: cur.maxHp,
-            decorations: cur.decorations,
-            level: cur.level,
-            downed: false,
-            dead: false,
-            hand: cur.hand,
-            discard: cur.discard,
-            inventory: cur.inventory,
-          },
-          rngShuffle,
-        );
-        return {
-          ...s,
-          rngState: rng.s,
-          seats: s.seats.map(x => (x.seat === seat
-            ? { ...x, hp: flip.hp, downed: flip.downed, dead: flip.dead, hand: flip.hand, discard: flip.discard, inventory: flip.inventory }
-            : x)),
-        };
+        return settleHeldDamageLoss(s, seat, applied, partnerLead);
+      }
+
+      if (kind === 'weskerDamageReduction' && chosenId !== undefined) {
+        // CH-049 Albert Wesker L1: same hold; the reduction has no printed cost,
+        // so there is nothing extra to pay on acceptance.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const amount = Number(prompt.payload?.amount ?? '0');
+        const partnerLead = prompt.payload?.leader === 'partner';
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
+        return settleHeldDamageLoss(cleared, seat, decline ? loss : Math.max(loss - amount, 0), partnerLead);
       }
 
       if (kind === 'jillNegateDamage') {

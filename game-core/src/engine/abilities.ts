@@ -1227,6 +1227,32 @@ export function queueHunkReductionPrompt(
   };
 }
 
+/**
+ * CH-049 ALBERT WESKER (Mercenaries) L1: "When Albert would take any damage
+ * while exploring, you may lower that damage by 10 for every card in your hand."
+ *
+ * Same hold-and-settle shape as CH-045; there is no printed cost, so accepting
+ * only lowers the loss. `amount` is already `10 x cards in hand`.
+ */
+export function queueWeskerReductionPrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  amount: number,
+  partnerLead: boolean,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `wesker-reduce-${seat}-v${state.version}`,
+      seat,
+      text: `Albert would take ${loss} damage — lower it by ${amount}?`,
+      options: [`Lower by ${amount}`, 'Decline'],
+      payload: { kind: 'weskerDamageReduction', loss: String(loss), amount: String(amount), leader: partnerLead ? 'partner' : 'main' },
+    }],
+  };
+}
+
 export function chrisL1DamageReduction(state: GameState, seat: number): number {
   const player = state.seats[seat];
   if (player === undefined || player.dead || player.downed) return 0;
