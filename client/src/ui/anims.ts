@@ -169,31 +169,49 @@ export function revealsForExplore(prev: GameState, next: GameState, action: Acti
   else prev.mansionDeck.forEach((id, i) => revealOrder.set(id, i));
 
   const outcomes = new Map<string, Reveal['outcomeZone']>();
-  for (const [instanceId, nextLoc] of nextZones) {
-    if (instanceId.startsWith('hidden-')) continue;
-    const prevLoc = prevZones.get(instanceId);
-    if (prevLoc === undefined) continue;
-    if (prevLoc.zone !== 'mansion') continue;
-    if (sameLoc(prevLoc, nextLoc)) continue;
-    if (nextLoc.zone === 'attached' || nextLoc.zone === 'removed') {
-      outcomes.set(instanceId, nextLoc.zone);
-    }
-  }
 
-  // The revealed set is the engine's list (or, for older logs, the top
-  // `exploreCount` of the pre-explore deck). Two cases are invisible to the
-  // zone diff above:
-  //  - a revealed card found back in the deck was RE-INSERTED (MX-001 Mr. X:
-  //    "place it on top of the mansion as the 5th upcoming card" — revealing
-  //    REMOVES it from the deck, so being back means re-inserted);
-  //  - a revealed NON-Infected card sits in NO zone at all. The engine parks it
-  //    in limbo while its Take / Send-to-bottom prompt is open, so it is
-  //    neither in the deck nor in any seat zone until the prompt is answered.
-  for (const instanceId of revealedIds) {
-    if (instanceId.startsWith('hidden-')) continue;
-    if (outcomes.has(instanceId)) continue;
-    if (next.mansionDeck.includes(instanceId)) outcomes.set(instanceId, 'mansion');
-    else if (!nextZones.has(instanceId)) outcomes.set(instanceId, 'pending');
+  /** Where an engine-recorded reveal ended up, or null if it resolved into a
+   *  ordinary seat zone (taken into hand, trashed, ...) and so leaves the panel. */
+  const zoneOf = (instanceId: string): Reveal['outcomeZone'] | null => {
+    const nextLoc = nextZones.get(instanceId);
+    if (nextLoc !== undefined && (nextLoc.zone === 'attached' || nextLoc.zone === 'removed')) {
+      return nextLoc.zone;
+    }
+    if (next.mansionDeck.includes(instanceId)) return 'mansion';
+    if (nextLoc === undefined) return 'pending'; // parked in limbo behind its Take/Bottom prompt
+    return null;
+  };
+
+  if (engineOrder !== null) {
+    // The engine's list is EXACT and scoped to THIS explore. Do NOT seed the map
+    // from a prev->next zone diff here: the server can deliver a whole bot
+    // stretch as ONE snapshot, and that diff spans every explore in it, so each
+    // queued explore would re-show all the earlier ones' cards (the reveal panel
+    // repeated cards and the queue ballooned). Derive each outcome directly.
+    for (const instanceId of engineOrder) {
+      if (instanceId.startsWith('hidden-')) continue;
+      const z = zoneOf(instanceId);
+      if (z !== null) outcomes.set(instanceId, z);
+    }
+  } else {
+    // Legacy fallback for logs written before `revealedInstanceIds`: the diff is
+    // all we have, so accept that it is snapshot-wide.
+    for (const [instanceId, nextLoc] of nextZones) {
+      if (instanceId.startsWith('hidden-')) continue;
+      const prevLoc = prevZones.get(instanceId);
+      if (prevLoc === undefined) continue;
+      if (prevLoc.zone !== 'mansion') continue;
+      if (sameLoc(prevLoc, nextLoc)) continue;
+      if (nextLoc.zone === 'attached' || nextLoc.zone === 'removed') {
+        outcomes.set(instanceId, nextLoc.zone);
+      }
+    }
+    for (const instanceId of revealedIds) {
+      if (instanceId.startsWith('hidden-')) continue;
+      if (outcomes.has(instanceId)) continue;
+      if (next.mansionDeck.includes(instanceId)) outcomes.set(instanceId, 'mansion');
+      else if (!nextZones.has(instanceId)) outcomes.set(instanceId, 'pending');
+    }
   }
 
   return [...outcomes.entries()]
