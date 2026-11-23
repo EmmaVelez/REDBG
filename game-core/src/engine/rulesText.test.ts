@@ -229,23 +229,34 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
     expect(taken.seats[0]?.attached ?? []).toContain('ma-054o#1');
   });
 
-  test('the jacket absorbs damage and moves to the bottom of the Mansion', () => {
-    const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-045#1'), ['we-009#1', 'ma-054o#1']);
+  test('the jacket is OFFERED and only moves to the bottom if accepted', () => {
+    const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-001#1'), ['we-009#1', 'ma-054o#1']);
     const withJacket: GameState = {
       ...s,
       seats: s.seats.map((p, i) => (i === 0 ? { ...p, attached: ['ma-054o#1'] } : p)),
     };
     const hpBefore = withJacket.seats[0]!.hp;
-    const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
-    expect(after.seats[0]?.hp).toBe(hpBefore);
-    expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
+    const asked = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    const prompt = asked.prompts.find(p => p.payload?.kind === 'kevlarJacket');
+    expect(prompt).toBeDefined();
+    // Held at pre-damage Health, and the jacket has NOT left play yet.
+    expect(asked.seats[0]?.hp).toBe(hpBefore);
+    expect(asked.seats[0]?.attached ?? []).toContain('ma-054o#1');
+
+    const declined = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 1 });
+    expect(declined.seats[0]?.hp).toBeLessThan(hpBefore);
+    expect(declined.seats[0]?.attached ?? []).toContain('ma-054o#1');
+
+    const accepted = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    expect(accepted.seats[0]?.hp).toBe(hpBefore);
+    expect(accepted.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
+    expect(accepted.mansionDeck).toContain('ma-054o#1');
   });
 
-  // Regression: applyDamageWithKevlar removes the jacket from `attached` and
-  // puts it at the bottom of the deck, but the explore paths rebuild the seat
-  // from the pre-kevlar `player` object, which used to restore the jacket into
-  // `attached` while it was also in the deck (two zones, one card).
-  test('the jacket is not duplicated when it absorbs infected combat damage', () => {
+  // Regression: the explore paths rebuild the seat from a pre-effect snapshot,
+  // so a card moved out of `attached` mid-explore used to reappear in `attached`
+  // while it was also in the deck (two zones, one card).
+  test('accepting on an infected hit puts the jacket in exactly one zone', () => {
     const s = withInstances(rigExplore(game(), 0, ['we-009#1'], 'ma-001#1'), ['we-009#1', 'ma-054o#1']);
     const tuned: GameState = {
       ...s,
@@ -256,10 +267,13 @@ describe('MA-054o Kevlar Jacket — attach, then prevent damage', () => {
       seats: tuned.seats.map((p, i) => (i === 0 ? { ...p, attached: ['ma-054o#1'] } : p)),
     };
     const hpBefore = withJacket.seats[0]!.hp;
-    const after = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
-    expect(after.seats[0]?.hp).toBe(hpBefore);
-    expect(after.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
-    expect(after.mansionDeck).toContain('ma-054o#1');
+    const asked = applyAction(withJacket, { type: 'explore', seat: 0, weapons: ['we-009#1'], exploreCount: 1 });
+    const prompt = asked.prompts.find(p => p.payload?.kind === 'kevlarJacket');
+    expect(prompt).toBeDefined();
+    const accepted = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: 0 });
+    expect(accepted.seats[0]?.hp).toBe(hpBefore);
+    expect(accepted.seats[0]?.attached ?? []).not.toContain('ma-054o#1');
+    expect(accepted.mansionDeck.filter(id => id === 'ma-054o#1')).toHaveLength(1);
   });
 
   test('the jacket is not duplicated when it absorbs a trap', () => {

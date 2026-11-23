@@ -32,6 +32,9 @@ import {
   queueHunkReductionPrompt,
   queueWeskerReductionPrompt,
   queueChrisL1ReductionPrompt,
+  attachedKevlarId,
+  queueKevlarJacketPrompt,
+  queueSloughArmorPrompt,
   baseDamageBonusIfHpAtMost,
   isImmuneToInfectionEffects,
   applyInfectionDecreaseDraws,
@@ -3771,13 +3774,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
             ? skillLethal
             : rawSkillDamage;
-          const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
-          state = kevlar.state;
-          // The jacket joined the Mansion bottom; fold it into the local pile
-          // or the return below (which spreads this local) drops it into no zone.
-          for (const id of kevlar.movedIds) {
-            if (!mDeck.includes(id)) mDeck = [...mDeck, id];
-          }
+          // MA-054o Kevlar Jacket: a CHOICE (queued below), so it is neither
+          // moved nor applied here — `damage` stays the full hit until answered.
+          const kevlarId = attachedKevlarId(state, seat);
+          const kevlar = { state, damage: effectiveSkillDamage, movedIds: [] as readonly string[] };
 
           if (damageOnAda) {
             const ric = applyRicardoDamage(state, seat, baseLeadingHp, kevlar.damage);
@@ -3788,10 +3788,19 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             newLeadingHp = baseLeadingHp - Math.max(kevlar.damage - reduce, 0);
             if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
           }
+          // MA-054o Kevlar Jacket: "you may move this card to the bottom of the
+          // mansion. If you do, that character receives no damage during this
+          // turn." A CHOICE that fully prevents the hit; it takes priority over
+          // the character reducers because it consumes the jacket.
+          const kevlarQueued = kevlarId !== undefined && kevlar.damage > 0 && !player.downed && !player.dead;
+          if (kevlarQueued) {
+            newLeadingHp = baseLeadingHp;
+            state = queueKevlarJacketPrompt(state, seat, kevlar.damage, kevlarId as string, leadingIsPartner);
+          }
           // CH-045 HUNK L1 (multi-explore): the -20 is a CHOICE, so the leading
           // character is held at pre-damage Health and the resolver settles it.
-          // At most one of these three reducers can apply to a given leader.
-          let reductionQueued = false;
+          // At most one of these windows can apply to a given leader.
+          let reductionQueued = kevlarQueued;
           const hunkReduceAmount = player.downed || player.dead
             ? 0
             : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
@@ -5452,18 +5461,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       const effectiveSkillDamage = rawSkillDamage >= baseLeadingHp && baseLeadingHp >= 20 && skillLethal !== undefined
         ? skillLethal
         : rawSkillDamage;
-      // MA-054o Kevlar Jacket: the jacket absorbs this damage and is moved to
-      // the bottom of the Mansion.
-      const kevlar = applyDamageWithKevlar(state, seat, effectiveSkillDamage);
-      state = kevlar.state;
-      // The jacket joined the bottom of the deck; keep the local deck in sync
-      // or the return below (which spreads this local) drops it into no zone.
-      // Append ONLY the moved jacket: `state.mansionDeck` is still the
-      // pre-reveal deck (the reveal lives in this local), so reading it
-      // back would restore the revealed card and duplicate it below.
-      for (const id of kevlar.movedIds) {
-        if (!mansionDeck.includes(id)) mansionDeck = [...mansionDeck, id];
-      }
+      // MA-054o Kevlar Jacket: a CHOICE (queued below), so it is neither moved
+      // nor applied here — `damage` stays the full hit until the player answers.
+      const kevlarId = attachedKevlarId(state, seat);
+      const kevlar = { state, damage: effectiveSkillDamage, movedIds: [] as readonly string[] };
 
       let newLeadingHp: number;
       if (damageOnAda) {
@@ -5475,13 +5476,22 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         newLeadingHp = Math.max(baseLeadingHp - Math.max(kevlar.damage - reduce, 0), 0);
         if (reduce > 0) state = queueRicardoL2Prompt(state, seat, kevlar.damage, reduce);
       }
+      // MA-054o Kevlar Jacket: "you may move this card to the bottom of the
+      // mansion. If you do, that character receives no damage during this turn."
+      // A CHOICE that fully prevents the hit; it takes priority over the
+      // character reducers because it consumes the jacket.
+      const kevlarQueued = kevlarId !== undefined && kevlar.damage > 0 && !player.downed && !player.dead;
+      if (kevlarQueued) {
+        newLeadingHp = baseLeadingHp;
+        state = queueKevlarJacketPrompt(state, seat, kevlar.damage, kevlarId as string, leadingIsPartner);
+      }
       // CH-045 HUNK L1: "you can lower that Damage by 20. In that case, Gain 1
       // 'Ammo x10'." The reduction is a CHOICE — hold the leading character at
       // its pre-damage Health (the same mechanism as Jill's hold below) and let
       // the resolver apply the reduced or the full loss. While the prompt is
-      // open the seat still has full Health. At most one of these three
-      // reducers can apply to a given leader.
-      let reductionQueued = false;
+      // open the seat still has full Health. At most one of these windows can
+      // apply to a given leader.
+      let reductionQueued = kevlarQueued;
       const hunkReduceAmount = player.downed || player.dead
         ? 0
         : abilities.reduce((sum, a) => (a.kind === 'damageReductionForAmmo' ? sum + a.amount : sum), 0);
@@ -6765,8 +6775,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           }
           // IN-004 Slough Armor: "When your infected character is attacked, you
           // may discard this card from your hand. If you do, reduce the damage
-          // of one weapon being used by 20." The attack reducer is atomic, so
-          // the engine auto-takes the beneficial option (documented limitation).
+          // of one weapon being used by 20." A CHOICE: the target is held at
+          // pre-attack Health and the resolver discards the armor / applies the
+          // reduced loss, or just applies the full loss.
           const sloughArmorId = target.isInfectedCharacter === true
             ? target.hand.find(id => state.cards[id]?.cardId === 'in-004')
             : undefined;
@@ -6776,24 +6787,28 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const sloughReduction = sloughArmorEffect !== undefined && sloughArmorEffect.kind === 'sloughArmor'
             ? sloughArmorEffect.amount
             : 0;
-          if (sloughReduction > 0) {
-            damage = Math.max(damage - sloughReduction, 0);
-          }
+          const sloughQueued = sloughReduction > 0 && !target.dead && !target.downed;
+          // While the choice is open the FULL pre-Slough hit is used, so the
+          // auto-applied Kevlar Jacket still composes correctly underneath it.
+          const sloughBase = sloughQueued ? damage : Math.max(damage - sloughReduction, 0);
           // MA-054o Kevlar Jacket: the target's jacket absorbs this damage.
-          const kevlar = applyDamageWithKevlar(state, targetSeat, damage);
+          const kevlar = applyDamageWithKevlar(state, targetSeat, sloughBase);
           state = kevlar.state;
           const ricTarget = applyRicardoDamage(state, targetSeat, target.hp, kevlar.damage);
           state = ricTarget.state;
-          const newTarget: PlayerState = {
+          let newTarget: PlayerState = {
             ...target,
             // Keep the post-kevlar `attached`: the jacket left play.
             attached: (state.seats[targetSeat] as PlayerState).attached,
             hp: ricTarget.hp,
-            hand: sloughArmorId !== undefined ? target.hand.filter(id => id !== sloughArmorId) : target.hand,
-            discard: sloughArmorId !== undefined ? [...target.discard, sloughArmorId] : target.discard,
             infectionCards: targetInfectionCards,
             ...targetFlags,
           };
+          if (sloughQueued) {
+            // Hold at pre-attack Health; the resolver settles the loss.
+            newTarget = { ...newTarget, hp: target.hp };
+            state = queueSloughArmorPrompt(state, targetSeat, kevlar.damage, sloughReduction, sloughArmorId as string);
+          }
           let finalPlayer: PlayerState = {
             ...player,
             hand: newHand,
@@ -11231,6 +11246,46 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cleared = { ...state, ...nextBase, prompts: newPrompts };
         if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
         return settleHeldDamageLoss(cleared, seat, decline ? loss : Math.max(loss - amount, 0), partnerLead);
+      }
+
+      if (kind === 'sloughArmor' && chosenId !== undefined) {
+        // IN-004 Slough Armor: accepting discards it from the attacked seat's
+        // hand and reduces the hit by `amount`; declining takes the full loss.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const amount = Number(prompt.payload?.amount ?? '0');
+        const armorId = String(prompt.payload?.instanceId ?? '');
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
+        let s: GameState = cleared;
+        if (!decline && armorId !== '') {
+          s = {
+            ...s,
+            seats: s.seats.map(x => (x.seat === seat
+              ? { ...x, hand: x.hand.filter(id => id !== armorId), discard: [...x.discard, armorId] }
+              : x)),
+          };
+        }
+        return settleHeldDamageLoss(s, seat, decline ? loss : Math.max(loss - amount, 0), false);
+      }
+
+      if (kind === 'kevlarJacket' && chosenId !== undefined) {
+        // MA-054o Kevlar Jacket: accepting moves it to the bottom of the Mansion
+        // and prevents the whole hit; declining applies the full loss.
+        const decline = chosenId === 'Decline';
+        const loss = Number(prompt.payload?.loss ?? '0');
+        const jacketId = String(prompt.payload?.instanceId ?? '');
+        const partnerLead = prompt.payload?.leader === 'partner';
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
+        if (decline || jacketId === '') return settleHeldDamageLoss(cleared, seat, loss, partnerLead);
+        const s: GameState = {
+          ...cleared,
+          seats: cleared.seats.map(x => (x.seat === seat ? { ...x, attached: x.attached.filter(id => id !== jacketId) } : x)),
+          // Move to the BOTTOM: drop any stray copy first, then append.
+          mansionDeck: [...cleared.mansionDeck.filter(id => id !== jacketId), jacketId],
+        };
+        return settleHeldDamageLoss(s, seat, 0, partnerLead);
       }
 
       if (kind === 'chrisL1DamageReduction' && chosenId !== undefined) {

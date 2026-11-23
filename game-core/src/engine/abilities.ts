@@ -1278,6 +1278,68 @@ export function queueChrisL1ReductionPrompt(
   };
 }
 
+/** The MA-054o Kevlar Jacket attached to this seat's Main, if any. */
+export function attachedKevlarId(state: GameState, seat: number): string | undefined {
+  const player = state.seats[seat];
+  if (player === undefined) return undefined;
+  return player.attached.find(id => state.cards[id]?.cardId === 'ma-054o');
+}
+
+/**
+ * IN-004 SLOUGH ARMOR (Outbreak): "When your infected character is attacked,
+ * you may discard this card from your hand. If you do, reduce the damage of one
+ * weapon being used by 20."
+ *
+ * Asked on the ATTACKED seat. `instanceId` rides along so the resolver can
+ * discard it from that seat's hand only when accepted.
+ */
+export function queueSloughArmorPrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  amount: number,
+  armorId: string,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `slough-${seat}-v${state.version}`,
+      seat,
+      text: `Discard the Slough Armor to reduce this attack by ${amount}?`,
+      options: [`Reduce by ${amount}`, 'Decline'],
+      payload: { kind: 'sloughArmor', loss: String(loss), amount: String(amount), instanceId: armorId },
+    }],
+  };
+}
+
+/**
+ * MA-054o KEVLAR JACKET (Outbreak): "When that character would receive any
+ * damage, you may move this card to the bottom of the mansion. If you do, that
+ * character receives no damage during this turn."
+ *
+ * A CHOICE that fully prevents the hit (rather than lowering it), and consumes
+ * the jacket. Same hold-and-settle shape; `instanceId` rides along so the
+ * resolver can move the jacket.
+ */
+export function queueKevlarJacketPrompt(
+  state: GameState,
+  seat: number,
+  loss: number,
+  jacketId: string,
+  partnerLead: boolean,
+): GameState {
+  return {
+    ...state,
+    prompts: [...state.prompts, {
+      id: `kevlar-${seat}-v${state.version}`,
+      seat,
+      text: `Move the Kevlar Jacket to the bottom of the Mansion to prevent ${loss} damage?`,
+      options: ['Prevent the damage', 'Decline'],
+      payload: { kind: 'kevlarJacket', loss: String(loss), amount: String(loss), instanceId: jacketId, leader: partnerLead ? 'partner' : 'main' },
+    }],
+  };
+}
+
 /**
  * B4MC-CH-007 Chris Redfield L1 (Mercenaries): "Once per round, the first
  * Infected Damage he takes on his own turn is lowered by 10. In that case, gain

@@ -177,7 +177,7 @@ describe('IN-002 Virulent Frenzy — "Look at the top three cards of your invent
 });
 
 describe('IN-004 Slough Armor — "When your infected character is attacked, you may discard this card from your hand to reduce the damage by 20"', () => {
-  test('an attacked Infected Character discards it and the damage drops by 20', () => {
+  test('an attacked Infected Character is ASKED, and only discards it if accepted', () => {
     const s = withInstances(rigExplore(game(), 0, ['we-030#1'], 'ma-001#1'), ['we-030#1', 'in-004#1']);
     const rigged: GameState = {
       ...s,
@@ -186,10 +186,20 @@ describe('IN-004 Slough Armor — "When your infected character is attacked, you
         : p)),
     };
     const hpBefore = rigged.seats[1]!.hp;
-    const after = applyAction(rigged, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-030#1' });
-    // Hand Cannon deals 80; Slough Armor reduces it by 20.
-    expect(after.seats[1]?.hp).toBe(hpBefore - 60);
-    expect(after.seats[1]?.hand ?? []).not.toContain('in-004#1');
-    expect(after.seats[1]?.discard).toContain('in-004#1');
+    const asked = applyAction(rigged, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-030#1' });
+    const prompt = asked.prompts.find(p => p.payload?.kind === 'sloughArmor');
+    expect(prompt).toBeDefined();
+    // Held at pre-attack Health, armor still in hand while the choice is open.
+    expect(asked.seats[1]?.hp).toBe(hpBefore);
+    expect(asked.seats[1]?.hand ?? []).toContain('in-004#1');
+
+    const declined = applyAction(asked, { type: 'chooseOption', seat: 1, promptId: prompt!.id, option: 1 });
+    expect(declined.seats[1]?.hp).toBe(hpBefore - 80); // Hand Cannon's full damage
+    expect(declined.seats[1]?.hand ?? []).toContain('in-004#1');
+
+    const accepted = applyAction(asked, { type: 'chooseOption', seat: 1, promptId: prompt!.id, option: 0 });
+    expect(accepted.seats[1]?.hp).toBe(hpBefore - 60); // reduced by 20
+    expect(accepted.seats[1]?.hand ?? []).not.toContain('in-004#1');
+    expect(accepted.seats[1]?.discard).toContain('in-004#1');
   });
 });
