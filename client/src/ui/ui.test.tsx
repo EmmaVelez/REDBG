@@ -108,15 +108,16 @@ describe('CardView (T03)', () => {
 
   it('uses the CARD-ART PNG as the card face when one exists', () => {
     const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
-    const noArt = MERCENARIES_CARDS.find(c => c.id === 'ma-073'); // no PNG for this id
     expect(majini).toBeDefined();
-    expect(noArt).toBeDefined();
-    if (majini === undefined || noArt === undefined) return;
+    if (majini === undefined) return;
 
     const artHtml = renderToStaticMarkup(<CardView def={majini} />);
     expect(artHtml).toContain('card-has-art');
     expect(artHtml).toMatch(/<img class="card-art-img" src="[^"]*"/);
 
+    // Every catalogue card now ships a PNG, so the placeholder path is exercised
+    // with a synthetic id that has no art file.
+    const noArt: CardDef = { ...majini, id: 'zz-999', name: 'Card Without Art' };
     const plainHtml = renderToStaticMarkup(<CardView def={noArt} />);
     expect(plainHtml).not.toContain('card-has-art');
     expect(plainHtml).not.toContain('card-art-img');
@@ -172,10 +173,8 @@ describe('CardView (T03)', () => {
 
   it('artOnly gives the hand/pile face an art-only card (rows stay for the hover reveal)', () => {
     const majini = PREMIER_CARDS.find(c => c.id === 'ma-001'); // MA-001.png exists
-    const noArt = MERCENARIES_CARDS.find(c => c.id === 'ma-073'); // no PNG for this id
     expect(majini).toBeDefined();
-    expect(noArt).toBeDefined();
-    if (majini === undefined || noArt === undefined) return;
+    if (majini === undefined) return;
 
     const artOnly = renderToStaticMarkup(<CardView def={majini} compact artOnly />);
     expect(artOnly).toContain('card-art-only');
@@ -188,7 +187,9 @@ describe('CardView (T03)', () => {
     const plain = renderToStaticMarkup(<CardView def={majini} compact />);
     expect(plain).not.toContain('card-art-only');
 
-    // a card with no art has nothing to show but text, so artOnly is ignored
+    // a card with no art has nothing to show but text, so artOnly is ignored.
+    // Every catalogue card now ships a PNG, so use a synthetic id with no file.
+    const noArt: CardDef = { ...majini, id: 'zz-999', name: 'Card Without Art' };
     const noArtHtml = renderToStaticMarkup(<CardView def={noArt} compact artOnly />);
     expect(noArtHtml).not.toContain('card-art-only');
   });

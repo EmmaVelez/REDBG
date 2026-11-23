@@ -1,5 +1,29 @@
 # HANDOFF — resume here
 
+**CARD ART COMPLETE — all 304 catalogue ids now ship a PNG (2026-11-23):** the last 100 missing
+cards were pulled from the UGC-named contact sheets in
+`Documents/My Games/Tabletop Simulator/Mods/Images/RE DBG - Expansión 1/` (char sheet,
+premier+alliance resource, mixed resource, complete-mansion 4940x4893 @494x695, partial-mansion,
+promo chars, premier mansion, Mercenaries subset). Every printed code was read with the LOCAL
+Ollama model (`/api/generate` + `images`, small corner crops — 5 corners per montage reads
+reliably; whole-card or wide reads hallucinate). Slices: `e` rows 2-6 = ma-022..053 +
+ma-054o..057o; `d` rows 0-4 = ma-054..098; `b` r4c4 = we-018g.
+- TWO CODE-SCAN TRAPS: sheet `e` prints MA-054..057 for the OUTBREAK bonus cards (Kevlar Jacket /
+  Antivirus / Laser Trap / Rock Trap -> ma-054o..057o) while sheet `d` carries the NIGHTMARE
+  MA-054..057; and `d` r3c3 scanned as a duplicate MA-095 is Los Illuminados (Bow) = ma-096.
+  Both settled by title re-reads, not by the printed code.
+- The 18 Mercenarios skills are NOT on any supplied sheet (the subset sheet stops at SK-012);
+  they came from the RE fandom wiki's per-card scans (`File:Mercenaries card - <name> (SK-0xx).jpeg`,
+  490x695) — the same source the earlier skill-research session used.
+- Pipeline unchanged: whole-cell slice -> LANCZOS 320 px wide -> quantize(256, MEDIANCUT,
+  FLOYDSTEINBERG). 82 sheet cards are 320x456/457, the 18 wiki scans 320x454.
+- TEST FIX: `ui.test.tsx` used `ma-073` as its "no PNG" example in TWO tests (card-face and
+  artOnly). With art added both broke, and NO catalogue card is artless any more, so both now
+  build a synthetic `CardDef` with id `zz-999`. Grep the test tree for the old example id after
+  any future art drop — but the real lesson is the placeholder path needs a synthetic id now.
+- Gates: typecheck x3 clean, client 283/283, vite build OK (467 assets, 33 SK-*), full game-core
+  suite green. Manny's own WIP (`client/src/ui/anims.ts`, `CARD-ART/MA-000.png`) left uncommitted.
+
 **LOCATIONS BATCH 11 — loc-046/047/048 (2026-11-20):** three 1X locations read from
 Manny's scans with the local Ollama vision model (two verbatim passes agreed on
 every line; no codes on the scans -> sequential loc ids). All have
