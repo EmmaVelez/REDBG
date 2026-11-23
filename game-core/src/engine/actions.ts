@@ -34,6 +34,7 @@ import {
   queueChrisL1ReductionPrompt,
   attachedKevlarId,
   heldAc012Id,
+  discardKnives,
   queueAc012Prompt,
   queueKevlarJacketPrompt,
   queueSloughArmorPrompt,
@@ -2813,6 +2814,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // a partner-led explore uses the Partner's (level derived from the
           // Main character's Decorations), not the Main character's.
           const abilities = leaderAbilities(state, seat, exploreLeader);
+          // CH-023 David King L2: "When you play a Knife Weapon from your Hand,
+          // move a Knife Weapon from your Discard Pile to your Play Area, David is
+          // now using that moved Weapon." The extra weapon changes this combat's
+          // damage AND outcome, so the explore is PARKED until the choice is made
+          // (the same pre-reveal park as CH-017 Helena), then re-dispatched by
+          // the `davidKnifeChoice` handler with the knife already moved.
+          if (state.davidKnifeAsk === undefined && player.davidKnifePending !== true) {
+            const playedKnifeFromHand = weapons.some(id => {
+              const cd = cardDef(state, id);
+              return cd?.type === 'weapon' && (cd.weaponTags ?? []).includes('knife') && player.hand.includes(id);
+            });
+            const discards = playedKnifeFromHand ? discardKnives(state, seat) : [];
+            if (abilities.some(a => a.kind === 'knifeFromDiscardForExplore') && discards.length > 0) {
+              return {
+                ...state,
+                davidKnifeAsk: { seat, action },
+                seats: state.seats.map(x => (x.seat === seat ? { ...x, davidKnifePending: true } : x)),
+                prompts: [...state.prompts, {
+                  id: `david-knife-${seat}-v${state.version}`,
+                  seat,
+                  text: 'David King: move a Knife from your Discard Pile to your Play Area to use it as well?',
+                  options: [...discards, 'Decline'],
+                  payload: { kind: 'davidKnifeChoice', options: discards.join(',') },
+                }],
+              };
+            }
+          }
           // B4MC-CH-005 L1: while the seat's Stun Rod is charged, a Stun Rod
           // used in this explore gets +amount Damage this turn.
           const stunRodBonus = player.stunRodCharged === true ? stunRodChargeAmount(abilities) : 0;
@@ -3069,26 +3097,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           });
 
           // David King (Outbreak) L2: when he uses a Knife weapon, he may also
-          // use one from his discard pile.
-          const davidAbilities = abilities;
-          if (davidAbilities.some(a => a.kind === 'knifeFromDiscardForExplore')) {
-            const usesKnife = exploreWeapons.some(w => (w.tags ?? []).includes('knife'));
-            if (usesKnife) {
-              const discardKnife = player.discard.find(id => {
-                const d = cardDef(state, id);
-                return d?.type === 'weapon' && (d.weaponTags ?? []).includes('knife');
-              });
-              if (discardKnife !== undefined) {
-                const kd = cardDef(state, discardKnife);
-                exploreWeapons.push({
-                  damage: kd?.damage ?? 0,
-                  ammoReq: 0,
-                  weaponEffects: kd?.weaponEffects,
-                  tags: kd?.weaponTags,
-                });
-              }
-            }
-          }
+          // use one from his discard pile. That is now a CHOICE — the explore is
+          // parked up front and re-dispatched after `davidKnifeChoice` moves the
+          // picked knife to the Play Area, so nothing is added here silently.
 
           // Passive damage abilities
           // Jill L1 explosives, Chris L2 per-Infected-fought (multi-explore
@@ -5793,6 +5804,12 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // were already applied at draw time (idempotent setters).
           let clockFinal = exploreResult;
           for (const locId of clockRevealed) clockFinal = applyRevealEffects(clockFinal, locId, seat);
+          // CH-023 David King L2: the park marker must survive while the window is
+          // open (`davidKnifeAsk` set), and is dropped once the re-dispatched
+          // explore has actually completed.
+          if (clockFinal.davidKnifeAsk === undefined && clockFinal.seats[seat]?.davidKnifePending === true) {
+            clockFinal = { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, davidKnifePending: undefined } : s)) };
+          }
           return arklayWasArmed
             ? { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, arklayArmed: undefined } : s)) }
             : (clockFinal.seats.some(s => s.seat === seat && s.firstExploreDamageBonus !== undefined)
@@ -11266,6 +11283,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const cleared = { ...state, ...nextBase, prompts: newPrompts };
         if ((cleared.seats[seat] as PlayerState | undefined) === undefined || loss <= 0) return cleared;
         return settleHeldDamageLoss(cleared, seat, decline ? loss : Math.max(loss - amount, 0), partnerLead);
+      }
+
+      if (kind === 'davidKnifeChoice' && chosenId !== undefined) {
+        // CH-023 David King L2: move the picked Knife from the Discard Pile to the
+        // Play Area (DECLINE moves nothing) and RE-DISPATCH the parked explore, so
+        // the extra weapon belongs to that same combat. `davidKnifePending` stays
+        // armed through the re-dispatch so the window is not offered twice.
+        const ask = state.davidKnifeAsk;
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if (ask === undefined || ask.seat !== seat) return cleared;
+        let s: GameState = { ...cleared, davidKnifeAsk: undefined };
+        if (chosenId !== 'Decline') {
+          const p = s.seats[seat] as PlayerState | undefined;
+          if (p !== undefined && p.discard.includes(chosenId)) {
+            const moved = { ...s.cards };
+            const inst = moved[chosenId];
+            if (inst !== undefined) moved[chosenId] = { ...inst, location: { zone: 'playArea', index: 0, seat } };
+            s = {
+              ...s,
+              cards: moved,
+              seats: s.seats.map(x => (x.seat === seat
+                ? { ...x, discard: x.discard.filter(id => id !== chosenId), playArea: [...x.playArea, chosenId] }
+                : x)),
+            };
+          }
+        }
+        return applyAction(s, ask.action);
       }
 
       if (kind === 'ac012Struggle' && chosenId !== undefined) {

@@ -219,18 +219,10 @@ export function exploreDamage(
       tags: id === undefined ? def?.weaponTags : (effectiveWeaponTags(state, seat, id, weaponIds) as readonly WeaponTag[]),
     };
   });
-  // David King (Outbreak) L2: when he uses a Knife, one from the discard
-  // pile is used as well.
-  if (abilities.some(a => a.kind === 'knifeFromDiscardForExplore') && weapons.some(w => (w.tags ?? []).includes('knife'))) {
-    const discardKnife = player.discard.find(id => {
-      const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
-      return cd?.type === 'weapon' && (cd.weaponTags ?? []).includes('knife');
-    });
-    if (discardKnife !== undefined) {
-      const kd = state.cardDefs[state.cards[discardKnife]?.cardId ?? ''];
-      weapons.push({ damage: kd?.damage ?? 0, ammoReq: 0, weaponEffects: kd?.weaponEffects, tags: kd?.weaponTags });
-    }
-  }
+  // David King (Outbreak) L2: when he uses a Knife, one from the discard pile
+  // can be used as well. That is now a CHOICE: actions.ts parks the explore up
+  // front (`davidKnifeAsk`) and re-dispatches it after `davidKnifeChoice` moves
+  // the picked knife to the Play Area, so nothing is added here silently.
   const abilityDamage =
     passiveDamageBonus(abilities, defs, 1, player.hand.length) +
     exploreBigHandBonus(abilities, state.seats) +

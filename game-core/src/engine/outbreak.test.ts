@@ -615,18 +615,42 @@ describe('Outbreak mode', () => {
     expect(exploreDamage(copied, 0, ['we-004#1', 'we-004#2'])).toBe(5 + 5 + 5);
   });
 
-  test('CH-023 David King L2: a Knife from the discard pile is used as well', () => {
+  test('CH-023 David King L2: moving a Knife from the Discard Pile is a CHOICE', () => {
     const s = withCards(outbreakState(st => ({
       ...st,
+      activeSeat: 0,
       seats: st.seats.map((x, i) => (i === 0
-        ? { ...x, characterInstanceId: 'ch-023#1', level: 2, hand: [...x.hand, 'we-004#1'], turnAmmo: 0, discard: ['we-005#1'] }
+        ? { ...x, characterInstanceId: 'ch-023#1', level: 2, hand: [...x.hand, 'we-004#1'], turnAmmo: 0, discard: ['we-005#1'], exploresLeft: 1 }
         : x)),
     })), ['ch-023#1', 'we-003#1']);
-    // Combat Knife 5 + Survival Knife 10, plus its +5 for the other Knife.
-    expect(exploreDamage(s, 0, ['we-004#1'])).toBe(5 + 10 + 5);
-    // Without a Knife in the explore, the discard pile is untouched. The
-    // preview now matches the resolve: 5 base + 5 for Submission's own
-    // +5-if-80+HP bonus (that term used to be missing from the preview).
+    // Until the choice is made the Discard-Pile Knife is NOT part of the combat.
+    expect(exploreDamage(s, 0, ['we-004#1'])).toBe(5);
+
+    const asked = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-004#1'], exploreCount: 1 });
+    const prompt = asked.prompts.find(p => p.payload?.kind === 'davidKnifeChoice');
+    expect(prompt).toBeDefined();
+    expect(asked.davidKnifeAsk?.seat).toBe(0);
+    expect(asked.seats[0]!.discard).toContain('we-005#1');   // not moved yet
+    expect(asked.seats[0]!.exploresLeft).toBe(1);           // explore parked
+
+    // Declining: the knife stays in the Discard Pile and the explore resolves.
+    const declined = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: prompt!.options.indexOf('Decline') });
+    expect(declined.seats[0]!.discard).toContain('we-005#1');
+    expect(declined.seats[0]!.playArea).not.toContain('we-005#1');
+    expect(declined.seats[0]!.exploresLeft).toBe(0);
+    expect(declined.prompts.some(p => p.payload?.kind === 'davidKnifeChoice')).toBe(false);
+
+    // Accepting: the picked Knife moves Discard -> Play Area and the SAME explore
+    // resolves with it (Combat Knife 5 + Survival Knife 10 + its +5 per other Knife).
+    const accepted = applyAction(asked, { type: 'chooseOption', seat: 0, promptId: prompt!.id, option: prompt!.options.indexOf('we-005#1') });
+    expect(accepted.seats[0]!.playArea).toContain('we-005#1');
+    expect(accepted.seats[0]!.discard).not.toContain('we-005#1');
+    expect(accepted.davidKnifeAsk).toBeUndefined();
+    expect(accepted.seats[0]!.exploresLeft).toBe(0);
+    // The window is not offered twice for the same explore.
+    expect(accepted.prompts.some(p => p.payload?.kind === 'davidKnifeChoice')).toBe(false);
+
+    // Without a Knife in the explore, the Discard Pile is untouched.
     expect(exploreDamage(s, 0, ['we-003#1'])).toBe(5 + 5);
   });
   test('CH-029 Rebecca Chambers L1: discard cards at turn start to lower her Infection Level', () => {

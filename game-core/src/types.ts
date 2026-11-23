@@ -1089,6 +1089,9 @@ export interface PlayerState {
   readonly nextItemToHand?: boolean;
   /** CH-017 L2: the reveal-time +10 Damage is armed for this explore. */
   readonly helenaRevealBonus?: number;
+  /** CH-023 David King L2: true while his Discard-Pile Knife window is open or
+   *  its answer is being applied, so the parked explore is not re-offered. */
+  readonly davidKnifePending?: boolean;
 
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
   readonly pendingBackstab?: { readonly targetSeat: number };
@@ -1393,6 +1396,13 @@ export interface GameState {
     /** True when the explore was an unconditional auto-defeat (Rocket
      *  Launcher / Crossbow). A re-resolve must not flip that. */
     readonly autoDefeat?: boolean;
+  };
+  /** CH-023 David King L2: an explore PARKED while his Discard-Pile Knife window
+   *  is open. The answer handler re-dispatches `action`, so the extra weapon is
+   *  part of the same combat (same pre-reveal park shape as CH-017 Helena). */
+  readonly davidKnifeAsk?: {
+    readonly seat: number;
+    readonly action: Action;
   };
   readonly log: readonly LoggedAction[];
 

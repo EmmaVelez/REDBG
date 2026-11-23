@@ -1293,6 +1293,20 @@ export function heldAc012Id(state: GameState, seat: number): string | undefined 
 }
 
 /**
+ * CH-023 DAVID KING L2 (Outbreak): the Knife weapons in this seat's Discard
+ * Pile. "When you play a Knife Weapon from your Hand, move a Knife Weapon from
+ * your Discard Pile to your Play Area."
+ */
+export function discardKnives(state: GameState, seat: number): string[] {
+  const player = state.seats[seat];
+  if (player === undefined) return [];
+  return player.discard.filter(id => {
+    const cd = state.cardDefs[state.cards[id]?.cardId ?? ''];
+    return cd?.type === 'weapon' && (cd.weaponTags ?? []).includes('knife');
+  });
+}
+
+/**
  * AC-012 STRUGGLE FOR SURVIVAL (Premier): "You can Discard this card from your
  * Hand to lower the Damage of 1 Weapon being used costing 40 Gold or less to 0."
  *
