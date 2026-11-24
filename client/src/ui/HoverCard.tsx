@@ -1,9 +1,9 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CardDef } from '@re/game-core';
 import { CardView } from './CardView';
-import { clampPopup, popupPlacement } from './hoverCardPos';
+import { popupPlacement, type PopupPlacement } from './hoverCardPos';
 
 /**
  * M4-T11: HoverCard — wraps any small card (hand, market, play area) and
@@ -19,8 +19,11 @@ import { clampPopup, popupPlacement } from './hoverCardPos';
  *   - `.decision-card` also sets `backdrop-filter` and `z-index: 45`, so it
  *     forms a STACKING CONTEXT: the popup's `z-index: 100` was local to it, so
  *     the fixed bottom action bar (`z-index: 50`) painted OVER the popup.
- * A portal escapes both. The popup is positioned in viewport coordinates and
- * measured after mount, then nudged/flipped back inside the viewport.
+ * A portal escapes both.
+ *
+ * Placement is pure viewport math (`hoverCardPos.popupPlacement`), so it needs
+ * no measure-after-mount pass — that would require useLayoutEffect, which
+ * React does not run during server rendering.
  *
  * pointer-events are off so the popup never swallows clicks meant for the
  * trigger.
@@ -36,16 +39,9 @@ export interface HoverCardProps {
   readonly maxHp?: number;
 }
 
-interface PopupPos {
-  readonly x: number;
-  readonly y: number;
-  readonly above: boolean;
-}
-
 export function HoverCard({ def, children, decorations, hp, maxHp }: HoverCardProps): JSX.Element {
   const triggerRef = useRef<HTMLSpanElement>(null);
-  const popRef = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<PopupPos | null>(null);
+  const [pos, setPos] = useState<PopupPlacement | null>(null);
 
   const show = (): void => {
     const el = triggerRef.current;
@@ -55,22 +51,6 @@ export function HoverCard({ def, children, decorations, hp, maxHp }: HoverCardPr
   };
 
   const hide = (): void => setPos(null);
-
-  // The estimate above can be off (art cards render their text rows taller).
-  // Measure the real box once mounted and push it back inside the viewport,
-  // flipping sides if there genuinely is no room on the chosen one.
-  useLayoutEffect(() => {
-    const pop = popRef.current;
-    const el = triggerRef.current;
-    if (pos === null || pop === null || el === null) return;
-    const next = clampPopup(
-      pop.getBoundingClientRect(),
-      { width: window.innerWidth, height: window.innerHeight },
-      pos,
-      el.getBoundingClientRect(),
-    );
-    if (next !== null) setPos(next);
-  }, [pos]);
 
   return (
     <span
@@ -83,7 +63,6 @@ export function HoverCard({ def, children, decorations, hp, maxHp }: HoverCardPr
       {pos !== null &&
         createPortal(
           <span
-            ref={popRef}
             className={pos.above ? 'hover-card-pop above' : 'hover-card-pop below'}
             style={{ left: pos.x, top: pos.y }}
             aria-hidden="true"

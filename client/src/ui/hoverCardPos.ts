@@ -10,8 +10,6 @@
 export interface Box {
   readonly left: number;
   readonly top: number;
-  readonly right: number;
-  readonly bottom: number;
   readonly width: number;
   readonly height: number;
 }
@@ -52,40 +50,4 @@ export function popupPlacement(
   // Prefer above: the bottom action dock owns the lower edge of the screen.
   const above = aboveFits || !belowFits;
   return { x, y: above ? trigger.top - gap : trigger.top + trigger.height + gap, above };
-}
-
-/**
- * Nudge a mounted popup back inside the viewport. Returns null when it already
- * fits, so callers can skip a re-render.
- */
-export function clampPopup(
-  rect: Box,
-  viewport: Size,
-  current: PopupPlacement,
-  trigger: Box,
-  gap: number = HOVER_GAP,
-  margin: number = HOVER_MARGIN,
-): PopupPlacement | null {
-  let { x, y, above } = current;
-  let changed = false;
-  if (rect.left < margin) {
-    x += margin - rect.left;
-    changed = true;
-  }
-  if (rect.right > viewport.width - margin) {
-    x -= rect.right - (viewport.width - margin);
-    changed = true;
-  }
-  if (rect.top < margin && above) {
-    // The chosen side cannot fit and the popup already crosses the top: flip down.
-    above = false;
-    y = trigger.top + trigger.height + gap;
-    changed = true;
-  } else if (rect.bottom > viewport.height - margin && !above) {
-    // …and symmetrically, a below popup hanging past the bottom flips up.
-    above = true;
-    y = trigger.top - gap;
-    changed = true;
-  }
-  return changed ? { x, y, above } : null;
 }
