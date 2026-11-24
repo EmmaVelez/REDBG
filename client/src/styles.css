@@ -3125,17 +3125,40 @@ h1, h2 { margin: 0 0 8px; }
 
 .location-card {
   position: relative;
-  width: 118px;
-  padding: 6px;
+  width: 94px;                 /* same footprint as a hand card (.card) */
+  aspect-ratio: 5 / 7;
   border-radius: 8px;
   background: linear-gradient(180deg, #241a12, #17100b);
   border: 1px solid #5a4632;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
   font-size: 11px;
   color: #e8dcc8;
 }
+
+/* The location art fills the whole tile. CardView already renders a 94x131.6
+   `.card`; pin it to the tile so the artwork is full bleed. */
+.location-card > .card,
+.location-card > .card-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Name / cost / cubes / actions ride ON TOP of that art. Clicks pass through
+   the overlay itself (so hover + art stay live); buttons opt back in. */
+.location-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  pointer-events: none;
+}
+.location-overlay button { pointer-events: auto; }
 
 .location-kind-global { border-color: #b8860b; }
 .location-kind-onex { border-color: #2f6f8f; }
@@ -3145,6 +3168,7 @@ h1, h2 { margin: 0 0 8px; }
   position: absolute;
   top: -7px;
   left: 6px;
+  z-index: 4;
   padding: 1px 6px;
   border-radius: 8px;
   font-size: 9px;
@@ -3157,35 +3181,42 @@ h1, h2 { margin: 0 0 8px; }
 .location-kind-onex .location-kind-badge { background: #7fc4e0; }
 .location-kind-invest .location-kind-badge { background: #a6d98a; }
 
-.location-card img {
+.location-card-facedown img {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 62px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .location-name {
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.1;
   text-align: center;
+  font-size: 10px;
+  max-width: 100%;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(8, 9, 12, 0.74);
 }
 
 .location-costs {
   display: flex;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .location-cost {
-  padding: 0 5px;
-  border-radius: 7px;
-  background: #3a2c1e;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(8, 9, 12, 0.74);
   color: #c9b79a;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .location-cost-paid {
-  background: #6b5320;
+  background: rgba(107, 83, 32, 0.92);
   color: #ffe6a8;
   text-decoration: line-through;
 }
@@ -3193,16 +3224,16 @@ h1, h2 { margin: 0 0 8px; }
 .location-cubes {
   display: flex;
   justify-content: center;
-  gap: 4px;
-  min-height: 16px;
+  gap: 3px;
+  min-height: 14px;
 }
 
 .location-cube {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   color: #101010;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -3212,17 +3243,31 @@ h1, h2 { margin: 0 0 8px; }
 
 .location-actions {
   margin-top: auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  align-items: center;
+  gap: 2px;
+  align-items: stretch;
+}
+
+/* Action labels are compressed so an invest card with several options still
+   fits inside the 131px tile without spilling over the art. */
+.location-actions .btn-small {
+  width: 100%;
+  padding: 2px 3px;
+  font-size: 9px;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .location-global-note {
-  font-size: 9px;
-  color: #a5947a;
+  font-size: 8px;
+  color: #f0e2c8;
   text-align: center;
   font-style: italic;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: rgba(8, 9, 12, 0.6);
 }
 
 .location-card-facedown {

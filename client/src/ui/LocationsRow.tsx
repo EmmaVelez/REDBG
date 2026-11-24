@@ -70,6 +70,9 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
             <div className={`location-card location-kind-${kind ?? 'invest'}`}>
               <div className="location-kind-badge">{kindLabel(kind)}</div>
               <CardView def={def} compact artOnly />
+              {/* Name / cost / actions sit ON the full-bleed location art, so
+                  the tile is exactly one hand-card sized box. */}
+              <div className="location-overlay">
               <div className="location-name">{def.name}</div>
               {costs.length > 0 && (
                 <div className="location-costs">
@@ -152,6 +155,7 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                 )}
                 {kind === 'global' && <span className="location-global-note">active for everyone</span>}
               </div>
+              </div>
             </div>
             </HoverCard>
           );
@@ -159,9 +163,11 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
         {(state.locationDeck ?? []).length > 0 && (
           <div className="location-card location-card-facedown">
             <div className="location-kind-badge">?</div>
-            <img src="/mansion-deck.svg" alt="Face-down location" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
-            <div className="location-name">Next: Location</div>
-            <div className="location-global-note">Revealed by an Explore</div>
+            <img src="/mansion-deck.svg" alt="Face-down location" />
+            <div className="location-overlay">
+              <div className="location-name">Next: Location</div>
+              <div className="location-global-note">Revealed by an Explore</div>
+            </div>
           </div>
         )}
       </div>
