@@ -9,12 +9,29 @@ action bar at `z-index: 50` painted OVER it). Viewport coordinates were therefor
 decision card's own origin. Reproduced in a real browser with the repo's exact rules at 1280x800: old
 popup rect y 913..1116 = 316px BELOW the viewport; portalled one 446..649, fully visible.
 - FIX: `HoverCard` renders the popup via `createPortal(..., document.body)`; placement lives in the new
-  pure module `client/src/ui/hoverCardPos.ts` (`popupPlacement` clamps the centre + picks above/below
-  by available room, `clampPopup` measures the mounted box and nudges/flips it inside the viewport).
-  Delete the old heuristic (`above = r.top > 260`, `half = 92` vs a 145-150px popup).
+  pure module `client/src/ui/hoverCardPos.ts` (`popupPlacement` clamps the centre + picks above/below by
+  available room). Delete the old heuristic (`above = r.top > 260`, `half = 92` vs a 145-150px popup).
+  Do NOT add a measure-after-mount clamp: it needs `useLayoutEffect`, which React refuses to run during
+  server rendering (it warns on every client test render). The popup box is fixed by CSS
+  (`.hover-card-pop .card` width 145/150, aspect-ratio 5/7), so the estimate is exact.
 - RULE: any `position: fixed` element that must be viewport-relative cannot live inside a
   transformed/filtered ancestor — portal it. Grep for other fixed popups before assuming they work.
-- Tests: `hoverCardPos.test.ts` (8). Gates: typecheck x3 clean, client 294/294, engine untouched.
+- Tests: `hoverCardPos.test.ts` (5). Gates: typecheck x3 clean, client 292/292, engine untouched.
+
+**LOBBY CHARACTER PICKER NOW FOLLOWS THE SCENARIO (2026-11-23):** Manny asked why the Outbreak characters
+are unselectable. `selectableCharacters(room)` in `client/src/ui/Lobby.tsx` pooled a HARD-CODED
+`[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS, ...CUSTOM_CARDS]` — OUTBREAK_CARDS and
+MERCENARIES_CARDS were never added, so their 21 characters (ch-021..033 incl. Zombie A/B/C, and the 8
+Mercenaries) never appeared in the Main/Partner dropdowns even though they ARE in the random pool
+(expansion scenarios use `ALL_CARDS`).
+- FIX: the picker now derives from `cardsForScenario(room.scenario, {...same opts host.ts/hotseat pass...})`
+  — i.e. exactly the pool Random draws from. This also fixes a latent bug in the other direction: a base
+  scenario (First Timer etc.) deals only PREMIER_CARDS, so picking an Alliance/Nightmare character there
+  silently fell through setup's "unknown explicit id: legacy lenient behavior" path (generic 100-HP card,
+  def absent from `state.cardDefs`). Those sets are now offered only where they can actually be played.
+- Dead code removed: the unused `allianceChars` const in the Pass & Play panel.
+- Test: ui.test.tsx asserts CH-021/Excella Gionne/CH-031 appear in an outbreak room and CH-021 does NOT in
+  a firstTimer room. Gates: typecheck x3 clean, client 292/292.
 
 **CUSTOM WEAPON CW-036 LEVER ACTION RIFLE (2026-11-23):** Manny sent a fan render
 (no printed code): 40 cost / 40 ammoReq / 20 damage, tags gun+rifle, text

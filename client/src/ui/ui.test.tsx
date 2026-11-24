@@ -1571,6 +1571,36 @@ describe('Lobby (T08)', () => {
     expect(inRoom).toContain('checked=""');
   });
 
+  it("offers exactly the scenario's own characters: Outbreak's cast only where it can actually be played", () => {
+    const mk = (scenario: 'firstTimer' | 'outbreak') => ({
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: false,
+    });
+
+    // First Timer deals PREMIER_CARDS, so an Outbreak character would fall back
+    // to a generic 100-HP card — the picker must not offer one.
+    const base = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk('firstTimer'), clientId: 'c1' })} />);
+    expect(base).not.toContain('CH-021');
+    expect(base).toContain('CH-002');
+
+    // Outbreak is an expansion scenario (ALL_CARDS), so its cast becomes selectable.
+    const outbreak = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk('outbreak'), clientId: 'c1' })} />);
+    expect(outbreak).toContain('CH-021');
+    expect(outbreak).toContain('Excella Gionne');
+    expect(outbreak).toContain('CH-031');
+  });
+
   it('offers the Fall of the House of Usher toggle in every lobby surface', () => {
     const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
     expect(noRoom).toContain('data-testid="create-usher-toggle"');
