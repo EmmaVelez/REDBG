@@ -19,7 +19,13 @@ export type AnimZone =
   | 'market'
   | 'mansion'
   | 'attached'
-  | 'removed';
+  | 'removed'
+  /** Unofficial Expansion counters: the shared supply lives OFF-SCREEN, so a
+   *  counter attaching to a Character flies in from the edge of the screen
+   *  instead of from a pile on the board. */
+  | 'supply'
+  /** A Character's attached counters (EX-009 Poison). */
+  | 'counters';
 
 export interface CardMove {
   readonly instanceId: string;
@@ -30,11 +36,15 @@ export interface CardMove {
   readonly toPileId?: string;
   /** True when the card travels face-down (drawn from or sent to a hidden zone). */
   readonly faceDown: boolean;
+  /** Seat owning the source zone, when it is a per-seat zone (counters). */
+  readonly fromSeat?: number;
+  /** Seat owning the destination zone, when it is a per-seat zone (counters). */
+  readonly toSeat?: number;
 }
 
 interface PlayerZoneRef {
   readonly zone: AnimZone;
-  readonly key: 'hand' | 'inventory' | 'discard' | 'playArea' | 'attached';
+  readonly key: 'hand' | 'inventory' | 'discard' | 'playArea' | 'attached' | 'counters';
 }
 
 const PLAYER_ZONES: readonly PlayerZoneRef[] = [
@@ -43,6 +53,8 @@ const PLAYER_ZONES: readonly PlayerZoneRef[] = [
   { zone: 'discard', key: 'discard' },
   { zone: 'play', key: 'playArea' },
   { zone: 'attached', key: 'attached' },
+  // Unofficial Expansion: counters attached to the Character (Poison).
+  { zone: 'counters', key: 'counters' },
 ];
 
 interface ZoneLoc {
@@ -58,7 +70,7 @@ function zoneIndex(state: GameState): Map<string, ZoneLoc> {
     const player = state.seats[seat.seat];
     if (player === undefined) continue;
     for (const ref of PLAYER_ZONES) {
-      const list = player[ref.key];
+      const list = player[ref.key] ?? [];
       for (const id of list) {
         map.set(id, { zone: ref.zone, seat: seat.seat });
       }
@@ -71,6 +83,8 @@ function zoneIndex(state: GameState): Map<string, ZoneLoc> {
   }
   for (const id of state.mansionDeck) map.set(id, { zone: 'mansion' });
   for (const id of state.removed) map.set(id, { zone: 'removed' });
+  // Counters cycle between the off-screen supply and a Character.
+  for (const id of state.supply ?? []) map.set(id, { zone: 'supply' });
   return map;
 }
 
@@ -319,6 +333,8 @@ export function diffCardMoves(prev: GameState, next: GameState, max = 10): reado
       fromPileId: prevLoc.pileId,
       toPileId: nextLoc.pileId,
       faceDown: travelsFaceDown(prevLoc.zone, nextLoc.zone),
+      fromSeat: prevLoc.seat,
+      toSeat: nextLoc.seat,
     });
     if (moves.length >= max) break;
   }
