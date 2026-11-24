@@ -63,6 +63,7 @@ const PER_CHARACTER_ONLY: ReadonlySet<string> = new Set([
   'noHealingNoNonInfectedAttach',
   // Self-targeting: they change what happens to one specific character.
   'setHpToOnLethal',
+  'lethalReduceMaxHpHealFull',
   'infectedDamageReduction',
   'weaponDamageReduction',
   'damageReductionForAmmo',
@@ -657,6 +658,38 @@ export function applyHpLoss(abilities: readonly CharacterAbility[], hp: number, 
 }
 
 /**
+ * PR-006 Yoko Suzuki L2: a hit that would drop her to 0 or less instead reduces
+ * her Maximum Health by `amount` and Heals her to full. Automatic, matching the
+ * reading already applied to Ada's "when health would be reduced to 0 or less".
+ * Returns the (possibly rewritten) state together with the resulting HP.
+ */
+export function applyYokoSubstitution(
+  state: GameState,
+  seat: number,
+  hp: number,
+): { readonly state: GameState; readonly hp: number } {
+  if (hp > 0) return { state, hp };
+  const player = state.seats[seat];
+  const ability = player === undefined
+    ? undefined
+    : characterAbilities(state, seat).find(a => a.kind === 'lethalReduceMaxHpHealFull');
+  if (player === undefined || ability === undefined || ability.kind !== 'lethalReduceMaxHpHealFull') {
+    return { state, hp };
+  }
+  const newMax = Math.max(player.maxHp - ability.amount, 1);
+  return {
+    state: {
+      ...state,
+      seats: state.seats.map(x => (x.seat === seat ? { ...x, maxHp: newMax, hp: newMax } : x)),
+      // Damage sites rebuild the seat from a snapshot, so the new Maximum
+      // Health is also recorded for the end-of-action hook to re-apply.
+      lethalSubstitution: { seat, maxHp: newMax },
+    },
+    hp: newMax,
+  };
+}
+
+/**
  * Applies `amount` damage to `seat` through the shared HP-loss choke
  * point, intercepting CU-001 Ricardo Irving L2: a hit greater than the
  * threshold is provisionally lowered by `reduction` and the player is
@@ -701,9 +734,12 @@ export function applyRicardoDamage(
   const abilities = characterAbilities(state, seat);
   const downed = player.downed || player.dead;
   const reduce = downed ? 0 : ricardoReduction(abilities, amount);
-  const nextHp = applyHpLoss(abilities, hp, Math.max(amount - reduce, 0), downed);
-  if (reduce <= 0) return { state, hp: nextHp };
-  return { state: queueRicardoL2Prompt(state, seat, amount, reduce), hp: nextHp };
+  const afterLoss = applyHpLoss(abilities, hp, Math.max(amount - reduce, 0), downed);
+  // PR-006 Yoko Suzuki L2 intercepts a LETHAL hit before anything else sees it.
+  const yoko = applyYokoSubstitution(state, seat, afterLoss);
+  const nextHp = yoko.hp;
+  if (reduce <= 0) return { state: yoko.state, hp: nextHp };
+  return { state: queueRicardoL2Prompt(yoko.state, seat, amount, reduce), hp: nextHp };
 }
 
 /**

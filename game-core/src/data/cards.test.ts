@@ -15,9 +15,9 @@ const pile = (pileId: string): { pileId: string; cardIds: readonly string[] } =>
 };
 
 test('database size and uniqueness', () => {
-  expect(PREMIER_CARDS.length).toBe(68);
+  expect(PREMIER_CARDS.length).toBe(71);
   const ids = PREMIER_CARDS.map(c => c.id);
-  expect(new Set(ids).size).toBe(68);
+  expect(new Set(ids).size).toBe(71);
 });
 
 test('all ids follow the printed numbering scheme', () => {

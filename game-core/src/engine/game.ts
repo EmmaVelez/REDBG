@@ -1507,6 +1507,7 @@ function startTurnInternal(state: GameState): GameState {
     extraWeaponTags: undefined,
     // CH-023 David King L2: the park marker is per-explore; drop any leftover.
     davidKnifePending: undefined,
+    exploreChoicePending: undefined,
     trashAtEndOfTurn: undefined,
     usedWeaponEffectsThisTurn: undefined,
     // B4MC-CH-005 L1: the Stun Rod charge lasts "this turn" only.

@@ -546,6 +546,8 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       switch (ability.kind) {
         case 'plusDamageThisTurn':
         case 'herbTrashForActionOrExplore':
+        case 'attachCardFaceDownToCharacter':
+        case 'nameTypeRevealInventoryTop':
         case 'drawOncePerTurnIfMaxHpAtMost':
         case 'exploreOncePerTurnIfMaxHpAtMost':
         case 'exchangeHandWithInventoryTop':

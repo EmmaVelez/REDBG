@@ -67,6 +67,7 @@ import {
   trashCardFromDiscardOnInfectedDefeat,
   trashCardFromDiscardGainCardCostingUpTo20MoreOnInfectedDefeat,
   applyRicardoDamage,
+  applyYokoSubstitution,
   applyTrashTopFromDiscardOnBigHit,
   trashTopFromDiscardIds,
   jakeDefeatDecorationBonus,
@@ -405,6 +406,47 @@ function applyDownedHooks(next: GameState): GameState {
  * list while it was his turn qualifies (once per turn). One choke point covers
  * every trash source (weapons trashed after use, effects that trash, explores).
  */
+/**
+ * PR-004 Jim Chapman L2: "During your turn, when an Infected is revealed, you can
+ * Gain 2 'Ammo x10'. In that case, move all revealed Infected to the bottom of the
+ * Mansion." Raised after the explore (the revealed Infected have already been
+ * placed); accepting pays the Ammo and forces every revealed Infected still in the
+ * Mansion to the very bottom, overriding a shuffle-back.
+ */
+function applyJimRevealHook(prev: GameState, next: GameState, action: Action): GameState {
+  if (action.type !== 'explore') return next;
+  const seat = action.seat;
+  const player = next.seats[seat];
+  if (player === undefined || player.dead || player.downed) return next;
+  if (next.activeSeat !== seat) return next;
+  const ability = characterAbilities(next, seat).find(a => a.kind === 'onInfectedRevealedAmmoBottom');
+  if (ability === undefined || ability.kind !== 'onInfectedRevealedAmmoBottom') return next;
+  let revealed: readonly string[] = [];
+  for (let i = next.log.length - 1; i >= 0; i--) {
+    const a = next.log[i]?.action as { type?: string; revealedInstanceIds?: readonly string[] } | undefined;
+    if (a?.type === 'explore') {
+      revealed = a.revealedInstanceIds ?? [];
+      break;
+    }
+  }
+  const infectedInDeck = revealed.filter(id => {
+    const def = next.cardDefs[next.cards[id]?.cardId ?? ''];
+    return def?.type === 'infected' && next.mansionDeck.includes(id);
+  });
+  if (infectedInDeck.length === 0) return next;
+  if (next.prompts.some(p => p.payload?.kind === 'jimRevealAmmo')) return next;
+  return {
+    ...next,
+    prompts: [...next.prompts, {
+      id: `jim-reveal-${seat}-v${next.version}`,
+      seat,
+      text: 'Jim Chapman: gain 2 "Ammo x10" and move the revealed Infected to the bottom of the Mansion?',
+      options: ['Gain 2 Ammo x10', 'Decline'],
+      payload: { kind: 'jimRevealAmmo', ids: infectedInDeck.join(','), ammo: String(ability.ammo) },
+    }],
+  };
+}
+
 function applyTrashDrawHook(prev: GameState, next: GameState, action: Action): GameState {
   if (!('seat' in action)) return next;
   const seat = action.seat;
@@ -1017,10 +1059,10 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
   }
   const next = applyDownedHooks(applyDamageTakenHooks(state, afterDefeat));
-  const afterTrash = applyTrashDrawHook(state, next, action);
+  const afterJim = applyJimRevealHook(state, applyTrashDrawHook(state, next, action), action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterTrash), action)))));
+  const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterJim), action)))));
   const leon = applyLeonTrashHook(state, hooked, action);
   // Location windows last so they see every trash/gain/shuffle the earlier
   // hooks produced (Leon's trash chains into the Shed offer, etc.).
@@ -1053,6 +1095,17 @@ export function applyAction(state: GameState, action: Action): GameState {
   // every hook) so the end-turn seat reconstruction cannot revert them.
   for (const { seat: st, id } of stuffedPending) {
     final = applyActionInternal(final, { type: 'playActionCard', seat: st, instanceId: id, isFreePlay: true });
+  }
+  // PR-006 Yoko Suzuki L2: re-apply a substituted Maximum Health LAST, because
+  // every damage site rebuilds the seat from a pre-damage snapshot and would
+  // otherwise silently drop the new Maximum Health.
+  if (final.lethalSubstitution !== undefined) {
+    const sub = final.lethalSubstitution;
+    final = {
+      ...final,
+      lethalSubstitution: undefined,
+      seats: final.seats.map(x => (x.seat === sub.seat ? { ...x, maxHp: sub.maxHp, hp: sub.maxHp } : x)),
+    };
   }
   return final;
 }
@@ -2837,6 +2890,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   text: 'David King: move a Knife from your Discard Pile to your Play Area to use it as well?',
                   options: [...discards, 'Decline'],
                   payload: { kind: 'davidKnifeChoice', options: discards.join(',') },
+                }],
+              };
+            }
+          }
+          // PR-004 Jim Chapman L1 and PR-007 Alyssa Ashcroft L1 both change THIS
+          // combat (a coin flip that can double the weapon's damage, or paying
+          // Ammo for +amount), so the explore is parked before it resolves and
+          // re-dispatched by the `exploreChoice` handler. Both name a single
+          // weapon, so each requires exactly one in use.
+          if (state.exploreChoiceAsk === undefined && player.exploreChoicePending !== true) {
+            const soleWeapon = weapons.length === 1 ? weapons[0] : undefined;
+            const alyssa = abilities.find(a => a.kind === 'payAmmoSingleWeaponExploreBonus');
+            if (alyssa !== undefined && alyssa.kind === 'payAmmoSingleWeaponExploreBonus'
+                && soleWeapon !== undefined && player.turnAmmo >= alyssa.ammoCost) {
+              return {
+                ...state,
+                exploreChoiceAsk: { seat, action, kind: 'alyssaPayAmmo' },
+                seats: state.seats.map(x => (x.seat === seat ? { ...x, exploreChoicePending: true } : x)),
+                prompts: [...state.prompts, {
+                  id: `explore-choice-${seat}-v${state.version}`,
+                  seat,
+                  text: `Alyssa is using one Weapon — pay ${alyssa.ammoCost} Ammo for +${alyssa.amount} Damage this turn?`,
+                  options: [`Pay ${alyssa.ammoCost} Ammo`, 'Decline'],
+                  payload: { kind: 'exploreChoice', choice: 'alyssaPayAmmo', instanceId: soleWeapon, ammoCost: String(alyssa.ammoCost), amount: String(alyssa.amount) },
+                }],
+              };
+            }
+            const jim = abilities.find(a => a.kind === 'coinFlipOnExplore');
+            if (jim !== undefined && jim.kind === 'coinFlipOnExplore' && soleWeapon !== undefined) {
+              return {
+                ...state,
+                exploreChoiceAsk: { seat, action, kind: 'jimCoinFlip' },
+                seats: state.seats.map(x => (x.seat === seat ? { ...x, exploreChoicePending: true } : x)),
+                prompts: [...state.prompts, {
+                  id: `explore-choice-${seat}-v${state.version}`,
+                  seat,
+                  text: `Jim Chapman: flip a coin? Heads — this weapon deals double Damage this turn. Tails — Jim takes ${jim.amount} Damage.`,
+                  options: ['Flip the coin', 'Decline'],
+                  payload: { kind: 'exploreChoice', choice: 'jimCoinFlip', instanceId: soleWeapon, amount: String(jim.amount) },
                 }],
               };
             }
@@ -5810,6 +5902,10 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (clockFinal.davidKnifeAsk === undefined && clockFinal.seats[seat]?.davidKnifePending === true) {
             clockFinal = { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, davidKnifePending: undefined } : s)) };
           }
+          // PR-004 / PR-007: same lifecycle for the pre-reveal explore park.
+          if (clockFinal.exploreChoiceAsk === undefined && clockFinal.seats[seat]?.exploreChoicePending === true) {
+            clockFinal = { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, exploreChoicePending: undefined } : s)) };
+          }
           return arklayWasArmed
             ? { ...clockFinal, seats: clockFinal.seats.map(s => (s.seat === seat ? { ...s, arklayArmed: undefined } : s)) }
             : (clockFinal.seats.some(s => s.seat === seat && s.firstExploreDamageBonus !== undefined)
@@ -6100,6 +6196,45 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 seats: state.seats.map(s => (s.seat === seat
                   ? { ...player, exploresLeft: player.exploresLeft + 1 }
                   : s)),
+              };
+            }
+            case 'attachCardFaceDownToCharacter': {
+              // PR-006 Yoko Suzuki L1 (and the fan CH-016 print): attach a card
+              // from hand face down; a card already attached by this effect moves
+              // back to hand. Once per turn is enforced by validate's log scan.
+              if (player.hand.length === 0) return { ...state, ...nextBase };
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Attach a card from your hand to this Character, face down?',
+                    options: [...player.hand, 'Decline'],
+                    payload: { kind: 'attachFaceDownChoice' },
+                  },
+                ],
+              };
+            }
+            case 'nameTypeRevealInventoryTop': {
+              // PR-007 Alyssa Ashcroft L2: name a card type, reveal the top of the
+              // Inventory; on a match draw it and get +1 Explore this turn.
+              if (player.inventory.length === 0) return { ...state, ...nextBase };
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Alyssa Ashcroft: name a card type to reveal the top of your Inventory?',
+                    options: ['action', 'item', 'weapon', 'ammunition', 'infected', 'character', 'Decline'],
+                    payload: { kind: 'alyssaNameType' },
+                  },
+                ],
               };
             }
             case 'stunRodCharge': {
@@ -8961,8 +9096,9 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let next: GameState;
         if (chosen === 'Take 20 damage') {
           const target = state.seats[seat];
-          const hp = applyHpLoss(characterAbilities(state, seat), target?.hp ?? 0, amount, (target?.downed ?? false) || (target?.dead ?? false));
-          next = { ...state, seats: state.seats.map(s => (s.seat === seat ? { ...s, hp } : s)) };
+          const rawHp = applyHpLoss(characterAbilities(state, seat), target?.hp ?? 0, amount, (target?.downed ?? false) || (target?.dead ?? false));
+          const yoko = applyYokoSubstitution(state, seat, rawHp);
+          next = { ...yoko.state, seats: yoko.state.seats.map(s => (s.seat === seat ? { ...s, hp: yoko.hp } : s)) };
         } else {
           next = {
             ...state,
@@ -11196,11 +11332,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           if (p === undefined || reduction <= 0) {
             return { ...state, ...nextBase, prompts: newPrompts };
           }
-          const hp = applyHpLoss(characterAbilities(state, seat), p.hp, reduction, p.downed || p.dead);
+          const rawHp = applyHpLoss(characterAbilities(state, seat), p.hp, reduction, p.downed || p.dead);
+          const yoko = applyYokoSubstitution({ ...state, ...nextBase }, seat, rawHp);
           return {
-            ...state,
-            ...nextBase,
-            seats: state.seats.map(s => (s.seat === seat ? { ...s, hp } : s)),
+            ...yoko.state,
+            seats: yoko.state.seats.map(s => (s.seat === seat ? { ...s, hp: yoko.hp } : s)),
             prompts: newPrompts,
           };
         }
@@ -11209,11 +11345,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         if (target === undefined || give <= 0) {
           return { ...state, ...nextBase, prompts: newPrompts };
         }
-        const targetHp = applyHpLoss(characterAbilities(state, targetSeat), target.hp, give, target.downed || target.dead);
+        const rawTargetHp = applyHpLoss(characterAbilities(state, targetSeat), target.hp, give, target.downed || target.dead);
+        const yokoTarget = applyYokoSubstitution({ ...state, ...nextBase }, targetSeat, rawTargetHp);
         return {
-          ...state,
-          ...nextBase,
-          seats: state.seats.map(s => (s.seat === targetSeat ? { ...s, hp: targetHp } : s)),
+          ...yokoTarget.state,
+          seats: yokoTarget.state.seats.map(s => (s.seat === targetSeat ? { ...s, hp: yokoTarget.hp } : s)),
           prompts: newPrompts,
         };
       }
@@ -11424,6 +11560,137 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 }
               : x)),
           };
+        }
+        return s;
+      }
+
+      if (kind === 'exploreChoice' && chosenId !== undefined) {
+        // PR-004 Jim Chapman L1 / PR-007 Alyssa Ashcroft L1: apply the choice to
+        // the pending combat, then RE-DISPATCH the parked explore so the effect
+        // lands on that same fight. `exploreChoicePending` stays armed through
+        // the re-dispatch so the window is not offered twice.
+        const ask = state.exploreChoiceAsk;
+        const cleared = { ...state, ...nextBase, prompts: newPrompts };
+        if (ask === undefined || ask.seat !== seat) return cleared;
+        let s: GameState = { ...cleared, exploreChoiceAsk: undefined };
+        const weaponId = String(prompt.payload?.instanceId ?? '');
+        const decline = chosenId === 'Decline';
+        if (!decline && weaponId !== '') {
+          const cur = s.seats[seat] as PlayerState | undefined;
+          if (cur !== undefined) {
+            if (ask.kind === 'alyssaPayAmmo') {
+              const cost = Number(prompt.payload?.ammoCost ?? '0');
+              const amount = Number(prompt.payload?.amount ?? '0');
+              if (cur.turnAmmo >= cost) {
+                s = {
+                  ...s,
+                  seats: s.seats.map(x => (x.seat === seat
+                    ? {
+                        ...x,
+                        turnAmmo: x.turnAmmo - cost,
+                        weaponDamageBonusById: { ...(x.weaponDamageBonusById ?? {}), [weaponId]: (x.weaponDamageBonusById?.[weaponId] ?? 0) + amount },
+                      }
+                    : x)),
+                };
+              }
+            } else {
+              // Jim's coin flip, on the seeded RNG.
+              const flip = nextInt(makeRng(s.rngState), 2);
+              s = { ...s, rngState: flip.rng.s };
+              if (flip.value === 0) {
+                // Heads: the weapon's printed damage is added again, i.e. doubled.
+                const base = cardDef(s, weaponId)?.damage ?? 0;
+                s = {
+                  ...s,
+                  seats: s.seats.map(x => (x.seat === seat
+                    ? { ...x, weaponDamageBonusById: { ...(x.weaponDamageBonusById ?? {}), [weaponId]: (x.weaponDamageBonusById?.[weaponId] ?? 0) + base } }
+                    : x)),
+                };
+              } else {
+                // Tails: Jim takes the printed damage.
+                const ric = applyRicardoDamage(s, seat, cur.hp, Number(prompt.payload?.amount ?? '0'));
+                s = { ...ric.state, seats: ric.state.seats.map(x => (x.seat === seat ? { ...x, hp: ric.hp } : x)) };
+              }
+            }
+          }
+        }
+        return applyAction(s, ask.action);
+      }
+
+      if (kind === 'attachFaceDownChoice') {
+        // PR-006 Yoko Suzuki L1 / CH-016: the chosen hand card goes on face down;
+        // whatever was attached by this effect before returns to hand.
+        const decline = chosenId === 'Decline';
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (!decline && chosenId !== '') {
+          const cur = s.seats[seat] as PlayerState | undefined;
+          const chosen = String(chosenId);
+          if (cur !== undefined && cur.hand.includes(chosen)) {
+            // `attached` is SHARED with trophies/partner attachments, so the card
+            // this effect attached previously is tracked by id, never by slot.
+            const replaced = cur.faceDownAttachedId;
+            const hand = [...cur.hand.filter(id => id !== chosen)];
+            const attached = cur.attached.filter(id => id !== replaced);
+            if (replaced !== undefined) hand.push(replaced);
+            attached.push(chosen);
+            const moved = { ...s.cards };
+            const inst = moved[chosen];
+            if (inst !== undefined) moved[chosen] = { ...inst, location: { zone: 'attached', index: 0, seat } };
+            if (replaced !== undefined) {
+              const r = moved[replaced];
+              if (r !== undefined) moved[replaced] = { ...r, location: { zone: 'hand', index: hand.length - 1, seat } };
+            }
+            s = {
+              ...s,
+              cards: moved,
+              seats: s.seats.map(x => (x.seat === seat
+                ? { ...x, hand, attached, faceDownAttachedId: chosen }
+                : x)),
+            };
+          }
+        }
+        return s;
+      }
+
+      if (kind === 'alyssaNameType') {
+        // PR-007 Alyssa Ashcroft L2: reveal the top of the Inventory. On the named
+        // type it is drawn and grants +1 Explore this turn; otherwise it stays put.
+        const decline = chosenId === 'Decline';
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (!decline) {
+          const cur = s.seats[seat] as PlayerState | undefined;
+          const topId = cur?.inventory[0];
+          if (cur !== undefined && topId !== undefined) {
+            const topDef = cardDef(s, topId);
+            recordCardReveals([{ instanceId: topId, pile: 'inventory' }]);
+            const match = topDef?.type === String(chosenId);
+            s = {
+              ...s,
+              seats: s.seats.map(x => (x.seat === seat
+                ? (match
+                    ? { ...x, inventory: x.inventory.slice(1), hand: [...x.hand, topId], exploresLeft: x.exploresLeft + 1 }
+                    : x)
+                : x)),
+            };
+          }
+        }
+        return s;
+      }
+
+      if (kind === 'jimRevealAmmo') {
+        // PR-004 Jim Chapman L2: pay 2 "Ammo x10" and send the revealed Infected
+        // still in the Mansion to its very bottom.
+        const decline = chosenId === 'Decline';
+        let s: GameState = { ...state, ...nextBase, prompts: newPrompts };
+        if (!decline) {
+          const ids = String(prompt.payload?.ids ?? '').split(',').filter(Boolean);
+          const ammo = Number(prompt.payload?.ammo ?? '0');
+          if (ammo > 0) s = gainAmmoCard(s, seat, ammo);
+          const stillThere = ids.filter(id => s.mansionDeck.includes(id));
+          if (stillThere.length > 0) {
+            const rest = s.mansionDeck.filter(id => !stillThere.includes(id));
+            s = { ...s, mansionDeck: [...rest, ...stillThere] };
+          }
         }
         return s;
       }

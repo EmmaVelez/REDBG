@@ -1025,6 +1025,10 @@ export interface PlayerState {
   readonly partnerInstanceId?: string;
   /** Cards attached to the partner (max 2 unless stated). */
   readonly partnerAttached?: readonly string[];
+  /** PR-006 Yoko Suzuki L1 / CH-016: the id of the card THIS EFFECT attached
+   *  face down. `attached` also holds trophies and partner attachments, so the
+   *  effect must track its own card rather than assume a slot. */
+  readonly faceDownAttachedId?: string;
   /** Whether partner leads exploration this turn (shared explore). */
   readonly partnerLeading?: boolean;
   /** Partner health, tracked separately from main character. */
@@ -1121,6 +1125,9 @@ export interface PlayerState {
   /** CH-023 David King L2: true while his Discard-Pile Knife window is open or
    *  its answer is being applied, so the parked explore is not re-offered. */
   readonly davidKnifePending?: boolean;
+  /** True while a pre-reveal explore park (PR-004 / PR-007) is open or being
+   *  applied, so the parked explore cannot re-offer. */
+  readonly exploreChoicePending?: boolean;
 
   /** AC-048 Backstab: the chosen target player, resolved on the next explore. */
   readonly pendingBackstab?: { readonly targetSeat: number };
@@ -1432,6 +1439,22 @@ export interface GameState {
   readonly davidKnifeAsk?: {
     readonly seat: number;
     readonly action: Action;
+  };
+  /** Pre-reveal explore parks shared by PR-004 Jim Chapman L1 (coin flip) and
+   *  PR-007 Alyssa Ashcroft L1 (pay Ammo for +damage): both change THAT combat,
+   *  so the explore must be decided before it resolves. */
+  readonly exploreChoiceAsk?: {
+    readonly seat: number;
+    readonly action: Action;
+    readonly kind: 'jimCoinFlip' | 'alyssaPayAmmo';
+  };
+  /** PR-006 Yoko Suzuki L2: a lethal hit was substituted, so the end-of-action
+   *  hook lowers this seat's Maximum Health and heals it to full. Recorded here
+   *  because damage sites rebuild the seat from a pre-damage snapshot and would
+   *  otherwise drop the new Maximum Health. */
+  readonly lethalSubstitution?: {
+    readonly seat: number;
+    readonly maxHp: number;
   };
   readonly log: readonly LoggedAction[];
 
