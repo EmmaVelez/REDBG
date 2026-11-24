@@ -18,20 +18,28 @@ popup rect y 913..1116 = 316px BELOW the viewport; portalled one 446..649, fully
   transformed/filtered ancestor — portal it. Grep for other fixed popups before assuming they work.
 - Tests: `hoverCardPos.test.ts` (5). Gates: typecheck x3 clean, client 292/292, engine untouched.
 
-**LOBBY CHARACTER PICKER NOW FOLLOWS THE SCENARIO (2026-11-23):** Manny asked why the Outbreak characters
-are unselectable. `selectableCharacters(room)` in `client/src/ui/Lobby.tsx` pooled a HARD-CODED
+**CHARACTER SELECTION — manual picks span every expansion, Random stays scenario-bound (Manny ruling
+2026-11-23):** Manny first asked why the Outbreak characters were unselectable; the answer was that
+`selectableCharacters(room)` in `client/src/ui/Lobby.tsx` pooled a HARD-CODED
 `[...PREMIER_CARDS, ...ALLIANCE_CARDS, ...NIGHTMARE_CARDS, ...CUSTOM_CARDS]` — OUTBREAK_CARDS and
-MERCENARIES_CARDS were never added, so their 21 characters (ch-021..033 incl. Zombie A/B/C, and the 8
-Mercenaries) never appeared in the Main/Partner dropdowns even though they ARE in the random pool
-(expansion scenarios use `ALL_CARDS`).
-- FIX: the picker now derives from `cardsForScenario(room.scenario, {...same opts host.ts/hotseat pass...})`
-  — i.e. exactly the pool Random draws from. This also fixes a latent bug in the other direction: a base
-  scenario (First Timer etc.) deals only PREMIER_CARDS, so picking an Alliance/Nightmare character there
-  silently fell through setup's "unknown explicit id: legacy lenient behavior" path (generic 100-HP card,
-  def absent from `state.cardDefs`). Those sets are now offered only where they can actually be played.
-- Dead code removed: the unused `allianceChars` const in the Pass & Play panel.
-- Test: ui.test.tsx asserts CH-021/Excella Gionne/CH-031 appear in an outbreak room and CH-021 does NOT in
-  a firstTimer room. Gates: typecheck x3 clean, client 292/292.
+MERCENARIES_CARDS were never added, so their 21 characters (ch-021..033 incl. Zombie A/B/C, plus the 8
+Mercenaries) never rendered in the Main/Partner dropdowns even though they ARE in the random pool
+(expansion scenarios deal ALL_CARDS).
+- RULING: the dropdown lists EVERY expansion (`[...ALL_CARDS, ...CUSTOM_CARDS]`, custom still gated on
+  `room.customCards`). An intermediate version restricted the picker to `cardsForScenario(...)`; that was
+  reverted per this ruling.
+- ENGINE must back it: an explicit pick outside the scenario's card list used to hit setup()'s
+  "unknown explicit id: legacy lenient behavior" branch → generic 100-HP card, def absent from
+  `state.cardDefs`. NEW `resolveCharacterDef()` in game.ts falls back to `ALL_CARDS` and registers the
+  def into `defsById`/`cardDefs`, so the picked character plays normally in ANY scenario. RANDOM still
+  draws only from `cards` (the scenario pool) — unchanged.
+- Duplicate handling: out-of-pool picks never enter `remainingCharacters`, so `claimedCharacters` /
+  `claimedPartners` sets catch explicit-explicit duplicates (in-pool keeps the existing
+  `characterIds.includes` guard, which also catches explicit-vs-earlier-random).
+- Tests: `game-core/src/engine/characterSelection.test.ts` (6 — out-of-pool main/partner resolve,
+  both duplicate guards, random-in-pool over 200 seeds x 4 seats) + ui.test.tsx asserts CH-021 /
+  Excella Gionne / CH-031 / CH-002 appear in BOTH a firstTimer and an outbreak room.
+- Dead code removed earlier: the unused `allianceChars` const in the Pass & Play panel.
 
 **CUSTOM WEAPON CW-036 LEVER ACTION RIFLE (2026-11-23):** Manny sent a fan render
 (no printed code): 40 cost / 40 ammoReq / 20 damage, tags gun+rifle, text

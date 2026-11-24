@@ -9,7 +9,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
-import { MERCENARIES_BASIC_RESOURCES } from '../data/cards';
+import { MERCENARIES_BASIC_RESOURCES, ALL_CARDS } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
 import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus, applySetupEffects } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
@@ -563,16 +563,39 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
 
   const characterIds = cards.filter(c => c.type === 'character').map(c => c.id);
+  /**
+   * A MANUAL pick may name ANY expansion's character, including one outside this
+   * scenario's card list (Manny ruling 2026-11-23). The lobby offers the whole
+   * pool while Random still draws only from `cards`, so an out-of-pool id has to
+   * be resolved here — otherwise the seat silently gets the generic 100-HP card
+   * with no abilities (the old "legacy lenient behavior" path).
+   */
+  const resolveCharacterDef = (id: string | undefined): CardDef | undefined => {
+    if (id === undefined) return undefined;
+    const inPool = defsById.get(id);
+    if (inPool !== undefined) return inPool;
+    const extra = ALL_CARDS.find(c => c.id === id && c.type === 'character');
+    if (extra !== undefined) {
+      defsById.set(extra.id, extra);
+      cardDefs[extra.id] = extra;
+    }
+    return extra;
+  };
   // Outbreak mode: infection levels, the Infection Deck and Infected Characters.
   const outbreakMode = setup.outbreakMode === true || setup.scenario === 'outbreak';
   // Characters are unique per game (user ruling): each seat gets its own
   // character card. Random picks draw from the remaining pool (no
   // replacement), and explicit picks consume their slot — a duplicate
   // explicit character that another seat already claimed is a setup error.
+  // Out-of-pool picks never enter `remainingCharacters`, so their duplicates
+  // are tracked separately.
   const remainingCharacters = [...characterIds];
+  const claimedCharacters = new Set<string>();
+  const claimedPartners = new Set<string>();
 
   const seats: PlayerState[] = setup.players.map((p, i) => {
     let characterCardId = p.characterCardId || undefined;
+    if (characterCardId !== undefined) resolveCharacterDef(characterCardId);
     if (characterCardId === undefined) {
       if (remainingCharacters.length === 0) {
         throw new Error(`not enough unique characters for ${setup.players.length} players`);
@@ -585,11 +608,12 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       // Explicit pick: remove it from the pool so later random picks cannot
       // collide with it.
       remainingCharacters.splice(remainingCharacters.indexOf(characterCardId), 1);
-    } else if (characterIds.includes(characterCardId)) {
-      // A known character that an earlier seat already claimed.
+    } else if (claimedCharacters.has(characterCardId) || characterIds.includes(characterCardId)) {
+      // Either an out-of-pool character a previous seat already named, or a
+      // known character an earlier seat already claimed.
       throw new Error(`character ${characterCardId} already assigned to another player`);
     }
-    // Unknown explicit id: legacy lenient behavior (default stats), no pool slot.
+    claimedCharacters.add(characterCardId);
     characterCardId = characterCardId ?? '';
     const def = defsById.get(characterCardId);
     const maxHp = def?.maxHp ?? 100;
@@ -603,6 +627,9 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     const wantPartner = setup.partnerMode === true || !!p.partnerCharacterId;
     if (wantPartner) {
       partnerCardId = p.partnerCharacterId || undefined;
+      // A manual pick may name an out-of-pool character, so resolve its def
+      // before the partner-eligibility check below.
+      if (partnerCardId !== undefined) resolveCharacterDef(partnerCardId);
       // A character that cannot receive attachments (Chris L1) can only ever
       // be a Main character — never a Partner.
       if (partnerCardId !== undefined && !canBePartner(defsById.get(partnerCardId))) {
@@ -620,9 +647,10 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
         remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
       } else if (remainingCharacters.includes(partnerCardId)) {
         remainingCharacters.splice(remainingCharacters.indexOf(partnerCardId), 1);
-      } else if (characterIds.includes(partnerCardId)) {
+      } else if (claimedPartners.has(partnerCardId) || characterIds.includes(partnerCardId)) {
         throw new Error(`character ${partnerCardId} already assigned to another player/partner`);
       }
+      if (partnerCardId !== undefined) claimedPartners.add(partnerCardId);
       partnerCardId = partnerCardId ?? '';
       const partnerInstanceIdStr = `${partnerCardId}#p${i + 1}`;
       partnerInstanceId = partnerInstanceIdStr;

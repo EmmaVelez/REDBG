@@ -2,31 +2,20 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE, canBePartner, cardsForScenario } from '@re/game-core';
+import { SCENARIOS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE, canBePartner, ALL_CARDS } from '@re/game-core';
 import type { CardDef } from '@re/game-core';
 
 /**
- * The characters a seat may pick are EXACTLY the ones its scenario will deal.
- * `cardsForScenario(room.scenario, ...)` is the same call host.ts and hotseat.ts
- * make before `setup()`, so its character list is the pool Random draws from.
- *
- * Two reasons this is driven by the scenario rather than a fixed set list:
- *   - picking an id outside the pool silently degrades: setup() logs "unknown
- *     explicit id: legacy lenient behavior" and builds a generic 100-HP card
- *     with no abilities;
- *   - the expansion sets belong to their scenarios. Outbreak (ch-021..033) and
- *     Mercenaries characters live in ALL_CARDS, so they are offered in the
- *     scenarios that play with them and hidden where they cannot be used.
+ * Every character a player may pick MANUALLY, from any expansion (Manny ruling
+ * 2026-11-23). The dropdown is deliberately broader than the scenario's card
+ * pool: Random stays scenario-bound inside `setup()`, while an explicit pick of
+ * an out-of-pool character is resolved against ALL_CARDS there (see
+ * `resolveCharacterDef` in game.ts). Custom characters still require the room
+ * to have enabled them.
  */
 function selectableCharacters(room: RoomSnapshot): ReadonlyArray<CardDef> {
-  return cardsForScenario(room.scenario, {
-    skillSystem: room.skillSystem,
-    customCards: room.customCards,
-    mercenariesBasicResources: room.mercenariesBasicResources,
-    usherMode: room.usherMode,
-    clockMode: room.clockMode,
-    ceMode: room.ceMode,
-  }).filter(c => c.type === 'character');
+  return [...ALL_CARDS, ...CUSTOM_CARDS].filter(c =>
+    c.type === 'character' && (c.set !== 'custom' || room.customCards.includes(c.id)));
 }
 
 /**

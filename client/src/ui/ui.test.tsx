@@ -1571,7 +1571,7 @@ describe('Lobby (T08)', () => {
     expect(inRoom).toContain('checked=""');
   });
 
-  it("offers exactly the scenario's own characters: Outbreak's cast only where it can actually be played", () => {
+  it("offers every expansion's characters for a manual pick, in any scenario", () => {
     const mk = (scenario: 'firstTimer' | 'outbreak') => ({
       roomCode: 'ABCDEF',
       phase: 'lobby' as const,
@@ -1588,17 +1588,16 @@ describe('Lobby (T08)', () => {
       ceMode: false,
     });
 
-    // First Timer deals PREMIER_CARDS, so an Outbreak character would fall back
-    // to a generic 100-HP card — the picker must not offer one.
-    const base = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk('firstTimer'), clientId: 'c1' })} />);
-    expect(base).not.toContain('CH-021');
-    expect(base).toContain('CH-002');
-
-    // Outbreak is an expansion scenario (ALL_CARDS), so its cast becomes selectable.
-    const outbreak = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk('outbreak'), clientId: 'c1' })} />);
-    expect(outbreak).toContain('CH-021');
-    expect(outbreak).toContain('Excella Gionne');
-    expect(outbreak).toContain('CH-031');
+    // Manual picks may name ANY expansion's character (Manny ruling), so the
+    // Outbreak cast shows up even in a First Timer room. Random stays
+    // scenario-bound inside setup() — see engine/characterSelection.test.ts.
+    for (const scenario of ['firstTimer', 'outbreak'] as const) {
+      const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk(scenario), clientId: 'c1' })} />);
+      expect(html).toContain('CH-021');
+      expect(html).toContain('Excella Gionne');
+      expect(html).toContain('CH-031');
+      expect(html).toContain('CH-002');
+    }
   });
 
   it('offers the Fall of the House of Usher toggle in every lobby surface', () => {
