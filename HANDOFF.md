@@ -1,5 +1,21 @@
 # HANDOFF — resume here
 
+**SKILL-DRAFT HOVERCARD FIXED — portal the popup, it was never viewport-fixed (2026-11-23):** Manny
+reported the enlarged skill card in the Skill Draft as "offscreen and not readable". The popup was
+`position: fixed`, but its ancestor `.decision-card` has **both** `transform: translateX(-50%)` (a
+transformed ancestor is the CONTAINING BLOCK for fixed descendants) and `backdrop-filter` +
+`z-index: 45` (a STACKING CONTEXT, so the popup's `z-index: 100` was local to it and the bottom
+action bar at `z-index: 50` painted OVER it). Viewport coordinates were therefore measured from the
+decision card's own origin. Reproduced in a real browser with the repo's exact rules at 1280x800: old
+popup rect y 913..1116 = 316px BELOW the viewport; portalled one 446..649, fully visible.
+- FIX: `HoverCard` renders the popup via `createPortal(..., document.body)`; placement lives in the new
+  pure module `client/src/ui/hoverCardPos.ts` (`popupPlacement` clamps the centre + picks above/below
+  by available room, `clampPopup` measures the mounted box and nudges/flips it inside the viewport).
+  Delete the old heuristic (`above = r.top > 260`, `half = 92` vs a 145-150px popup).
+- RULE: any `position: fixed` element that must be viewport-relative cannot live inside a
+  transformed/filtered ancestor — portal it. Grep for other fixed popups before assuming they work.
+- Tests: `hoverCardPos.test.ts` (8). Gates: typecheck x3 clean, client 294/294, engine untouched.
+
 **CUSTOM WEAPON CW-036 LEVER ACTION RIFLE (2026-11-23):** Manny sent a fan render
 (no printed code): 40 cost / 40 ammoReq / 20 damage, tags gun+rifle, text
 "This weapon gets +5 Damage for every Action you played this turn." Reuses the
