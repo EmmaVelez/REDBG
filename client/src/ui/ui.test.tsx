@@ -1621,6 +1621,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     for (const id of ['CH-031', 'CH-032', 'CH-033']) {

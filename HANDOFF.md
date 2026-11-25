@@ -32,6 +32,14 @@ plumbing; this session verified it, aligned it to Manny's list, and shipped.
   engine actions were lost in the earlier tree gutting (commit 9512605 added
   the labels; the Action union never kept them) — removed; every Action union
   kind still has a verb.
+- **FOLLOW-UP (1654856+1, typecheck-red master fixed):** the parallel session's
+  293b67a re-added the elevatorDiscardStart/courtyardStart Action kinds AFTER
+  both sessions had dropped the verbs, so the merged master was typecheck-red
+  (TurnHistory verbs + one a395894 ui.test.tsx fixture missing infectionMode).
+  Re-added `elevatorDiscardStart: 'used the Elevator Room'` / `courtyardStart:
+  'used the Courtyard'` and patched the fixture. LESSON: `npm run typecheck
+  | tail` is a FALSE GREEN — the pipe eats npm's non-zero exit; verify per-
+  workspace with `npx tsc --noEmit; echo EXIT:$?`.
 - Gates: typecheck clean x3, game-core **1562/1562** (full soak, exit 0),
   server 118/118, client 294/294, vite build OK, bot-game probe with
   infectionMode on played 381 actions to a clean gameOver (infection deck
