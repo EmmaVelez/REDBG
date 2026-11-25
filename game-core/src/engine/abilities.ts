@@ -1190,14 +1190,22 @@ export function plusTagDamage(
 ): number {
   let bonus = 0;
   for (const ability of abilities) {
-    if (ability.kind !== 'plusDamageForWeaponTags') continue;
-    for (const def of weaponDefs) {
-      if (def === undefined) continue;
-      for (const tag of def.weaponTags ?? []) {
-        if (ability.tags.includes(tag)) {
-          bonus += ability.amount;
-          break;
+    if (ability.kind === 'plusDamageForWeaponTags') {
+      for (const def of weaponDefs) {
+        if (def === undefined) continue;
+        for (const tag of def.weaponTags ?? []) {
+          if (ability.tags.includes(tag)) {
+            bonus += ability.amount;
+            break;
+          }
         }
+      }
+    } else if (ability.kind === 'plusDamageForWeaponTag') {
+      // RC-002 Rebecca L2 / CC-002 Javier L2: single-tag +amount per matching
+      // weapon. Mirrors the resolve (attachmentDamageByTag in actions.ts).
+      for (const def of weaponDefs) {
+        if (def === undefined) continue;
+        if ((def.weaponTags ?? []).includes(ability.tag)) bonus += ability.amount;
       }
     }
   }

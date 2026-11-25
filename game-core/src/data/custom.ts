@@ -329,6 +329,67 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    // Fan character (printed code CC-002). Same family as cc-001 Claire.
+    id: 'cc-002',
+    name: 'Javier Hidalgo',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: During your turn you can reveal a "Machine Gun" Weapon from your hand; if you do you get +2 cards.\\nLevel 2: All your "Machine Gun" Weapons get +10 Damage.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 3,
+    level2At: 6,
+    levels: [
+      { level: 1, text: 'During your turn you can reveal a "Machine Gun" Weapon from your hand; if you do you get +2 cards.' },
+      { level: 2, text: 'All your "Machine Gun" Weapons get +10 Damage.' },
+    ],
+    abilities: [
+      { kind: 'revealWeaponTagFromHandForCards', tag: 'machineGun', amount: 2, level: 1 },
+      { kind: 'plusDamageForWeaponTag', tag: 'machineGun', amount: 10, level: 2 },
+    ],
+  },
+  {
+    // Fan character (printed code FCH-003). Richard Aiken, S.T.A.R.S. Bravo.
+    id: 'fch-003',
+    name: 'Richard Aiken',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: After being fatally wounded, you do not need to skip your next turn.\\nLevel 2: Reduce the damage of a fatally wounding attack by 10. If your health remains above 0 the attack is not fatally wounding.',
+    copies: 1,
+    maxHp: 80,
+    level1At: 3,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'After being fatally wounded, you do not need to skip your next turn.' },
+      { level: 2, text: 'Reduce the damage of a fatally wounding attack by 10. If your health remains above 0 the attack is not fatally wounding.' },
+    ],
+    abilities: [
+      { kind: 'noTurnSkipAfterDowned', level: 1 },
+      { kind: 'fatalWoundDamageReduction', amount: 10, level: 2 },
+    ],
+  },
+  {
+    // Fan character (printed code FCH-007). Jill Valentine in her S.T.A.R.S. gear.
+    id: 'fch-007',
+    name: 'Jill Valentine (S.T.A.R.S.)',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: During your turn, you get +1 Buy and Gold x10.\\nLevel 2: When Jill Explores, you can look at one player\'s top Inventory card. If it is a Weapon you may take it.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 4,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'During your turn, you get +1 Buy and Gold x10.' },
+      { level: 2, text: 'When Jill Explores, you can look at one player\'s top Inventory card. If it is a Weapon you may take it.' },
+    ],
+    abilities: [
+      { kind: 'plusBuyPassive', amount: 1, level: 1 },
+      { kind: 'goldAtTurnStart', amount: 10, level: 1 },
+      { kind: 'explorePeekInventoryTopTakeWeapon', level: 2 },
+    ],
+  },
+  {
     id: 'rc-001',
     name: 'Rebecca Chambers',
     type: 'character',

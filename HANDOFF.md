@@ -1,4 +1,53 @@
 # HANDOFF — resume here
+## THREE FAN CHARACTERS — CC-002 Javier / FCH-003 Richard / FCH-007 Jill S.T.A.R.S. (2026-11-25)
+
+Manny sent 3 renders (2 attachments + a 3rd image that landed in a separate
+native-inputs folder — ALWAYS check every folder when the caption count and the
+attachment count disagree):
+
+- **cc-002 Javier Hidalgo** (printed CC-002; family of cc-001): 100 HP, gates
+  3/6. L1 `revealWeaponTagFromHandForCards` {tag machineGun, amount 2} — manual,
+  once-per-turn (validate's log scan); prompt picks a hand Machine Gun (stays
+  in hand, `recordCardReveals` pile 'hand') → draw 2. L2 reuses
+  `plusDamageForWeaponTag` (machineGun +10).
+- **fch-003 Richard Aiken** (FCH-003): 80 HP, gates 3/7. L1 `noTurnSkipAfterDowned`
+  — the rulebook's downed "skip this turn" is delivered by the startTurn
+  downed-branch advanceTurn (revive + draw 5 + PASS); Richard instead falls
+  THROUGH to the normal turn build (player = revivedPlayer; dead Richard still
+  passes). L2 `fatalWoundDamageReduction` {10} — cuts the raw damage at BOTH
+  explore kevlar-construction sites when `damage >= baseLeadingHp`, so both the
+  applyRicardoDamage (no-partner leader, applyHpLoss CLAMPS at 0 — adding to
+  the clamped value over-heals, that approach was tried and reverted) and the
+  partner-led raw-subtraction branches land on the true post-reduction HP.
+  Scope: explore attacks (single + multi, both sub-blocks); PvP attack + poison/
+  events/AoE NOT reduced (RULINGS).
+- **fch-007 Jill Valentine (S.T.A.R.S.)** (FCH-007): 70 HP, gates 4/7. L1 reuses
+  `plusBuyPassive` + `goldAtTurnStart` (Carlos kind — do NOT add new gold-start
+  kinds). L2 `explorePeekInventoryTopTakeWeapon` — post-explore hook
+  `applyJillStarsPeekHook` raises a target-player prompt (ANOTHER player — the
+  exploring seat is excluded per the caption read "another player's top
+  Inventory card"),
+  resolver reveals the top inventory card (recordCardReveals, ownerSeat) and, if
+  a Weapon, offers Take/Leave; Take moves it to Jill's HAND (MoU's action-card
+  take sends to discard — chose hand, flag if different). One peek per explore
+  action.
+
+Art: full-card renders → CARD-ART/CC-002.png, FCH-003.png, FCH-007.png (320x446,
+P-mode 256, ~100 KB); vite glob emits all three.
+
+LATENT BUG FIXED on the way: `plusTagDamage` (preview) only summed the PLURAL
+plusDamageForWeaponTags — the SINGULAR plusDamageForWeaponTag (rc-002 Rebecca
+L2, machineGun) never reached exploreDamage, and the RESOLVE had it hardcoded to
+machineGun. Generalized both (resolve feeds attachmentDamageByTag per tag from
+the abilities) — rc-002's preview is now correct too.
+
+Tests: `customFchCc.test.ts` (14) — data shape, reject/prompt/draw/once-per-turn
+for Javier, L1 recovery-turn vs skip control + L2 survive-at-5 vs still-downed
+for Richard (fixture lesson: clear the OTHER seats' hands or seed ac-050 holders
+make the resuscitate window hold HP at 10 and zero the recorded damage), Jill
+turn-start gold/buy, peek → take vs non-weapon no-op. Gates: typecheck x3 clean,
+regression batches 60/60, client 310/310, server 118/118, vite build OK.
+
 
 **INFECTION GAME MODE — "INFECTION" checkbox; Outbreak cards join ANY scenario
 (2026-11-25):** Manny sent the card list in `CARDID COUNT` format and asked for

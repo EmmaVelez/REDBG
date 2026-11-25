@@ -609,6 +609,7 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'discardActionCardFromHandForPlusTwoCards':
         case 'forceAllyExploreWithSupport':
         case 'stunRodCharge':
+        case 'revealWeaponTagFromHandForCards':
         case 'moveMansionBottomToTop': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
@@ -661,6 +662,17 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             // lo-001 Louis L1: needs at least two cards for a meaningful move.
             if (state.mansionDeck.length < 2) {
               return { ok: false, reason: 'useCharacterAbility: Mansion has fewer than 2 cards' };
+            }
+          }
+          if (ability.kind === 'revealWeaponTagFromHandForCards') {
+            // CC-002 Javier Hidalgo L1: the ability needs a tag Weapon in hand
+            // to reveal (the tag comes from the ability variant).
+            const hasTagWeapon = player.hand.some(id => {
+              const d = cardDef(state, id);
+              return d?.weaponTags?.includes(ability.tag) ?? false;
+            });
+            if (!hasTagWeapon) {
+              return { ok: false, reason: 'useCharacterAbility: no weapon of that tag in hand' };
             }
           }
           if (ability.kind === 'exchangeHandWithInventoryTop') {

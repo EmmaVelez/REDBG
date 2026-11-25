@@ -821,6 +821,38 @@ function endTurnWithRecallChoice(
  *  resumes) so none of them drifts. The id carries a counter so two windows
  *  in one version (a resolved pending explore + the new explore) cannot
  *  collide — chooseOption removes every prompt carrying the same id. */
+/**
+ * FCH-007 Jill Valentine (S.T.A.R.S.) L2: "When Jill Explores, you can look at
+ * one player's top Inventory card. If it is a Weapon you may take it." Raised
+ * after an explore action resolves; the player-target peek and the optional
+ * take run through chooseOption prompts (jillStarsPeek / jillStarsTake).
+ * Ally/partner explores are not covered (only the seat's own explore action).
+ */
+function applyJillStarsPeekHook(next: GameState, action: Action): GameState {
+  if (action.type !== 'explore') return next;
+  const seat = action.seat;
+  const player = next.seats[seat];
+  if (player === undefined || player.dead || player.downed) return next;
+  if (next.activeSeat !== seat) return next;
+  if (!seatAbilities(next, seat).some(a => a.kind === 'explorePeekInventoryTopTakeWeapon')) return next;
+  // "another player's top Inventory card" — Jill herself is not a target.
+  const targets = next.seats.filter(s => s.seat !== seat && !s.dead && !s.downed).map(s => String(s.seat));
+  if (targets.length === 0) return next;
+  return {
+    ...next,
+    prompts: [
+      ...next.prompts,
+      {
+        id: `jillStars-${seat}-v${next.version}`,
+        seat,
+        text: "Jill Valentine (S.T.A.R.S.): look at one player's top Inventory card?",
+        options: targets,
+        payload: { kind: 'jillStarsPeek' },
+      },
+    ],
+  };
+}
+
 export function eclipticTrashPromptFor(s: GameState, seat: number): Prompt | undefined {
   const p = s.seats[seat];
   if (p === undefined || p.discard.length === 0) return undefined;
@@ -1064,9 +1096,10 @@ export function applyAction(state: GameState, action: Action): GameState {
   }
   const next = applyDownedHooks(applyDamageTakenHooks(state, afterDefeat));
   const afterJim = applyJimRevealHook(state, applyTrashDrawHook(state, next, action), action);
+  const afterJill = applyJillStarsPeekHook(afterJim, action);
   // Choke point: a prompt with no options can never be resolved and would
   // deadlock the seat behind the "resolve pending prompt first" gate.
-  const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterJim), action)))));
+  const hooked = applyLocationTrashXpHooks(state, applyHealTracking(state, applyTrashAmmoGoldHooks(state, dropEmptyPrompts(applyOutbreakHooks(state, applyActionDiscardedHooks(state, afterJill), action)))));
   const leon = applyLeonTrashHook(state, hooked, action);
   // Location windows last so they see every trash/gain/shuffle the earlier
   // hooks produced (Leon's trash chains into the Shed offer, etc.).
@@ -3232,13 +3265,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               }
             }
           }
-          // RC-002 Rebecca Chambers L2: Machine Gun weapons get +N damage.
-          const rebeccaMachineGunBonus = abilities
-            .filter(a => a.kind === 'plusDamageForWeaponTag' && a.tag === 'machineGun')
-            .reduce((sum, a) => sum + (a.kind === 'plusDamageForWeaponTag' ? a.amount : 0), 0);
-          if (rebeccaMachineGunBonus > 0) {
-            const current = attachmentDamageByTag.get('machineGun') ?? 0;
-            attachmentDamageByTag.set('machineGun', current + rebeccaMachineGunBonus);
+          // Character abilities: plusDamageForWeaponTag per tag (RC-002
+          // Rebecca L2 machineGun +5, CC-002 Javier L2 machineGun +10).
+          for (const a of abilities) {
+            if (a.kind === 'plusDamageForWeaponTag') {
+              const current = attachmentDamageByTag.get(a.tag) ?? 0;
+              attachmentDamageByTag.set(a.tag, current + a.amount);
+            }
           }
 
           const exploreWeapons: ExploreWeapon[] = weaponDefs.map((w, i) => {
@@ -4022,6 +4055,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           // moved nor applied here — `damage` stays the full hit until answered.
           const kevlarId = attachedKevlarId(state, seat);
           const kevlar = { state, damage: effectiveSkillDamage, movedIds: [] as readonly string[] };
+          // FCH-003 Richard Aiken L2: a fatally wounding hit (damage >= current
+          // Health) deals `amount` less damage BEFORE the down check — if his
+          // Health stays above 0 the attack is not fatally wounding. Applied to
+          // the RAW damage so both the applyRicardoDamage and partner-led
+          // branches land on the true post-reduction value (applyHpLoss clamps
+          // at 0, which would otherwise erase the difference).
+          if (kevlar.damage >= baseLeadingHp) {
+            const l2 = abilities.find(a => a.kind === 'fatalWoundDamageReduction');
+            if (l2 !== undefined && l2.kind === 'fatalWoundDamageReduction') {
+              kevlar.damage = Math.max(kevlar.damage - l2.amount, 0);
+            }
+          }
 
           if (damageOnAda) {
             const ric = applyRicardoDamage(state, seat, baseLeadingHp, kevlar.damage);
@@ -5709,6 +5754,18 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       // nor applied here — `damage` stays the full hit until the player answers.
       const kevlarId = attachedKevlarId(state, seat);
       const kevlar = { state, damage: effectiveSkillDamage, movedIds: [] as readonly string[] };
+      // FCH-003 Richard Aiken L2: a fatally wounding hit (damage >= current
+      // Health) deals `amount` less damage BEFORE the down check — if his
+      // Health stays above 0 the attack is not fatally wounding. Applied to
+      // the RAW damage so both the applyRicardoDamage and partner-led
+      // branches land on the true post-reduction value (applyHpLoss clamps
+      // at 0, which would otherwise erase the difference).
+      if (kevlar.damage >= baseLeadingHp) {
+        const l2 = abilities.find(a => a.kind === 'fatalWoundDamageReduction');
+        if (l2 !== undefined && l2.kind === 'fatalWoundDamageReduction') {
+          kevlar.damage = Math.max(kevlar.damage - l2.amount, 0);
+        }
+      }
 
       let newLeadingHp: number;
       if (damageOnAda) {
@@ -7065,6 +7122,33 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                     text: `Choose a player: all of the weapons they use on their next turn require +${amount} Ammo.`,
                     options: others.map(s => String(s.seat)),
                     payload: { kind: 'jillAmmoIncrease', amount: String(amount) },
+                  },
+                ],
+              };
+            }
+            case 'revealWeaponTagFromHandForCards': {
+              // CC-002 Javier Hidalgo L1: reveal a tag Weapon from hand (it
+              // stays there) for +amount cards — once per turn (validate's
+              // log scan). The weapon choice is a prompt.
+              const tagLabel = ability.tag === 'machineGun' ? 'Machine Gun' : ability.tag;
+              const tagWeapons = player.hand.filter(id => {
+                const d = cardDef(state, id);
+                return d?.weaponTags?.includes(ability.tag) ?? false;
+              });
+              if (tagWeapons.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: `Reveal a \"${tagLabel}\" Weapon from your hand for +${ability.amount} cards?`,
+                    options: [...tagWeapons, 'Decline'],
+                    payload: { kind: 'revealWeaponTagFromHandForCards' },
                   },
                 ],
               };
@@ -9196,6 +9280,81 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             payload: { kind: 'turnStartRevealActionsForCards', count: String(count + (isAction ? 1 : 0)) },
           }],
         };
+      }
+
+      if (kind === 'revealWeaponTagFromHandForCards') {
+        // CC-002 Javier Hidalgo L1: the revealed weapon stays in hand; draw
+        // the ability's card amount.
+        if (chosenId === undefined || chosenId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const ab = characterAbilities(state, seat).find(a => a.kind === 'revealWeaponTagFromHandForCards');
+        const amount = ab !== undefined && ab.kind === 'revealWeaponTagFromHandForCards' ? ab.amount : 2;
+        recordCardReveals([{ instanceId: chosenId, pile: 'hand' }]);
+        const d = drawWithReshuffle({ deck: player.inventory, discard: player.discard, count: amount, rngState: state.rngState });
+        return {
+          ...state,
+          ...nextBase,
+          rngState: d.rngState,
+          seats: state.seats.map(s => (s.seat === seat
+            ? { ...player, hand: [...player.hand, ...d.hand], inventory: d.deck, discard: d.discard }
+            : s)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'jillStarsPeek') {
+        // FCH-007 Jill Valentine (S.T.A.R.S.) L2: reveal the chosen player's
+        // top Inventory card; a Weapon on top offers Take/Leave.
+        const target = Number(chosenId);
+        const targetSeat = state.seats[target];
+        if (targetSeat === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const topId = targetSeat.inventory[0];
+        if (topId === undefined) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        recordCardReveals([{ instanceId: topId, pile: 'inventory', ownerSeat: target }]);
+        const topDef = cardDef(state, topId);
+        if (topDef?.type !== 'weapon') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [
+            ...newPrompts,
+            {
+              id: `jillStarsTake-${seat}-${state.version}`,
+              seat,
+              text: `Take ${topDef.name} from ${targetSeat.name}'s Inventory?`,
+              options: ['Take', 'Leave'],
+              payload: { kind: 'jillStarsTake', instanceId: topId, owner: String(target) },
+            },
+          ],
+        };
+      }
+
+      if (kind === 'jillStarsTake') {
+        // FCH-007 Jill Valentine (S.T.A.R.S.) L2: taking moves the revealed
+        // weapon from the owner's Inventory top into Jill's hand.
+        const instanceId = String(prompt.payload?.instanceId ?? '');
+        const owner = Number(prompt.payload?.owner ?? -1);
+        const ownerSeat = state.seats[owner];
+        if (chosenId === 'Take' && instanceId !== '' && ownerSeat !== undefined && ownerSeat.inventory[0] === instanceId) {
+          return {
+            ...state,
+            ...nextBase,
+            seats: state.seats.map(s => {
+              if (s.seat === owner) return { ...s, inventory: s.inventory.slice(1) };
+              if (s.seat === seat) return { ...player, hand: [...player.hand, instanceId] };
+              return s;
+            }),
+            prompts: newPrompts,
+          };
+        }
+        return { ...state, ...nextBase, prompts: newPrompts };
       }
 
       if (kind === 'leonHandToInventoryTop') {

@@ -1295,7 +1295,7 @@ function startTurnInternal(state: GameState): GameState {
       rngState: state.rngState,
     });
 
-    const newPlayer: PlayerState = {
+    const revivedPlayer: PlayerState = {
       ...player,
       hp: ch.hp,
       maxHp: ch.maxHp,
@@ -1344,26 +1344,36 @@ function startTurnInternal(state: GameState): GameState {
       // not consume the Yellow Herb heal debt.
     };
 
-    const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
-    const ctx = advanceTurn({
-      seatCount: state.seats.length,
-      activeSeat: state.activeSeat,
-      turnNumber: state.turnNumber,
-      aliveSeats,
-    });
+    // FCH-003 Richard Aiken L1: "After being fatally wounded, you do not need
+    // to skip your next turn." The rulebook's skip is delivered right here —
+    // the advanceTurn below passes play on without letting the revived
+    // character act. Richard instead takes the recovery turn: keep him active
+    // and fall through to the standard turn build below with the revived
+    // player (a dead Richard still passes, exactly like everyone else).
+    if (!revivedPlayer.dead && seatAbilities(state, player.seat).some(a => a.kind === 'noTurnSkipAfterDowned')) {
+      player = revivedPlayer;
+    } else {
+      const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
+      const ctx = advanceTurn({
+        seatCount: state.seats.length,
+        activeSeat: state.activeSeat,
+        turnNumber: state.turnNumber,
+        aliveSeats,
+      });
 
-    // Unofficial Expansion: a Character who dies returns its counters to the
-    // shared supply ("return this card to the Resource Area").
-    const deathState = ch.dead ? returnCountersToSupply(state, player.seat) : state;
+      // Unofficial Expansion: a Character who dies returns its counters to the
+      // shared supply ("return this card to the Resource Area").
+      const deathState = ch.dead ? returnCountersToSupply(state, player.seat) : state;
 
-    return {
-      ...deathState,
-      version: state.version + 1,
-      rngState: d.rngState,
-      seats: deathState.seats.map((s, i) => (i === state.activeSeat ? newPlayer : s)),
-      activeSeat: ctx.activeSeat,
-      turnNumber: ctx.turnNumber,
-    };
+      return {
+        ...deathState,
+        version: state.version + 1,
+        rngState: d.rngState,
+        seats: deathState.seats.map((s, i) => (i === state.activeSeat ? revivedPlayer : s)),
+        activeSeat: ctx.activeSeat,
+        turnNumber: ctx.turnNumber,
+      };
+    }
   }
 
   // Yellow Herb: heal owed from a herb attached on a previous turn applies at

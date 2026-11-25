@@ -849,6 +849,11 @@ export type CharacterAbility =
   | { readonly kind: "drawFromInventoryOncePerTurn"; readonly level: 1 | 2 } // FCH-001 Carlos L1: once per turn, draw from inventory; weapon/ammo to hand, else discard
   | { readonly kind: "searchDiscardForAmmoAtTurnStart"; readonly level: 1 | 2 } // FCH-001 Carlos L2: at turn start, search discard for an Ammo card to hand
   | { readonly kind: "plusDamageForWeaponTagIfAmmoAbove"; readonly tag: WeaponTag; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // FCH-002 HUNK L2: +amount to tag weapons while turn Ammo > threshold
+  // --- Fan characters (CC-002 Javier / FCH-003 Richard / FCH-007 Jill S.T.A.R.S., 2026-11-25) ---
+  | { readonly kind: "revealWeaponTagFromHandForCards"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // CC-002 Javier Hidalgo L1: manual, once/turn — reveal a tag Weapon from hand (it stays there) for +amount cards
+  | { readonly kind: "noTurnSkipAfterDowned"; readonly level: 1 | 2 } // FCH-003 Richard Aiken L1: do not skip the recovery turn after being fatally wounded
+  | { readonly kind: "fatalWoundDamageReduction"; readonly amount: number; readonly level: 1 | 2 } // FCH-003 Richard Aiken L2: the fatally wounding attack deals `amount` less damage
+  | { readonly kind: "explorePeekInventoryTopTakeWeapon"; readonly level: 1 | 2 } // FCH-007 Jill Valentine (S.T.A.R.S.) L2: when she explores, she may look at ANOTHER player's top Inventory card; a Weapon may be taken
   // --- Fan characters (JM-001..) ---
   | { readonly kind: "trashTopFromDiscardOnBigHit"; readonly threshold: number; readonly count: number; readonly level: 1 | 2 } // JM-001 Jake Muller L1: when he takes more than `threshold` Damage, Trash the top `count` cards of his Discard Pile
   | { readonly kind: "plusDecorationOnDefeatHighHp"; readonly threshold: number; readonly amount: number; readonly level: 1 | 2 } // JM-001 Jake Muller L2: +amount Decorations for each Infected with more than `threshold` Health he defeats
