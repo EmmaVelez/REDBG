@@ -134,6 +134,11 @@ export interface CardDef {
     readonly level2At?: number;
     /** Decorations needed to reach Level 1 (default 0; Krauser requires 1). */
     readonly level1At?: number;
+  /** Outbreak: this Character card is an INFECTED Character (Zombie A/B/C).
+   *  Such cards are never in the manual selection pool — they only enter play
+   *  through the infection-counter reanimation rule — and a seat that somehow
+   *  starts on one plays under the Infected Character rules. */
+  readonly infectedCharacter?: boolean;
   /** Ability text per level (level 1 first). */
   readonly levels?: ReadonlyArray<{ readonly level: number; readonly text: string }>;
   /** Machine-readable ability keys (see CharacterAbility). */

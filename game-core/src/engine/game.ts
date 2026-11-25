@@ -1,7 +1,7 @@
 import type { GameSetup, GameState, PlayerState, CardDef, CardInstance, CardZone, Prompt, SkillDraftState } from '../types';
 import { makeRng, shuffle, nextInt } from '../util/rng';
 import { draw, drawWithReshuffle } from './deck';
-import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner } from './characters';
+import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner, isSelectableCharacter } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { withBonusesAndDraws } from './actions';
 import { advanceTurn } from './turn';
@@ -11,6 +11,7 @@ import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompt
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES, ALL_CARDS } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
+import { INFECTED_CHARACTER_IDS } from '../data/outbreak';
 import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus, applySetupEffects } from './locations';
 import { sumBonuses, applyBonusPools } from './cards';
 import { helenaLowHpDrawAvailable } from './abilities';
@@ -562,7 +563,11 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     return r.value;
   };
 
-  const characterIds = cards.filter(c => c.type === 'character').map(c => c.id);
+  // Outbreak: Infected Character cards (Zombie A/B/C) are NOT selectable — they
+  // only ever enter play through the infection-counter reanimation rule. They
+  // are still resolved when named explicitly (resolveCharacterDef below finds
+  // them in ALL_CARDS), so such a seat plays under the Infected Character rules.
+  const characterIds = cards.filter(isSelectableCharacter).map(c => c.id);
   /**
    * A MANUAL pick may name ANY expansion's character, including one outside this
    * scenario's card list (Manny ruling 2026-11-23). The lobby offers the whole
@@ -743,7 +748,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
       damageMultiplierThisTurn: undefined,
-      ...(outbreakMode ? { infectionCards: [] as string[], isInfectedCharacter: false, exploredOrAttackedThisTurn: false } : {}),
+      ...(outbreakMode ? { infectionCards: [] as string[], isInfectedCharacter: def?.infectedCharacter === true, exploredOrAttackedThisTurn: false } : {}),
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       attached: [],
@@ -1170,7 +1175,7 @@ function startTurnInternal(state: GameState): GameState {
   // Outbreak: a Character who died of the Infection reanimates as a random
   // Infected Character (Zombie A/B/C), keeping its Decorations.
   if (player.pendingReanimate === true) {
-    const zombieIds = ['ch-031', 'ch-032', 'ch-033'];
+    const zombieIds = [...INFECTED_CHARACTER_IDS];
     const pick = nextInt(makeRng(state.rngState), zombieIds.length);
     const zombieId = zombieIds[pick.value] ?? 'ch-031';
     const zDef = state.cardDefs[zombieId];

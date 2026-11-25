@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { RoomSnapshot, PlayerInfo } from '@re/server';
 import type { ScenarioId } from '@re/game-core';
-import { SCENARIOS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE, canBePartner, ALL_CARDS } from '@re/game-core';
+import { SCENARIOS, CUSTOM_CARDS, POISON_OPTION_ID, POISON_BUNDLE, canBePartner, isSelectableCharacter, ALL_CARDS } from '@re/game-core';
 import type { CardDef } from '@re/game-core';
 
 /**
@@ -11,11 +11,12 @@ import type { CardDef } from '@re/game-core';
  * pool: Random stays scenario-bound inside `setup()`, while an explicit pick of
  * an out-of-pool character is resolved against ALL_CARDS there (see
  * `resolveCharacterDef` in game.ts). Custom characters still require the room
- * to have enabled them.
+ * to have enabled them. Outbreak's Infected Characters are not selectable
+ * (`isSelectableCharacter`) — they only come from the reanimation rule.
  */
 function selectableCharacters(room: RoomSnapshot): ReadonlyArray<CardDef> {
   return [...ALL_CARDS, ...CUSTOM_CARDS].filter(c =>
-    c.type === 'character' && (c.set !== 'custom' || room.customCards.includes(c.id)));
+    isSelectableCharacter(c) && (c.set !== 'custom' || room.customCards.includes(c.id)));
 }
 
 /**

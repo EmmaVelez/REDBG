@@ -122,3 +122,11 @@ export function canBePartner(def: CardDef | undefined): boolean {
     a => a.kind === 'noHealingNoNonInfectedAttach' || a.kind === 'cannotBePartner',
   );
 }
+
+/** True when a Character card may be offered in the manual selection pool.
+ *  Outbreak's Infected Characters (Zombie A/B/C) are excluded: they only enter
+ *  play through the infection-counter reanimation rule. Single source of truth
+ *  for both the Lobby dropdown and `setup()`'s random deal. */
+export function isSelectableCharacter(def: CardDef): boolean {
+  return def.type === 'character' && def.infectedCharacter !== true;
+}

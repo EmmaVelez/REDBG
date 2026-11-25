@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { GameSetup } from '../types';
 import { setup } from './game';
 import { PREMIER_CARDS, FIRST_TIMER_PILES } from '../data/cards';
+import { ALL_CARDS, OUTBREAK_PILES, OUTBREAK_MANSION } from '../data/cards';
+import { INFECTED_CHARACTER_IDS } from '../data/outbreak';
+import { isSelectableCharacter } from './characters';
 import { OUTBREAK_CARDS } from '../data/outbreak';
 
 /**
@@ -111,5 +114,73 @@ describe('random character selection', () => {
         expect(POOL_CHARACTER_IDS).toContain(seatCharacter(s, seat));
       }
     }
+  });
+});
+
+/**
+ * Infected Characters are NOT selectable (Manny ruling 2026-11-24).
+ *
+ * Outbreak's Zombie A/B/C exist only so the infection-counter reanimation rule
+ * has something to turn a dead Character into. The manual dropdown used to
+ * offer them, and picking one produced a plain NON-infected seat — Zombie B's
+ * ability could then never fire at all, because `zombieBPrompts` requires
+ * `isInfectedCharacter`. They stay resolvable when named explicitly (a host or
+ * saved config can still force one), and such a seat plays under the Infected
+ * Character rules.
+ */
+describe('Infected Characters are not selectable', () => {
+  it('flags exactly the three Zombie cards in the data', () => {
+    for (const id of ['ch-031', 'ch-032', 'ch-033']) {
+      const def = ALL_CARDS.find(c => c.id === id);
+      expect(def?.infectedCharacter).toBe(true);
+      expect(isSelectableCharacter(def!)).toBe(false);
+    }
+    // Ordinary characters are untouched, non-character cards still excluded.
+    const leon = ALL_CARDS.find(c => c.id === 'ch-002');
+    expect(leon?.infectedCharacter).toBeUndefined();
+    expect(isSelectableCharacter(leon!)).toBe(true);
+    expect(isSelectableCharacter(ALL_CARDS.find(c => c.id === 'we-009')!)).toBe(false);
+  });
+
+  it('Random never deals a player a Zombie', () => {
+    for (let seed = 0; seed < 100; seed += 1) {
+      const s = setup(
+        {
+          seed,
+          players: [
+            { name: 'A', controller: 'human' },
+            { name: 'B', controller: 'human' },
+            { name: 'C', controller: 'bot' },
+          ],
+          scenario: 'outbreak',
+        },
+        ALL_CARDS,
+        OUTBREAK_PILES,
+        OUTBREAK_MANSION,
+      );
+      for (const p of s.seats) {
+        expect(INFECTED_CHARACTER_IDS).not.toContain(s.cards[p.characterInstanceId]?.cardId ?? '');
+        expect(p.isInfectedCharacter).toBe(false);
+      }
+    }
+  });
+
+  it('an explicit pick of a Zombie still builds an Infected Character seat', () => {
+    const s = setup(
+      {
+        seed: 7,
+        players: [
+          { name: 'A', controller: 'human', characterCardId: 'ch-032' },
+          { name: 'B', controller: 'human' },
+        ],
+        scenario: 'outbreak',
+      },
+      ALL_CARDS,
+      OUTBREAK_PILES,
+      OUTBREAK_MANSION,
+    );
+    expect(seatCharacter(s, 0)).toBe('ch-032');
+    expect(s.seats[0]?.maxHp).toBe(140);
+    expect(s.seats[0]?.isInfectedCharacter).toBe(true);
   });
 });

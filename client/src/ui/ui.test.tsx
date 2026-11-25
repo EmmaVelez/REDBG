@@ -1595,9 +1595,37 @@ describe('Lobby (T08)', () => {
       const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room: mk(scenario), clientId: 'c1' })} />);
       expect(html).toContain('CH-021');
       expect(html).toContain('Excella Gionne');
-      expect(html).toContain('CH-031');
       expect(html).toContain('CH-002');
     }
+  });
+
+  it("does not offer Infected Characters (Zombie A/B/C) as a manual pick", () => {
+    // They only ever enter play through the infection-counter reanimation rule;
+    // picking one produced a plain non-infected seat whose Zombie B ability
+    // could never fire (see engine/characterSelection.test.ts).
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'outbreak' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: true,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: false,
+    };
+    const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    for (const id of ['CH-031', 'CH-032', 'CH-033']) {
+      expect(html).not.toContain(`value="${id.toLowerCase()}"`);
+      expect(html).not.toContain(`${id} Zombie`);
+    }
+    // A regular Outbreak character is still there, and Random still is.
+    expect(html).toContain('CH-021');
+    expect(html).toContain('Random');
   });
 
   it('offers the Fall of the House of Usher toggle in every lobby surface', () => {
