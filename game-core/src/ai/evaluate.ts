@@ -37,6 +37,20 @@ const HEAL_ITEM_PULL = 15;
  */
 const LOW_HP_FRACTION = 0.3;
 const LOW_HP_PENALTY = 3;
+/**
+ * Infection mirrors Health's low-HP logic: every counter is a liability and
+ * the value accelerates near the 10-counter cap, where the Character is
+ * removed and reanimated as an Infected Character (permanent loss of THIS
+ * character). The near-cap tax is what makes the bot pay to reduce infection
+ * (Antivirus, Injection, By Any Means) instead of farming gold at level 8+,
+ * and the cap penalty makes a push to 10 cost more than any explore pays —
+ * "weighed the same as exploring" when permanent death is certain.
+ */
+export const INFECTION_PER_COUNTER = 10;
+export const HIGH_INFECTION_AT = 6;
+export const HIGH_INFECTION_PENALTY = 15;
+export const MAX_INFECTION_LEVEL_AI = 10;
+export const MAX_INFECTION_PENALTY = 1500;
 /** Flat cost of the turn a downed character loses. */
 const DOWNED_TURN_PENALTY = 200;
 /**
@@ -146,6 +160,21 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
       total -= (lowHpThreshold - player.hp) * LOW_HP_PENALTY;
     }
   }
+  // 2.2c. Infection — carrying counters hurts, and near the 10-counter cap
+  // every counter is worth far more than a point (the Character is removed
+  // and reanimated as an Infected Character). Infected Characters (Zombie
+  // A/B/C) are exempt: their level is fixed and the mechanic does not apply.
+  const infectionLevel = player.infectionCards?.length ?? 0;
+  if (infectionLevel > 0 && player.isInfectedCharacter !== true) {
+    total -= infectionLevel * INFECTION_PER_COUNTER;
+    if (infectionLevel >= HIGH_INFECTION_AT) {
+      total -= (infectionLevel - HIGH_INFECTION_AT) * HIGH_INFECTION_PENALTY;
+    }
+    if (infectionLevel >= MAX_INFECTION_LEVEL_AI) {
+      total -= MAX_INFECTION_PENALTY;
+    }
+  }
+
   // 2.3. Decorations
   total += player.decorations * 50;
 
@@ -186,7 +215,7 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
       if (!cardInstance) continue;
       const cardDef = state.cardDefs[cardInstance.cardId];
       if (!cardDef) continue;
-      total += cardHeldValue(cardDef, abilities, state, bloat);
+      total += cardHeldValue(cardDef, abilities, state, bloat, infectionLevel);
     }
   }
 
@@ -240,7 +269,7 @@ export function evaluateState(state: GameState, seat: number, options?: Evaluate
     // Buy-cost discounts (Mikhail L1, Billy melee L1) make the card
     // affordable at a lower gold total — price it the same way validate does.
     if (buyCostAfterReduction(abilities, topCardDef) > player.turnGold) continue;
-    const ownedVal = cardOwnedValue(topCardDef, abilities, state, bloat);
+    const ownedVal = cardOwnedValue(topCardDef, abilities, state, bloat, infectionLevel);
     affordablePiles += 8 + Math.floor(ownedVal * 0.6) + marketPull(topCardDef, abilities, bloat);
   }
   total += affordablePiles;
@@ -291,7 +320,7 @@ function activeAbilities(state: GameState, player: PlayerState): readonly Charac
  * one Action a turn, so the option is worth less than the effect. Junk cards
  * cost a little when the deck is bloated (you want them gone).
  */
-function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number): number {
+function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number, infectionLevel = 0): number {
   if (cardDef.type === 'weapon') {
     const base = (cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage));
     return base + weaponAffinityBonus(abilities, cardDef);
@@ -306,7 +335,7 @@ function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[],
     if (bloat > 0 && hasTrashEffect(cardDef)) {
       v += trashBloatValue(bloat);
     }
-    return v;
+    return v + actionInfectionAdjustment(cardDef, infectionLevel);
   }
   if (cardDef.type === 'item') return healItemValue(cardDef);
   // tokens: flat small value
@@ -317,7 +346,7 @@ function cardHeldValue(cardDef: CardDef, abilities: readonly CharacterAbility[],
  * Value of a card sitting owned in discard (or offered on the market):
  * the full value it will deliver when drawn and used (no hold discount).
  */
-function cardOwnedValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number): number {
+function cardOwnedValue(cardDef: CardDef, abilities: readonly CharacterAbility[], state: GameState, bloat: number, infectionLevel = 0): number {
   if (cardDef.type === 'weapon') {
     const base = (cardDef.damage === undefined ? 10 : weaponBaseValue(cardDef.damage));
     return base + weaponAffinityBonus(abilities, cardDef);
@@ -330,7 +359,7 @@ function cardOwnedValue(cardDef: CardDef, abilities: readonly CharacterAbility[]
     if (bloat > 0 && hasTrashEffect(cardDef)) {
       v += trashBloatValue(bloat);
     }
-    return v;
+    return v + actionInfectionAdjustment(cardDef, infectionLevel);
   }
   if (cardDef.type === 'item') return healItemValue(cardDef);
   return 5;
@@ -414,6 +443,32 @@ function trashBloatValue(bloat: number): number {
  * (cards drawn 12 each, gold 1, ammo 3, buys/actions/explores 40) plus
  * trash-effect credit and per-action affinity (Ada).
  */
+/**
+ * How holding/owning an Action card should be priced for an infected seat.
+ * The 1-ply post-state cannot see delayed, optional or end-of-turn infection
+ * changes, so the card value carries them: ac-023 Power of the t-Virus raises
+ * the level +1 at end of turn (worth the marginal counter, NEGATIVE), while
+ * ac-026 Injection and ac-027 By Any Means Necessary can drop it by 1 each
+ * (worth the marginal counter, POSITIVE). At the seat's CURRENT level the
+ * marginal counter includes the accelerating zone tax and, when the raise
+ * would reach the cap, the permanent-loss penalty.
+ */
+function actionInfectionAdjustment(cardDef: CardDef, infectionLevel: number): number {
+  if (infectionLevel <= 0) return 0;
+  if (cardDef.type !== 'action') return 0;
+  const raisesToCap = infectionLevel + 1 >= MAX_INFECTION_LEVEL_AI;
+  const marginal = INFECTION_PER_COUNTER
+    + (infectionLevel >= HIGH_INFECTION_AT ? HIGH_INFECTION_PENALTY : 0)
+    + (raisesToCap ? MAX_INFECTION_PENALTY : 0);
+  let delta = 0;
+  for (const e of cardDef.actionEffects ?? []) {
+    if (e.kind === 'powerOfTVirus') delta -= marginal;      // end of turn: +1
+    if (e.kind === 'injection') delta += marginal;          // trash: -1
+    if (e.kind === 'byAnyMeansNecessary') delta += marginal; // net -1
+  }
+  return delta;
+}
+
 function actionTextValue(cardDef: CardDef, abilities: readonly CharacterAbility[]): number {
   const b = cardDef.bonuses;
   let v = 0;

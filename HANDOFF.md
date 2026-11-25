@@ -1,4 +1,29 @@
 # HANDOFF — resume here
+## BOTS TREAT INFECTION LIKE HEALTH (2026-11-25)
+
+Manny: bots must prioritize reducing/preventing infection counters the same
+way they handle health, and gaining the 10th counter should weigh like a
+fatal explore (permanent character loss). All in game-core/src/ai:
+- **evaluate.ts**: `INFECTION_PER_COUNTER 10`, `HIGH_INFECTION_AT 6` +
+  `HIGH_INFECTION_PENALTY 15` per counter above, `MAX_INFECTION_PENALTY 1500`
+  at level >= 10 (Zombie A/B/C exempt — `isInfectedCharacter`). The penalty
+  makes reduction cards/prompt options score better at high infection, exactly
+  like the LOW_HP block makes heals score better at low HP — the bot buys,
+  plays and answers prompts toward the safe option automatically (prompts are
+  pick-by-simulated-state).
+- **actionInfectionAdjustment** (cardHeld/ownedValue): 1-ply cannot see
+  delayed/optional infection changes, so card VALUES carry them — ac-023
+  Power of the t-Virus (end-of-turn +1) is worth the NEGATIVE marginal
+  counter; ac-026 Injection / ac-027 By Any Means (net -1) the positive.
+- **policy.ts caution** (chooseGreedyAction): playing ac-023 charges the
+  marginal counter; exploring/attacking at level 9 charges MAX_INFECTION_PENALTY
+  — the 10th counter outweighs EXPLORE_BIAS (+80), so a near-cap bot plays the
+  reversal cards first instead of racing the cap.
+- Tests: `src/ai/infectionPolicy.test.ts` (5): penalty ordering + cap step,
+  zombie exemption, refuses explore at 9, still explores at 1, reducer-over-
+  raiser at 9. Gates: ai suites 65/65, typecheck clean, full soak pending at
+  commit time.
+
 ## INFECTED-CHARACTER REANIMATION FIXED — bots returning as Zombie A/B/C (2026-11-25)
 
 Manny: "When bots die gaining 10 infection counters with the infection rules
@@ -29,12 +54,15 @@ ALSO FIXED (soak conservation): the zombie conversion only read
 folds ALL four zones. Tests in infectionMode.test.ts (+5: dead-at-10 mark,
 <10 no-op, conversion, turn-cycle reach, checkWin alive-while-pending).
 
-KNOWN LEFTOVER (next session): the 4-bot outbreak soak (seed 1) still leaks ONE
-instance — in-001#3, location field 'infectionDeck'/index 0 but no longer in any
-zone array. Happens only now that reanimations actually complete; suspect the
-explore-time infectionDeck pops (actions.ts ~3861/5411) or a reveal-time
-infection effect taking the deck top when the victim is a dead/pending seat.
-Chase it before re-running the full soak as a gate.
+RESOLVED (2026-11-25, "bots treat infection like health" commit): ROOT CAUSE
+found — while a seat is dead-but-PENDING its reanimation, effects can still
+grant it fresh Infection counters (gainInfections does not check dead/pending),
+so by conversion time the strays sit in `infectionCards`, NOT in the pile the
+fold read. The game.ts conversion fold now includes `infectionCards` (same bug
+class as the hand/playArea-stray fix, one zone later). Regression test in
+infectionMode.test.ts ("conversion conserves infection counters gained while
+dead-pending"). Probe-verified zero orphans on outbreak seed 3 (the seed that
+tripped: in-002#4/in-004#3/in-006#1).
 
 ## THREE FAN CHARACTERS — CC-002 Javier / FCH-003 Richard / FCH-007 Jill S.T.A.R.S. (2026-11-25)
 

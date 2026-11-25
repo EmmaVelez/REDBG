@@ -1,7 +1,7 @@
 
 import type { Action, GameState } from '../types';
 import { enumerateLegalActions } from './enumerate';
-import { evaluateState } from './evaluate';
+import { evaluateState, MAX_INFECTION_LEVEL_AI, MAX_INFECTION_PENALTY, HIGH_INFECTION_AT, HIGH_INFECTION_PENALTY, INFECTION_PER_COUNTER } from './evaluate';
 import { applyAction } from '../engine/actions';
 import { checkWin } from '../engine/game';
 import { mustExploreNow } from '../engine/abilities';
@@ -264,15 +264,40 @@ export function chooseGreedyAction(state: GameState, seat: number): Action {
         // turn (playing Ammo, buying etc. must win first).
         const score = action.type === 'explore' && action.weapons.length > 0 ? raw + EXPLORE_BIAS : raw;
 
+        // Infection caution — the 1-ply post-state is blind to the delayed
+        // costs, so they are charged here:
+        // 1. playing an Action that RAISES the infection level at end of turn
+        //    (ac-023 Power of the t-Virus) — the +1 lands after the simulated
+        //    state, so the card's negative held value would not stop the play;
+        // 2. exploring/attacking at level 9 — a reveal that pushes to 10 means
+        //    permanent Character loss (reanimation). The charge outweighs
+        //    EXPLORE_BIAS, so a near-cap bot "weighs gaining the 10th counter
+        //    the same as exploring" and plays the reversal cards first.
+        let finalScore = score;
+        const infectionLevel = state.seats[seat]?.infectionCards?.length ?? 0;
+        if (infectionLevel > 0) {
+          if (action.type === 'playActionCard') {
+            const playedDef = state.cardDefs[state.cards[action.instanceId]?.cardId ?? ''];
+            if (playedDef?.actionEffects?.some(e => e.kind === 'powerOfTVirus')) {
+              finalScore -= INFECTION_PER_COUNTER
+                + (infectionLevel >= HIGH_INFECTION_AT ? HIGH_INFECTION_PENALTY : 0)
+                + (infectionLevel + 1 >= MAX_INFECTION_LEVEL_AI ? MAX_INFECTION_PENALTY : 0);
+            }
+          }
+          if (infectionLevel >= MAX_INFECTION_LEVEL_AI - 1 && (action.type === 'explore' || action.type === 'attack')) {
+            finalScore -= MAX_INFECTION_PENALTY;
+          }
+        }
+
         // The seat's best explore, kept aside as the stall-breaking move.
-        if (isExplore && (progressExplore === undefined || score > progressExplore.score)) {
-          progressExplore = { action, score };
+        if (isExplore && (progressExplore === undefined || finalScore > progressExplore.score)) {
+          progressExplore = { action, score: finalScore };
         }
 
     // c. If best is undefined OR score is STRICTLY GREATER, update best.
     // This ensures deterministic tie-breaking (first action wins).
-    if (best === undefined || score > best.score) {
-      best = { action, score };
+    if (best === undefined || finalScore > best.score) {
+      best = { action, score: finalScore };
     }
   }
 

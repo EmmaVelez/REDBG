@@ -1219,8 +1219,14 @@ function startTurnInternal(state: GameState): GameState {
     // effects may still have granted it cards (hand/playArea/discard strays) —
     // reading only `inventory` dropped them, leaking registered instances
     // with no zone (soak conservation failure, outbreak reanimation).
+    // NOTE: `infectionCards` too — while this seat was dead-but-pending,
+    // effects could still grant it Infection counters (gainInfections does not
+    // check dead/pending), so by conversion time they live on the seat, not in
+    // `inventory`. Omitting them leaked registered instances with no zone
+    // (outbreak soak conservation failure) — same bug class as the previous
+    // hand/playArea-stray fold, one zone later.
     const d = drawWithReshuffle({
-      deck: [...player.inventory, ...player.hand, ...player.playArea, ...player.discard],
+      deck: [...player.inventory, ...player.hand, ...player.playArea, ...player.discard, ...(player.infectionCards ?? [])],
       discard: [],
       count: 5,
       rngState: pick.rng.s,

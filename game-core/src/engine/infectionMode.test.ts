@@ -223,6 +223,37 @@ describe('INFECTION reanimation ("Becoming the Infected")', () => {
     expect(zombie.exploresLeft).toBe(1);
   });
 
+  it('conversion conserves infection counters gained while dead-pending', () => {
+    // The seat died of the Infection (10 counters folded into its pile via
+    // reanimateAsInfected) but effects can STILL grant it fresh Infection
+    // counters while it waits for its zombie turn (gainInfections does not
+    // check dead/pending). The conversion must carry those too — it previously
+    // folded only inventory/hand/playArea/discard, dropping the strays into
+    // registered-but-zone-less orphans (outbreak soak conservation failure).
+    const s = deadWithCounters(10);
+    const cards = { ...s.cards };
+    cards['in-001#stray1'] = { instanceId: 'in-001#stray1', cardId: 'in-001', location: { zone: 'hand' as const, index: 0 } };
+    cards['in-001#stray2'] = { instanceId: 'in-001#stray2', cardId: 'in-001', location: { zone: 'hand' as const, index: 0 } };
+    const pending = {
+      ...s,
+      cards,
+      seats: s.seats.map((st, i) =>
+        i === 0
+          ? { ...st, pendingReanimate: true as const, infectionCards: [...(st.infectionCards ?? []), 'in-001#stray1', 'in-001#stray2'] }
+          : st),
+    };
+    const zombieTurn = startTurn(pending);
+    const zombie = zombieTurn.seats[0]!;
+    expect(zombie.isInfectedCharacter).toBe(true);
+    const owned = new Set([...zombie.hand, ...zombie.inventory, ...zombie.discard, ...zombie.playArea, ...zombie.attached, ...(zombie.infectionCards ?? [])]);
+    expect(owned.has('in-001#stray1')).toBe(true);
+    expect(owned.has('in-001#stray2')).toBe(true);
+    // and all ten original counters that were folded into the pile are present too
+    for (let i = 0; i < 10; i++) {
+      expect(owned.has(`in-001#dead${i}`)).toBe(true);
+    }
+  });
+
   it('the turn cycle reaches a pendingReanimate seat (its zombie turn comes up)', () => {
     // Simulate the state right after the level-10 mark: seat 0 dead + pending,
     // seat 1 alive and active.
