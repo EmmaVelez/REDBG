@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../types';
-import { setup } from './game';
+import { setup, startTurn, checkWin } from './game';
+import { applyAction } from './actions';
 import {
   cardsForScenario,
   pilesForScenario,
@@ -163,5 +164,99 @@ describe('INFECTION game mode', () => {
     }
     // No instance may appear twice — that is what a failed guard would produce.
     expect(new Set(s.mansionDeck).size).toBe(s.mansionDeck.length);
+  });
+});
+
+describe('INFECTION reanimation ("Becoming the Infected")', () => {
+  /** A seat that died physically while holding MAX infection counters. */
+  function deadWithCounters(count: number): GameState {
+    const s = MansionInfGame();
+    const cards = { ...s.cards };
+    const infectionCards: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const id = `in-001#dead${i}`;
+      cards[id] = { instanceId: id, cardId: 'in-001', location: { zone: 'hand' as const, index: 0 } };
+      infectionCards.push(id);
+    }
+    return {
+      ...s,
+      cards,
+      seats: s.seats.map((st, i) =>
+        i === 0
+          ? { ...st, dead: true, hp: 0, hand: [], discard: [], pendingReanimate: undefined, infectionCards }
+          : st),
+    };
+  }
+
+  it('marks a physically dead seat with 10 counters to reanimate', () => {
+    const s = { ...deadWithCounters(10), activeSeat: 1 };
+    const after = applyAction(s, { type: 'endTurn', seat: 1 });
+    expect(after.seats[0]!.pendingReanimate).toBe(true);
+    // and the seat is still dead until its zombie turn converts it
+    expect(after.seats[0]!.dead).toBe(true);
+  });
+
+  it('does NOT reanimate a seat with fewer than 10 counters', () => {
+    const s = { ...deadWithCounters(9), activeSeat: 1 };
+    const after = applyAction(s, { type: 'endTurn', seat: 1 });
+    expect(after.seats[0]!.pendingReanimate).toBeUndefined();
+    expect(after.seats[0]!.dead).toBe(true);
+  });
+
+  it('converts the pending seat into a random Infected Character on its turn', () => {
+    const s = { ...deadWithCounters(10), activeSeat: 1 };
+    const after = applyAction(s, { type: 'endTurn', seat: 1 });
+    const zombieTurn = startTurn({ ...after, activeSeat: 0 });
+    const zombie = zombieTurn.seats[0]!;
+    expect(zombie.dead).toBe(false);
+    expect(zombie.isInfectedCharacter).toBe(true);
+    expect(zombie.pendingReanimate).toBeUndefined();
+    const zid = zombieTurn.cards[zombie.characterInstanceId]?.cardId;
+    expect(['ch-031', 'ch-032', 'ch-033']).toContain(zid);
+    // the Outbreak zombie def is registered even though the base-scenario pool
+    // never contained ch-031..033 — full zombie stats, not a 100-HP stub
+    const zDef = zombieTurn.cardDefs[zid ?? ''];
+    expect(zDef?.type).toBe('character');
+    expect(zDef?.maxHp).toBeGreaterThan(100);
+    // zombies get no actions or buys — only their explore/attack
+    expect(zombie.actionsLeft).toBe(0);
+    expect(zombie.exploresLeft).toBe(1);
+  });
+
+  it('the turn cycle reaches a pendingReanimate seat (its zombie turn comes up)', () => {
+    // Simulate the state right after the level-10 mark: seat 0 dead + pending,
+    // seat 1 alive and active.
+    const pending = { ...deadWithCounters(10), activeSeat: 1 };
+    const p0 = pending.seats[0]!;
+    const withPending = {
+      ...pending,
+      seats: pending.seats.map((st, i) => (i === 0 ? { ...st, pendingReanimate: true } : st)),
+    };
+    void p0;
+    const afterEnd = applyAction(withPending, { type: 'endTurn', seat: 1 });
+    expect(afterEnd.activeSeat).toBe(0);
+    const zombieTurn = startTurn(afterEnd);
+    expect(zombieTurn.seats[0]!.isInfectedCharacter).toBe(true);
+    expect(zombieTurn.seats[0]!.dead).toBe(false);
+  });
+
+  it('a pending reanimation keeps the game alive; plain all-dead ends it', () => {
+    let s = deadWithCounters(10);
+    s = {
+      ...s,
+      seats: s.seats.map((st, i) => (i === 0 ? { ...st, pendingReanimate: true } : st)),
+    };
+    // only the pending seat remains (seat 1 dead too) — still not game over
+    const allDeadPending = {
+      ...s,
+      seats: s.seats.map(st => ({ ...st, dead: true, hp: 0 })),
+    };
+    expect(checkWin(allDeadPending).gameOver).toBe(false);
+    const allDeadPlain = {
+      ...allDeadPending,
+      seats: allDeadPending.seats.map(st => ({ ...st, pendingReanimate: undefined })),
+    };
+    expect(checkWin(allDeadPlain).gameOver).toBe(true);
+    expect(checkWin(allDeadPlain).endReason).toBe('allPlayersDead');
   });
 });

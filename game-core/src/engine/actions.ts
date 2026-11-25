@@ -94,7 +94,7 @@ import {
   effectiveWeaponTags,
   } from './abilities';
 import { sumBonuses, applyBonusPools } from './cards';
-import { advanceTurn } from './turn';
+import { advanceTurn, isTurnEligible } from './turn';
 import { startTurn } from './game';
 import { gainCard } from './gainCard';
 import { dropEmptyPrompts } from './prompts';
@@ -633,7 +633,7 @@ function applyEndOfTurn(state: GameState, seat: number, nextBase: { version: num
         seatCount: state.seats.length,
         activeSeat: seat,
         turnNumber: state.turnNumber,
-        aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
+        aliveSeats: state.seats.filter(isTurnEligible).map(s => s.seat),
       });
 
       // Downed players skip their turn: flipDown already merged
@@ -1745,7 +1745,12 @@ function applyOutbreakHooks(prev: GameState, next: GameState, action: Action): G
     const s = state.seats[i];
     if (s === undefined) continue;
     const level = s.infectionCards?.length ?? 0;
-      if (level >= MAX_INFECTION_LEVEL && !s.dead && s.isInfectedCharacter !== true) {
+      // "Becoming the Infected": 10 Infection counters remove the Character.
+      // The check deliberately allows a seat that DIED physically with the
+      // counters already on it (physical death resolved earlier in this hook
+      // chain, so s.dead was already true when the level check ran) — as long
+      // as it is not already pending or already an Infected Character.
+      if (level >= MAX_INFECTION_LEVEL && s.pendingReanimate !== true && s.isInfectedCharacter !== true) {
         state = reanimateAsInfected(state, s.seat);
       }
     }
@@ -10535,7 +10540,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           seatCount: state.seats.length,
           activeSeat: seat,
           turnNumber: state.turnNumber,
-          aliveSeats: state.seats.filter(s => !s.dead).map(s => s.seat),
+          aliveSeats: state.seats.filter(isTurnEligible).map(s => s.seat),
         });
         return {
           ...state,

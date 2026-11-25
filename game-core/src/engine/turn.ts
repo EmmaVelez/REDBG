@@ -26,6 +26,22 @@ export function nextAliveSeat(ctx: TurnContext, fromSeat: number): number {
   throw new Error('nextAliveSeat: no alive seats');
 }
 
+
+
+export interface TurnEligible {
+  readonly dead: boolean;
+  readonly pendingReanimate?: boolean;
+}
+
+/** Seats that take a turn: living seats PLUS dead seats waiting to reanimate
+ *  as an Infected Character ("Becoming the Infected" — their zombie turn runs
+ *  the startTurn conversion and returns them to play). Excluding them made the
+ *  reanimation unreachable in real games: the level-10 mark sets dead+pending,
+ *  and every turn advance passed around dead seats forever. */
+export function isTurnEligible(s: TurnEligible): boolean {
+  return !s.dead || s.pendingReanimate === true;
+}
+
 export function advanceTurn(ctx: TurnContext): TurnContext {
   return {
     seatCount: ctx.seatCount,

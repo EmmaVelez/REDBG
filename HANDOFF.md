@@ -1,4 +1,41 @@
 # HANDOFF — resume here
+## INFECTED-CHARACTER REANIMATION FIXED — bots returning as Zombie A/B/C (2026-11-25)
+
+Manny: "When bots die gaining 10 infection counters with the infection rules
+engaged. They are not reviving as infected characters." FOUR defects, all in the
+"Becoming the Infected" path (Outbreak AND the INFECTION opt-in mode):
+1. **Dead-first skip** — the level>=10 reanimate check required `!s.dead`, but
+   physical death resolves EARLIER in the same hook chain (applyDownedHooks), so
+   a character that died while gaining the 10th counter was skipped forever.
+   Now: `level >= MAX && pendingReanimate !== true && !isInfectedCharacter` —
+   dead seats with 10 counters are marked too (reanimateAsInfected reshuffles
+   hand/playArea/discard/inventory/infectionCards and sets dead+pending).
+2. **Turn cycle never reached the pending seat** — the mark sets `dead: true`
+   and every advance filtered `!s.dead`, so the zombie conversion (which runs
+   at the seat's next turn in startTurnInternal) NEVER executed in real games —
+   the outbreak test faked it with a forced activeSeat. FIX: `isTurnEligible`
+   (turn.ts) = living OR pendingReanimate; applied at ALL turn-advance sites
+   (game.ts round/poison/downed + actions.ts x2 endTurn advances).
+3. **Game-over before reanimation** — checkWinBase's allPlayersDead ended the
+   game while a reanimation was pending. Now pending seats keep the game alive.
+4. **Zombie defs missing in INFECTION mode** — a base-scenario pool has no
+   ch-031..033; the reanimated seat was a 100-HP stub with no zombie abilities.
+   The conversion now resolves the def from OUTBREAK_CARDS and REGISTERS it into
+   state.cardDefs (like resolveCharacterDef's out-of-pool fallback).
+
+ALSO FIXED (soak conservation): the zombie conversion only read
+`player.inventory` for the draw-5 — a seat granted cards while dead-but-pending
+(hand/playArea/discard strays) leaked them (registered, no zone). The draw now
+folds ALL four zones. Tests in infectionMode.test.ts (+5: dead-at-10 mark,
+<10 no-op, conversion, turn-cycle reach, checkWin alive-while-pending).
+
+KNOWN LEFTOVER (next session): the 4-bot outbreak soak (seed 1) still leaks ONE
+instance — in-001#3, location field 'infectionDeck'/index 0 but no longer in any
+zone array. Happens only now that reanimations actually complete; suspect the
+explore-time infectionDeck pops (actions.ts ~3861/5411) or a reveal-time
+infection effect taking the deck top when the victim is a dead/pending seat.
+Chase it before re-running the full soak as a gate.
+
 ## THREE FAN CHARACTERS — CC-002 Javier / FCH-003 Richard / FCH-007 Jill S.T.A.R.S. (2026-11-25)
 
 Manny sent 3 renders (2 attachments + a 3rd image that landed in a separate

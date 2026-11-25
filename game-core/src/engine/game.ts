@@ -4,12 +4,13 @@ import { draw, drawWithReshuffle } from './deck';
 import { levelForDecorations, revive, abilitiesForLevel, flipDown, canBePartner, isSelectableCharacter } from './characters';
 import { dropEmptyPrompts } from './prompts';
 import { withBonusesAndDraws } from './actions';
-import { advanceTurn } from './turn';
+import { advanceTurn, isTurnEligible } from './turn';
 import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbilities, partnerAbilities, chrisL1TurnDamageBonus, applyHealTracking } from './abilities';
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
 import { MERCENARIES_BASIC_RESOURCES, ALL_CARDS, OUTBREAK_MANSION } from '../data/cards';
+import { OUTBREAK_CARDS } from '../data/outbreak';
 import { CE_CARD_IDS } from '../data/custom';
 import { INFECTED_CHARACTER_IDS } from '../data/outbreak';
 import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus, applySetupEffects } from './locations';
@@ -1096,7 +1097,7 @@ function startTurnInternal(state: GameState): GameState {
   // back to the first living seat (Manny's definition, 2026-11-15). The B4MC
   // Chris cards gate some abilities on the round, so their once-per-round
   // flags are cleared here for EVERY seat.
-  const aliveSeatsNow = state.seats.filter(s => !s.dead).map(s => s.seat);
+  const aliveSeatsNow = state.seats.filter(isTurnEligible).map(s => s.seat);
   const firstAliveSeat = aliveSeatsNow.length > 0 ? Math.min(...aliveSeatsNow) : state.activeSeat;
   if (state.activeSeat === firstAliveSeat) {
     state = {
@@ -1173,7 +1174,7 @@ function startTurnInternal(state: GameState): GameState {
           : x)),
       };
       // The Character is face down: its turn ends here (no revive yet).
-      const aliveSeats = downedState.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
+      const aliveSeats = downedState.seats.map((s, i) => (isTurnEligible(s) ? i : -1)).filter(i => i >= 0);
       const ctx = advanceTurn({
         seatCount: downedState.seats.length,
         activeSeat: downedState.activeSeat,
@@ -1205,10 +1206,25 @@ function startTurnInternal(state: GameState): GameState {
     const zombieIds = [...INFECTED_CHARACTER_IDS];
     const pick = nextInt(makeRng(state.rngState), zombieIds.length);
     const zombieId = zombieIds[pick.value] ?? 'ch-031';
-    const zDef = state.cardDefs[zombieId];
+    // INFECTION mode on a base scenario never pools the Outbreak zombie
+    // characters (ch-031..033) — resolve the def from the Outbreak data and
+    // register it so the reanimated seat actually plays as the zombie (full
+    // maxHp + the zombie ability kinds), exactly like setup's out-of-pool
+    // resolveCharacterDef fallback.
+    const zDef = state.cardDefs[zombieId]
+      ?? OUTBREAK_CARDS.find(c => c.id === zombieId);
     const zMaxHp = zDef?.maxHp ?? 100;
     const instanceId = `${zombieId}#${player.seat + 1}`;
-    const d = drawWithReshuffle({ deck: player.inventory, discard: [], count: 5, rngState: pick.rng.s });
+    // Fold EVERY zone into the draw: while this seat was dead-but-pending,
+    // effects may still have granted it cards (hand/playArea/discard strays) —
+    // reading only `inventory` dropped them, leaking registered instances
+    // with no zone (soak conservation failure, outbreak reanimation).
+    const d = drawWithReshuffle({
+      deck: [...player.inventory, ...player.hand, ...player.playArea, ...player.discard],
+      discard: [],
+      count: 5,
+      rngState: pick.rng.s,
+    });
     // Rulebook: "Remove your Character card from the Game, along with all
     // non-Infected cards that were attached to that Character." Infected
     // attachments stay attached to the reanimated Character (and keep their
@@ -1241,9 +1257,13 @@ function startTurnInternal(state: GameState): GameState {
       exploredOrAttackedThisTurn: false,
       gainedCardsGoToHand: false,
     };
+    const defsToKeep = zDef !== undefined && state.cardDefs[zombieId] === undefined
+      ? { ...state.cardDefs, [zombieId]: zDef }
+      : state.cardDefs;
     return {
       ...state,
       rngState: d.rngState,
+      cardDefs: defsToKeep,
       cards: {
         ...state.cards,
         [instanceId]: { instanceId, cardId: zombieId, location: { zone: 'hand' as CardZone, index: 0 } },
@@ -1353,7 +1373,7 @@ function startTurnInternal(state: GameState): GameState {
     if (!revivedPlayer.dead && seatAbilities(state, player.seat).some(a => a.kind === 'noTurnSkipAfterDowned')) {
       player = revivedPlayer;
     } else {
-      const aliveSeats = state.seats.map((s, i) => (s.dead ? -1 : i)).filter(i => i >= 0);
+      const aliveSeats = state.seats.map((s, i) => (isTurnEligible(s) ? i : -1)).filter(i => i >= 0);
       const ctx = advanceTurn({
         seatCount: state.seats.length,
         activeSeat: state.activeSeat,
@@ -2016,7 +2036,9 @@ export function checkWinBase(state: GameState): { gameOver: boolean; winners: re
     return { gameOver: true, winners, endReason: 'uroborosDefeated' };
   }
 
-  if (state.seats.every(seat => seat.dead)) {
+  // A dead seat waiting to reanimate as an Infected Character is not out
+  // of the game — its zombie turn returns it to play.
+  if (state.seats.every(seat => seat.dead && seat.pendingReanimate !== true)) {
     return { gameOver: true, winners: [], endReason: 'allPlayersDead' };
   }
 
