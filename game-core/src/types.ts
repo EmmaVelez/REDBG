@@ -1671,6 +1671,13 @@ export interface GameSetup {
   /** CE mode: floor(Mansion size / 10) random CE-001..CE-012 event cards are
    *  shuffled into the Mansion deck, never two of them adjacent. Opt-in. */
   readonly ceMode?: boolean;
+  /** INFECTION opt-in game mode (Manny ruling 2026-11-23): the Outbreak
+   *  mansion cards (MA-041..MA-057), the AC-023/AC-026/AC-027 action piles
+   *  and the face-down Infection Deck join ANY scenario. Unlike Outbreak
+   *  itself it does NOT make MA-041 the win condition — the scenario keeps
+   *  its normal win rule.
+   *  Implied by nothing; the lobby checkbox is the only switch. */
+  readonly infectionMode?: boolean;
 }
 
 /**

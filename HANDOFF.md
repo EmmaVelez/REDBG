@@ -1,5 +1,42 @@
 # HANDOFF — resume here
 
+**INFECTION GAME MODE — "INFECTION" checkbox; Outbreak cards join ANY scenario
+(2026-11-25):** Manny sent the card list in `CARDID COUNT` format and asked for
+a checkbox in the optional-modes list. The shared WIP (uncommitted) had the
+plumbing; this session verified it, aligned it to Manny's list, and shipped.
+- **Card pool** (`INFECTION_CARD_IDS` in `data/cards.ts`): ma-041..053 +
+  ma-054o..057o (counts == OUTBREAK_MANSION exactly: 1/2/1/3/2/2/3/2/3/2/3/2/
+  1/1/2/1/1 — MA-054..057 from the render list ARE the Outbreak ma-054o..057o,
+  the 'o' suffix is the Nightmare-collision convention), ac-023/ac-026/ac-027
+  and **in-001..in-006 only — in-007 is deliberately NOT included** (Manny's
+  list stops there; the WIP had it at 7 cards/40, now 6 cards/35).
+- **Action piles** (`INFECTION_ACTION_PILES`): each of the three ac-* gets its
+  OWN Resource Area pile (action-tvirus / action-injection /
+  action-by-any-means), 5 copies each from the printed `copies`.
+- **Engine** (`GameSetup.infectionMode`; game.ts): `infectionMode = outbreakMode
+  || setup.infectionMode` — infection levels (seat.infectionCards), the
+  face-down Infection Deck and its draws run on ANY scenario, while the
+  scenario keeps its own win condition (endInfectedCardId stays outbreak-only).
+  OUTBREAK_MANSION joins the deck behind NEW `#infN` instance ids + a
+  `mansionCardIds` dedup guard, so it is idempotent on the Outbreak scenario
+  and with the no-explicit-mansion fallback sweep.
+- **Plumbing mirrors usherMode**: RoomSnapshot.infectionMode, createRoom 14th
+  positional param, setInfectionMode host msg, ws createRoom case forwards it,
+  host.ts/hotseat.ts/sim.ts pass it to setup + cardsForScenario +
+  pilesForScenario. Testids: create-infection-toggle / infection-toggle /
+  hotseat-infection-toggle (all three lobby surfaces). Client forwards the
+  ClientMessage verbatim, so no store change was needed.
+- **Fixed the WIP**: ws.test + hotseat.test asserted the stale 40-card deck →
+  35. **Pre-existing master typecheck break fixed on the way**: turnHistory.ts
+  VERBS carried two orphan keys (elevatorDiscardStart, courtyardStart) whose
+  engine actions were lost in the earlier tree gutting (commit 9512605 added
+  the labels; the Action union never kept them) — removed; every Action union
+  kind still has a verb.
+- Gates: typecheck clean x3, game-core **1562/1562** (full soak, exit 0),
+  server 118/118, client 294/294, vite build OK, bot-game probe with
+  infectionMode on played 381 actions to a clean gameOver (infection deck
+  consumed 35→16 — the Outbreak draw mechanics are live).
+
 **SKILL-DRAFT HOVERCARD FIXED — portal the popup, it was never viewport-fixed (2026-11-23):** Manny
 reported the enlarged skill card in the Skill Draft as "offscreen and not readable". The popup was
 `position: fixed`, but its ancestor `.decision-card` has **both** `transform: translateX(-50%)` (a

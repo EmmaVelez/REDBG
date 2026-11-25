@@ -9,7 +9,7 @@ import { healAtTurnStart, applyInfectionDecreaseDraws, plusBuyBonus, seatAbiliti
 
 import { skillCardDefs, draftPrompt, turnStartSkillEffects, turnStartSkillPrompts } from './skill';
 import { poisonDamageAtTurnStart, returnCountersToSupply } from './counters';
-import { MERCENARIES_BASIC_RESOURCES, ALL_CARDS } from '../data/cards';
+import { MERCENARIES_BASIC_RESOURCES, ALL_CARDS, OUTBREAK_MANSION } from '../data/cards';
 import { CE_CARD_IDS } from '../data/custom';
 import { INFECTED_CHARACTER_IDS } from '../data/outbreak';
 import { scoreTotal, revealedLocations, muralCubes, researcherInvested, shedInvested, diningXp, storeroomInvestors, teaRoomInvested, teaRoomCubes, stuffedDeerInvested, taxidermyActionBonus, applySetupEffects } from './locations';
@@ -588,6 +588,10 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
   // Outbreak mode: infection levels, the Infection Deck and Infected Characters.
   const outbreakMode = setup.outbreakMode === true || setup.scenario === 'outbreak';
+  // INFECTION game mode turns on the same infection rules (levels, the
+  // face-down Infection Deck, turn-start/end-of-turn draws) WITHOUT the
+  // Outbreak win condition — see GameSetup.infectionMode.
+  const infectionMode = outbreakMode || setup.infectionMode === true;
   // Characters are unique per game (user ruling): each seat gets its own
   // character card. Random picks draw from the remaining pool (no
   // replacement), and explicit picks consume their slot — a duplicate
@@ -748,7 +752,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       exploresLeft: 1,
       weaponDamageBonusThisTurn: 0,
       damageMultiplierThisTurn: undefined,
-      ...(outbreakMode ? { infectionCards: [] as string[], isInfectedCharacter: def?.infectedCharacter === true, exploredOrAttackedThisTurn: false } : {}),
+...(infectionMode ? { infectionCards: [] as string[], isInfectedCharacter: def?.infectedCharacter === true, exploredOrAttackedThisTurn: false } : {}),
     gainedThisTurn: [],
       damagePerAdditionalActionThisTurn: 0,
       attached: [],
@@ -782,10 +786,15 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
   };
   const customMansion = cards.filter(isCustomMansionCard);
   const mansionIds: string[] = [];
+  // Card ids already committed to the Mansion by either branch below. The
+  // INFECTION game mode consults this so it never doubles the Outbreak
+  // scenario's own copies.
+  const mansionCardIds = new Set<string>();
   if (mansionCards !== undefined) {
     for (const mc of mansionCards) {
       const c = defsById.get(mc.cardId);
       if (c === undefined) continue;
+      mansionCardIds.add(c.id);
       for (let j = 0; j < mc.count; j++) {
         const id = `${c.id}#${j + 1}`;
         mansionIds.push(id);
@@ -796,8 +805,25 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     for (const c of cards) {
       if (c.set === 'custom') continue;
       if (!isMansionCard(c)) continue;
+      mansionCardIds.add(c.id);
       for (let j = 0; j < c.copies; j++) {
         const id = `${c.id}#${j + 1}`;
+        mansionIds.push(id);
+        register(id, c.id, 'mansionDeck');
+      }
+    }
+  }
+  // INFECTION game mode: the Outbreak mansion cards join ANY scenario's
+  // Mansion deck. The '#inf' suffix keeps these instances distinct from
+  // any same-numbered copy a scenario already listed.
+  if (setup.infectionMode === true) {
+    for (const mc of OUTBREAK_MANSION) {
+      const c = defsById.get(mc.cardId);
+      if (c === undefined || mansionCardIds.has(c.id)) continue;
+      mansionCardIds.add(c.id);
+      for (let j = 0; j < mc.count; j++) {
+        const id = `${c.id}#inf${j + 1}`;
+        if (instances[id] !== undefined) continue;
         mansionIds.push(id);
         register(id, c.id, 'mansionDeck');
       }
@@ -898,7 +924,7 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
 
   // Outbreak: the Infection Deck (face down above the Mansion).
   let infectionDeck: readonly string[] = [];
-  if (outbreakMode) {
+  if (infectionMode) {
     const infectionIds: string[] = [];
     for (const c of cards) {
       if (c.id.startsWith('in-')) {
@@ -985,7 +1011,8 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
     prompts: [],
     winners: [],
     log: [],
-    ...(outbreakMode ? { infectionDeck, endInfectedCardId: 'ma-041' } : {}),
+    ...(infectionMode ? { infectionDeck } : {}),
+    ...(outbreakMode ? { endInfectedCardId: 'ma-041' } : {}),
     ...(winInfectedCardId !== undefined ? { endInfectedCardId: winInfectedCardId } : {}),
     supply: supplyIds,
     mansionAttachments: [],

@@ -87,6 +87,29 @@ describe('game server over WebSocket', () => {
     c.ws.close();
   });
 
+  it('createRoom carries infectionMode through and the game deals the Infection Deck', async () => {
+    const server = startServer({ tokenSeq: ['tok-infection'] });
+    const c = connect(server);
+    await open(c);
+    await c.next(); // welcome
+    c.send({ kind: 'createRoom', playerName: 'Manny', scenario: 'firstTimer', partnerMode: false, infectionMode: true });
+    const roomState = await c.next();
+    expect(roomState.kind).toBe('roomState');
+    if (roomState.kind === 'roomState') {
+      expect(roomState.room.infectionMode).toBe(true);
+    }
+    c.send({ kind: 'startGame' });
+    const started = await c.next();
+    expect(started.kind).toBe('gameStarted');
+    const sync = await c.next();
+    expect(sync.kind).toBe('stateSync');
+    if (sync.kind === 'stateSync') {
+      expect(sync.view.state.infectionDeck?.length).toBe(35);
+      expect(sync.view.state.endInfectedCardId).toBeUndefined();
+    }
+    server.close();
+  });
+
   it('createRoom carries usherMode/clockMode/ceMode through to the started game', async () => {
     const server = startServer({ tokenSeq: ['tok-mode'] });
     const c = connect(server);

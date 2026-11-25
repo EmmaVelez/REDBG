@@ -1497,6 +1497,7 @@ describe('Lobby (T08)', () => {
     onSetUsherMode: () => {},
     onSetClockMode: () => {},
     onSetCeMode: () => {},
+    onSetInfectionMode: () => {},
     onSetCharacterSelection: () => {},
     onStart: () => {},
     onStartHotseat: () => {},
@@ -1535,6 +1536,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room })} />);
     expect(html).toContain('ABCDEF');
@@ -1564,6 +1566,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="mercenaries-basic-resources-toggle"');
@@ -1586,6 +1589,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     });
 
     // Manual picks may name ANY expansion's character (Manny ruling), so the
@@ -1648,6 +1652,7 @@ describe('Lobby (T08)', () => {
       usherMode: true,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="usher-toggle"');
@@ -1682,6 +1687,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: true,
       ceMode: true,
+      infectionMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="clock-toggle"');
@@ -1709,9 +1715,36 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: true,
+      infectionMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom).toContain('data-testid="ce-toggle"');
+    expect(inRoom).toContain('checked=""');
+  });
+
+  it('offers the INFECTION toggle under Optional modes in every lobby surface', () => {
+    const noRoom = renderToStaticMarkup(<Lobby {...lobbyProps()} />);
+    expect(noRoom).toContain('data-testid="create-infection-toggle"');
+    expect(noRoom).toContain('data-testid="hotseat-infection-toggle"');
+
+    const room = {
+      roomCode: 'ABCDEF',
+      phase: 'lobby' as const,
+      maxSeats: 2,
+      scenario: 'firstTimer' as const,
+      players: [{ clientId: 'c1', name: 'Me', seat: 0, isBot: false, connected: true }],
+      partnerMode: false,
+      skillSystem: false,
+      customCards: [] as string[],
+      mansionAttachmentMode: 1 as const,
+      mercenariesBasicResources: false,
+      usherMode: false,
+      clockMode: false,
+      ceMode: false,
+      infectionMode: true,
+    };
+    const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
+    expect(inRoom).toContain('data-testid="infection-toggle"');
     expect(inRoom).toContain('checked=""');
   });
 
@@ -1730,6 +1763,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: true,
+      infectionMode: false,
     };
     // CE events attach when revealed, so the mode selector must be offered
     // even though no attachable event was picked in the custom-card picker.
@@ -1762,6 +1796,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const inRoom = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(inRoom.match(/<details[^>]*class="optional-modes"/g)?.length).toBeGreaterThanOrEqual(1);
@@ -1847,6 +1882,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     expect(html).toContain('Custom Cards (1 selected)');
@@ -1868,6 +1904,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const off = renderToStaticMarkup(<Lobby {...lobbyProps({ room: base, clientId: 'c1' })} />);
     expect(off).not.toContain('value="cu-001"');
@@ -1898,6 +1935,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Chris
@@ -1925,6 +1963,7 @@ describe('Lobby (T08)', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     };
     const html = renderToStaticMarkup(<Lobby {...lobbyProps({ room, clientId: 'c1' })} />);
     // Main character dropdown still offers Sherry

@@ -33,6 +33,8 @@ export interface SimConfig {
   readonly clockMode?: boolean;
   /** CE mode: floor(Mansion/10) random CE-001..CE-012 events in the Mansion deck. */
   readonly ceMode?: boolean;
+  /** INFECTION game mode: Outbreak cards + Infection Deck on any scenario. */
+  readonly infectionMode?: boolean;
   /** Called with each applied action; can be used for live telemetry or
    *  unit tests that assert action sequences. */
   readonly onAction?: (action: Action, stateBefore: GameState) => void;
@@ -62,8 +64,8 @@ function rngFromSeed(seed: number): () => number {
  */
 export function playBotGame(config: SimConfig): SimResult {
   const scenario = config.scenario ?? 'firstTimer';
-  const cards = config.cards ?? cardsForScenario(scenario, { usherMode: config.usherMode, clockMode: config.clockMode, ceMode: config.ceMode });
-  const piles = config.piles ?? pilesForScenario(scenario);
+  const cards = config.cards ?? cardsForScenario(scenario, { usherMode: config.usherMode, clockMode: config.clockMode, ceMode: config.ceMode, infectionMode: config.infectionMode });
+  const piles = config.piles ?? pilesForScenario(scenario, { infectionMode: config.infectionMode });
   const scenarioDef = SCENARIOS.find(s => s.id === scenario);
   const mansionCards =
     config.mansionCards ??
@@ -88,6 +90,7 @@ export function playBotGame(config: SimConfig): SimResult {
     usherMode: config.usherMode,
     clockMode: config.clockMode,
     ceMode: config.ceMode,
+    infectionMode: config.infectionMode,
   };
 
   const initialState = setup(setupConfig, cards, piles, mansionCards, winInfectedCardId);

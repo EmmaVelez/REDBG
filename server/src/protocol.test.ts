@@ -33,7 +33,7 @@ describe('protocol round trips', () => {
     { name: 'welcome', msg: { kind: 'welcome', clientId: 'c1', reconnectToken: 'tok' } },
     {
       name: 'roomState',
-      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1, mercenariesBasicResources: false, usherMode: false, clockMode: false, ceMode: false } },
+      msg: { kind: 'roomState', room: { roomCode: 'ABCDEF', phase: 'lobby', maxSeats: 4, scenario: 'firstTimer', players: [{ clientId: 'c1', name: 'Manny', seat: 0, isBot: false, connected: true }], partnerMode: false, skillSystem: false, customCards: [], mansionAttachmentMode: 1, mercenariesBasicResources: false, usherMode: false, clockMode: false, ceMode: false, infectionMode: false } },
     },
     {
       name: 'stateSync',
@@ -171,5 +171,12 @@ describe('protocol validation', () => {
     expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, ceMode: true }).ok).toBe(true);
     expect(validateMessage({ kind: 'setCeMode', ceMode: 1 }).ok).toBe(false);
     expect(validateMessage({ kind: 'setCeMode', ceMode: false }).ok).toBe(true);
+  });
+
+  it('validates infectionMode as a boolean', () => {
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, infectionMode: 'yes' }).ok).toBe(false);
+    expect(validateMessage({ kind: 'createRoom', playerName: 'M', scenario: 'firstTimer', partnerMode: false, infectionMode: true }).ok).toBe(true);
+    expect(validateMessage({ kind: 'setInfectionMode', infectionMode: 1 }).ok).toBe(false);
+    expect(validateMessage({ kind: 'setInfectionMode', infectionMode: false }).ok).toBe(true);
   });
 });

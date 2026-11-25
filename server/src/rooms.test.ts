@@ -194,6 +194,7 @@ describe('createRoomStore', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+      infectionMode: false,
     });
   });
 
@@ -269,6 +270,21 @@ describe('createRoomStore', () => {
     expect(() => store.setCeMode(room.roomCode, 'stranger', true)).toThrow('not the host');
     store.startGame(room.roomCode, 'c1');
     expect(() => store.setCeMode(room.roomCode, 'c1', true)).toThrow('game already started');
+  });
+
+  it('setInfectionMode records the flag; guarded to host + lobby', () => {
+    const store = createRoomStore(() => 0.3);
+    const room = store.createRoom('c1', 'Host', 'firstTimer', false, undefined, undefined, false, [], 1, false, false, false, true, true);
+    expect(room.infectionMode).toBe(true);
+    expect(store.toSnapshot(room).infectionMode).toBe(true);
+
+    const changed = store.setInfectionMode(room.roomCode, 'c1', false);
+    expect(changed.infectionMode).toBe(false);
+    expect(store.toSnapshot(changed).infectionMode).toBe(false);
+
+    expect(() => store.setInfectionMode(room.roomCode, 'stranger', true)).toThrow('not the host');
+    store.startGame(room.roomCode, 'c1');
+    expect(() => store.setInfectionMode(room.roomCode, 'c1', true)).toThrow('game already started');
   });
 
   it('rejects a main-only character (ch-008) as a partner', () => {

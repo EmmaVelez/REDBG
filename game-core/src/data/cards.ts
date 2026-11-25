@@ -390,6 +390,30 @@ export const OUTBREAK_MANSION: ReadonlyArray<{ cardId: string; count: number }> 
   { cardId: 'ma-057o', count: 1 },
 ];
 
+/**
+ * INFECTION opt-in game mode (Manny ruling 2026-11-23): these Outbreak
+ * cards join ANY scenario. The MA counts are Manny's list and match
+ * OUTBREAK_MANSION; AC-023/AC-026/AC-027 enter as 5-copy market piles and
+ * IN-001..IN-006 (Manny's list — in-007 is deliberately NOT included)
+ * build the Infection Deck from their printed `copies`.
+ * MA-054..MA-057 keep the 'o' suffix because Bandai reused those numbers
+ * for the Nightmare set.
+ */
+export const INFECTION_CARD_IDS: readonly string[] = [
+  'ma-041', 'ma-042', 'ma-043', 'ma-044', 'ma-045', 'ma-046', 'ma-047',
+  'ma-048', 'ma-049', 'ma-050', 'ma-051', 'ma-052', 'ma-053',
+  'ma-054o', 'ma-055o', 'ma-056o', 'ma-057o',
+  'ac-023', 'ac-026', 'ac-027',
+  'in-001', 'in-002', 'in-003', 'in-004', 'in-005', 'in-006',
+];
+
+/** The three action cards each get their OWN Resource Area pile. */
+export const INFECTION_ACTION_PILES: ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> = [
+  { pileId: 'action-tvirus', cardIds: ['ac-023'] },
+  { pileId: 'action-injection', cardIds: ['ac-026'] },
+  { pileId: 'action-by-any-means', cardIds: ['ac-027'] },
+];
+
 export const OUTBREAK_SCENARIO_DEF = {
   id: 'outbreak' as ScenarioId,
   name: 'Outbreak',
@@ -621,7 +645,7 @@ export const MERCENARIES_BASIC_RESOURCE_CARDS: readonly string[] = [
   'we-050',
 ];
 
-export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
+export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly infectionMode?: boolean }): ReadonlyArray<{ pileId: string; cardIds: readonly string[] }> {
   const found = SCENARIOS.find(s => s.id === id);
   if (found === undefined) {
     throw new Error(`unknown scenario: ${String(id)}`);
@@ -633,7 +657,7 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
       return replacement === undefined ? p : { pileId: p.pileId, cardIds: replacement };
     });
   }
-  if (opts?.customCards === undefined) {
+  if (opts?.customCards === undefined && opts?.infectionMode !== true) {
     return base;
   }
   // Unofficial Expansion: custom cards that print a cost are REAL market cards
@@ -665,7 +689,7 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
       }
     }
   }
-  const expandedCustomCards = expandCustomCards(opts.customCards);
+  const expandedCustomCards = expandCustomCards(opts.customCards ?? []);
   // EX-001 Special Rocket Launcher Case is the sole source of EX-002: when the
   // Case is in the game the Launcher never sits in the Resource Area (the Case
   // holds its method; a market copy would double the supply). EX-002 ticked on
@@ -713,6 +737,16 @@ export function pilesForScenario(id: ScenarioId, opts?: { readonly customCards?:
     }
     extra.push({ pileId: `custom-${def.id}`, cardIds: [def.id] });
   }
+  // INFECTION game mode: each of the three Outbreak action cards gets its
+  // own Resource Area pile. A card the scenario already piles (ac-023 /
+  // ac-026 on the Outbreak scenario) is skipped rather than duplicated.
+  if (opts?.infectionMode === true) {
+    for (const pile of INFECTION_ACTION_PILES) {
+      const missing = pile.cardIds.filter(cardId => !known.has(cardId));
+      if (missing.length > 0) extra.push({ pileId: pile.pileId, cardIds: missing });
+    }
+  }
+
   // Return base piles (excluding merged ones) plus extra piles
   const filteredBase = base.filter(p => !mergedBasePileIds.has(p.pileId));
   return [...filteredBase, ...extra];
@@ -793,9 +827,9 @@ export function isExpansionScenario(id: ScenarioId): boolean {
  * to live as a duplicated inline copy in both the server and the client.
  * Expansion scenarios need ALL_CARDS or their piles resolve to nothing.
  */
-export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean; readonly ceMode?: boolean }): ReadonlyArray<CardDef> {
+export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?: boolean; readonly customCards?: readonly string[]; readonly mercenariesBasicResources?: boolean; readonly usherMode?: boolean; readonly clockMode?: boolean; readonly ceMode?: boolean; readonly infectionMode?: boolean }): ReadonlyArray<CardDef> {
   const base = isExpansionScenario(id) ? ALL_CARDS : PREMIER_CARDS;
-  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true && opts?.usherMode !== true && opts?.clockMode !== true && opts?.ceMode !== true) {
+  if (opts?.skillSystem !== true && opts?.customCards === undefined && opts?.mercenariesBasicResources !== true && opts?.usherMode !== true && opts?.clockMode !== true && opts?.ceMode !== true && opts?.infectionMode !== true) {
     return base;
   }
   const known = new Set(base.map(c => c.id));
@@ -864,6 +898,15 @@ export function cardsForScenario(id: ScenarioId, opts?: { readonly skillSystem?:
     // scenario. Ids already present (an expansion scenario) are skipped.
     for (const cardId of MERCENARIES_BASIC_RESOURCE_CARDS) {
       const def = MERCENARIES_CARDS.find(c => c.id === cardId);
+      if (def !== undefined && !known.has(def.id)) extras.push(def);
+    }
+  }
+  if (opts?.infectionMode === true) {
+    // INFECTION game mode: the Outbreak mansion/action/infection cards join
+    // any scenario. Ids already present (the Outbreak scenario's own list)
+    // are skipped so enabling both never doubles the supply.
+    for (const cardId of INFECTION_CARD_IDS) {
+      const def = OUTBREAK_CARDS.find(c => c.id === cardId);
       if (def !== undefined && !known.has(def.id)) extras.push(def);
     }
   }

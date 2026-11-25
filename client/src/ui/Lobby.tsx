@@ -33,7 +33,7 @@ export interface LobbyProps {
   readonly room: RoomSnapshot | null;
   readonly clientId: string | null;
   readonly status: string;
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean, infectionMode: boolean) => void;
   readonly onJoinRoom: (roomCode: string, name: string) => void;
   readonly onSelectSeat: (seat: number) => void;
   readonly onAddBot: (seat: number | undefined) => void;
@@ -47,9 +47,10 @@ export interface LobbyProps {
   readonly onSetUsherMode: (usherMode: boolean) => void;
   readonly onSetClockMode: (clockMode: boolean) => void;
   readonly onSetCeMode: (ceMode: boolean) => void;
+  readonly onSetInfectionMode: (infectionMode: boolean) => void;
   readonly onSetCharacterSelection: (mainCharacterId?: string, partnerCharacterId?: string) => void;
   readonly onStart: () => void;
-  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
+  readonly onStartHotseat: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean, infectionMode: boolean) => void;
 }
 
 const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
@@ -308,7 +309,7 @@ function CustomCardsPicker(props: {
 }
 
 function PassAndPlay(props: {
-  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
+  readonly onStart: (names: readonly string[], scenario: ScenarioId, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean, infectionMode: boolean) => void;
 }): JSX.Element {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<readonly string[]>([...DEFAULT_NAMES]);
@@ -320,6 +321,7 @@ function PassAndPlay(props: {
   const [usherMode, setUsherMode] = useState(false);
   const [clockMode, setClockMode] = useState(false);
   const [ceMode, setCeMode] = useState(false);
+  const [infectionMode, setInfectionMode] = useState(false);
 
   const setNameAt = (index: number, value: string): void => {
     setNames(prev => prev.map((n, i) => (i === index ? value : n)));
@@ -389,6 +391,16 @@ function PassAndPlay(props: {
         />
         <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
       </label>
+      <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={infectionMode}
+          onChange={e => setInfectionMode(e.target.checked)}
+          data-testid="hotseat-infection-toggle"
+          title="Outbreak mansion cards, three action piles and the face-down Infection Deck join this scenario"
+        />
+        <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>INFECTION</span>
+      </label>
       </details>
       <CustomCardsPicker selected={customCards} onChange={setCustomCards} />
       {(hasAttachmentCards || ceMode) && (
@@ -434,7 +446,7 @@ function PassAndPlay(props: {
         type="button"
         className="btn-primary"
         disabled={!ready}
-        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode)}
+        onClick={() => props.onStart(effective, scenario, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode, infectionMode)}
       >
         Start pass &amp; play
       </button>
@@ -461,6 +473,7 @@ export function Lobby({
   onSetUsherMode,
   onSetClockMode,
   onSetCeMode,
+  onSetInfectionMode,
   onSetCharacterSelection,
   onStart,
   onStartHotseat,
@@ -564,6 +577,18 @@ export function Lobby({
                   {' '}Random CE Events (CE-001..CE-012)
                 </label>
               </div>
+              <div className="lobby-partner-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={room.infectionMode}
+                    onChange={e => onSetInfectionMode(e.target.checked)}
+                    data-testid="infection-toggle"
+                    title="Outbreak mansion cards, three action piles and the face-down Infection Deck join this scenario"
+                  />
+                  {' '}INFECTION
+                </label>
+              </div>
               </details>
               <CustomCardsPicker selected={room.customCards} onChange={onSetCustomCards} />
               {(room.ceMode || room.customCards.some(id => {
@@ -662,7 +687,7 @@ export function Lobby({
 }
 
 function RoomEntry(props: {
-  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean) => void;
+  readonly onCreateRoom: (name: string, scenario: ScenarioId, partnerMode: boolean, mainCharacterId: string | undefined, partnerCharacterId: string | undefined, skillSystem: boolean, customCards: readonly string[], mansionAttachmentMode: 1 | 2, mercenariesBasicResources: boolean, usherMode: boolean, clockMode: boolean, ceMode: boolean, infectionMode: boolean) => void;
   readonly onJoinRoom: (code: string, name: string) => void;
 }): JSX.Element {
   const [scenario, setScenario] = useState<ScenarioId>('firstTimer');
@@ -674,13 +699,14 @@ function RoomEntry(props: {
   const [usherMode, setUsherMode] = useState(false);
   const [clockMode, setClockMode] = useState(false);
   const [ceMode, setCeMode] = useState(false);
+  const [infectionMode, setInfectionMode] = useState(false);
   const [mainChar, setMainChar] = useState<string>('');
   const [partnerChar, setPartnerChar] = useState<string>('');
   function handleCreate(e: React.FormEvent<HTMLFormElement>): void {
     e.preventDefault();
     const name = new FormData(e.currentTarget).get('name');
     if (typeof name === 'string' && name.trim() !== '') {
-      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode);
+      props.onCreateRoom(name.trim(), scenario, partnerMode, undefined, undefined, skillSystem, customCards, mansionAttachmentMode, mercenariesBasicResources, usherMode, clockMode, ceMode, infectionMode);
     }
   }
   function handleJoin(e: React.FormEvent<HTMLFormElement>): void {
@@ -757,6 +783,16 @@ function RoomEntry(props: {
             title="floor(Mansion size / 10) random CE-001..CE-012 event cards are shuffled into the Mansion deck, never two of them adjacent"
           />
           <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>Random CE Events (CE-001..CE-012)</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={infectionMode}
+            onChange={e => setInfectionMode(e.target.checked)}
+            data-testid="create-infection-toggle"
+            title="Outbreak mansion cards, three action piles and the face-down Infection Deck join this scenario"
+          />
+          <span style={{ marginLeft: '6px', fontSize: '0.9em' }}>INFECTION</span>
         </label>
         </details>
         <CustomCardsPicker selected={customCards} onChange={setCustomCards} />

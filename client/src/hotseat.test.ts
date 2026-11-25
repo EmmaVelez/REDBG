@@ -48,6 +48,22 @@ describe('createHotseatGame', () => {
     });
   });
 
+  it('infectionMode adds the Outbreak cards, three action piles and the Infection Deck', () => {
+    const s = createHotseatGame(['A', 'B'], 1, 'firstTimer', { infectionMode: true });
+    expect(s.infectionDeck?.length).toBe(35);
+    expect(s.mansionDeck.some(id => s.cards[id]?.cardId === 'ma-041')).toBe(true);
+    expect(s.mansionDeck.filter(id => s.cards[id]?.cardId === 'ma-044')).toHaveLength(3);
+    expect(s.mansionDeck.some(id => s.cards[id]?.cardId === 'ma-057o')).toBe(true);
+    for (const pileId of ['action-tvirus', 'action-injection', 'action-by-any-means']) {
+      expect(s.marketPiles[pileId]?.cards).toHaveLength(5);
+    }
+    // INFECTION does not import the Outbreak win condition.
+    expect(s.endInfectedCardId).toBeUndefined();
+    const plain = createHotseatGame(['A', 'B'], 1);
+    expect(plain.infectionDeck).toBeUndefined();
+    expect(plain.mansionDeck.some(id => (s.cards[id]?.cardId ?? '').startsWith('ma-04'))).toBe(false);
+  });
+
   it('rejects fewer than 2 or more than 4 players', () => {
     expect(() => createHotseatGame(['Solo'], 1)).toThrow();
     expect(() => createHotseatGame(['A', 'B', 'C', 'D', 'E'], 1)).toThrow();

@@ -53,6 +53,8 @@ export interface HotseatOptions {
   readonly clockMode?: boolean;
   /** CE mode: floor(Mansion/10) random CE-001..CE-012 events hide in the Mansion. */
   readonly ceMode?: boolean;
+  /** INFECTION game mode: Outbreak mansion/action cards + the Infection Deck. */
+  readonly infectionMode?: boolean;
 }
 
 export function createHotseatGame(names: readonly string[], seed: number, scenario: ScenarioId = 'firstTimer', opts: HotseatOptions = {}): GameState {
@@ -65,7 +67,7 @@ export function createHotseatGame(names: readonly string[], seed: number, scenar
     characterCardId: undefined,
   }));
   const scenarioDef = SCENARIOS.find((s: any) => s.id === scenario);
-  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode, mercenariesBasicResources: opts.mercenariesBasicResources, locationsMode: opts.locationsMode, usherMode: opts.usherMode, clockMode: opts.clockMode, ceMode: opts.ceMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources, usherMode: opts.usherMode, clockMode: opts.clockMode, ceMode: opts.ceMode }), pilesForScenario(scenario, { customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
+  return setup({ seed: seed, players, outbreakMode: scenario === 'outbreak', skillSystem: opts.skillSystem, mansionAttachmentMode: opts.mansionAttachmentMode, mercenariesBasicResources: opts.mercenariesBasicResources, locationsMode: opts.locationsMode, usherMode: opts.usherMode, clockMode: opts.clockMode, ceMode: opts.ceMode, infectionMode: opts.infectionMode }, cardsForScenario(scenario, { skillSystem: opts.skillSystem, customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources, usherMode: opts.usherMode, clockMode: opts.clockMode, ceMode: opts.ceMode, infectionMode: opts.infectionMode }), pilesForScenario(scenario, { customCards: opts.customCards, mercenariesBasicResources: opts.mercenariesBasicResources, infectionMode: opts.infectionMode }), (scenarioDef as any)?.mansionCards, (scenarioDef as any)?.winInfectedCardId);
 }
 
 /** The view the device holder is entitled to: their seats cards, everyone elses hidden. */

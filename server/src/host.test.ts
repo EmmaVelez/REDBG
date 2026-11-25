@@ -72,6 +72,7 @@ describe('createHost', () => {
       usherMode: false,
       clockMode: false,
       ceMode: false,
+    infectionMode: false,
     };
     const host = createHost(lonely);
     expect(() => host.start(1)).toThrow('no seated players');
