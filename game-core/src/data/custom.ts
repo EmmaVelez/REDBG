@@ -2188,9 +2188,10 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     locationInvestEffects: [{ kind: 'ongoingExhibitionBuyMoveXp' }, { kind: 'ongoingExhibitionDamageTakeXp' }],
     locationSetupEffects: [{ kind: 'setupXpOnActionWeaponPiles' }],
   },
-  // ── Fan Locations batch 11 (loc-046..048) — read from Manny's scans with
-  // the local Ollama vision model (2026-11-20); two verbatim passes agreed on
-  // every line. No printed codes on the scans -> sequential loc ids.
+  // ── Fan Locations batch 11 (loc-046..loc-051) ─────────────────────────
+  // Two parallel sessions transcribed two different three-room batches from
+  // Manny's scans; the ids collide, so the union keeps BOTH sets and moves the
+  // second batch up to loc-049..loc-051.
   {
     id: 'loc-046',
     copies: 1,
@@ -2201,7 +2202,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     locationCost: 40,
     locationMaxPerTurn: 1,
     text: '1X\nGain an infection. If you do, trash a card in your hand.\n+10 damage for each 10 it cost the first time you explore this turn.\nMax: once per turn.',
-    locationLevels: [{ cubes: 1, text: 'Gain an infection. If you do, trash a card in your hand. +10 damage for each 10 it cost the first time you explore this turn. Max: once per turn.' }],
+    locationLevels: [{ cubes: 1, text: 'Gain an infection. If you do, trash a card in your hand. +10 damage for each 10 of its cost the first time you explore this turn. Max: once per turn.' }],
     locationRevealEffects: [
       { kind: 'onexGainInfectionThenTrash' },
       { kind: 'onexFirstExploreDamagePer10Cost', per10: 10 },
@@ -2217,7 +2218,7 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     locationCost: 50,
     locationMaxPerTurn: 1,
     text: '1X\nGain 20 health or Remove an infection.\nOn Reveal: Every other player may gain an action card costing 50 or less.\nMax: once per turn.',
-    locationLevels: [{ cubes: 1, text: 'Gain 20 health or Remove an infection. On Reveal: Every other player may gain an action card costing 50 or less. Max: once per turn.' }],
+    locationLevels: [{ cubes: 1, text: 'Gain 20 health or remove an infection. On Reveal: every other player may gain an action card costing 50 or less. Max: once per turn.' }],
     locationRevealEffects: [
       { kind: 'onexGainHealthOrRemoveInfection', health: 20 },
       { kind: 'revealEachOtherPlayerMayGainActionAtMost', maxCost: 50 },
@@ -2233,10 +2234,113 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     locationCost: 40,
     locationMaxPerTurn: 1,
     text: '1X\nLose 10 health.\nGain an infection.\nGain a 30 ammo.\nOn Reveal: You may look at the top card of your inventory and discard it or put it back.\nMax: once per turn.',
-    locationLevels: [{ cubes: 1, text: 'Lose 10 health. Gain an infection. Gain a 30 ammo. On Reveal: You may look at the top card of your inventory and discard it or put it back. Max: once per turn.' }],
+    locationLevels: [{ cubes: 1, text: 'Lose 10 health. Gain an infection. Gain a 30 ammo. On Reveal: you may look at the top card of your inventory and discard it or put it back. Max: once per turn.' }],
     locationRevealEffects: [
       { kind: 'onexCemeteryCosts', hp: 10, ammo: 30 },
       { kind: 'revealInventoryTopPeek' },
+    ],
+  },
+  {
+    id: 'loc-049',
+    copies: 1,
+    name: 'Dining Hall',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'onex',
+    locationCost: 30,
+    locationMaxPerTurn: 1,
+    text: '1X\nWhen someone gains an ammo, move 1 xp from its pile to this card. When you buy this room, take all the XP from this card.\nSetup: Put 5 xp on each ammo pile.\nMax: once per turn.',
+    locationRevealEffects: [{ kind: 'onexDiningHallTakeXp' }],
+    locationInvestEffects: [{ kind: 'ongoingDiningHallAmmoGain' }],
+    locationSetupEffects: [{ kind: 'setupXpOnAmmoPiles', perPile: 5 }],
+  },
+  {
+    id: 'loc-050',
+    copies: 1,
+    name: 'Elevator Room',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'invest',
+    locationCosts: [10],
+    text: 'Once a turn, you may discard an action card. If you do, take 1 xp from this card and +20 gold, +20 ammo this turn.\nSetup: Add 3 xp per player to this card.',
+    locationInvestEffects: [{ kind: 'ongoingElevatorDiscard' }],
+    locationSetupEffects: [{ kind: 'setupAddXpPerPlayer', perPlayer: 3 }],
+  },
+  {
+    id: 'loc-051',
+    copies: 1,
+    name: 'Entrance Hall',
+    type: 'location',
+    set: 'custom',
+    locationKind: 'invest',
+    locationCosts: [10],
+    text: 'When you buy a weapon of a type that you used this turn, gain 1 xp from this card.\nSetup: Add 4 xp per player to this card.',
+    locationInvestEffects: [{ kind: 'ongoingEntranceHallWeaponBuy' }],
+    locationSetupEffects: [{ kind: 'setupAddXpPerPlayer', perPlayer: 4 }],
+  },
+
+  // ── Fan characters: Excella Gionne / Aya Brea (JP prints, CH-006) ───────
+  // All three scans carry the printed code CH-006, which is already official
+  // CH-006 (Ada Wong, Premier), so each print gets a family suffix. The
+  // shields were read from ~8x crops of JUST the shield emblem (the level digit
+  // sits outside it): Excella 3/8, tactical-coat Aya 4/9, brown-outfit Aya 5/8.
+  {
+    id: 'ch-006e',
+    name: 'Excella Gionne',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: Once per turn, you may Trash 1 Ammunition from your Hand to Gain another Ammunition costing up to 30 Gold more than the Trashed card.\nLevel 2: During your turn, you can Discard a "Uroboros Injection" from your hand. In that case, you may look at the top card of the Mansion and Excella deals an additional 20 Damage during this turn.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 3,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'Once per turn, you may Trash 1 Ammunition from your Hand to Gain another Ammunition costing up to 30 Gold more than the Trashed card.' },
+      { level: 2, text: 'During your turn, you can Discard a "Uroboros Injection" from your hand. In that case, you may look at the top card of the Mansion and Excella deals an additional 20 Damage during this turn.' },
+    ],
+    abilities: [
+      { kind: 'trashAmmoForAmmoUpTo30More', amount: 30, level: 1 },
+      { kind: 'discardCardForPeekMansionTopAndDamage', cardId: 'ac-018', damage: 20, level: 2 },
+    ],
+    // Uroboros Injection is the official Alliance action; the def must exist.
+    dependencies: ['ac-018'],
+  },
+  {
+    id: 'ch-006a',
+    name: 'Aya Brea',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: When Aya attacks with a Rifle and a Knife weapon, she deals an additional +10 damage.\nLevel 2: Once, on your turn, you can use an ability of another character on the table.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 4,
+    level2At: 9,
+    levels: [
+      { level: 1, text: 'When Aya attacks with a Rifle and a Knife weapon, she deals an additional +10 damage.' },
+      { level: 2, text: 'Once, on your turn, you can use an ability of another character on the table.' },
+    ],
+    abilities: [
+      { kind: 'plusDamageWithRifleAndKnife', tags: ['rifle', 'knife'], amount: 10, level: 1 },
+      { kind: 'useAnotherCharactersAbility', level: 2 },
+    ],
+  },
+  {
+    id: 'ch-006b',
+    name: 'Aya Brea',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: If Aya is battling more than one Infected, she deals an additional +5 damage for each character in the game.\nLevel 2: Once, on your turn, you can use an ability of another character on the table.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 5,
+    level2At: 8,
+    levels: [
+      { level: 1, text: 'If Aya is battling more than one Infected, she deals an additional +5 damage for each character in the game.' },
+      { level: 2, text: 'Once, on your turn, you can use an ability of another character on the table.' },
+    ],
+    abilities: [
+      { kind: 'plusDamagePerMultiExplorePerPlayer', amount: 5, level: 1 },
+      { kind: 'useAnotherCharactersAbility', level: 2 },
     ],
   },
 ];

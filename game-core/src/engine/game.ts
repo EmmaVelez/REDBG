@@ -1849,6 +1849,10 @@ function startTurnInternal(state: GameState): GameState {
 
   const turnStartPrompts = [...abilityPrompts, ...skillPrompts, ...coverUpPrompts];
 
+  // Aya Brea (ch-006a / ch-006b) L2: "Once, on your turn, you can use an ability
+  // of another character on the table." The latch is set during the turn and
+  // cleared at the boundary (see the per-turn resets in the return below).
+
   return {
       ...state,
       version: newVersion,
@@ -1869,6 +1873,13 @@ function startTurnInternal(state: GameState): GameState {
             actionsLeft: turnPlayer.actionsLeft + taxidermyActionBonus(state, player.seat),
             // Taxidermy reveal block expires at the turn boundary.
             blockedActionPlaysThisTurn: undefined,
+            // Batch 11: per-turn counters reset for the seat whose turn starts.
+            infectionsGainedThisTurn: 0,
+            weaponTypesUsedThisTurn: [],
+            // Aya Brea L2: the borrow grant and its once-per-turn latch expire
+            // at the boundary; a new turn may borrow again.
+            borrowedAbilityFrom: undefined,
+            usedAnotherCharacterThisTurn: undefined,
           };
         }
         return { ...s, ...refresh };

@@ -6,7 +6,7 @@ import { characterAbilities, weaponCostCap, attachEligibleHandCards } from '../e
 
 import { skillXpRequired, skillXpOn, activeSkillIds } from '../engine/skill';
 import { grantedExploresFor } from '../engine/explore';
-import { canInvest, readingRoomInvested, storeroomRearrangeInvested, greenhouseInvested, cardXp } from '../engine/locations';
+import { canInvest, readingRoomInvested, storeroomRearrangeInvested, greenhouseInvested, cardXp, elevatorInvested } from '../engine/locations';
 import { exploreAmmoReq } from '../engine/ammo';
 
 export function enumerateLegalActions(state: GameState, seat: number): readonly Action[] {
@@ -218,6 +218,13 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
       return d === undefined ? undefined : state.cardDefs[d.cardId];
     })()],
   ];
+  // Aya Brea L2 grant: the seat may ALSO activate one manual ability of a
+  // character named in `borrowedAbilityFrom`. The borrowed list is offered with
+  // `character: 'main'` and an explicit borrowed flag, so validate's grant check
+  // can tell it apart from that character's own button.
+  const borrowedDefs: readonly CardDef[] = (player.borrowedAbilityFrom ?? [])
+    .map(id => state.cardDefs[id])
+    .filter((d): d is CardDef => d !== undefined);
   for (const [character, charDef] of abilityTargets) {
     if (!charDef?.abilities) continue;
     for (let i = 0; i < charDef.abilities.length; i++) {
@@ -230,6 +237,21 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
         seat,
         abilityIndex: i,
         ...(character === 'partner' ? { character: 'partner' as const } : {}),
+      });
+    }
+  }
+  for (const def of borrowedDefs) {
+    for (let i = 0; i < (def.abilities?.length ?? 0); i++) {
+      const ability = def.abilities?.[i];
+      if (ability === undefined) continue;
+      if (ability.kind === 'skipTurnForSuperNextTurn') continue;
+      if (ability.kind === 'gainKnifeAtTurnStart') continue;
+      generatedActions.push({
+        type: 'useCharacterAbility',
+        seat,
+        abilityIndex: i,
+        character: 'main',
+        borrowedFrom: def.id,
       });
     }
   }
@@ -316,6 +338,12 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     }
     if (def.id === 'loc-042' && greenhouseInvested(state, seat) && player.buysLeft >= 1 && cardXp(state, loc.instanceId) >= 1) {
       generatedActions.push({ type: 'forfeitBuy', seat });
+    }
+    if (def.id === 'loc-050' && elevatorInvested(state, seat) && cardXp(state, loc.instanceId) >= 1 && !(player.locationUsesThisTurn ?? []).includes(loc.instanceId) && player.hand.some(id => state.cardDefs[state.cards[id]?.cardId ?? '']?.type === 'action')) {
+      generatedActions.push({ type: 'elevatorDiscardStart', seat });
+    }
+    if (def.id === 'loc-048' && player.buysLeft >= 1 && player.turnGold >= (def.locationCost ?? 0)) {
+      generatedActions.push({ type: 'courtyardStart', seat });
     }
     if (def.locationKind === 'onex' && (player.turnGold >= (def.locationCost ?? 0)) && player.buysLeft >= 1) {
       const used = (player.locationUsesThisTurn ?? []).filter(x => x === loc.instanceId).length;

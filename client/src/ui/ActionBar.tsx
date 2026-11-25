@@ -287,7 +287,10 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
   // Partner, so label it from that character's own card. The button reads the
   // character's first name + the ability's level ("Jill:Lv1"); the full rules
   // text rides in the tooltip so the button stays short.
-  const abilityDef = (a: Extract<Action, { type: 'useCharacterAbility' }>) => (a.character === 'partner' ? partnerDef : charDef);
+  const abilityDef = (a: Extract<Action, { type: 'useCharacterAbility' }>) =>
+    a.borrowedFrom !== undefined
+      ? (state.cardDefs[a.borrowedFrom] ?? (a.character === 'partner' ? partnerDef : charDef))
+      : (a.character === 'partner' ? partnerDef : charDef);
   const abilityLevel = (a: Extract<Action, { type: 'useCharacterAbility' }>): number =>
     abilityDef(a)?.abilities?.[a.abilityIndex]?.level ?? 1;
   const abilityLabel = (a: Extract<Action, { type: 'useCharacterAbility' }>): string => {
@@ -660,10 +663,11 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
                   <div className="decision-actions" data-decision-group="abilities">
                     {abilities.map(a => (
                       <ActionButton
-                        key={`ability-${a.abilityIndex}`}
+                        key={`ability-${a.character ?? 'main'}-${a.borrowedFrom ?? 'own'}-${a.abilityIndex}`}
                         variant="secondary"
                         data-ability-index={a.abilityIndex}
                         data-ability-character={a.character ?? 'main'}
+                        data-ability-borrowed={a.borrowedFrom ?? ''}
                         onClick={() => onAction(a)}
                         disabled={disabled}
                         title={abilityText(a)}

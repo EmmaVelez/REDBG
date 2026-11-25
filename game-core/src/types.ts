@@ -510,6 +510,14 @@ export type LocationEffect =
   | { readonly kind: 'revealBlockMansionRevealThisTurn' }
   /** Bedroom: gain `ammoCount` Ammo x`ammo` cards, then choose a card up to `maxCost`. */
   | { readonly kind: 'onexGainAmmoAndChooseCard'; readonly ammo: number; readonly ammoCount: number; readonly maxCost: number }
+  /** Corridor: if Inventory + discard empty, gain 3 Ammo x30 OR draw 2 skills keep 1. */
+  | { readonly kind: 'onexCorridor' }
+  /** Costume Room: gain 2 infections, +1 XP / +10 ammo per infection gained this turn, +1 explore. */
+  | { readonly kind: 'onexCostumeRoom' }
+  /** Courtyard: reveal top 2 of a chosen mansion deck, auto-defeat Infected, choose events. */
+  | { readonly kind: 'onexCourtyard' }
+  /** Dining Hall: using this 1X takes all the XP stored on the card. */
+  | { readonly kind: 'onexDiningHallTakeXp' }
   /** Parlor: after a buy that gained a card, may pay `gold` to gain a random skill. */
   | { readonly kind: 'ongoingParlorSkillOnBuy'; readonly gold: number }
   /** Passage to the Shed: when you trash a card, may spend `xp` to trash a hand/discard card. */
@@ -574,7 +582,15 @@ export type LocationEffect =
   /** Exhibition Room: taking >20 explore damage takes all this card's XP. */
   | { readonly kind: 'ongoingExhibitionDamageTakeXp' }
   /** On Reveal: every OTHER player may discard their hand and draw `draw`. */
-  | { readonly kind: 'revealEachOtherPlayerMayDiscardAndDraw'; readonly draw: number };
+  | { readonly kind: 'revealEachOtherPlayerMayDiscardAndDraw'; readonly draw: number }
+  /** Elevator Room: once a turn, discard an action for 1 card XP + 20 gold + 20 ammo. */
+  | { readonly kind: 'ongoingElevatorDiscard' }
+  /** Entrance Hall: buying a weapon of a type used this turn gains 1 card XP. */
+  | { readonly kind: 'ongoingEntranceHallWeaponBuy' }
+  /** Dining Hall: when anyone gains an ammo, move 1 XP from its pile to this card. */
+  | { readonly kind: 'ongoingDiningHallAmmoGain' }
+  /** Costume Room On Reveal: you may trash a discard card; if you do, others may too. */
+  | { readonly kind: 'revealCostumeRoomTrash' };
 
 /** "When scoring" effects: converted into Decorations at game end. */
 export type LocationScoreEffect =
@@ -604,7 +620,9 @@ export type LocationSetupEffect =
   /** Greenhouse / Helipad Lookout: add `perPlayer` XP per player to this card. */
   | { readonly kind: 'setupAddXpPerPlayer'; readonly perPlayer: number }
   /** Exhibition Room: put 1 XP token on every action and weapon supply pile. */
-  | { readonly kind: 'setupXpOnActionWeaponPiles' };
+  | { readonly kind: 'setupXpOnActionWeaponPiles' }
+  /** Dining Hall: put `perPile` XP tokens on every ammunition supply pile. */
+  | { readonly kind: 'setupXpOnAmmoPiles'; readonly perPile: number };
 
 export type TokenEffect =
   | { readonly kind: "gainWeaponAndTrashToken"; readonly weaponCardId: string } // Rocket Launcher Case -> we-008, Gatling Gun Case -> we-007
@@ -890,6 +908,25 @@ export type CharacterAbility =
   | { readonly kind: "buyOnHerbGain"; readonly level: 1 | 2 }
   /** PR-008 L2: at turn start, if at full Health, +`amount` Damage this turn. */
   | { readonly kind: "fullHpDamageBonusAtTurnStart"; readonly amount: number; readonly level: 1 | 2 }
+  // --- Fan characters (JP prints, CH-006): Excella Gionne / Aya Brea ---
+  /** ch-006e Excella Gionne L1: once per turn, Trash 1 Ammunition from hand to
+   *  Gain another Ammunition costing up to `amount` Gold more than the trashed
+   *  one. Manual trigger, resolves through chooseOption. */
+  | { readonly kind: "trashAmmoForAmmoUpTo30More"; readonly amount: number; readonly level: 1 | 2 }
+  /** ch-006e Excella Gionne L2: during your turn, Discard `cardId` from hand to
+   *  peek the top of the Mansion and deal +`damage` this turn. */
+  | { readonly kind: "discardCardForPeekMansionTopAndDamage"; readonly cardId: string; readonly damage: number; readonly level: 1 | 2 }
+  /** ch-006a Aya Brea L1: when she attacks with a weapon carrying EVERY tag in
+   *  `tags`, that attack deals +`amount` Damage. Passive, applied per-weapon in
+   *  the shared explore damage expression. */
+  | { readonly kind: "plusDamageWithRifleAndKnife"; readonly tags: readonly WeaponTag[]; readonly amount: number; readonly level: 1 | 2 }
+  /** ch-006b Aya Brea L1: while battling more than one Infected, +`amount`
+   *  Damage for each character in the game. Passive, scaled by the explore's
+   *  Infected count and the living-player count. */
+  | { readonly kind: "plusDamagePerMultiExplorePerPlayer"; readonly amount: number; readonly level: 1 | 2 }
+  /** ch-006a / ch-006b Aya Brea L2: once per turn, on your turn, use ONE legal
+   *  manual ability belonging to ANOTHER character on the table. */
+  | { readonly kind: "useAnotherCharactersAbility"; readonly level: 1 | 2 }
 
 
 // ---------------------------------------------------------------------------
@@ -1184,6 +1221,19 @@ export interface PlayerState {
   /** Stuffed Deer Room (loc-037): a revealed top-Inventory action card armed
    *  for a free auto-play (no Action). Consumed by the applyAction wrapper. */
   readonly pendingStuffedDeerPlayId?: string;
+  /** Costume Room (loc-047): infections gained this turn (cleared at turn start). */
+  readonly infectionsGainedThisTurn?: number;
+  /** Entrance Hall (loc-051): weapon card ids used this turn (cleared at turn start). */
+  readonly weaponTypesUsedThisTurn?: readonly string[];
+  /** Elevator Room (loc-050): the once-per-turn discard has been used. */
+  readonly elevatorUsedThisTurn?: boolean;
+  /** Aya Brea (ch-006a / ch-006b) L2: "use an ability of another character" has
+   *  already been spent this turn (cleared at the start of the next turn). */
+  readonly usedAnotherCharacterThisTurn?: boolean;
+  /** Aya Brea L2 grant: while set, this seat may activate ONE manual ability
+   *  belonging to a character named in the list. Consumed by that activation and
+   *  cleared at the turn boundary. */
+  readonly borrowedAbilityFrom?: readonly string[];
   /** Fan Location (Terrace): an action card just bought that should be
    *  played immediately and for free. Consumed by applyAction. */
   readonly pendingFreeActionInstanceId?: string;
@@ -1297,6 +1347,9 @@ export interface GameState {
   /** Batch 10: XP stored ON location cards (Greenhouse/Helipad/Exhibition),
    *  keyed by location instance id. Seeded by Setup effects on reveal. */
   readonly locationXp?: Readonly<Record<string, number>>;
+  /** Dining Hall (loc-049): XP tokens stored on supply piles, keyed by pile id
+   *  (a count, unlike the presence-only xpTokens). */
+  readonly pileXp?: Readonly<Record<string, number>>;
   /** Greenhouse (loc-042): +damage armed for the seat's FIRST explore this turn. */
   readonly greenhouseDamageBonus?: { readonly seat: number; readonly amount: number };
   /** Fan Location (Bedroom): the seat that may not reveal Mansion cards
@@ -1515,7 +1568,8 @@ export type Action =
   | { readonly type: "attack"; readonly seat: number; readonly targetSeat: number; readonly weaponInstanceId?: string; readonly infectionCardIds?: readonly string[] }
     | { readonly type: "playWeapon"; readonly seat: number; readonly instanceId: string } // move weapon from hand to play area for later explore
   | { readonly type: "buy"; readonly seat: number; readonly pileId: string; readonly instanceId?: string }
-  | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number; readonly character?: "main" | "partner" }
+  | { readonly type: "useCharacterAbility"; readonly seat: number; readonly abilityIndex: number; readonly character?: "main" | "partner"; /** Aya Brea L2: the id of the OTHER character whose ability this seat is borrowing. */
+    readonly borrowedFrom?: string }
   | { readonly type: "attachToPartner"; readonly seat: number; readonly instanceId: string; readonly replaceIndex?: 0 | 1 }
   /** Alliance: human seats get ONE guided action that raises a card prompt (and,
    *  when the Partner is full, a slot prompt) instead of a button per legal card.
@@ -1537,6 +1591,8 @@ export type Action =
   | { readonly type: "readingRoomPeek"; readonly seat: number }
   | { readonly type: "storeroomRearrangeStart"; readonly seat: number }
   | { readonly type: "forfeitBuy"; readonly seat: number }
+  | { readonly type: "elevatorDiscardStart"; readonly seat: number }
+  | { readonly type: "courtyardStart"; readonly seat: number }
   /** Fan Locations: pay a 1X location's cost for a one-shot effect. */
   | { readonly type: "useLocation"; readonly seat: number; readonly instanceId: string }
   /** Fan Location (Underground Passage): start the trash-and-upgrade chain. */

@@ -133,6 +133,17 @@ export function LocationsRow({ state, mySeat, onAction, disabled = false }: Loca
                     Forfeit Buy (+20 dmg)
                   </button>
                 )}
+                {kind === 'invest' && (def.locationInvestEffects ?? []).some(e => e.kind === 'ongoingElevatorDiscard') && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    disabled={!canAct || (loc.cubes[mySeat] ?? 0) < 1 || cardXp(state, loc.instanceId) < 1 || (me?.locationUsesThisTurn ?? []).includes(loc.instanceId)}
+                    title="Elevator Room: once a turn, discard an action card to take 1 XP from this card and +20 Gold, +20 Ammo"
+                    onClick={() => onAction({ type: 'elevatorDiscardStart', seat: mySeat })}
+                  >
+                    Discard action (+20g/+20 ammo)
+                  </button>
+                )}
                 {kind === 'onex' && (
                   <button
                     type="button"

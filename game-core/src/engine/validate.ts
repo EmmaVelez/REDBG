@@ -1,8 +1,8 @@
 import type { GameState, Action, CardDef, ValidationResult } from '../types';
-import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags } from './abilities';
+import { seatAbilities, weaponCostCap, partnerAttachCap, leaderAbilities, characterSource, buyCostAfterReduction, mustExploreNow, attachEligibleHandCards, effectiveWeaponTags, useAnotherCharacterAvailable } from './abilities';
 import { requiredAmmoForExplore, xAmmoAllocationError } from './ammo';
 import { canReuseWeapon, isPartnerWeapon, remainingWeaponUses, canUseWeaponTimes, canPlayFromDiscard } from './weaponReuse';
-import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested, statueCorridorInvested, storeroomRearrangeInvested, exhibitionInPlay } from './locations';
+import { nextCubeCost, locationBuyCostReduction, pileHasXpToken, readingRoomInvested, statueCorridorInvested, storeroomRearrangeInvested, exhibitionInPlay, elevatorInvested } from './locations';
 import { isSkillActive } from './skill';
 import { deckCount } from './mansion';
 import { grantedExploresFor } from './explore';
@@ -59,11 +59,16 @@ export function validateAction(state: GameState, action: Action): ValidationResu
   // postTurnTrashChoose IS the end-of-turn phase's resolution action, so it
   // must be legal while its own prompt is open.
   if (action.type !== 'startGame' && action.type !== 'chooseOption' && action.type !== 'postTurnTrashChoose') {
-    if ('seat' in action && state.prompts.some(p => p.seat === action.seat)) {
+    const open = state.prompts.some(p => p.seat === ('seat' in action ? action.seat : -1));
+    // Aya Brea L2: the borrowed ability is a real activation and may itself
+    // raise a prompt, so it must be legal while the grant's own prompt is
+    // being answered.
+    const borrowing = action.type === 'useCharacterAbility'
+      && (state.seats[action.seat]?.borrowedAbilityFrom?.length ?? 0) > 0;
+    if (open && !borrowing) {
       return { ok: false, reason: `${action.type}: resolve pending prompt first` };
     }
   }
-
   // Outbreak: "A face down Character is considered to be out of the game."
   // A downed Character cannot start actions; its turn is consumed by the
   // revive in startTurn, and this guard also covers a Character downed
@@ -509,11 +514,22 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         return { ok: false, reason: 'useCharacterAbility: player is dead' };
       }
       if (action.seat !== state.activeSeat) {
+        // Aya Brea L2 grant: the borrowed activation happens on THIS seat's own
+        // turn, but the ability belongs to another character — so the normal
+        // active-seat check still applies to the ACTIVATING seat.
         return { ok: false, reason: 'useCharacterAbility: not your turn' };
       }
       // Alliance Partner Modification: the ability may belong to the Main
       // character or to the Partner (whose level follows the Main's Decorations).
-      const source = characterSource(state, action.seat, action.character ?? 'main');
+      // Aya Brea L2: `borrowedFrom` names ANOTHER seat's character, whose def and
+      // level supply the ability while this seat's grant authorises it.
+      const borrowedFromId = action.borrowedFrom;
+      let source = characterSource(state, action.seat, action.character ?? 'main');
+      if (borrowedFromId !== undefined) {
+        const donor = state.seats.find(s => s.seat !== action.seat && !s.dead && !s.downed
+          && state.cardDefs[state.cards[s.characterInstanceId]?.cardId ?? '']?.id === borrowedFromId);
+        source = donor === undefined ? undefined : characterSource(state, donor.seat, 'main');
+      }
       if (source === undefined) {
         return { ok: false, reason: `useCharacterAbility: unknown character: ${action.character ?? 'main'}` };
       }
@@ -533,6 +549,21 @@ export function validateAction(state: GameState, action: Action): ValidationResu
                   if (ability.level > charLevel) {
                     return { ok: false, reason: 'useCharacterAbility: ability not unlocked' };
                   }
+            // Aya Brea L2 grant: while `borrowedAbilityFrom` is armed this seat
+            // may activate ONE manual ability belonging to a character in that
+            // list. The grant is consumed by the activation (see the wrapper).
+            // A borrowed activation keeps every per-ability precondition below,
+            // but skips the once-per-turn LOG SCAN — that scan keys on the
+            // ACTIVATING seat + ability index, which for a borrow would compare
+            // against the donor's index and could false-block on an unrelated
+            // same-index ability of the borrower.
+            const borrowedActivation = (player.borrowedAbilityFrom?.length ?? 0) > 0
+              && action.borrowedFrom !== undefined
+              && (player.borrowedAbilityFrom ?? []).includes(action.borrowedFrom)
+              && charDef.id === action.borrowedFrom;
+            if ((player.borrowedAbilityFrom?.length ?? 0) > 0 && action.borrowedFrom !== undefined && !borrowedActivation) {
+              return { ok: false, reason: 'useCharacterAbility: that character\'s ability was not granted' };
+            }
       // PR-005 Albert Wesker L1/L2: gated on MAXIMUM Health, not current Health —
       // the print says "if Albert's Maximum Health is 80 or less".
       if (ability.kind === 'drawOncePerTurnIfMaxHpAtMost'
@@ -561,6 +592,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'discardCardToInventoryBottom':
         case 'inventoryBottomToTop':
         case 'gainAmmoX10ForGold':
+        case 'trashAmmoForAmmoUpTo30More':
+        case 'discardCardForPeekMansionTopAndDamage':
+        case 'useAnotherCharactersAbility':
         case 'discardToHandIfTenPlus':
         case 'discardCardForHealAndDamage':
         case 'chosenWeaponTypeAmmoDiscount':
@@ -582,23 +616,27 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           // stall a greedy bot. Rebecca still trashes any number of cards via
           // the DONE chain within her one activation. Scan the log back to
           // this seat's last endTurn for a prior use of the same ability.
-          for (let i = state.log.length - 1; i >= 0; i--) {
-            const logged = state.log[i]?.action;
-            if (logged === undefined) continue;
-            if (logged.type === 'endTurn' && logged.seat === action.seat) break;
-            if (
-              logged.type === 'useCharacterAbility' &&
-              logged.seat === action.seat &&
-              logged.abilityIndex === action.abilityIndex
-            ) {
-              return { ok: false, reason: 'useCharacterAbility: already used this turn' };
+          // Aya's borrowed activation skips this: the scan keys on the
+          // activating seat + index, which would not match the donor's own use.
+          if (!borrowedActivation) {
+            for (let i = state.log.length - 1; i >= 0; i--) {
+              const logged = state.log[i]?.action;
+              if (logged === undefined) continue;
+              if (logged.type === 'endTurn' && logged.seat === action.seat) break;
+              if (
+                logged.type === 'useCharacterAbility' &&
+                logged.seat === action.seat &&
+                logged.abilityIndex === action.abilityIndex
+              ) {
+                return { ok: false, reason: 'useCharacterAbility: already used this turn' };
+              }
             }
-          }
-          // Check if this start-of-turn ability was already used via the turn-start prompt.
-          // Only abilities that can FIRE from a turn-start prompt belong in that
-          // flag; a manual ability is already covered by the log scan above.
-          if (state.usedStartOfTurnAbilities?.[ability.kind]) {
-            return { ok: false, reason: 'useCharacterAbility: start-of-turn ability already used this turn' };
+            // Check if this start-of-turn ability was already used via the turn-start prompt.
+            // Only abilities that can FIRE from a turn-start prompt belong in that
+            // flag; a manual ability is already covered by the log scan above.
+            if (state.usedStartOfTurnAbilities?.[ability.kind]) {
+              return { ok: false, reason: 'useCharacterAbility: start-of-turn ability already used this turn' };
+            }
           }
           if (ability.kind === 'forceAllyExploreWithSupport') {
             const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed);
@@ -670,6 +708,31 @@ export function validateAction(state: GameState, action: Action): ValidationResu
           }
           if (ability.kind === 'discardToHandIfTenPlus' && player.discard.length < ability.threshold) {
             return { ok: false, reason: 'useCharacterAbility: not enough cards in discard' };
+          }
+          // ch-006e Excella L1: needs an Ammunition in hand to trash.
+          if (ability.kind === 'trashAmmoForAmmoUpTo30More'
+              && !player.hand.some(id => cardDef(state, id)?.type === 'ammunition')) {
+            return { ok: false, reason: 'useCharacterAbility: no Ammunition in hand' };
+          }
+          // ch-006e Excella L2: needs the named card in hand.
+          if (ability.kind === 'discardCardForPeekMansionTopAndDamage'
+              && !player.hand.some(id => cardDef(state, id)?.id === ability.cardId)) {
+            return { ok: false, reason: 'useCharacterAbility: the required card is not in hand' };
+          }
+          // ch-006a / ch-006b Aya L2: needs at least one other character on the
+          // table. Once the grant is armed the borrowed activation is admitted by
+          // the `borrowedAbilityFrom` check below.
+          if (ability.kind === 'useAnotherCharactersAbility') {
+            const myDefId = state.cardDefs[state.cards[player.characterInstanceId]?.cardId ?? '']?.id;
+            const others = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed)
+              .map(s => state.cardDefs[state.cards[s.characterInstanceId]?.cardId ?? '']?.id)
+              .some(id => id !== undefined && id !== myDefId);
+            if (!others) {
+              return { ok: false, reason: 'useCharacterAbility: no other character on the table' };
+            }
+            if (!useAnotherCharacterAvailable(state, action.seat)) {
+              return { ok: false, reason: 'useCharacterAbility: already used another character\'s ability this turn' };
+            }
           }
           if (ability.kind === 'discardCardToInventoryBottom' && player.discard.length === 0) {
             return { ok: false, reason: 'useCharacterAbility: discard is empty' };
@@ -860,6 +923,22 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       return { ok: true };
     }
 
+    case 'elevatorDiscardStart': {
+      if (state.phase !== 'main') return { ok: false, reason: 'elevatorDiscardStart: not in main phase' };
+      if (player === undefined) return { ok: false, reason: `elevatorDiscardStart: unknown seat: ${action.seat}` };
+      if (player.dead || player.downed) return { ok: false, reason: 'elevatorDiscardStart: player is downed' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'elevatorDiscardStart: not your turn' };
+      if (!elevatorInvested(state, action.seat)) return { ok: false, reason: 'elevatorDiscardStart: no Elevator Room investment' };
+      return { ok: true };
+    }
+    case 'courtyardStart': {
+      if (state.phase !== 'main') return { ok: false, reason: 'courtyardStart: not in main phase' };
+      if (player === undefined) return { ok: false, reason: `courtyardStart: unknown seat: ${action.seat}` };
+      if (player.dead || player.downed) return { ok: false, reason: 'courtyardStart: player is downed' };
+      if (action.seat !== state.activeSeat) return { ok: false, reason: 'courtyardStart: not your turn' };
+      if (player.buysLeft < 1) return { ok: false, reason: 'courtyardStart: no buys left' };
+      return { ok: true };
+    }
     case 'forfeitBuy': {
       if (state.phase !== 'main') return { ok: false, reason: 'forfeitBuy: not in main phase' };
       if (player === undefined) return { ok: false, reason: `forfeitBuy: unknown seat: ${action.seat}` };

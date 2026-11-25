@@ -28,6 +28,10 @@ import {
   plusTagDamageIfAmmoAbove,
   plusTagDamage,
   actionDiscardDamage,
+  rifleAndKnifeBonus,
+  multiExplorePerPlayerBonus,
+  useAnotherCharacterAvailable,
+  markUseAnotherCharacterUsed,
   queueJillNegatePrompt,
   queueHunkReductionPrompt,
   queueWeskerReductionPrompt,
@@ -110,7 +114,7 @@ import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus, checkWinBase } from './game';
-import { storeroomInvestors, suspendedCeilingInvested, gardenInvested, greenhouseInvested, helipadInvested, exhibitionInPlay, cardXp, addCardXp, removeCardXp, locationInstanceId, gainInfections } from './locations';
+import { storeroomInvestors, suspendedCeilingInvested, gardenInvested, greenhouseInvested, helipadInvested, exhibitionInPlay, cardXp, addCardXp, removeCardXp, locationInstanceId, gainInfections, diningHallInPlay, entranceHallInvested, elevatorInvested, pileXpCount, removePileXp } from './locations';
 
 function cardDef(state: GameState, instanceId: string | undefined): CardDef | undefined {
   if (instanceId === undefined) return undefined;
@@ -1071,6 +1075,36 @@ export function applyAction(state: GameState, action: Action): GameState {
   final = applyGardenHook(state, final, action);
   final = applyHelipadHook(state, final);
   final = applyExhibitionDamageTake(state, final, action);
+  final = applyWeaponTypeTracking(state, final, action);
+  final = applyDiningHallAmmoGain(state, final);
+  final = applyEntranceHallWeaponBuy(state, final, action);
+  // Aya Brea L2: a borrowed activation spends the grant. Runs LAST so it sees
+  // every seat rebuild above; a declined/other action leaves the grant armed.
+  if (action.type === 'useCharacterAbility') {
+    const srcSeat = action.seat;
+    const granted = internal.seats[srcSeat]?.borrowedAbilityFrom;
+    // `borrowedFrom` names the DONOR character; an activation without it is the
+    // seat's own ability and must leave the grant armed.
+    const borrowed = action.borrowedFrom;
+    if (granted !== undefined && (granted?.length ?? 0) > 0 && borrowed !== undefined) {
+      final = markUseAnotherCharacterUsed({
+        ...final,
+        seats: final.seats.map(s => (s.seat === srcSeat
+          ? { ...s, borrowedAbilityFrom: undefined }
+          : s)),
+      }, srcSeat);
+    }
+  }
+  // PR-006 Yoko Suzuki L2: re-apply a substituted Maximum Health last, because
+  // every damage site rebuilds the seat from a pre-damage snapshot.
+  if (final.lethalSubstitution !== undefined) {
+    const sub = final.lethalSubstitution;
+    final = {
+      ...final,
+      lethalSubstitution: undefined,
+      seats: final.seats.map(x => (x.seat === sub.seat ? { ...x, maxHp: sub.maxHp, hp: sub.maxHp } : x)),
+    };
+  }
   // Greenhouse (loc-042): the +damage bonus is consumed by the seat's first
   // explore after the forfeit-buy.
   if (action.type === 'explore' && final.greenhouseDamageBonus?.seat === action.seat) {
@@ -1211,6 +1245,100 @@ function applyExhibitionDamageTake(prev: GameState, next: GameState, action: Act
   if (before - after <= 20) return next;
   const out = removeCardXp(next, exId, stored);
   return { ...out, seats: out.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + stored } : x)) };
+}
+
+/** Batch 11: record the weapon TAGS used this turn (explore weapons / played
+ *  weapons) so Entrance Hall can match a bought weapon's type. */
+function applyWeaponTypeTracking(prev: GameState, next: GameState, action: Action): GameState {
+  let ids: readonly string[] = [];
+  let seat: number | undefined;
+  if (action.type === 'explore') { ids = action.weapons; seat = action.seat; }
+  else if (action.type === 'playWeapon') { ids = [action.instanceId]; seat = action.seat; }
+  else return next;
+  if (seat === undefined) return next;
+  const tags = new Set<string>();
+  for (const id of ids) {
+    const def = next.cardDefs[next.cards[id]?.cardId ?? ''];
+    for (const t of def?.weaponTags ?? []) tags.add(t);
+  }
+  if (tags.size === 0) return next;
+  return { ...next, seats: next.seats.map(x => (x.seat === seat
+    ? { ...x, weaponTypesUsedThisTurn: [...new Set([...(x.weaponTypesUsedThisTurn ?? []), ...tags])] }
+    : x)) };
+}
+
+/** Dining Hall (loc-049): when anyone gains an ammo card, move 1 XP from that
+ *  ammo's supply pile onto the Dining Hall card. */
+function applyDiningHallAmmoGain(prev: GameState, next: GameState): GameState {
+  if (!diningHallInPlay(next)) return next;
+  const dhId = locationInstanceId(next, 'loc-049');
+  if (dhId === undefined) return next;
+  const before = new Set(prev.seats.flatMap(s => s.gainedThisTurn ?? []));
+  let out = next;
+  for (const seat of next.seats) {
+    const newAmmo = (seat.gainedThisTurn ?? []).filter(id => !before.has(id) && next.cardDefs[next.cards[id]?.cardId ?? '']?.type === 'ammunition');
+    for (const id of newAmmo) {
+      const cardId = next.cards[id]?.cardId;
+      const srcPile = Object.values(out.marketPiles).find(p => p.cards.some(c => out.cards[c]?.cardId === cardId));
+      if (srcPile !== undefined && pileXpCount(out, srcPile.pileId) >= 1) {
+        out = removePileXp(out, srcPile.pileId, 1);
+        out = addCardXp(out, dhId, 1);
+      }
+    }
+  }
+  return out;
+}
+
+/** Entrance Hall (loc-051): buying a weapon whose type you used this turn gains
+ *  1 XP from the card. */
+function applyEntranceHallWeaponBuy(prev: GameState, next: GameState, action: Action): GameState {
+  if (action.type !== 'buy') return next;
+  const seat = action.seat;
+  if (!entranceHallInvested(next, seat)) return next;
+  const ehId = locationInstanceId(next, 'loc-051');
+  if (ehId === undefined || cardXp(next, ehId) < 1) return next;
+  const disc = next.seats[seat]?.discard ?? [];
+  const bought = disc[disc.length - 1];
+  const def = bought !== undefined ? next.cardDefs[next.cards[bought]?.cardId ?? ''] : undefined;
+  if (def?.type !== 'weapon') return next;
+  const used = new Set(next.seats[seat]?.weaponTypesUsedThisTurn ?? []);
+  if (!(def.weaponTags ?? []).some(t => used.has(t))) return next;
+  const out = removeCardXp(next, ehId, 1);
+  return { ...out, seats: out.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + 1 } : x)) };
+}
+
+/** Courtyard (loc-048): reveal the top 2 Mansion cards — auto-defeat any
+ *  Infected (attach as a trophy), prompt whether to apply Events, and gain the
+ *  rest as if revealed during an explore. */
+function startCourtyard(state: GameState, seat: number): GameState {
+  const top2 = state.mansionDeck.slice(0, 2);
+  let s: GameState = { ...state, mansionDeck: state.mansionDeck.slice(top2.length) };
+  for (const id of top2) {
+    const inst = s.cards[id];
+    if (inst === undefined) continue;
+    const def = s.cardDefs[inst.cardId];
+    if (def === undefined) continue;
+    if (def.type === 'infected') {
+      s = {
+        ...s,
+        cards: { ...s.cards, [id]: { ...inst, location: { zone: 'attached', index: 0, seat } } },
+        seats: s.seats.map(x => (x.seat === seat
+          ? { ...x, attached: [...x.attached, id], decorations: (x.decorations ?? 0) + (def.decorations ?? 0) }
+          : x)),
+      };
+    } else if (def.type === 'event') {
+      s = { ...s, prompts: [...s.prompts, {
+        id: `courtyard-event-${seat}-${id}-v${s.version}`,
+        seat,
+        text: `Courtyard: apply the event "${def.name}"?`,
+        options: ['Apply', 'Skip'],
+        payload: { kind: 'courtyardEvent', instanceId: id },
+      }] };
+    } else {
+      s = gainCard(s, { seat, instanceId: id, cardId: def.id, destination: 'discard' });
+    }
+  }
+  return s;
 }
 
 /**
@@ -3227,6 +3355,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
             const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
           })) ? 10 : 0;
+          // ch-006a Aya Brea L1: a Rifle AND a Knife in the attack.
+          const ayaTags = new Set<string>();
+          for (const wdef of weaponDefs) for (const t of wdef?.weaponTags ?? []) ayaTags.add(t);
+          const ayaRifleKnifeBonus = rifleAndKnifeBonus(abilities, [...ayaTags]);
+          // ch-006b Aya Brea L1: multi-explore (more than one Infected) pays
+          // +5 per character in the game.
+          const ayaMultiBonus = multiExplorePerPlayerBonus(
+            abilities,
+            exploreCount,
+            state.seats.length,
+          );
           // Weapon effects like "plusDamageIfAmmoAbove" read the ammo the player
           // has available for this attack — the pool before it is spent.
           const ammoForEffects = player.turnAmmo;
@@ -3627,7 +3766,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         const damage = computeDamage({
           weapons: exploreWeapons,
           ammo: ammoForEffects,
-          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
+          bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + ayaRifleKnifeBonus + ayaMultiBonus + (player.firstExploreDamageBonus ?? 0) + pendingSkillDamage + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + perDiscardCardBonus + blowbackBonus + armedLauncherEffect - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
           knifeUsesEarlierThisTurn: knifeWeaponsUsedThisTurn(state, seat),
           ammoCardsInPlayArea,
           inventoryCount: player.inventory.length,
@@ -5096,7 +5235,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         infectedHpBonus: locationInfectedHpBonus(state),
         revealBonus: player.helenaRevealBonus ?? 0,
         ammo: ammoForEffects,
-        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + (player.firstExploreDamageBonus ?? 0) + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
+        bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + ayaRifleKnifeBonus + ayaMultiBonus + (player.firstExploreDamageBonus ?? 0) + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + pendingSkillDamage + perDiscardCardBonus + blowbackBonus - mazeDamagePenalty(state, player.playArea.filter(id => cardDef(state, id)?.type === 'action').length) + (state.greenhouseDamageBonus?.seat === player.seat ? state.greenhouseDamageBonus.amount : 0),
         ammoCardsInPlayArea,
         ammoX10InDiscardCount: ammoX10CountInDiscard(state, seat),
         revealed: {
@@ -6109,7 +6248,15 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const player = state.seats[seat] as PlayerState;
           // Alliance Partner Modification: the ability may belong to the Main
           // character or to the Partner.
-          const source = characterSource(state, seat, action.character ?? 'main');
+          // Aya Brea L2: `borrowedFrom` names ANOTHER character on the table;
+          // that character's def/level supply the ability, while the grant on
+          // this seat authorises the activation.
+          let source = characterSource(state, seat, action.character ?? 'main');
+          if (action.borrowedFrom !== undefined) {
+            const donor = state.seats.find(s => s.seat !== seat && !s.dead && !s.downed
+              && state.cardDefs[state.cards[s.characterInstanceId]?.cardId ?? '']?.id === action.borrowedFrom);
+            source = donor === undefined ? undefined : characterSource(state, donor.seat, 'main');
+          }
           const charDef = source?.def;
           const ability = charDef?.abilities?.[abilityIndex];
           if (charDef === undefined || ability === undefined) {
@@ -6714,6 +6861,92 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   : s)),
               };
             }
+            case 'trashAmmoForAmmoUpTo30More': {
+              // ch-006e Excella Gionne L1: trash 1 Ammunition from hand, gain
+              // another costing up to `amount` more than the trashed card.
+              const ammoInHand = player.hand.filter(id => cardDef(state, id)?.type === 'ammunition');
+              if (ammoInHand.length === 0) return { ...state, ...nextBase };
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: `Excella Gionne: Trash 1 Ammunition from your hand to Gain another costing up to ${ability.amount} Gold more.`,
+                    options: [...ammoInHand, 'Decline'],
+                    payload: { kind: 'excellaTrashAmmo' },
+                  },
+                ],
+              };
+            }
+            case 'discardCardForPeekMansionTopAndDamage': {
+              // ch-006e Excella Gionne L2: discard the named card from hand to
+              // look at the Mansion top and deal +amount Damage this turn.
+              const idx = player.hand.findIndex(id => cardDef(state, id)?.id === ability.cardId);
+              if (idx === -1) return { ...state, ...nextBase };
+              const discarded = player.hand[idx]!;
+              const topId = state.mansionDeck[0];
+              const topDef = topId === undefined ? undefined : cardDef(state, topId);
+              recordCardReveals(topId === undefined ? [] : [{ instanceId: topId, pile: 'mansion' }]);
+              return {
+                ...state,
+                ...nextBase,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? {
+                      ...player,
+                      hand: player.hand.filter(id => id !== discarded),
+                      discard: [...player.discard, discarded],
+                      weaponDamageBonusThisTurn: player.weaponDamageBonusThisTurn + ability.damage,
+                    }
+                  : s)),
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: `You look at the top of the Mansion: ${topDef?.name ?? 'an unknown card'}${topDef?.hp !== undefined ? ` (${topDef.hp} HP)` : ''}. It stays on top. Excella deals +${ability.damage} Damage this turn.`,
+                    options: ['OK'],
+                    payload: { kind: 'excellaPeekMansion' },
+                  },
+                ],
+              };
+            }
+            case 'useAnotherCharactersAbility': {
+              // ch-006a / ch-006b Aya Brea L2: once per turn, use ONE legal
+              // manual ability of ANOTHER character on the table. The grant is a
+              // seat flag (`borrowedAbilityFrom`) consumed by the borrowed
+              // activation; validate admits the borrowed action while it is set.
+              const myDefId = state.cardDefs[state.cards[player.characterInstanceId]?.cardId ?? '']?.id;
+              const targets = state.seats
+                .filter(s => s.seat !== seat && !s.dead && !s.downed)
+                .map(s => {
+                  const inst = state.cards[s.characterInstanceId];
+                  return inst === undefined ? undefined : state.cardDefs[inst.cardId];
+                })
+                .filter((d): d is CardDef => d !== undefined && d.id !== myDefId);
+              if (targets.length === 0) return { ...state, ...nextBase };
+              const ver = state.version + 1;
+              return {
+                ...state,
+                ...nextBase,
+                version: ver,
+                seats: state.seats.map(s => (s.seat === seat
+                  ? { ...s, borrowedAbilityFrom: targets.map(d => d.id) }
+                  : s)),
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: `aya-borrow-${seat}-v${ver}`,
+                    seat,
+                    text: 'Aya Brea: use an ability of another character on the table?',
+                    options: [...targets.map(d => d.name), 'Decline'],
+                    payload: { kind: 'ayaBorrowChoose' },
+                  },
+                ],
+              };
+            }
             case 'gainAmmoX10ForGold': {
               // Billy (Alliance) L1: gain one Ammo x10 (Resource Area -> discard
               // per the rules glossary) and get +amount gold.
@@ -7258,6 +7491,49 @@ function applyActionInternal(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'courtyardStart': {
+      // Courtyard (loc-048): dedicated entry mirroring useLocation's 1X charge.
+      const { seat } = action;
+      const player = state.seats[seat];
+      const loc = (state.locations ?? []).find(l => state.cardDefs[state.cards[l.instanceId]?.cardId ?? '']?.id === 'loc-048');
+      if (loc === undefined || player === undefined) return { ...state, ...nextBase };
+      const def = state.cardDefs[state.cards[loc.instanceId]?.cardId ?? ''];
+      const cost = def?.locationCost ?? 0;
+      const used = (player.locationUsesThisTurn ?? []).filter(x => x === loc.instanceId).length;
+      if (player.buysLeft < 1 || player.turnGold < cost || (def?.locationMaxPerTurn !== undefined && used >= def.locationMaxPerTurn)) {
+        return { ...state, ...nextBase };
+      }
+      const charged: GameState = {
+        ...state, ...nextBase,
+        seats: state.seats.map(x => (x.seat === seat
+          ? { ...x, buysLeft: x.buysLeft - 1, turnGold: x.turnGold - cost, locationUsesThisTurn: [...(x.locationUsesThisTurn ?? []), loc.instanceId] }
+          : x)),
+      };
+      return startCourtyard(charged, seat);
+    }
+    case 'elevatorDiscardStart': {
+      // Elevator Room (loc-050): once a turn, discard an action card to take 1
+      // card XP + 20 gold + 20 ammo.
+      const { seat } = action;
+      const player = state.seats[seat];
+      const elId = locationInstanceId(state, 'loc-050');
+      if (player === undefined || elId === undefined || !elevatorInvested(state, seat) || cardXp(state, elId) < 1) {
+        return { ...state, ...nextBase };
+      }
+      if ((player.locationUsesThisTurn ?? []).includes(elId)) return { ...state, ...nextBase };
+      const actions = player.hand.filter(id => cardDef(state, id)?.type === 'action');
+      if (actions.length === 0) return { ...state, ...nextBase };
+      return {
+        ...state, ...nextBase,
+        prompts: [...state.prompts, {
+          id: `elevator-${seat}-v${state.version}`,
+          seat,
+          text: 'Elevator Room: discard an action card to take 1 XP from this card and +20 Gold, +20 Ammo?',
+          options: [...actions, 'Decline'],
+          payload: { kind: 'elevatorDiscardChoose', locId: elId },
+        }],
+      };
+    }
     case 'forfeitBuy': {
       // Greenhouse (loc-042): forfeit a Buy; if invested and the card has XP,
       // discard 1 card XP and arm +20 damage for the first explore this turn.
@@ -7651,6 +7927,38 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               ? { ...x, turnAmmo: x.turnAmmo + effect.ammo, buysLeft: x.buysLeft + 1, arklayArmed: true }
               : x)),
           };
+        } else if (effect.kind === 'onexCorridor') {
+          // Corridor: only if Inventory AND discard are empty; choose ammo or skills.
+          const p = s.seats[seat];
+          if (p !== undefined && p.inventory.length === 0 && p.discard.length === 0) {
+            s = { ...s, prompts: [...s.prompts, {
+              id: `corridor-${seat}-v${s.version}`,
+              seat,
+              text: 'Corridor: gain 3 Ammo x30, or draw 2 skills and keep 1?',
+              options: ['Gain 3 Ammo x30', 'Draw 2 skills (keep 1)', 'Decline'],
+              payload: { kind: 'corridorChoice' },
+            }] };
+          }
+        } else if (effect.kind === 'onexCostumeRoom') {
+          // Costume Room: gain 2 Infections, then +1 XP / 10 ammo per infection
+          // gained this turn (the 2 just gained count), and +1 Explore.
+          s = gainInfections(s, seat, 2);
+          const n = s.seats[seat]?.infectionsGainedThisTurn ?? 0;
+          s = { ...s, seats: s.seats.map(x => (x.seat === seat
+            ? { ...x, xp: (x.xp ?? 0) + n, turnAmmo: (x.turnAmmo ?? 0) + 10 * n, exploresLeft: x.exploresLeft + 1 }
+            : x)) };
+        } else if (effect.kind === 'onexCourtyard') {
+          s = startCourtyard(s, seat);
+        } else if (effect.kind === 'onexDiningHallTakeXp') {
+          // Dining Hall: using the room takes ALL its stored XP as personal XP.
+          const dhId = locationInstanceId(s, 'loc-049');
+          if (dhId !== undefined) {
+            const stored = cardXp(s, dhId);
+            if (stored > 0) {
+              s = removeCardXp(s, dhId, stored);
+              s = { ...s, seats: s.seats.map(x => (x.seat === seat ? { ...x, xp: (x.xp ?? 0) + stored } : x)) };
+            }
+          }
         } else if (effect.kind === 'onexGainBuyAndAmmo') {
           // Attic Landing: +1 Buy, then gain a `ammo` ammo card (its own
           // Ammo/Gold bonus applies, as for any gained ammo card).
@@ -8471,6 +8779,89 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               };
             }
 
+      if (kind === 'excellaTrashAmmo') {
+        // ch-006e Excella Gionne L1: trash the chosen Ammunition, then Gain an
+        // Ammunition costing up to `amount` more. "Gain" moves a physical card
+        // out of its Resource Area pile (instance-preserving), like IT-000 /
+        // EX-003 — creating a fresh instance would orphan the pile copy.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline' || !player.hand.includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const trashedDef = cardDef(state, chosen);
+        const cap = (trashedDef?.cost ?? 0) + 30;
+        const options: string[] = [];
+        for (const pile of Object.values(state.marketPiles)) {
+          const topId = pile.cards[0];
+          if (topId === undefined) continue;
+          const def = cardDef(state, topId);
+          if (def?.type !== 'ammunition') continue;
+          if ((def.cost ?? 0) > cap) continue;
+          options.push(topId);
+        }
+        let s: GameState = {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(x => (x.seat === seat ? { ...player, hand: player.hand.filter(id => id !== chosen) } : x)),
+          removed: [...state.removed, chosen],
+          prompts: newPrompts,
+        };
+        if (options.length === 0) return s;
+        return {
+          ...s,
+          prompts: [...s.prompts, {
+            id: `excella-ammo-${seat}-v${s.version}`,
+            seat,
+            text: `Gain an Ammunition costing up to ${cap} Gold.`,
+            options: [...options, 'Decline'],
+            payload: { kind: 'excellaGainAmmo' },
+          }],
+        };
+      }
+
+      if (kind === 'excellaGainAmmo') {
+        // The pick from the previous prompt: move that instance into the discard.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        let removedFromPile = false;
+        const marketPiles = { ...state.marketPiles };
+        for (const pile of Object.values(marketPiles)) {
+          if (pile.cards.includes(chosen)) {
+            marketPiles[pile.pileId] = { ...pile, cards: pile.cards.filter(id => id !== chosen) };
+            removedFromPile = true;
+            break;
+          }
+        }
+        if (!removedFromPile) return { ...state, ...nextBase, prompts: newPrompts };
+        const def = cardDef(state, chosen);
+        if (def === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const stripped: GameState = { ...state, ...nextBase, marketPiles, prompts: newPrompts };
+        return gainCard(stripped, {
+          seat,
+          cardId: def.id,
+          instanceId: chosen,
+          destination: 'discard',
+          reason: 'ability',
+        });
+      }
+
+      if (kind === 'ayaBorrowChoose') {
+        // ch-006a / ch-006b Aya Brea L2: the seat named which other character it
+        // wants to borrow from. The grant itself is already armed on the seat
+        // (`borrowedAbilityFrom`); this only confirms the choice — enumerate
+        // surfaces that character's manual ability buttons while it is set.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const granted = state.seats[seat]?.borrowedAbilityFrom ?? [];
+        const target = state.cardDefs[granted.find(id => state.cardDefs[id]?.name === chosen) ?? ''];
+        if (target === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        return { ...state, ...nextBase, prompts: newPrompts };
+      }
+
       if (kind === 'upgradeAmmoBy30Gold' && chosenId !== undefined) {
         const chosenDef = cardDef(state, chosenId);
         const chosenCost = chosenDef?.cost ?? 0;
@@ -9157,6 +9548,132 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : s)),
           removed: [...state.removed, chosen],
           prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'corridorChoice') {
+        // Corridor (loc-046): gain 3 Ammo x30, or draw 2 catalogue skills keep 1.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen === 'Gain 3 Ammo x30') {
+          return gainCard({ ...state, ...nextBase, prompts: newPrompts }, { seat, cardId: 'am-003', count: 3, destination: 'discard' });
+        }
+        // Draw 2 skills (keep 1): register two random catalogue skills, ask which.
+        const skillDefs = MERCENARIES_CARDS.filter(c => c.type === 'skill');
+        if (skillDefs.length < 2) return { ...state, ...nextBase, prompts: newPrompts };
+        const r1 = nextInt(makeRng(state.rngState), skillDefs.length);
+        const d1 = skillDefs[r1.value]!;
+        const r2 = nextInt(makeRng(r1.rng.s), skillDefs.length - 1);
+        const d2 = skillDefs.filter(d => d.id !== d1.id)[r2.value]!;
+        const id1 = `${d1.id}#corridor-${state.version}-${seat}-a`;
+        const id2 = `${d2.id}#corridor-${state.version}-${seat}-b`;
+        return {
+          ...state, ...nextBase, rngState: r2.rng.s,
+          cardDefs: { ...state.cardDefs, [d1.id]: d1, [d2.id]: d2 },
+          cards: { ...state.cards,
+            [id1]: { instanceId: id1, cardId: d1.id, location: { zone: 'supply', index: 0 } },
+            [id2]: { instanceId: id2, cardId: d2.id, location: { zone: 'supply', index: 0 } } },
+          prompts: [...newPrompts, {
+            id: `corridor-keep-${seat}-v${state.version}`,
+            seat,
+            text: 'Corridor: keep which skill? (the other shuffles back)',
+            options: [id1, id2],
+            payload: { kind: 'corridorKeepSkill' },
+          }],
+        };
+      }
+
+      if (kind === 'corridorKeepSkill') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const other = prompt.options.find(o => o !== chosen);
+        const cards = { ...state.cards };
+        if (cards[chosen] !== undefined) cards[chosen] = { ...cards[chosen], location: { zone: 'skillArea', index: 0 } };
+        let removed = state.removed;
+        if (other !== undefined && cards[other] !== undefined) {
+          cards[other] = { ...cards[other], location: { zone: 'removed', index: 0 } };
+          removed = [...removed, other];
+        }
+        return {
+          ...state, ...nextBase, cards, removed,
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, skills: [...(x.skills ?? []), chosen] } : x)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'costumeTrashSelf') {
+        // Costume Room (loc-047): trash a discard card; if you do, every other
+        // player may too.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const p = state.seats[seat];
+        if (p === undefined || !p.discard.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        let out: GameState = {
+          ...state, ...nextBase,
+          cards: { ...state.cards, [chosen]: { ...state.cards[chosen]!, location: { zone: 'removed', index: 0 } } },
+          removed: [...state.removed, chosen],
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, discard: x.discard.filter(id => id !== chosen) } : x)),
+          prompts: newPrompts,
+        };
+        for (const other of out.seats.filter(x => x.seat !== seat && !x.dead && !x.downed && x.discard.length > 0)) {
+          out = { ...out, prompts: [...out.prompts, {
+            id: `costume-other-${other.seat}-${state.version}`,
+            seat: other.seat,
+            text: 'Costume Room: trash a card in your discard?',
+            options: [...other.discard, 'Decline'],
+            payload: { kind: 'costumeTrashOther' },
+          }] };
+        }
+        return out;
+      }
+
+      if (kind === 'costumeTrashOther') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const p = state.seats[seat];
+        if (p === undefined || !p.discard.includes(chosen)) return { ...state, ...nextBase, prompts: newPrompts };
+        return {
+          ...state, ...nextBase,
+          cards: { ...state.cards, [chosen]: { ...state.cards[chosen]!, location: { zone: 'removed', index: 0 } } },
+          removed: [...state.removed, chosen],
+          seats: state.seats.map(x => (x.seat === seat ? { ...x, discard: x.discard.filter(id => id !== chosen) } : x)),
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'courtyardEvent') {
+        // Courtyard (loc-048): apply the event (gain it, triggering its effects)
+        // or skip it (leave play).
+        const chosen = prompt.options[option];
+        const id = String(prompt.payload?.instanceId ?? '');
+        const inst = state.cards[id];
+        if (inst === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (chosen === 'Apply') {
+          const def = state.cardDefs[inst.cardId];
+          return gainCard({ ...state, ...nextBase, prompts: newPrompts }, { seat, instanceId: id, cardId: def?.id ?? inst.cardId, destination: 'discard' });
+        }
+        return {
+          ...state, ...nextBase,
+          cards: { ...state.cards, [id]: { ...inst, location: { zone: 'removed', index: 0 } } },
+          removed: [...state.removed, id],
+          prompts: newPrompts,
+        };
+      }
+
+      if (kind === 'elevatorDiscardChoose') {
+        // Elevator Room (loc-050): discard an action card -> 1 card XP + 20 gold
+        // + 20 ammo, once per turn.
+        const chosen = prompt.options[option];
+        if (chosen === undefined || chosen === 'Decline') return { ...state, ...nextBase, prompts: newPrompts };
+        const p = state.seats[seat];
+        const elId = String(prompt.payload?.locId ?? '');
+        if (p === undefined || !p.hand.includes(chosen) || cardXp(state, elId) < 1) return { ...state, ...nextBase, prompts: newPrompts };
+        const out = removeCardXp({ ...state, ...nextBase, prompts: newPrompts }, elId, 1);
+        return {
+          ...out,
+          seats: out.seats.map(x => (x.seat === seat
+            ? { ...x, hand: x.hand.filter(id => id !== chosen), discard: [...x.discard, chosen], xp: (x.xp ?? 0) + 1, turnGold: (x.turnGold ?? 0) + 20, turnAmmo: (x.turnAmmo ?? 0) + 20, locationUsesThisTurn: [...(x.locationUsesThisTurn ?? []), elId] }
+            : x)),
         };
       }
 
@@ -11457,6 +11974,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let s: GameState = cleared;
         const applied = decline ? loss : Math.max(loss - amount, 0);
         if (!decline && applied < loss) s = gainAmmoCard(s, seat, 1);
+        if (applied <= 0) return s;
         return settleHeldDamageLoss(s, seat, applied, partnerLead);
       }
 

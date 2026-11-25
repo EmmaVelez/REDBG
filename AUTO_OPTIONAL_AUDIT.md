@@ -43,6 +43,55 @@ scan silently misses all 45 fan cards. Any future audit must parse whole objects
 >
 > Re-verified against the current tree: F1 (the five atomic-reducer cards) and
 > ac-012 / ch-023 remain outstanding.
+>
+> **UPDATE 2026-11-23 (later) — F1 STARTED, ch-045 first.** `ch-045` is now a
+> CHOICE on the EXPLORE path only (commit 974f3a1): the explore holds the leader
+> at pre-damage Health (`queueHunkReductionPrompt` + the `hunkDamageReduction`
+> resolver), so a declined lethal hit still downs him. Still auto-applied: the
+> AoE reveal sites, traps and `mercenaries.ts dealDamageToCharacter`. Still
+> untouched: `ch-049`, `b4mc-ch-007`, `ma-054o`, `in-004`.
+>
+> **UPDATE 2026-11-23 (later still) — `ch-049` DONE too** (commit ae68b78). Same
+> hold-and-settle shape; amount = `10 x handAfter.length`, no printed cost. The
+> two reducers now share `settleHeldDamageLoss`. Still untouched: `b4mc-ch-007`,
+> `ma-054o`, `in-004`; the non-explore damage sites are still auto-applied.
+>
+> **UPDATE 2026-11-23 (end of F1 pass) — `b4mc-ch-007` DONE too** (commit d7e34cc).
+> Same hold-and-settle shape; accepting consumes the once-per-round latch and pays
+> the Ammo. Helper renamed to `leaderInfectedReduction(state, seat, abilities)` so
+> partner-led explores qualify, and a shared `reductionQueued` flag keeps one window
+> per hit.
+>
+> **UPDATE 2026-11-23 — `ma-054o` Kevlar Jacket AND `in-004` Slough Armor DONE**
+> (commit 58eaaa8). Both now hold the victim at pre-damage Health and settle via a
+> prompt through `settleHeldDamageLoss`. The jacket is raised FIRST in the reducer
+> chain (`kevlarQueued` seeds `reductionQueued`) since it consumes itself; its
+> resolver drops any stray deck copy before appending, so a card is never in two
+> zones. Slough keeps the full pre-Slough hit pending so the auto-applied jacket
+> still composes underneath. **F1 is complete for the explore/attack paths.**
+> Remaining backlog: the non-explore damage sites (MA-037/MA-031 AoE reveals,
+> outbreak traps, `mercenaries.ts dealDamageToCharacter`), `ac-012`, `ch-023`.
+>
+> **UPDATE 2026-11-23 — `ac-012` DONE** (commit abbb950). "You can Discard this card
+> from your Hand to lower the Damage of 1 Weapon being used costing 40 Gold or less
+> to 0." Keyed on the `ac-012` card id (AC-008 shares the effect kind but is
+> Versus-only). An opponent holding it is asked during the attack; the target is
+> held at pre-attack Health and the resolver zeroes the hit on accept / applies the
+> full loss on decline. Gates green, pushed.
+>
+> **`ch-023` David King L2 REMAINS, and it needs NEW machinery.** The window fires
+> when a Knife is PLAYED, i.e. BEFORE the reveal, so it cannot use the hold trick:
+> the explore has to be PARKED and RE-RUN with the chosen knife moved discard ->
+> playArea. That is a pre-reveal variant of CW-013's `pendingExplore`, not the
+> post-reveal deferral. Both silent sites: `explore.ts` (~224) and `actions.ts`
+> (~3169).
+>
+> **UPDATE 2026-11-23 — `ch-023` DONE** (commit 54e32b2). Implemented exactly as a
+> pre-reveal park (`davidKnifeAsk` + `davidKnifePending`), answered through
+> `chooseOption`; accepting moves the knife and re-dispatches the stored explore.
+> **F1, `ac-012` and `ch-023` are all complete.** Remaining backlog: the
+> non-explore damage sites (MA-037/MA-031 AoE reveals, outbreak traps,
+> `mercenaries.ts dealDamageToCharacter`).
 
 ---
 

@@ -288,6 +288,13 @@ export function applySetupEffects(state: GameState, instanceId: string): GameSta
           if (t === 'action' || t === 'weapon') s = addXpTokenToPile(s, pile.pileId);
         }
         break;
+      case 'setupXpOnAmmoPiles':
+        for (const pile of Object.values(s.marketPiles)) {
+          const top = pile.cards[0];
+          const t = top !== undefined ? s.cardDefs[s.cards[top]?.cardId ?? '']?.type : undefined;
+          if (t === 'ammunition') s = addPileXp(s, pile.pileId, effect.perPile);
+        }
+        break;
     }
   }
   return s;
@@ -523,6 +530,21 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
         }
         break;
       }
+      case 'revealCostumeRoomTrash': {
+        // Costume Room: the revealer may trash a discard card; if they do, every
+        // other player may too (the chain is raised by the handler).
+        const p = s.seats[seat];
+        if (p !== undefined && !p.dead && !p.downed && p.discard.length > 0) {
+          prompts = [...prompts, {
+            id: `costume-${seat}-${s.version}`,
+            seat,
+            text: 'Costume Room: trash a card in your discard?',
+            options: [...p.discard, 'Decline'],
+            payload: { kind: 'costumeTrashSelf' },
+          }];
+        }
+        break;
+      }
       case 'ongoingDrawAtTurnEnd':
       case 'ongoingGainXpOnTrash':
       case 'ongoingParlorSkillOnBuy':
@@ -546,6 +568,13 @@ export function applyRevealEffects(state: GameState, instanceId: string, seat: n
       case 'ongoingHelipadOnDefeat':
       case 'ongoingExhibitionBuyMoveXp':
       case 'ongoingExhibitionDamageTakeXp':
+      case 'ongoingElevatorDiscard':
+      case 'ongoingEntranceHallWeaponBuy':
+      case 'ongoingDiningHallAmmoGain':
+      case 'onexCorridor':
+      case 'onexCostumeRoom':
+      case 'onexCourtyard':
+      case 'onexDiningHallTakeXp':
       case 'onexGainAmmoAndDamagePerCardGained':
       case 'onexLookThroughDiscard':
       case 'onexGainBuyAndAmmo':
@@ -834,6 +863,29 @@ export function exhibitionInPlay(state: GameState): boolean {
   return revealedLocations(state).some(l => l.def.id === 'loc-045');
 }
 
+/** Dining Hall (loc-049): XP stored on a supply pile (a count). */
+export function pileXpCount(state: GameState, pileId: string): number {
+  return state.pileXp?.[pileId] ?? 0;
+}
+export function addPileXp(state: GameState, pileId: string, n: number): GameState {
+  return { ...state, pileXp: { ...(state.pileXp ?? {}), [pileId]: (state.pileXp?.[pileId] ?? 0) + n } };
+}
+export function removePileXp(state: GameState, pileId: string, n: number): GameState {
+  return { ...state, pileXp: { ...(state.pileXp ?? {}), [pileId]: Math.max(0, (state.pileXp?.[pileId] ?? 0) - n) } };
+}
+/** Elevator Room (loc-050): once-a-turn discard for card XP + gold + ammo. */
+export function elevatorInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingElevatorDiscard');
+}
+/** Entrance Hall (loc-051): buy a weapon of a type used this turn for card XP. */
+export function entranceHallInvested(state: GameState, seat: number): boolean {
+  return investEffectsFor(state, seat).some(e => e.kind === 'ongoingEntranceHallWeaponBuy');
+}
+/** Dining Hall (loc-049): in play (its ammo-gain hook applies to everyone). */
+export function diningHallInPlay(state: GameState): boolean {
+  return revealedLocations(state).some(l => l.def.id === 'loc-049');
+}
+
 /** Gain `amount` Infection from the Infection deck (Outbreak convention:
  *  no deck -> no-op; immunity respected). Used by the location On Reveal
  *  infection effects. */
@@ -848,7 +900,7 @@ export function gainInfections(state: GameState, seat: number, amount: number): 
     ...state,
     infectionDeck: deck.slice(take),
     seats: state.seats.map(x => (x.seat === seat
-      ? { ...x, infectionCards: [...(x.infectionCards ?? []), ...deck.slice(0, take)] }
+      ? { ...x, infectionCards: [...(x.infectionCards ?? []), ...deck.slice(0, take)], infectionsGainedThisTurn: (x.infectionsGainedThisTurn ?? 0) + take }
       : x)),
   };
 }

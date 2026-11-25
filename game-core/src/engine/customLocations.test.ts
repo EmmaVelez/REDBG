@@ -15,7 +15,9 @@ import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK } from '../data
  * Explore is consumed); its On Reveal effect fires at that moment.
  */
 
-const LOC_IDS = ['loc-001', 'loc-002', 'loc-003', 'loc-004', 'loc-005', 'loc-006', 'loc-007', 'loc-008', 'loc-009', 'loc-010', 'loc-011', 'loc-012', 'loc-013', 'loc-014', 'loc-015', 'loc-016', 'loc-017', 'loc-018', 'loc-019', 'loc-020', 'loc-021', 'loc-022', 'loc-023', 'loc-024', 'loc-025', 'loc-026', 'loc-027', 'loc-028', 'loc-029', 'loc-030', 'loc-031', 'loc-032', 'loc-033', 'loc-034', 'loc-035', 'loc-036', 'loc-037', 'loc-038', 'loc-039', 'loc-040', 'loc-041', 'loc-042', 'loc-043', 'loc-044', 'loc-045', 'loc-046', 'loc-047', 'loc-048'] as const;
+// Derived, not hand-maintained: adding a Location used to red this list (batch
+// 11 took it 48 -> 51). customClock.test.ts / customUsher.test.ts already derive.
+const LOC_IDS = CUSTOM_CARDS.filter(c => c.type === 'location').map(c => c.id);
 
 function locDef(id: string) {
   const d = CUSTOM_CARDS.find(c => c.id === id);

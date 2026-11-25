@@ -1,5 +1,5 @@
 import type { CardDef, WeaponEffect, InfectedEffect, GameState, WeaponTag, CharacterAbility } from '../types';
-import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount, effectiveWeaponTags } from './abilities';
+import { characterAbilities, ammoReqForWeapon, passiveDamageBonus, exploreBigHandBonus, exploreActionsBonus, knifeWeaponsUsedThisTurn, revealHighHpInfectedBonusDamage, singleWeaponAmmoDiscount, chosenWeaponTypeAmmoDiscount, partnerAttachedDamageBonus, plusDamageIfTwoOrMoreWeapons, exploreBonusIfAmmoAbove, plusTagDamageIfAmmoAbove, plusTagDamage, actionDiscardDamage, emptyHandDamage, plusDamagePerUnusedAction, dualWieldBonus, leaderAbilities, exploreBonusIfFullHp, exploreDamageIfHpAtMost, exploreDamagePerHealedCharacter, stunRodChargeAmount, effectiveWeaponTags, rifleAndKnifeBonus, multiExplorePerPlayerBonus } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { revealTop } from './mansion';
 import { activeSkillEffects, exploreSkillDamageBonus } from './skill';
@@ -247,6 +247,12 @@ export function exploreDamage(
     emptyHandDamage(abilities, player.hand.filter(id => !weaponIds.includes(id)).length) +
     plusDamagePerUnusedAction(abilities, player.actionsLeft) +
     (player.firstExploreDamageBonus ?? 0);
+  // ch-006a Aya Brea L1 / ch-006b Aya Brea L1 — mirror the reducer terms so the
+  // picker's preview agrees with the resolved combat.
+  const ayaTagSet = new Set<string>();
+  for (const wdef of defs) for (const t of wdef?.weaponTags ?? []) ayaTagSet.add(t);
+  const ayaRifleKnife = rifleAndKnifeBonus(abilities, [...ayaTagSet]);
+  const ayaMulti = multiExplorePerPlayerBonus(abilities, battledCount, state.seats.length);
   const starCrossedBonus = state.seats.some(s => s.seat !== seat && (s.partnerAttached ?? []).some(id => {
     const ci = state.cards[id]; const cd = ci ? state.cardDefs[ci.cardId] : undefined; return cd?.id === 'ac-014';
   })) ? 10 : 0;
@@ -301,7 +307,7 @@ export function exploreDamage(
     ammoCardsInPlayArea,
     inventoryCount: player.inventory.length,
     discardWeaponTagCounts,
-    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + starCrossedBonus + perDiscardCardBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + (armedLauncherAmount * battledCount),
+    bonusDamage: player.weaponDamageBonusThisTurn + abilityDamage + ayaRifleKnife + ayaMulti + starCrossedBonus + perDiscardCardBonus + perActionBonus + selfHpBonus + costGateBonus + multiWeaponBonus + (armedLauncherAmount * battledCount),
     damageMultiplier: player.damageMultiplierThisTurn ?? 1,
     infectedBattledThisTurn: battledCount,
   });

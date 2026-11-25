@@ -1500,6 +1500,73 @@ export function actionDiscardDamage(abilities: readonly CharacterAbility[], coun
 }
 
 /**
+ * Fan character (ch-006a Aya Brea) L1: "When Aya attacks with a Rifle and a
+ * Knife weapon, she deals an additional +10 damage." Both tags must be present
+ * across the attack's weapon set (one weapon carrying both also qualifies).
+ * `weaponTags` is the union of the granted tags of every weapon in the explore.
+ */
+export function rifleAndKnifeBonus(
+  abilities: readonly CharacterAbility[],
+  weaponTags: readonly string[],
+): number {
+  let bonus = 0;
+  const have = new Set<string>(weaponTags);
+  for (const a of abilities) {
+    if (a.kind !== 'plusDamageWithRifleAndKnife') continue;
+    if (a.tags.every(t => have.has(t))) bonus += a.amount;
+  }
+  return bonus;
+}
+
+/**
+ * Fan character (ch-006b Aya Brea) L1: "If Aya is battling more than one
+ * Infected, she deals an additional +5 damage for each character in the game."
+ * Scales with the EXPLORE's Infected count and the number of characters in the
+ * game (every seat, alive or not — "in the game" is not "alive"). Returns 0 for
+ * a single-Infected engagement.
+ */
+export function multiExplorePerPlayerBonus(
+  abilities: readonly CharacterAbility[],
+  infectedBattled: number,
+  characterCount: number,
+): number {
+  let bonus = 0;
+  for (const a of abilities) {
+    if (a.kind !== 'plusDamagePerMultiExplorePerPlayer') continue;
+    // `infectedBattled > 1` is the card's own "more than one Infected" gate, so
+    // a single-Infected engagement pays nothing no matter how many characters
+    // are in the game.
+    if (infectedBattled > 1) bonus += a.amount * Math.max(characterCount, 0);
+  }
+  return bonus;
+}
+
+/**
+ * Aya Brea (ch-006a / ch-006b) L2: "Once, on your turn, you can use an ability
+ * of another character on the table."
+ *
+ * Ruling (Manny): this follows the Alliance Partner Modification — the seat may
+ * trigger ONE legal MANUAL ability belonging to ANOTHER character. Passive
+ * bonuses and any "at the beginning of your turn" prompt abilities stay out.
+ * The latch is a per-turn flag (`usedAnotherCharacterThisTurn`), so it expires
+ * with the turn; the log scan in validate stops a second activation.
+ */
+export function useAnotherCharacterAvailable(state: GameState, seat: number): boolean {
+  const player = state.seats[seat];
+  if (player === undefined || player.dead || player.downed) return false;
+  if (!characterAbilities(state, seat).some(a => a.kind === 'useAnotherCharactersAbility')) return false;
+  return player.usedAnotherCharacterThisTurn !== true;
+}
+
+/** Mark Aya's once-per-turn "another character's ability" as spent. */
+export function markUseAnotherCharacterUsed(state: GameState, seat: number): GameState {
+  return {
+    ...state,
+    seats: state.seats.map(s => (s.seat === seat ? { ...s, usedAnotherCharacterThisTurn: true } : s)),
+  };
+}
+
+/**
  * B4MC-CH-008 Chris L2 - "Once per round, when an Infected is not Defeated,
  * you can put it on top of the Mansion (even if it's the BOSS)." Automatic:
  * the first not-defeated Infected on his own turn in a round goes on top.

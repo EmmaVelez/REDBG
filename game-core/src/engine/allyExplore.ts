@@ -1,7 +1,7 @@
 import type { CardDef, GameState, PlayerState } from '../types';
 import { revealTop, sendToBottom } from './mansion';
 import { drawWithReshuffle } from './deck';
-import { characterAbilities, passiveDamageBonus, plusTagDamageIfAmmoAbove, plusTagDamage, infectedDamageReduction, applyRicardoDamage, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount } from './abilities';
+import { characterAbilities, passiveDamageBonus, plusTagDamageIfAmmoAbove, plusTagDamage, infectedDamageReduction, applyRicardoDamage, exploreBonusIfFullHp, exploreDamagePerHealedCharacter, stunRodChargeAmount, effectiveWeaponTags, rifleAndKnifeBonus, multiExplorePerPlayerBonus } from './abilities';
 import { exploreAmmoReq } from './ammo';
 import { resolveExplore, type ExploreOutcome, type ExploreWeapon } from './explore';
 import { isNemesisPursuit, applyNemesisPursuit, nemesisPursuitBuff } from './nemesisPursuit';
@@ -125,6 +125,9 @@ export function resolveAllyExplore(
     plusTagDamageIfAmmoAbove(targetAbilities, weaponDefs, target.turnAmmo) +
     exploreBonusIfFullHp(targetAbilities, target.hp, target.maxHp) +
     exploreDamagePerHealedCharacter(targetAbilities, (state.healedCharactersThisTurn ?? []).length) +
+    // ch-006a / ch-006b Aya Brea L1: the forced explore is still her attack.
+    rifleAndKnifeBonus(targetAbilities, usedWeaponIds.flatMap(id => [...effectiveWeaponTags(state, targetSeat, id, usedWeaponIds)])) +
+    multiExplorePerPlayerBonus(targetAbilities, 1, state.seats.length) +
     plusTagDamage(targetAbilities, weaponDefs);
   const bonusDamage = target.weaponDamageBonusThisTurn + abilityDamage;
 

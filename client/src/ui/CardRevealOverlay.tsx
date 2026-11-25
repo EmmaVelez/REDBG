@@ -41,7 +41,11 @@ function sourceLabel(state: GameState, action: Action): string {
   }
   if (action.type === 'useCharacterAbility') {
     const player = state.seats[action.seat];
-    const def = defForInstance(state, player?.characterInstanceId);
+    // Aya Brea L2: the ability belongs to ANOTHER character, so label it from
+    // the donor named in `borrowedFrom`, not the activating seat.
+    const def = action.borrowedFrom !== undefined
+      ? state.cardDefs[action.borrowedFrom]
+      : defForInstance(state, player?.characterInstanceId);
     const name = def?.name ?? 'A character';
     return name.includes(' ') ? name.split(' ')[0] ?? name : name;
   }

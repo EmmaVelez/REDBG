@@ -44,6 +44,8 @@ const VERBS: Record<Action['type'], string> = {
   readingRoomPeek: 'peeked at the Mansion (Reading Room)',
   storeroomRearrangeStart: 'rearranged a weapon pile (Storeroom)',
   forfeitBuy: 'forfeited a Buy',
+  elevatorDiscardStart: 'used the Elevator Room',
+  courtyardStart: 'used the Courtyard',
   useLocation: 'used a location',
   passageStart: 'used the Underground Passage',
   passageChooseAction: 'chose an action to trash',
