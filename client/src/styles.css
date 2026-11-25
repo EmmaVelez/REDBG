@@ -943,6 +943,37 @@ h1, h2 { margin: 0 0 8px; }
    fan can use the same value. */
 .player-character-card .card { min-height: 0; }
 
+/* ---- opponent identity: character cards + their Skill Area ----
+   The viewing player's own action bar puts the Skill Area immediately right of
+   the character/partner cards; an opponent's panel mirrors that order. */
+.player-identity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.player-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 52px;
+}
+.player-skills-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+/* Same footprint treatment as the public play-area/discard cards: a fixed
+   narrow width and no forced aspect ratio, so the art-only face fills the box. */
+.player-skills .card {
+  width: 46px;
+  min-height: 0;
+  aspect-ratio: auto;
+  padding: 2px 3px;
+  gap: 1px;
+  font-size: 8px;
+}
+
 /* ---- character skill list ---- */
 .card-skills {
   display: flex;
@@ -2330,6 +2361,8 @@ h1, h2 { margin: 0 0 8px; }
 .app-board .skill-row-inactive { opacity: 0.6; }
 .app-board .skill-row-name { color: #e2ddd0; }
 .app-board .skill-row-pips { color: #7f8896; }
+/* An opponent's Skill Area in the player panel (cards, not text rows). */
+.app-board .player-skills .player-zone-label { color: #7f8896; }
 /* skill Use / +N XP buttons: M7 unified control system */
 
 /* ---- misc labels ---- */
@@ -2837,6 +2870,7 @@ h1, h2 { margin: 0 0 8px; }
   .app-board .player-panel .player-deck-stats,
   .app-board .player-panel .player-public-zones,
   .app-board .player-panel .character-skills,
+  .app-board .player-panel .player-skills,
   .app-board .player-panel .player-character-row { display: none; }
 
   /* ---- your table ---- */

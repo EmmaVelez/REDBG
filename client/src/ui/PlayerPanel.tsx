@@ -3,6 +3,7 @@ import type { GameState, PlayerState } from '@re/game-core';
 import { CardView } from './CardView';
 import { CharacterCards } from './CharacterCards';
 import { CharacterSkills } from './CharacterSkills';
+import { PlayerSkills } from './PlayerSkills';
 import { defForInstance } from './cards';
 
 /**
@@ -104,7 +105,13 @@ export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = tr
           </div>
         </div>
       )}
-      {showCharacterCards && <CharacterCards state={state} seat={seat} />}
+      {/* Character/partner cards with that seat's Skill Area immediately to
+          their right — the same order the viewing player's own action bar
+          uses (CharacterCards, then skills, then the deck). */}
+      <div className="player-identity-row" data-identity-row>
+        {showCharacterCards && <CharacterCards state={state} seat={seat} />}
+        <PlayerSkills state={state} seat={seat} />
+      </div>
       {charDef !== null && <CharacterSkills state={state} seat={seat} />}
     </div>
   );
