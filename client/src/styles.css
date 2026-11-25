@@ -827,6 +827,12 @@ h1, h2 { margin: 0 0 8px; }
   overflow: hidden;
   transition: max-height 0.3s ease-out;
 }
+/* Outbreak adds the Infection Level to that stats row, which wraps it onto a
+   second line at the collapsed panel's width — grow the chip rather than clip
+   the very number the mode revolves around. */
+.player-panel:not([data-me]):has(.player-infection) {
+  max-height: 88px;
+}
 .player-panel:not([data-me]):hover {
   max-height: 800px;
 }
@@ -942,6 +948,17 @@ h1, h2 { margin: 0 0 8px; }
    the width comes from `--cc-w` on `.player-character-card` so the attached-trophy
    fan can use the same value. */
 .player-character-card .card { min-height: 0; }
+
+/* ---- Outbreak: a seat's Infection Level ---- */
+.player-infection {
+  color: #8fd18a;
+  font-variant-numeric: tabular-nums;
+}
+/* At the maximum the character dies and reanimates — flag it loudly. */
+.player-infection-max {
+  color: #ff6b6b;
+  font-weight: 700;
+}
 
 /* ---- opponent identity: character cards + their Skill Area ----
    The viewing player's own action bar puts the Skill Area immediately right of
@@ -2363,6 +2380,10 @@ h1, h2 { margin: 0 0 8px; }
 .app-board .skill-row-pips { color: #7f8896; }
 /* An opponent's Skill Area in the player panel (cards, not text rows). */
 .app-board .player-skills .player-zone-label { color: #7f8896; }
+/* Outbreak infection readouts: green level, red at the reanimation threshold. */
+.app-board .player-infection { color: #8fd18a; }
+.app-board .player-infection-max { color: #ff6b6b; }
+.app-board .action-col-infections .player-zone-label { color: #7f8896; }
 /* skill Use / +N XP buttons: M7 unified control system */
 
 /* ---- misc labels ---- */
@@ -2434,6 +2455,29 @@ h1, h2 { margin: 0 0 8px; }
   max-height: var(--cc-h);
   overflow-y: auto;
   scrollbar-width: thin;
+}
+/* Outbreak: the viewer's own face-up infection cards, right of their character
+   cards. Narrower than the Skill Area and capped the same way so a long
+   infection run scrolls instead of growing the row past the character cards. */
+.action-col-infections {
+  align-items: center;
+  gap: 2px;
+  max-height: var(--cc-h);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.player-infections-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.action-col-infections .card {
+  width: 40px;
+  min-height: 0;
+  padding: 2px 3px;
+  gap: 1px;
+  font-size: 8px;
 }
 /* no `.action-col-label` any more: the character card needs no caption, and
    the deck/discard piles carry their own `.zone-pile-label`. */

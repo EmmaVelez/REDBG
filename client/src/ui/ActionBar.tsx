@@ -6,6 +6,7 @@ import type { ConnectionStatus } from '../net/ws';
 import { ActionBarStats } from './ActionBarStats';
 import { CharacterCards } from './CharacterCards';
 import { Hand } from './Hand';
+import { PlayerInfections } from './PlayerInfections';
 import { SkillPanel } from './SkillPanel';
 import { ZonePile } from './ZonePile';
 import { playFromHand } from './playFromHand';
@@ -367,6 +368,8 @@ export function ActionBar({ state, seat, onAction, disabled = false, lastError, 
           <div className="action-col">
             <CharacterCards state={state} seat={seat} />
           </div>
+          {/* Face-up infection cards sit with the character they belong to. */}
+          <PlayerInfections state={state} seat={seat} />
           {/* Skill Area sits immediately right of the character/partner cards
               (Manny's layout reference), before the deck. */}
           <div className="action-col action-col-skills" data-skill-column>

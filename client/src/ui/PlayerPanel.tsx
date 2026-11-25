@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import type { GameState, PlayerState } from '@re/game-core';
+import { MAX_INFECTION_LEVEL } from '@re/game-core';
 import { CardView } from './CardView';
 import { CharacterCards } from './CharacterCards';
 import { CharacterSkills } from './CharacterSkills';
@@ -23,6 +24,13 @@ export interface PlayerPanelProps {
   readonly isMe?: boolean;
   /** The viewing player's own character/partner cards live in the action bar. */
   readonly showCharacterCards?: boolean;
+}
+
+/** Outbreak tooltip for a seat's Infection Level. */
+function infectionTitle(player: PlayerState): string {
+  const level = player.infectionCards?.length ?? 0;
+  return `Infection Level ${level} of ${MAX_INFECTION_LEVEL} (face-up infection cards). `
+    + `Reaching ${MAX_INFECTION_LEVEL} kills the character, who reanimates as an Infected Character on their next turn.`;
 }
 
 export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = true }: PlayerPanelProps): JSX.Element {
@@ -51,6 +59,18 @@ export function PlayerPanel({ state, seat, isMe = false, showCharacterCards = tr
         {/* Attached sits with HP/Decorations — it is a score, not a deck
             statistic, and it is the one count a slim mobile chip still shows. */}
         <span title="Defeated infected attached">Attached {player.attached.length}</span>
+        {/* Outbreak: the Infection Level is the count of face-up infection
+            cards. It lives in this row on purpose — panels collapse to their
+            first two children until hovered, and this must stay readable. */}
+        {state.infectionDeck !== undefined && (
+          <span
+            className={`player-infection${(player.infectionCards?.length ?? 0) >= MAX_INFECTION_LEVEL ? ' player-infection-max' : ''}`}
+            data-player-infection
+            title={infectionTitle(player)}
+          >
+            Infection {player.infectionCards?.length ?? 0}
+          </span>
+        )}
       </div>
       <div className="player-row player-pools">
         <span title="Ammo">Ammo {player.turnAmmo}</span>

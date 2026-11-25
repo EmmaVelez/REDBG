@@ -1,7 +1,7 @@
 export * from "./types";
 export { setup, startTurn, checkWin } from "./engine/game";
 export { canBePartner, isSelectableCharacter } from "./engine/characters";
-export { applyAction } from "./engine/actions";
+export { applyAction, MAX_INFECTION_LEVEL } from "./engine/actions";
 export { validateAction } from "./engine/validate";
 export { exploreDamage, grantedExploresFor } from "./engine/explore";
 export { requiredAmmoForWeapons, ammoReqForWeapon, leaderAbilities } from "./engine/abilities";
