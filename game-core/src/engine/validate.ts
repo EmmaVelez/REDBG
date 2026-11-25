@@ -417,15 +417,25 @@ export function validateAction(state: GameState, action: Action): ValidationResu
       if (player.exploresLeft < 1) {
         return { ok: false, reason: 'attack: no explores left' };
       }
-      // Infected Characters cannot attack other Infected Characters.
+      // Outbreak PvP is strictly cross-type (stated ruling 2026-11-25): a
+      // non-Infected Character can only attack Infected Characters, and an
+      // Infected Character can only attack non-Infected Characters (and only
+      // with Infection cards, never weapons — enforced by the branches below).
       if (player.isInfectedCharacter === true && target.isInfectedCharacter === true) {
         return { ok: false, reason: 'attack: infected cannot attack infected' };
+      }
+      if (player.isInfectedCharacter !== true && target.isInfectedCharacter !== true) {
+        return { ok: false, reason: 'attack: non-infected can only attack infected characters' };
       }      // IN-005 Drag: the attacked character cannot attack back next turn.
       if (player.cannotAttackSeatNextTurn === action.targetSeat) {
         return { ok: false, reason: 'attack: Drag prevents attacking back' };
       }
       if (player.isInfectedCharacter === true) {
-        // Only Infected Characters may use Infection cards, and only from hand.
+        // Infected Characters attack with Infection cards only — never weapons
+        // (stated ruling).
+        if (action.weaponInstanceId !== undefined) {
+          return { ok: false, reason: 'attack: infected characters attack with infection cards, not weapons' };
+        }        // Only Infected Characters may use Infection cards, and only from hand.
         for (const iid of action.infectionCardIds ?? []) {
           const idef = cardDef(state, iid);
           if (idef === undefined || !idef.id.startsWith('in-')) {

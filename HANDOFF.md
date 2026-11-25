@@ -1,4 +1,27 @@
 # HANDOFF — resume here
+## OUTBREAK PvP ATTACKS STRICTLY CROSS-TYPE (2026-11-25, stated ruling)
+
+Manny: in Outbreak scenarios/modes a non-Infected Character can only attack
+Infected Characters, and an Infected Character can only attack non-Infected
+Characters — and only with Infection cards, never weapons.
+- validate.ts 'attack': added the mirror ban (non-infected CANNOT attack
+  non-infected; the infected-vs-infected ban already existed) + infected
+  attackers are rejected if they name a weaponInstanceId.
+- enumerate.ts attacks: XOR target filter (`infectedAttacker ===
+  targetIsInfected` → skip) — same-target pairs are never offered, so bots
+  cannot propose an illegal attack.
+- applyAction throws 'applyAction: <validate reason>' anyway (it validates
+  first) — no engine path can apply a same-type attack.
+- Existing tests updated (they had been attacking OTHER HUMANS — now correctly
+  illegal, so their defenders are Infected Characters): Hunk L2 (outbreak),
+  AC-012 Struggle for Survival x2 (deadKinds), PR-006 Yoko Suzuki L2
+  (promoCharacters), WE-001 Grenade attack (rulesText). Real gameplay implication: in a
+  humans-only Outbreak game there is NO PvP until someone reanimates.
+- Tests: outbreak.test.ts "Outbreak PvP is strictly cross-type" (6: legal
+  human→infected, illegal human→human + apply throw, legal infected→human,
+  illegal infected→infected, infected-with-weapon rejected, bot enumeration
+  across all four pairings).
+
 ## BOTS TREAT INFECTION LIKE HEALTH (2026-11-25)
 
 Manny: bots must prioritize reducing/preventing infection counters the same

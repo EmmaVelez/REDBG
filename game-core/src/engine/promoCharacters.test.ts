@@ -189,6 +189,8 @@ describe('PR-006 Yoko Suzuki', () => {
     let s = game('pr-006', { level: 2, hp: 5, maxHp: 70 });
     const w = addCard(s, 1, 'we-004');                 // 5 damage, no ammo
     s = { ...w.state, activeSeat: 1 };
+    // Attack targets must be Infected Characters (cross-type ruling).
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, isInfectedCharacter: true as const } : p)) };
     const out = applyAction(s, { type: 'attack', seat: 1, targetSeat: 0, weaponInstanceId: w.id });
     expect(out.seats[0]?.maxHp).toBe(50);
     expect(out.seats[0]?.hp).toBe(50);

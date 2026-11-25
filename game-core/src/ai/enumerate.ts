@@ -178,7 +178,11 @@ export function enumerateLegalActions(state: GameState, seat: number): readonly 
     for (let t = 0; t < state.seats.length; t++) {
       const target = state.seats[t];
       if (target === undefined || t === seat || target.dead || target.downed) continue;
-      if (infectedAttacker && target.isInfectedCharacter === true) continue;
+      // Outbreak PvP is strictly cross-type: Infected only attack
+      // non-Infected, non-Infected only attack Infected. A pair of humans
+      // (or a pair of zombies) cannot fight each other.
+      const targetIsInfected = target.isInfectedCharacter === true;
+      if (infectedAttacker === targetIsInfected) continue;
       if (infectedAttacker) {
         generatedActions.push({ type: 'attack', seat, targetSeat: t });
         // Infected attackers may also play any infection cards from hand.

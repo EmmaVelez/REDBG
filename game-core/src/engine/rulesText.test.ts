@@ -62,8 +62,14 @@ describe('WE-001 Grenade — "Trashed after use"', () => {
   });
 
   test('attacking with it trashes it', () => {
-    const s = withInstances(rigExplore(game(), 0, ['we-001#1']), ['we-001#1']);
-    const after = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-001#1' });
+    const s = withInstances(rigExplore(game(), 0, ['we-001#1']), ['we-001#1', 'ch-031#9']);
+    // Attack targets must be Infected Characters (cross-type ruling).
+    const rigged = {
+      ...s,
+      seats: s.seats.map((p, i) =>
+        i === 1 ? { ...p, isInfectedCharacter: true as const, characterInstanceId: 'ch-031#9', hp: 100, maxHp: 100 } : p),
+    };
+    const after = applyAction(rigged, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-001#1' });
     expect(after.removed).toContain('we-001#1');
   });
 });

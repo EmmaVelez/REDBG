@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { setup, startTurn, checkWin } from './game';
 import { exploreDamage } from './explore';
 import { applyAction } from './actions';
+import { validateAction } from './validate';
+import { enumerateLegalActions } from '../ai/enumerate';
 import { ALL_CARDS, OUTBREAK_PILES, OUTBREAK_MANSION } from '../data/cards';
 import { SCENARIOS } from '../data/cards';
 import type { GameState } from '../types';
@@ -33,6 +35,101 @@ function outbreakState(over: (s: GameState) => GameState = s => s): GameState {
   );
   return over(base);
 }
+
+describe('Outbreak PvP is strictly cross-type (stated ruling 2026-11-25)', () => {
+  // Uninfected Characters can only attack Infected Characters; Infected
+  // Characters can only attack uninfected Characters, and only with Infection
+  // cards — never weapons.
+  const humanWithWeapon = (s: GameState): GameState => ({
+    ...s,
+    seats: s.seats.map((x, i) =>
+      i === 0 ? { ...x, hand: [...x.hand, 'we-009#1'], turnAmmo: 20, exploresLeft: 1 } : x),
+  });
+  const infectS1 = (s: GameState): GameState => ({
+    ...s,
+    seats: s.seats.map((x, i) =>
+      i === 1 ? { ...x, isInfectedCharacter: true as const, characterInstanceId: 'ch-031#9', hp: 140, maxHp: 140, exploresLeft: 1, hand: [...x.hand, 'in-001#z1'] } : x),
+    cards: {
+      ...s.cards,
+      'ch-031#9': { instanceId: 'ch-031#9', cardId: 'ch-031', location: { zone: 'hand' as const, index: 0 } },
+      'in-001#z1': { instanceId: 'in-001#z1', cardId: 'in-001', location: { zone: 'hand' as const, index: 0 } },
+    },
+  });
+
+  test('a non-Infected character can attack an Infected character', () => {
+    const s = infectS1(humanWithWeapon(outbreakState()));
+    const v = validateAction(s, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-009#1' });
+    expect(v.ok).toBe(true);
+  });
+
+  test('a non-Infected character CANNOT attack another non-Infected character', () => {
+    const s = humanWithWeapon(outbreakState());
+    const v = validateAction(s, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-009#1' });
+    expect(v.ok).toBe(false);
+    expect(!v.ok && v.reason).toMatch(/non-infected can only attack infected/);
+    // defense-in-depth: applying the illegal action throws (engine validates first)
+    expect(() => applyAction(s, { type: 'attack', seat: 0, targetSeat: 1, weaponInstanceId: 'we-009#1' })).toThrow(/non-infected can only attack infected/);
+  });
+
+  test('an Infected character can attack a non-Infected character', () => {
+    const s = infectS1(outbreakState());
+    const v = validateAction({ ...s, activeSeat: 1 }, { type: 'attack', seat: 1, targetSeat: 0, infectionCardIds: ['in-001#z1'] });
+    expect(v.ok).toBe(true);
+  });
+
+  test('an Infected character CANNOT attack another Infected character', () => {
+    const s = infectS1(outbreakState());
+    const both = {
+      ...s,
+      seats: s.seats.map((x, i) =>
+        i === 0 ? { ...x, isInfectedCharacter: true as const, characterInstanceId: 'ch-032#9', hp: 140, maxHp: 140 } : x),
+      cards: {
+        ...s.cards,
+        'ch-032#9': { instanceId: 'ch-032#9', cardId: 'ch-032', location: { zone: 'hand' as const, index: 0 } },
+      },
+    };
+    const v = validateAction({ ...both, activeSeat: 1 }, { type: 'attack', seat: 1, targetSeat: 0, infectionCardIds: ['in-001#z1'] });
+    expect(v.ok).toBe(false);
+    expect(!v.ok && v.reason).toMatch(/infected cannot attack infected/);
+  });
+
+  test('an Infected character attacks with Infection cards only — weapons are rejected', () => {
+    const s = infectS1(humanWithWeapon(outbreakState()));
+    const v = validateAction({ ...s, activeSeat: 1 }, { type: 'attack', seat: 1, targetSeat: 0, weaponInstanceId: 'we-009#1' });
+    expect(v.ok).toBe(false);
+    expect(!v.ok && v.reason).toMatch(/infection cards, not weapons/);
+  });
+
+  test('bots offer attacks only across the types, and only with legal payloads', () => {
+    // Human with a weapon vs ONLY another human: no attack is enumerated.
+    const humansOnly = humanWithWeapon(outbreakState());
+    const humanActs = enumerateLegalActions(humansOnly, 0);
+    expect(humanActs.some(a => a.type === 'attack')).toBe(false);
+    // Same human vs an Infected character: weapon attacks ARE enumerated.
+    const withZombie = infectS1(humanWithWeapon(outbreakState()));
+    const withZombieActs = enumerateLegalActions(withZombie, 0);
+    expect(withZombieActs.some(a => a.type === 'attack' && a.targetSeat === 1)).toBe(true);
+    // Infected attacker vs a human: infection-card attacks only, never weapons.
+    // (enumerateLegalActions validates against the active seat, so seat 1 must
+    // be the one whose turn it is.)
+    const infectedActs = enumerateLegalActions({ ...withZombie, activeSeat: 1 }, 1);
+    const atks = infectedActs.filter(a => a.type === 'attack') as Array<
+      { type: 'attack'; targetSeat: number; weaponInstanceId?: string; infectionCardIds?: readonly string[] }>;
+    expect(atks.length).toBeGreaterThan(0);
+    for (const a of atks) {
+      expect(a.targetSeat).toBe(0);
+      expect(a.weaponInstanceId).toBeUndefined();
+    }
+    // Infected attacker with ONLY infected targets: no attack at all.
+    const zombiesOnly = {
+      ...infectS1(outbreakState()),
+      seats: infectS1(outbreakState()).seats.map((x, i) =>
+        i === 0 ? { ...x, isInfectedCharacter: true as const } : x),
+    };
+    const zombieActs = enumerateLegalActions(zombiesOnly, 1);
+    expect(zombieActs.some(a => a.type === 'attack')).toBe(false);
+  });
+});
 
 describe('Outbreak mode', () => {
   test('setup builds the Infection Deck and the per-seat infection fields', () => {
@@ -463,8 +560,11 @@ describe('Outbreak mode', () => {
       ...st,
       seats: st.seats.map((x, i) => {
         if (i === 0) return { ...x, characterInstanceId: 'ch-030#1', level: 2, hp: 10, maxHp: 90, exploresLeft: 1 };
+        // Attack targets must be Infected Characters (cross-type ruling)
+        if (i === 1) return { ...x, isInfectedCharacter: true as const, characterInstanceId: 'ch-033#2', hp: 140, maxHp: 140 };
         return x;
       }),
+      cards: { ...st.cards, 'ch-033#2': { instanceId: 'ch-033#2', cardId: 'ch-033', location: { zone: 'hand' as const, index: 0 } } },
     })), ['ch-030#1']);
     const atk = applyAction(s, { type: 'attack', seat: 0, targetSeat: 1 });
     // Non-Infected attackers still use a weapon; Hunk's +30 is base Damage on top.
