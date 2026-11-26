@@ -581,9 +581,13 @@ describe('Nightmare items and event', () => {
     const withItem = mansionTop(s, 'ma-071');
     let next = explore(withItem, 0, [findHand(withItem, 'we-004')]);
     const takePrompt = findPrompt(next, 'takeOrBottom');
+    const preTake = next;
     next = choose(next, 0, takePrompt, 0);
     expect(next.seats[0]?.turnGold).toBe(30);
     expect(next.seats[0]?.buysLeft).toBe(2);
+    // the optional +1 Card/+1 Explore fields on the shared branch stay 0 for MA-071
+    expect(next.seats[0]?.exploresLeft).toBe(preTake.seats[0]?.exploresLeft);
+    expect(next.seats[0]?.hand.length).toBe(preTake.seats[0]?.hand.length);
     expect(next.removed.some(id => next.cards[id]?.cardId === 'ma-071')).toBe(true);
   });
 

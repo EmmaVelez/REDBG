@@ -1,4 +1,28 @@
 # HANDOFF — resume here
+## MA-085 ITEM CRATE — fan item completed from Manny's card print (2026-11-25)
+
+Manny sent the card render: [ITEM] ITEM CRATE, MA-085 — "When this Item is
+Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn.
+Remove this Item from the game."
+- The def existed as UNCOMMITTED parallel-session WIP (name guessed "Mysterious
+  Relic", def sitting OUTSIDE the CUSTOM_CARDS array — a pending syntax error).
+  Renamed to the print, moved into CUSTOM_CARDS, effect completed.
+- Effect: the +1 Buy/+20 Gold/remove half was wired via the shared
+  gainGoldAndBuyThenRemove (MA-071 Hidden Treasure) take-branch; the +1 Card
+  and +1 Explore were DEAD CONFIG (item bonuses never apply on reveal). Kind
+  extended with optional cards/explores; branch now draws the card and adds
+  the explore at take. MA-071 untouched (defaults 0; regression-pinned).
+- Timing reads like the MA-071 family: resolves on TAKE ("When revealed...
+  then remove" is the established wording the engine triggers at take).
+- Tests: customFanJp2025.test.ts "MA-085 Item Crate" (def + full take
+  resolution), MA-071 pin in nightmare.test.ts. 140/140 targeted.
+
+RESOLVED per Manny: the crate is RE-KEYED to BFMM-001 (new fan family, first
+member; the def notes "prints MA-085"). 'ma-085' is fully free again for the
+Mercenaries Adjule — no def override, no shared art. The crate's art ships as
+CARD-ART/BFMM-001.png (320x435 contain-fit from Manny's render). Tests use
+bfmm-001 throughout; customFanJp2025 asserts the id is no longer 'ma-085'.
+
 ## OUTBREAK PvP ATTACKS STRICTLY CROSS-TYPE (2026-11-25, stated ruling)
 
 Manny: in Outbreak scenarios/modes a non-Infected Character can only attack

@@ -11835,17 +11835,27 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 // Nightmare: MA-070 Treasure Map — "you may attach this card to
                 // your character". A CHOICE: the take lands in the discard and the
                 // normal-take return below offers ma070Choose.
-                // Nightmare: MA-071 Hidden Treasure — +gold +buy, then remove.
+                // Nightmare: MA-071 Hidden Treasure / custom MA-085 Item Crate —
+                // +gold +buy (+ optionally +1 Card and +1 Explore for the Crate),
+                // then remove.
                 const treasureEffect = (takenDef?.itemEffects ?? []).find(e => e.kind === 'gainGoldAndBuyThenRemove');
                 if (treasureEffect !== undefined && treasureEffect.kind === 'gainGoldAndBuyThenRemove') {
+                  let treasurePlayer = { ...player,
+                    turnGold: player.turnGold + treasureEffect.gold,
+                    buysLeft: player.buysLeft + treasureEffect.buys,
+                    exploresLeft: player.exploresLeft + (treasureEffect.explores ?? 0),
+                  };
+                  let treasureRng = state.rngState;
+                  if ((treasureEffect.cards ?? 0) > 0) {
+                    const td = drawWithReshuffle({ deck: treasurePlayer.inventory, discard: treasurePlayer.discard, count: treasureEffect.cards ?? 0, rngState: treasureRng });
+                    treasurePlayer = { ...treasurePlayer, hand: [...treasurePlayer.hand, ...td.hand], inventory: td.deck, discard: td.discard };
+                    treasureRng = td.rngState;
+                  }
                   return {
                     ...state,
                     ...nextBase,
-                    seats: state.seats.map(s =>
-                      s.seat === seat
-                        ? { ...player, turnGold: player.turnGold + treasureEffect.gold, buysLeft: player.buysLeft + treasureEffect.buys }
-                        : s,
-                    ),
+                    rngState: treasureRng,
+                    seats: state.seats.map(s => (s.seat === seat ? treasurePlayer : s)),
                     removed: [...state.removed, instanceId],
                     prompts: newPrompts,
                   };

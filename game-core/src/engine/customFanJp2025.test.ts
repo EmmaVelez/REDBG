@@ -136,6 +136,39 @@ describe('Fan JP 2025 set — data', () => {
   });
 });
 
+describe('MA-085 Item Crate (fan JP 2025 promo)', () => {
+  it('def prints the card: item, verbatim text, one mansion copy, no cost, re-keyed from the printed MA-085', () => {
+    const d = def('bfmm-001');
+    expect(CUSTOM_CARDS.some(c => c.id === 'ma-085')).toBe(false);
+    expect(d.type).toBe('item');
+    expect(d.name).toBe('Item Crate');
+    expect(d.text).toBe('When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.');
+    expect(d.copies).toBe(1);
+    expect(d.cost).toBeUndefined();
+    expect(d.mansion).toBe(true);
+  });
+
+  it('when taken: +1 Buy, +1 Card, +1 Explore, +20 Gold this turn, then removed', () => {
+    let s = game({ level: 1, hp: 100, turnAmmo: 0, exploresLeft: 1 });
+    const wep = place(s, 0, 'we-004'); // 5 damage, no ammo
+    s = wep.state;
+    const top = setMansionTop(s, ['bfmm-001']);
+    const explored = applyAction(top.state, { type: 'explore', seat: 0, weapons: [wep.id], exploreCount: 1 });
+    const takePrompt = explored.prompts.find(pr => pr.payload?.kind === 'takeOrBottom');
+    expect(takePrompt).toBeDefined();
+    const before = explored.seats[0] as PlayerState;
+    const beforeHand = before.hand.length;
+    const taken = applyAction(explored, { type: 'chooseOption', seat: 0, promptId: takePrompt!.id, option: 0 });
+    const after = taken.seats[0] as PlayerState;
+    expect(after.turnGold - before.turnGold).toBe(20);
+    expect(after.buysLeft - before.buysLeft).toBe(1);
+    expect(after.exploresLeft - before.exploresLeft).toBe(1);
+    expect(after.hand.length - beforeHand).toBe(1);
+    expect(taken.removed.some(id => taken.cards[id]?.cardId === 'bfmm-001')).toBe(true);
+  });
+
+});
+
 describe('CAC-014 Global Battle — another player draws', () => {
   it('offers a target prompt on play and the chosen player draws a card', () => {
     let s = game({ actionsLeft: 1 });

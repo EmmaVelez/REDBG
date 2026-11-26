@@ -2404,6 +2404,26 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
       { kind: 'useAnotherCharactersAbility', level: 2 },
     ],
   },
+  // ── Fan item: BFMM-001 Item Crate (prints MA-085, JP 2025 promo) ─────┐
+  // Manny's card print: "When this Item is Revealed, you get +1 Buy, +1 Card,
+  // +1 Explore, and +20 Gold during this turn. Remove this Item from the game."
+  // Resolves on TAKE like the official MA-071 Hidden Treasure it mirrors
+  // ("When revealed ... then remove"); the +1 Card / +1 Explore ride the same
+  // branch. One copy joins the Mansion deck (the standard custom item wiring).
+  // RE-KEYED per Manny: the printed code MA-085 collides with the OFFICIAL
+  // Mercenaries card Adjule (an Infected) — id AND CARD-ART/MA-085.png. The
+  // bfmm-### family (first member) keeps the crate distinct, like the CAC-/CW-
+  // fan-family re-keys. Art ships as CARD-ART/BFMM-001.png.
+  {
+    id: 'bfmm-001',
+    name: 'Item Crate',
+    type: 'item',
+    set: 'custom',
+    text: 'When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.',
+    copies: 1,
+    mansion: true,
+    itemEffects: [{ kind: 'gainGoldAndBuyThenRemove', gold: 20, buys: 1, cards: 1, explores: 1 }],
+  },
 ];
 
 /**
@@ -2417,3 +2437,4 @@ export const CE_CARD_IDS: readonly string[] = [
   'ce-001', 'ce-002', 'ce-003', 'ce-004', 'ce-005', 'ce-006',
   'ce-007', 'ce-008', 'ce-009', 'ce-010', 'ce-011', 'ce-012',
 ];
+

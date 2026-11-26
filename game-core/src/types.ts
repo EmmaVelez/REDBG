@@ -344,7 +344,7 @@ export type ItemEffect =
   | { readonly kind: "healSelfAndPartnerToFull" }                            // Red Herb IT-004
   | { readonly kind: "plusMaxHp"; readonly amount: number }                  // Yellow Herb (Mansion only): +amount max HP
   | { readonly kind: "attachThenRemoveForCardsAndGold"; readonly cards: number; readonly gold: number } // Treasure Map
-  | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number } // Hidden Treasure
+  | { readonly kind: "gainGoldAndBuyThenRemove"; readonly gold: number; readonly buys: number; readonly cards?: number; readonly explores?: number } // Hidden Treasure / Item Crate
   // --- Outbreak items (MA-054o..MA-055o) ---
   | { readonly kind: "attachAndPreventDamageByMovingToMansionBottom" } // MA-054o Kevlar Jacket
   | { readonly kind: "antivirusReduceInfectionOrRemove"; readonly threshold: number; readonly amount: number } // MA-055o Antivirus
