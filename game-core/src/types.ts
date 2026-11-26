@@ -832,6 +832,9 @@ export type CharacterAbility =
   // --- Custom characters (CU-001..) ---
   | { readonly kind: "revealInventoryTopForAction"; readonly level: 1 | 2 } // CU-001 Ricardo Irving L1: reveal the top of your Inventory; an Action there moves to your hand
   | { readonly kind: "damageReductionAndGiveDamage"; readonly threshold: number; readonly reduction: number; readonly give: number; readonly level: 1 | 2 } // CU-001 Ricardo Irving L2
+  | { readonly kind: "weaponTagPlusDamagePerInfectedBattled"; readonly tag: WeaponTag; readonly amount: number; readonly level: 1 | 2 } // CU-002 Parker Luciani L2: each Shotgun +amount per Infected battled
+  | { readonly kind: "gainMarketWeaponWithTagDuringTurn"; readonly tag: WeaponTag; readonly level: 1 | 2 } // CU-003 Quint Cetcham L1: during your turn, may gain 1 weapon with that tag from a market pile top
+  | { readonly kind: "peekHandDiscardChosenCard"; readonly level: 1 | 2 } // CU-003 Quint Cetcham L2: during your turn, look at another Player's Hand and Discard a card you choose
   // --- Fan characters (LK-001..) ---
   | { readonly kind: "plusDamagePerPistolUsed"; readonly amount: number; readonly threshold: number; readonly level: 1 | 2 } // LK-001 Leon L1: +amount per pistol when using threshold+ pistols
   | { readonly kind: "playAreaCardsArePistols"; readonly level: 1 | 2 } // LK-001 Leon L2: all cards in your play area are also labeled as pistol

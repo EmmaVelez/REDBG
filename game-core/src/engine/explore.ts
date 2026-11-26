@@ -224,7 +224,7 @@ export function exploreDamage(
   // front (`davidKnifeAsk`) and re-dispatches it after `davidKnifeChoice` moves
   // the picked knife to the Play Area, so nothing is added here silently.
   const abilityDamage =
-    passiveDamageBonus(abilities, defs, 1, player.hand.length) +
+    passiveDamageBonus(abilities, defs, battledCount, player.hand.length) +
     exploreBigHandBonus(abilities, state.seats) +
     exploreActionsBonus(
       abilities,

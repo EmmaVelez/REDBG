@@ -7159,6 +7159,66 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                 ],
               };
             }
+            case 'gainMarketWeaponWithTagDuringTurn': {
+              // CU-003 Quint Cetcham L1: during your turn, may Gain 1
+              // "Explosive" Weapon. Mirrors Krauser's turn-start knife gain:
+              // the options are the TOP card of every market pile holding a
+              // tagged weapon, plus Decline. "Gain" = Resource Area -> the
+              // player's Discard Pile (rules glossary).
+              const options: string[] = [];
+              for (const pile of Object.values(state.marketPiles)) {
+                const top = pile.cards[0];
+                if (top === undefined) continue;
+                const d = cardDef(state, top);
+                if (d?.type === 'weapon' && (d.weaponTags?.includes(ability.tag) ?? false)) {
+                  options.push(top);
+                }
+              }
+              if (options.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              const tagLabel = ability.tag === 'machineGun' ? 'Machine Gun'
+                : ability.tag === 'explosive' ? 'Explosive'
+                : ability.tag;
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: `Gain 1 "${tagLabel}" Weapon from the top of a market pile.`,
+                    options: [...options, 'Decline'],
+                    payload: { kind: 'gainMarketWeaponWithTag', tag: ability.tag },
+                  },
+                ],
+              };
+            }
+            case 'peekHandDiscardChosenCard': {
+              // CU-003 Quint Cetcham L2: look at another Player's Hand, then
+              // choose a card there and Discard it (AC-038 Mind Control's
+              // reveal chain; here the ACTOR picks and the card goes to the
+              // victim's Discard Pile).
+              const others = state.seats.filter(s => s.seat !== seat && !s.dead && !s.downed && s.hand.length > 0);
+              if (others.length === 0) {
+                return { ...state, ...nextBase };
+              }
+              return {
+                ...state,
+                ...nextBase,
+                prompts: [
+                  ...state.prompts,
+                  {
+                    id: promptId,
+                    seat,
+                    text: 'Quint: choose a Player to look at their Hand.',
+                    options: others.map(s => String(s.seat)),
+                    payload: { kind: 'quintPeekHandChoosePlayer' },
+                  },
+                ],
+              };
+            }
             case 'choosePlayerIncreaseAmmoReqNextTurn': {
               // CH-048 Jill Valentine (Mercenaries) L1: choose a player; all of
               // the weapons they use on their next turn require +amount Ammo.
@@ -13597,6 +13657,84 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             : x)),
         };
         return { ...applyMindControlCopy(s, seat, def), prompts: newPrompts };
+      }
+
+      // --- CU-003 Quint Cetcham L1 — gain 1 tagged Weapon from a market pile
+      // top (Krauser's turn-start knife bookkeeping, manual trigger). ---
+      if (kind === 'gainMarketWeaponWithTag') {
+        const gainedId = prompt.options[option];
+        if (gainedId === undefined || gainedId === 'Decline') {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const pileEntry = Object.entries(state.marketPiles).find(
+          ([, pile]) => pile.cards[0] === gainedId
+        );
+        if (pileEntry === undefined) {
+          // Top card changed underneath us (defensive) — drop the prompt.
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        const [pileId, pile] = pileEntry;
+        const afterPile: GameState = {
+          ...state,
+          ...nextBase,
+          marketPiles: {
+            ...state.marketPiles,
+            [pileId]: { pileId, cards: pile.cards.slice(1) },
+          },
+          prompts: newPrompts,
+        };
+        const wDef = cardDef(state, gainedId);
+        return gainCard(afterPile, {
+          seat,
+          cardId: wDef?.id ?? (gainedId.split('#')[0] as string),
+          instanceId: gainedId,
+          destination: 'discard',
+          reason: 'ability',
+        });
+      }
+
+      // --- CU-003 Quint Cetcham L2 — step 1: reveal the chosen Player's Hand
+      // to the actor, then offer its cards. ---
+      if (kind === 'quintPeekHandChoosePlayer') {
+        const chosen = prompt.options[option];
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        const targetSeat = Number(chosen);
+        state = recordTargeted(state, targetSeat, seat, 'revealHand');
+        const target = state.seats[targetSeat];
+        if (target === undefined || target.hand.length === 0) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        recordCardReveals(target.hand.map(instanceId => ({ instanceId, pile: 'hand', ownerSeat: targetSeat })));
+        return {
+          ...state,
+          ...nextBase,
+          prompts: [...newPrompts, {
+            id: `${prompt.id}:card`,
+            seat,
+            text: `Quint: choose a card in ${target.name}'s Hand and Discard it.`,
+            options: [...target.hand],
+            payload: { kind: 'quintDiscardChosen', targetSeat: String(targetSeat) },
+          }],
+        };
+      }
+
+      // --- CU-003 Quint Cetcham L2 — step 2: the ACTOR's pick goes from the
+      // victim's Hand to the victim's Discard Pile. ---
+      if (kind === 'quintDiscardChosen') {
+        const chosen = prompt.options[option];
+        const targetSeat = Number(prompt.payload?.targetSeat ?? '');
+        if (chosen === undefined) return { ...state, ...nextBase, prompts: newPrompts };
+        if (!(state.seats[targetSeat]?.hand ?? []).includes(chosen)) {
+          return { ...state, ...nextBase, prompts: newPrompts };
+        }
+        return {
+          ...state,
+          ...nextBase,
+          seats: state.seats.map(s => (s.seat === targetSeat
+            ? { ...s, hand: s.hand.filter(id => id !== chosen), discard: [...s.discard, chosen] }
+            : s)),
+          prompts: newPrompts,
+        };
       }
 
       if (kind === 'ac044Discard') {

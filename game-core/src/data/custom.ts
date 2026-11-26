@@ -57,6 +57,51 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    // Fan character (Bandai print, code CH-000). Parker Luciani — the L1 gate
+    // is 2 Decorations, the L2 gate is 6. L1 reuses the established
+    // ammoReqReduction kind (cc-001 Claire carries the same Shotgun discount).
+    id: 'cu-002',
+    name: 'Parker Luciani',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: \"Shotgun\" Weapons Parker uses get -10 Ammo Requirement.\nLevel 2: \"Shotgun\" Weapons Parker uses get +10 Damage for each Infected he is Battling.',
+    copies: 1,
+    maxHp: 100,
+    level1At: 2,
+    level2At: 6,
+    levels: [
+      { level: 1, text: '\"Shotgun\" Weapons Parker uses get -10 Ammo Requirement.' },
+      { level: 2, text: '\"Shotgun\" Weapons Parker uses get +10 Damage for each Infected he is Battling.' },
+    ],
+    abilities: [
+      { kind: 'ammoReqReduction', tag: 'shotgun', amount: 10, level: 1 },
+      { kind: 'weaponTagPlusDamagePerInfectedBattled', tag: 'shotgun', amount: 10, level: 2 },
+    ],
+  },
+  {
+    // Fan character (Bandai print, code CH-000). Quint Cetcham — the L1 gate
+    // is 1 Decoration, the L2 gate is 7. L1 mirrors Krauser's
+    // gainKnifeAtTurnStart market-top gain; L2 mirrors AC-038 Mind Control's
+    // reveal-hand-then-choose chain, but the ACTOR discards the chosen card.
+    id: 'cu-003',
+    name: 'Quint Cetcham',
+    type: 'character',
+    set: 'custom',
+    text: 'Level 1: During your turn, you can Gain 1 \"Explosive\" Weapon.\nLevel 2: During your turn, you can look at another Player\'s Hand. Choose a Card there and Discard it.',
+    copies: 1,
+    maxHp: 70,
+    level1At: 1,
+    level2At: 7,
+    levels: [
+      { level: 1, text: 'During your turn, you can Gain 1 \"Explosive\" Weapon.' },
+      { level: 2, text: 'During your turn, you can look at another Player\'s Hand. Choose a Card there and Discard it.' },
+    ],
+    abilities: [
+      { kind: 'gainMarketWeaponWithTagDuringTurn', tag: 'explosive', level: 1 },
+      { kind: 'peekHandDiscardChosenCard', level: 2 },
+    ],
+  },
+  {
     id: 'ci-002',
     name: 'Infected Crow',
     type: 'infected',

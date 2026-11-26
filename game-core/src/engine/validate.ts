@@ -620,7 +620,9 @@ export function validateAction(state: GameState, action: Action): ValidationResu
         case 'forceAllyExploreWithSupport':
         case 'stunRodCharge':
         case 'revealWeaponTagFromHandForCards':
-        case 'moveMansionBottomToTop': {
+        case 'moveMansionBottomToTop':
+        case 'gainMarketWeaponWithTagDuringTurn':
+        case 'peekHandDiscardChosenCard': {
           // Manual triggers are once per turn. Barry's bonus stacks (unlimited
           // would break the game); Sheva's exchange could ping-pong the same
           // two cards and Ada's peek is repeatable-identical — both would
@@ -770,6 +772,28 @@ export function validateAction(state: GameState, action: Action): ValidationResu
             const target = lowHpOthers.length === 1 ? lowHpOthers[0] : undefined;
             if (target === undefined || target.hand.length === 0) {
               return { ok: false, reason: 'useCharacterAbility: needs exactly one other player with 30 or less HP and a card in hand' };
+            }
+          }
+          if (ability.kind === 'gainMarketWeaponWithTagDuringTurn') {
+            // CU-003 Quint L1: like Billy's Ammo x10 gain, the market must
+            // actually hold the card — a pile TOP carrying the tag.
+            const available = Object.values(state.marketPiles).some(pile => {
+              const top = pile.cards[0];
+              if (top === undefined) return false;
+              const d = cardDef(state, top);
+              return d?.type === 'weapon' && (d.weaponTags?.includes(ability.tag) ?? false);
+            });
+            if (!available) {
+              return { ok: false, reason: 'useCharacterAbility: no weapon of that tag on top of a market pile' };
+            }
+          }
+          if (ability.kind === 'peekHandDiscardChosenCard') {
+            // CU-003 Quint L2: needs another living player WITH a card in
+            // hand. sanitize() keeps hidden-hand LENGTH, so the client's
+            // ActionBar and the server agree on this precondition.
+            const targets = state.seats.filter(s => s.seat !== action.seat && !s.dead && !s.downed && s.hand.length > 0);
+            if (targets.length === 0) {
+              return { ok: false, reason: 'useCharacterAbility: no other player with cards in hand' };
             }
           }
           if (ability.kind === 'choosePlayerIncreaseAmmoReqNextTurn') {

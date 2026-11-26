@@ -254,6 +254,15 @@ export function passiveDamageBonus(
     if (ability.kind === 'weaponPlusDamagePerInfectedFought') {
       bonus += ability.amount * Math.max(infectedFought, 0);
     }
+    if (ability.kind === 'weaponTagPlusDamagePerInfectedBattled') {
+      // CU-002 Parker Luciani L2: EACH weapon carrying the tag gets
+      // amount x Infected battled (per-weapon, unlike Chris L1's flat total).
+      for (const def of weaponDefs) {
+        if (def !== undefined && (def.weaponTags ?? []).includes(ability.tag)) {
+          bonus += ability.amount * Math.max(infectedFought, 0);
+        }
+      }
+    }
     if (ability.kind === 'plusDamagePerCardInHand') {
       bonus += ability.amount * Math.max(handCount, 0);
     }
