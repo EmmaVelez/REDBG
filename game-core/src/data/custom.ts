@@ -2405,24 +2405,69 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   // ── Fan item: BFMM-001 Item Crate (prints MA-085, JP 2025 promo) ─────┐
-  // Manny's card print: "When this Item is Revealed, you get +1 Buy, +1 Card,
-  // +1 Explore, and +20 Gold during this turn. Remove this Item from the game."
-  // Resolves on TAKE like the official MA-071 Hidden Treasure it mirrors
-  // ("When revealed ... then remove"); the +1 Card / +1 Explore ride the same
-  // branch. One copy joins the Mansion deck (the standard custom item wiring).
+  // Manny's card print (REVISED print, 2026-11-25 — supersedes the old
+  // +1 Buy/+1 Card/+1 Explore/+20 Gold version): "When this Item is Revealed
+  // roll a D6, on 1 gain a grenade, on 2 gain a flash grenade, on 3 gain an
+  // HE grenade, on 4 gain an incendiary grenade, on 5 gain an ammox30 card,
+  // on 6 replace this card with MA-SNK and treat it as a regular explore.
+  // Remove this card from the game."
+  // Roll is deterministic from the game RNG. Prizes land in the hand.
   // RE-KEYED per Manny: the printed code MA-085 collides with the OFFICIAL
   // Mercenaries card Adjule (an Infected) — id AND CARD-ART/MA-085.png. The
   // bfmm-### family (first member) keeps the crate distinct, like the CAC-/CW-
-  // fan-family re-keys. Art ships as CARD-ART/BFMM-001.png.
+  // fan-family re-keys. One copy per 10 Mansion cards (mansionScaleDivisor).
   {
     id: 'bfmm-001',
+    name: 'Item Crate',
+    type: 'item',
+    set: 'custom',
+    text: 'When this Item is Revealed roll a D6, on 1 gain a grenade, on 2 gain a flash grenade, on 3 gain an HE grenade, on 4 gain an incendiary grenade, on 5 gain an ammox30 card, on 6 replace this card with MA-SNK and treat it as a regular explore. Remove this card from the game.',
+    copies: 1,
+    mansion: true,
+    // One Crate per 10 Mansion cards (Manny's ruling): floor(deckSize/10).
+    mansionScaleDivisor: 10,
+    itemEffects: [{
+      kind: 'itemCrateD6',
+      prizes: ['we-001', 'we-017', 'we-041', 'we-042', 'am-003'],
+      snakeCardId: 'ma-snk',
+    }],
+  },
+  // ── Fan infected: MA-SNK Snake (prints MA-084, JP 2025 promo) ─────────
+  // Manny's card print: SNAKE — HP 5, ATK 5, 3 Decorations, no effect.
+  // The printed code MA-084 collides with the OFFICIAL Mercenaries card, so
+  // the crate's own text names it "MA-SNK" — that is the internal id (same
+  // print-vs-id gap as the CAC-/CW-/BFMM- re-keys). One copy joins the
+  // Mansion deck; the Item Crate's D6-6 outcome summons one in its place.
+  {
+    id: 'ma-snk',
+    name: 'Snake',
+    type: 'infected',
+    set: 'custom',
+    text: 'No effect.',
+    copies: 1,
+    mansion: true,
+    hp: 5,
+    attack: 5,
+    decorations: 3,
+  },
+  // ── Fan item: BFMM-002 Item Crate (ORIGINAL print, also prints MA-085) ─
+  // Manny's earlier card print, re-added as its OWN card alongside the D6
+  // revision (bfmm-001): "When this Item is Revealed, you get +1 Buy, +1
+  // Card, +1 Explore, and +20 Gold during this turn. Remove this Item from
+  // the game." Resolves on TAKE exactly like the official MA-071 Hidden
+  // Treasure (the shared gainGoldAndBuyThenRemove branch: +gold/+buy at
+  // take, +1 Card drawn, +1 Explore).
+  // Scaling (Manny, 2026-11-25): the SAME mansion rule as bfmm-001 —
+  // floor(deckSize/10) copies. Both crates' counts are computed on the deck
+  // BEFORE any custom copies join, so neither inflates the other's count.
+  {
+    id: 'bfmm-002',
     name: 'Item Crate',
     type: 'item',
     set: 'custom',
     text: 'When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.',
     copies: 1,
     mansion: true,
-    // One Crate per 10 Mansion cards (Manny's ruling): floor(deckSize/10).
     mansionScaleDivisor: 10,
     itemEffects: [{ kind: 'gainGoldAndBuyThenRemove', gold: 20, buys: 1, cards: 1, explores: 1 }],
   },

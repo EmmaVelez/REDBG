@@ -3479,8 +3479,59 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         }
       };
       const rev = drawMansion(state.mansionDeck, revealFromBottom);
-      const revealedInstanceId = rev.revealedInstanceId;
+      let revealedInstanceId = rev.revealedInstanceId;
       let revealedDef = cardDef(state, revealedInstanceId);
+      // BFMM-001 Item Crate (itemCrateD6): resolve IMMEDIATELY on reveal with a
+      // D6 roll from the game RNG (the first rng draw of this explore) — no
+      // Take/Send-to-bottom choice. Rolls 1-5 gain the prize to the hand and
+      // remove the crate; roll 6 removes the crate and REPLACES it with the
+      // MA-SNK Snake as this explore's reveal — "treated as a regular explore",
+      // so the normal battle below resolves it (defeat scores its Decorations).
+      const crateEffect = (revealedDef?.itemEffects ?? []).find(e => e.kind === 'itemCrateD6');
+      if (crateEffect !== undefined && crateEffect.kind === 'itemCrateD6') {
+        const cre = nextInt(makeRng(currentRng), 6);
+        currentRng = cre.rng.s;
+        const roll = cre.value + 1;
+        if (roll <= 5) {
+          const prizeCardId = crateEffect.prizes[roll - 1] ?? 'we-001';
+          let n = 1;
+          while (state.cards[`${prizeCardId}#crate${n}`] !== undefined) n++;
+          const prizeInstanceId = `${prizeCardId}#crate${n}`;
+          recordExploreReveals([revealedInstanceId]);
+          return {
+            ...state,
+            ...nextBase,
+            cards: {
+              ...state.cards,
+              [prizeInstanceId]: { instanceId: prizeInstanceId, cardId: prizeCardId, location: { zone: 'hand' as const, index: 0 } },
+            },
+            seats: state.seats.map(s => (s.seat === seat
+              ? { ...s, hand: [...handAfter, prizeInstanceId], playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft }
+              : s)),
+            mansionDeck: rev.mansion.deck,
+            removed: [...state.removed, revealedInstanceId],
+            rngState: currentRng,
+            prompts: state.prompts,
+          };
+        }
+        let n = 1;
+        while (state.cards[`${crateEffect.snakeCardId}#crate${n}`] !== undefined) n++;
+        const snakeInstanceId = `${crateEffect.snakeCardId}#crate${n}`;
+        state = {
+          ...state,
+          cards: {
+            ...state.cards,
+            [snakeInstanceId]: { instanceId: snakeInstanceId, cardId: crateEffect.snakeCardId, location: { zone: 'hand' as const, index: 0 } },
+          },
+          removed: [...state.removed, revealedInstanceId],
+          rngState: currentRng,
+        };
+        // The battle returns below rebuild `removed` from the `removedAfter`
+        // local — push the crate there too or it would drop out of every zone.
+        removedAfter = [...removedAfter, revealedInstanceId];
+        revealedInstanceId = snakeInstanceId;
+        revealedDef = cardDef(state, snakeInstanceId);
+      }
       if (revealedInstanceId === '') {
         // The Mansion ran out while Locations were entering play: the Explore
         // is consumed, no battle happens.

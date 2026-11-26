@@ -5,6 +5,7 @@ import { applyAction } from './actions';
 import { validateAction } from './validate';
 import { enumerateLegalActions } from '../ai/enumerate';
 import { exploreDamage } from './explore';
+import { makeRng, nextInt } from '../util/rng';
 import { CUSTOM_CARDS } from '../data/custom';
 import { MERCENARIES_CARDS } from '../data/mercenaries';
 import { PREMIER_CARDS, FIRST_TIMER_PILES, STANDARD_MANSION_DECK, cardsForScenario, pilesForScenario } from '../data/cards';
@@ -136,33 +137,95 @@ describe('Fan JP 2025 set — data', () => {
   });
 });
 
-describe('MA-085 Item Crate (fan JP 2025 promo)', () => {
-  it('def prints the card: item, verbatim text, one mansion copy, no cost, re-keyed from the printed MA-085', () => {
-    const d = def('bfmm-001');
-    expect(CUSTOM_CARDS.some(c => c.id === 'ma-085')).toBe(false);
-    expect(d.type).toBe('item');
-    expect(d.name).toBe('Item Crate');
-    expect(d.text).toBe('When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.');
-    expect(d.copies).toBe(1);
-    expect(d.cost).toBeUndefined();
-    expect(d.mansion).toBe(true);
-    expect(d.mansionScaleDivisor).toBe(10);
+describe('BFMM-001 Item Crate (D6) + MA-SNK Snake (fan JP 2025 promos)', () => {
+  const crate = def('bfmm-001');
+  const snake = def('ma-snk');
+
+  it('def prints the revision: D6 text, prizes, and the snake replacement', () => {
+    expect(crate.type).toBe('item');
+    expect(crate.name).toBe('Item Crate');
+    expect(crate.text).toBe('When this Item is Revealed roll a D6, on 1 gain a grenade, on 2 gain a flash grenade, on 3 gain an HE grenade, on 4 gain an incendiary grenade, on 5 gain an ammox30 card, on 6 replace this card with MA-SNK and treat it as a regular explore. Remove this card from the game.');
+    expect(crate.mansion).toBe(true);
+    expect(crate.mansionScaleDivisor).toBe(10);
+    const e = crate.itemEffects?.[0];
+    expect(e?.kind).toBe('itemCrateD6');
+    if (e?.kind === 'itemCrateD6') {
+      expect([...e.prizes]).toEqual(['we-001', 'we-017', 'we-041', 'we-042', 'am-003']);
+      expect(e.snakeCardId).toBe('ma-snk');
+    }
+    expect(snake.type).toBe('infected');
+    expect(snake.name).toBe('Snake');
+    expect(snake.hp).toBe(5);
+    expect(snake.attack).toBe(5);
+    expect(snake.decorations).toBe(3);
+    expect(snake.mansion).toBe(true);
+  });
+
+  // The crate's roll is the FIRST rng draw of the explore, so the state's
+  // rngState fully determines it. Find a seed whose first d6 rolls `want`.
+  function rollState(want: number): GameState {
+    for (let seed = 0; seed < 2000; seed++) {
+      const r = nextInt(makeRng(seed), 6);
+      if (r.value + 1 === want) return { ...game(), rngState: seed };
+    }
+    throw new Error('no rngState rolls ' + want);
+  }
+
+  it('rolls 1-5: gains the matching prize to hand, removes the crate, no take prompt', () => {
+    const expectPrize = ['we-001', 'we-017', 'we-041', 'we-042', 'am-003'];
+    for (let roll = 1; roll <= 5; roll++) {
+      const s = rollState(roll);
+      const wep = place(s, 0, 'we-004');
+      const top = setMansionTop(wep.state, ['bfmm-001']);
+      const after = applyAction(top.state, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 });
+      const seat = after.seats[0] as PlayerState;
+      const prize = expectPrize[roll - 1]!;
+      const gained = seat.hand.find(id => after.cards[id]?.cardId === prize);
+      expect(gained, `roll ${roll} gains ${prize}`).toBeDefined();
+      expect(after.removed.some(id => after.cards[id]?.cardId === 'bfmm-001')).toBe(true);
+      expect(after.prompts.some(p => p.payload?.kind === 'takeOrBottom')).toBe(false);
+      // the crate consumed the explore
+      expect(seat.exploresLeft).toBe(0);
+    }
+  });
+
+  it('roll 6: the crate is replaced by MA-SNK and the battle resolves as a regular explore', () => {
+    // Weaponless: 0 damage < 5 HP — the Snake survives, the explorer takes its
+    // 5 attack, and the Snake goes to the bottom of the Mansion.
+    let s = rollState(6);
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1, hp: 100, maxHp: 100, turnAmmo: 0, exploresLeft: 1 } : p)) };
+    const top = setMansionTop(s, ['bfmm-001']);
+    const before = top.state.seats[0] as PlayerState;
+    const after = applyAction(top.state, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 });
+    const seat = after.seats[0] as PlayerState;
+    expect(seat.hp).toBe(before.hp - 5);
+    // snake went to the bottom (a "regular explore" outcome)
+    expect(after.mansionDeck[after.mansionDeck.length - 1] ? after.cards[after.mansionDeck[after.mansionDeck.length - 1]!]?.cardId : '?').toBe('ma-snk');
+    expect(after.removed.some(id => after.cards[id]?.cardId === 'bfmm-001')).toBe(true);
+    expect(seat.exploresLeft).toBe(0);
+  });
+
+  it('roll 6 with a real weapon: the Snake is defeated for its Decorations', () => {
+    let s = rollState(6);
+    s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, level: 1, hp: 100, maxHp: 100, turnAmmo: 0, exploresLeft: 1 } : p)) };
+    const wep = place(s, 0, 'we-004'); // 5 damage >= 5 HP
+    const top = setMansionTop(wep.state, ['bfmm-001']);
+    const after = applyAction(top.state, { type: 'explore', seat: 0, weapons: [wep.id], exploreCount: 1 });
+    const seat = after.seats[0] as PlayerState;
+    expect(seat.decorations).toBe((s.seats[0] as PlayerState).decorations + 3);
+    expect(seat.hp).toBe(100); // no damage taken
   });
 
   it('scales with the Mansion: floor(deckSize/10) crates join the deck', () => {
     const s = game();
     const deckSize = STANDARD_MANSION_DECK.reduce((a, m) => a + m.count, 0);
     const expected = Math.floor(deckSize / 10);
-    expect(expected).toBeGreaterThan(0); // sanity: the standard deck warrants at least one crate
+    expect(expected).toBeGreaterThan(0);
     const crates = s.mansionDeck.filter(id => (s.cards[id]?.cardId ?? '') === 'bfmm-001');
-    expect(crates.length, 'one crate per 10 mansion cards').toBe(expected);
-    // every registered instance is in the deck (conservation)
-    const registered = Object.values(s.cards).filter(ci => ci.cardId === 'bfmm-001').length;
-    expect(registered).toBe(expected);
+    expect(crates.length).toBe(expected);
   });
 
   it('a tiny mansion (fewer than 10 cards) gets no crates by the same formula', () => {
-    // Setup with a real 9-card mansion deck: floor(9/10) = 0 crates.
     const tiny = setup(
       { seed: 11, players: [{ name: 'P0', controller: 'human' as const, characterCardId: 'ch-002' }] },
       [...PREMIER_CARDS, ...CUSTOM_CARDS],
@@ -172,13 +235,32 @@ describe('MA-085 Item Crate (fan JP 2025 promo)', () => {
     const crates = tiny.mansionDeck.filter(id => (tiny.cards[id]?.cardId ?? '') === 'bfmm-001');
     expect(crates.length).toBe(0);
   });
+});
+
+describe('BFMM-002 Item Crate (ORIGINAL print, fan JP 2025 promo)', () => {
+  it('def prints the original card: +1 Buy/+1 Card/+1 Explore/+20 Gold, remove', () => {
+    const d = def('bfmm-002');
+    expect(d.type).toBe('item');
+    expect(d.name).toBe('Item Crate');
+    expect(d.text).toBe('When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.');
+    expect(d.copies).toBe(1);
+    expect(d.mansion).toBe(true);
+    // same mansion rule as bfmm-001 (Manny): floor(deckSize/10) copies
+    expect(d.mansionScaleDivisor).toBe(10);
+    const e = d.itemEffects?.[0];
+    expect(e?.kind).toBe('gainGoldAndBuyThenRemove');
+    if (e?.kind === 'gainGoldAndBuyThenRemove') {
+      expect(e.gold).toBe(20);
+      expect(e.buys).toBe(1);
+      expect(e.cards).toBe(1);
+      expect(e.explores).toBe(1);
+    }
+  });
 
   it('when taken: +1 Buy, +1 Card, +1 Explore, +20 Gold this turn, then removed', () => {
-    let s = game({ level: 1, hp: 100, turnAmmo: 0, exploresLeft: 1 });
-    const wep = place(s, 0, 'we-004'); // 5 damage, no ammo
-    s = wep.state;
-    const top = setMansionTop(s, ['bfmm-001']);
-    const explored = applyAction(top.state, { type: 'explore', seat: 0, weapons: [wep.id], exploreCount: 1 });
+    const s = game({ level: 1, hp: 100, maxHp: 100, turnAmmo: 0, exploresLeft: 1 });
+    const top = setMansionTop(s, ['bfmm-002']);
+    const explored = applyAction(top.state, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 });
     const takePrompt = explored.prompts.find(pr => pr.payload?.kind === 'takeOrBottom');
     expect(takePrompt).toBeDefined();
     const before = explored.seats[0] as PlayerState;
@@ -189,9 +271,23 @@ describe('MA-085 Item Crate (fan JP 2025 promo)', () => {
     expect(after.buysLeft - before.buysLeft).toBe(1);
     expect(after.exploresLeft - before.exploresLeft).toBe(1);
     expect(after.hand.length - beforeHand).toBe(1);
-    expect(taken.removed.some(id => taken.cards[id]?.cardId === 'bfmm-001')).toBe(true);
+    expect(taken.removed.some(id => taken.cards[id]?.cardId === 'bfmm-002')).toBe(true);
   });
 
+  it('scales with the Mansion like the D6 crate: floor(deckSize/10) copies', () => {
+    const s = game();
+    const deckSize = STANDARD_MANSION_DECK.reduce((a, m) => a + m.count, 0);
+    const crates = s.mansionDeck.filter(id => (s.cards[id]?.cardId ?? '') === 'bfmm-002');
+    expect(crates.length).toBe(Math.floor(deckSize / 10));
+    // and a tiny (<10 card) mansion deck gets none, by the same formula
+    const tiny = setup(
+      { seed: 11, players: [{ name: 'P0', controller: 'human' as const, characterCardId: 'ch-002' }] },
+      [...PREMIER_CARDS, ...CUSTOM_CARDS],
+      FIRST_TIMER_PILES,
+      [{ cardId: 'ma-001', count: 9 }],
+    );
+    expect(tiny.mansionDeck.filter(id => (tiny.cards[id]?.cardId ?? '') === 'bfmm-002').length).toBe(0);
+  });
 });
 
 describe('CAC-014 Global Battle — another player draws', () => {
@@ -236,7 +332,15 @@ describe('CAC-015 This Shit Ends Now! — weapons route to the Play Area', () =>
     // Buy a weapon from the Resource Area (we-004 Combat Knife, cost 50).
     const knifePile = Object.values(s.marketPiles).find(p => p.cards.some(id => s.cards[id]?.cardId === 'we-004'));
     expect(knifePile).toBeDefined();
-    const bought = applyAction(s, { type: 'buy', seat: 0, pileId: knifePile!.pileId });
+    // The pile's buy-top (cards[0]) is shuffle-dependent — kitchen-sink fixtures
+    // gain/lose custom Mansion cards (e.g. BFMM-002), shifting the seeded
+    // shuffles. Pin the knife to the top so the bought card is deterministic.
+    const we004 = knifePile!.cards.find(id => s.cards[id]?.cardId === 'we-004') as string;
+    const rigged = {
+      ...s,
+      marketPiles: { ...s.marketPiles, [knifePile!.pileId]: { ...knifePile!, cards: [we004, ...knifePile!.cards.filter(id => id !== we004)] } },
+    };
+    const bought = applyAction(rigged, { type: 'buy', seat: 0, pileId: knifePile!.pileId });
     const seat = bought.seats[0] as PlayerState;
     expect(seat.playArea.some(id => bought.cards[id]?.cardId === 'we-004')).toBe(true);
     expect(seat.firstWeaponToPlayAreaInstanceId).toBeDefined();

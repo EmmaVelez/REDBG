@@ -1,4 +1,56 @@
 # HANDOFF — resume here
+## BFMM-002 — the ORIGINAL Item Crate print re-added as its own card (2026-11-25)
+
+Manny re-sent the original Item Crate print ("+1 Buy, +1 Card, +1 Explore, and
++20 Gold during this turn. Remove this Item from the game.") and asked for it
+back as a SEPARATE custom mansion card alongside the D6 crate:
+- New def bfmm-002 "Item Crate" (also prints MA-085): item, mansion: true,
+  mansionScaleDivisor: 10 — Manny extended the SAME mansion rule to both
+  crates (floor(deckSize/10) copies each; both counts compute on the deck
+  BEFORE any custom copies join, so neither inflates the other).
+  Effect: gainGoldAndBuyThenRemove { gold 20, buys 1, cards 1, explores 1 } —
+  resolves on TAKE like MA-071 Hidden Treasure (that shared branch is intact
+  and MA-071-pinned). Art: CARD-ART/BFMM-002.png from Manny's render.
+- Tests (customFanJp2025 "BFMM-002 Item Crate (ORIGINAL print)"): def print,
+  full take resolution (+20 gold/+1 buy/+1 card/+1 explore, removed),
+  floor(38/10) = 3 copies in the standard deck + zero in a 9-card deck.
+- The extra Mansion instance shifted the kitchen-sink seeded shuffles —
+  CAC-015's "bought weapon" test now pins a we-004 to the pile's buy-top
+  (cards[0]) instead of assuming the shuffle. Same fragility class as the
+  earlier location/JamesMarcus pins.
+
+## BFMM-001 ITEM CRATE REVISED TO D6 + MA-SNK SNAKE (2026-11-25, Manny prints)
+
+Manny sent the REVISED Item Crate print (supersedes the old +1 Buy/+1 Card/
++1 Explore/+20 Gold version) plus a second card:
+- BFMM-001 Item Crate — "When this Item is Revealed roll a D6, on 1 gain a
+  grenade, on 2 gain a flash grenade, on 3 gain an HE grenade, on 4 gain an
+  incendiary grenade, on 5 gain an ammox30 card, on 6 replace this card with
+  MA-SNK and treat it as a regular explore. Remove this card from the game."
+- MA-SNK Snake (prints MA-084): infected, HP 5, ATK 5, 3 Decorations, no
+  effect. Internal id ma-snk (per the crate's own text) avoids the official
+  Mercenaries ma-084 collision. One copy in the Mansion deck.
+
+Implementation (actions.ts reveal flow):
+- New item effect kind `itemCrateD6` (prizes + snakeCardId in the def).
+- Reveal-time branch (right after the mansion draw): the crate rolls the D6
+  as the FIRST rng draw of the explore (deterministic per state). 1-5: the
+  prize card is GAINED TO HAND (we-001/we-017/we-041/we-042/am-003) and the
+  crate is removed — no Take/Send-to-bottom prompt. 6: the crate is removed
+  and a summoned `ma-snk#crateN` instance REPLACES it as this explore's
+  reveal — the normal battle resolves it (defeat scores its 3 Decorations,
+  not-defeated deals its 5 attack and it returns to the Mansion bottom).
+  The roll-6 crate also joins `removedAfter` so the battle's `removed`
+  rebuild keeps it (conservation).
+- The default rngState sequence means the crate's outcomes are seed-locked.
+- Tests (customFanJp2025 "BFMM-001 Item Crate (D6) + MA-SNK Snake"): def
+  print for both, all five prize rolls gain the right card + remove + no
+  prompt + explore consumed, roll 6 weaponless (Snake survives, -5 HP, to
+  bottom) and with a real weapon (defeated, +3 Decorations, hp sealed at
+  maxHp). Scaling + tiny-mansion tests retained. Note: test fixtures must
+  set maxHp alongside hp (the defeated path clamps hp to maxHp).
+- Art: CARD-ART/BFMM-001.png (revised print) + CARD-ART/MA-SNK.png.
+
 ## BFMM-001 SCALES WITH THE MANSION (2026-11-25, Manny ruling)
 
 The Item Crate now joins the Mansion deck at floor(deckSize/10) copies — one
