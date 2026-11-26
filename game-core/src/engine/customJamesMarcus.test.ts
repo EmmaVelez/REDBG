@@ -167,8 +167,17 @@ describe('CI-010 James Marcus', () => {
     const w1 = ready.state.seats[1]?.hand.find(h => ready.state.cards[h]?.cardId === 'we-006');
     expect(w1).toBeDefined();
     if (w1 === undefined) return;
+    // Pin the mansion top to a defensible card so the reveal can't hit a
+    // take-or-bottom ITEM (the scaled BFMM-001 Item Crate)/prompt and derail
+    // the requirement check.
+    const pin = 'ma-001#pin';
+    const pinned = {
+      ...started,
+      cards: { ...started.cards, [pin]: { instanceId: pin, cardId: 'ma-001', location: { zone: 'mansionDeck' as const, index: 0 } } },
+      mansionDeck: [pin, ...started.mansionDeck],
+    };
     const explored = applyAction(
-      { ...started, seats: started.seats.map((s, i) => (i === 1 ? { ...s, turnAmmo: 80 } : s)) },
+      { ...pinned, seats: pinned.seats.map((s, i) => (i === 1 ? { ...s, turnAmmo: 80 } : s)) },
       { type: 'explore', seat: 1, weapons: [w1], exploreCount: 1 },
     );
     expect(explored.seats[1]?.exploresRequiredThisTurn ?? 0).toBe(0);

@@ -2422,6 +2422,8 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     text: 'When this Item is Revealed, you get +1 Buy, +1 Card, +1 Explore, and +20 Gold during this turn. Remove this Item from the game.',
     copies: 1,
     mansion: true,
+    // One Crate per 10 Mansion cards (Manny's ruling): floor(deckSize/10).
+    mansionScaleDivisor: 10,
     itemEffects: [{ kind: 'gainGoldAndBuyThenRemove', gold: 20, buys: 1, cards: 1, explores: 1 }],
   },
 ];

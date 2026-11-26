@@ -84,6 +84,12 @@ export interface CardDef {
    *  if they have this flag set). */
   readonly mansion?: boolean;
 
+  /** When the card joins the Mansion deck, add floor(deck size / N) copies
+   *  instead of `copies` (N = this value, e.g. 10 = one copy per 10 Mansion
+   *  cards, computed on the deck BEFORE this card's own copies are added).
+   *  BFMM-001 Item Crate: one Crate per 10 Mansion cards. */
+  readonly mansionScaleDivisor?: number;
+
   /** Bonus icons (ammunition, some actions/weapons). */
   readonly bonuses?: CardBonuses;
   /** Extra printed abilities for Ammunition cards (Mercenaries AM-005..007).

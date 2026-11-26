@@ -830,8 +830,16 @@ export function setup(setup: GameSetup, cards: ReadonlyArray<CardDef>, piles: Re
       }
     }
   }
+  // The count for a scaling card (mansionScaleDivisor, e.g. BFMM-001 Item
+  // Crate: one per 10 Mansion cards) is floor(size/10) of the deck BEFORE any
+  // custom card's own copies join — so the crates scale with the scenario and
+  // never inflate each other's count.
+  const mansionSizeBeforeCustom = mansionIds.length;
   for (const c of customMansion) {
-    for (let j = 0; j < c.copies; j++) {
+    const copies = c.mansionScaleDivisor !== undefined
+      ? Math.floor(mansionSizeBeforeCustom / c.mansionScaleDivisor)
+      : c.copies;
+    for (let j = 0; j < copies; j++) {
       const id = `${c.id}#${j + 1}`;
       mansionIds.push(id);
       register(id, c.id, 'mansionDeck');

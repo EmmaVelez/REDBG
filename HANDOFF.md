@@ -1,4 +1,22 @@
 # HANDOFF — resume here
+## BFMM-001 SCALES WITH THE MANSION (2026-11-25, Manny ruling)
+
+The Item Crate now joins the Mansion deck at floor(deckSize/10) copies — one
+per 10 Mansion cards, computed on the deck BEFORE its own copies (and before
+any other custom card's copies) are added — instead of the fixed `copies: 1`.
+- New CardDef field `mansionScaleDivisor?: number` (types.ts); game.ts
+  customMansion loop: copies = floor(mansionSizeBeforeCustom / divisor).
+- bfmm-001 carries `mansionScaleDivisor: 10` (the original WIP comment in
+  custom.ts said "floor(MansionSize/10)" — now actually implemented).
+- Tests (customFanJp2025): STANDARD_MANSION_DECK yields floor(size/10)
+  crates, all registered instances accounted; a real 9-card mansion deck
+  yields zero crates; def-print asserts the divisor field.
+- The scaling surfaced 2 FRAGILE kitchen-sink fixtures (their seeded mansion
+  tops now land on a take-or-bottom ITEM instead of an inert card):
+  customLocations "location deck empty" and customJamesMarcus CI-010 now pin
+  the mansion top to an undefetable Majini (ma-001#pin) so the revealed card
+  can't consume the deck or raise a prompt. Their intent (fallback reach /
+  explore-pool debt) is unchanged.
 ## MA-085 ITEM CRATE — fan item completed from Manny's card print (2026-11-25)
 
 Manny sent the card render: [ITEM] ITEM CRATE, MA-085 — "When this Item is

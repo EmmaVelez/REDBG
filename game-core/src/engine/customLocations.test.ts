@@ -115,6 +115,16 @@ describe('Locations — reveal', () => {
   it('does NOT reveal anything when the location deck is empty', () => {
     let s = game({ level: 1, hp: 80, exploresLeft: 1 });
     s = { ...s, locationDeck: [], locations: [] };
+    // Pin the mansion top to a card a weaponless reveal cannot consume: Majini
+    // survives (0 damage < 20 HP) and returns to the bottom, so the deck length
+    // is provably unchanged. (Without the pin, a take-or-bottom ITEM — e.g. the
+    // scaled BFMM-001 Item Crate — leaves the deck for its prompt.)
+    const pin = 'ma-001#pin';
+    s = {
+      ...s,
+      cards: { ...s.cards, [pin]: { instanceId: pin, cardId: 'ma-001', location: { zone: 'mansionDeck' as const, index: 0 } } },
+      mansionDeck: [pin, ...s.mansionDeck],
+    };
     const after = applyAction(s, { type: 'explore', seat: 0, weapons: [], exploreCount: 1 });
     // It reached the mansion instead: no location was revealed or left a deck.
     expect(after.locations ?? []).toEqual([]);

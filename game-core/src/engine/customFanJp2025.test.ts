@@ -146,6 +146,31 @@ describe('MA-085 Item Crate (fan JP 2025 promo)', () => {
     expect(d.copies).toBe(1);
     expect(d.cost).toBeUndefined();
     expect(d.mansion).toBe(true);
+    expect(d.mansionScaleDivisor).toBe(10);
+  });
+
+  it('scales with the Mansion: floor(deckSize/10) crates join the deck', () => {
+    const s = game();
+    const deckSize = STANDARD_MANSION_DECK.reduce((a, m) => a + m.count, 0);
+    const expected = Math.floor(deckSize / 10);
+    expect(expected).toBeGreaterThan(0); // sanity: the standard deck warrants at least one crate
+    const crates = s.mansionDeck.filter(id => (s.cards[id]?.cardId ?? '') === 'bfmm-001');
+    expect(crates.length, 'one crate per 10 mansion cards').toBe(expected);
+    // every registered instance is in the deck (conservation)
+    const registered = Object.values(s.cards).filter(ci => ci.cardId === 'bfmm-001').length;
+    expect(registered).toBe(expected);
+  });
+
+  it('a tiny mansion (fewer than 10 cards) gets no crates by the same formula', () => {
+    // Setup with a real 9-card mansion deck: floor(9/10) = 0 crates.
+    const tiny = setup(
+      { seed: 11, players: [{ name: 'P0', controller: 'human' as const, characterCardId: 'ch-002' }] },
+      [...PREMIER_CARDS, ...CUSTOM_CARDS],
+      FIRST_TIMER_PILES,
+      [{ cardId: 'ma-001', count: 9 }],
+    );
+    const crates = tiny.mansionDeck.filter(id => (tiny.cards[id]?.cardId ?? '') === 'bfmm-001');
+    expect(crates.length).toBe(0);
   });
 
   it('when taken: +1 Buy, +1 Card, +1 Explore, +20 Gold this turn, then removed', () => {
