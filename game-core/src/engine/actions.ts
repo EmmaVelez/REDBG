@@ -3130,7 +3130,11 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const discardAfterKukri = discardAfterPistols.filter(id => !discardWeaponIds.includes(id));
           // Alliance Partner Modification: weapons attached to the Partner take
           // part in the explore but stay attached — they are never moved to the
-          // play area, trashed, or removed by use.
+          // play area or removed by use. THE EXPLOSIVE EXCEPTION (Manny ruling,
+          // 2026-11-26): an "Explosive" weapon used from the Partner zone is
+          // disposed of exactly like one used from hand (trashed, or discarded
+          // under Jill L2 / Grenade Launcher) — the zone exemption covers the
+          // stay-attached bookkeeping, not the all-explosives rule.
           const partnerWeaponSet = new Set(player.partnerAttached ?? []);
           // Leon L2 pistol reuse: a pistol already in the play area stays there
           // (it was not just moved from hand); only fresh weapons get added
@@ -3162,6 +3166,13 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             if (!player.playArea.includes(id) || partnerWeaponSet.has(id)) continue;
             if (isExplosive(cardDef(state, id)) && exhausted(id)) explosiveIds.push(id);
           }
+          // Partner-attached explosives used this explore join the same
+          // disposition (ruling above); every other attached weapon stays.
+          for (const id of uniqueWeapons(weapons)) {
+            if (!partnerWeaponSet.has(id)) continue;
+            if (isExplosive(cardDef(state, id)) && exhausted(id)) explosiveIds.push(id);
+          }
+          const partnerAttachedAfter = (player.partnerAttached ?? []).filter(id => !explosiveIds.includes(id));
           let playAreaAfter = [...player.playArea, ...playedWeaponIds].filter(id => !explosiveIds.includes(id));
           // WE-030 Hand Cannon: "Trash one ammunition from your play area."
           const trashAmmoCount = weapons.reduce((sum, id) => {
@@ -3478,6 +3489,17 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           state = clockLocationIntoPlay(state, r.revealedInstanceId, seat);
         }
       };
+      // Carry the explosive disposition into the seat snapshot for EVERY
+      // downstream return path — rebuilds spread `player`, reload it from
+      // `state.seats`, or seed `reaperPartnerAttached`, so BOTH must see the
+      // filtered list. Placed AFTER the damage terms above, which must count
+      // the explosive being used (Jill L1's attached-count bonus reads the
+      // pre-disposition list).
+      state = {
+        ...state,
+        seats: state.seats.map(x => (x.seat === seat ? { ...x, partnerAttached: partnerAttachedAfter } : x)),
+      };
+      player = state.seats[seat] as PlayerState;
       const rev = drawMansion(state.mansionDeck, revealFromBottom);
       let revealedInstanceId = rev.revealedInstanceId;
       let revealedDef = cardDef(state, revealedInstanceId);
@@ -3506,10 +3528,14 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               [prizeInstanceId]: { instanceId: prizeInstanceId, cardId: prizeCardId, location: { zone: 'hand' as const, index: 0 } },
             },
             seats: state.seats.map(s => (s.seat === seat
-              ? { ...s, hand: [...handAfter, prizeInstanceId], playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft }
+              ? { ...s, hand: [...handAfter, prizeInstanceId], playArea: playAreaAfter, discard: discardAfterExplosives, exploresLeft, partnerAttached: partnerAttachedAfter }
               : s)),
             mansionDeck: rev.mansion.deck,
-            removed: [...state.removed, revealedInstanceId],
+            // Build on removedAfter, not state.removed — the explosive/
+            // trashAfterUse disposition above lives there, and dropping it
+            // would leave used Weapons in no zone (the Snake branch below
+            // documents the same trap).
+            removed: [...removedAfter, revealedInstanceId],
             rngState: currentRng,
             prompts: state.prompts,
           };
@@ -3935,7 +3961,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
         let level = player.level;
         let xp = player.xp ?? 0;
         let exploresLeftAfter = exploresLeft + grantedExplores + (laserTargeting ? 1 : 0);
-        let partnerAttached = player.partnerAttached ?? [];
+        let partnerAttached = partnerAttachedAfter;
         const reaperTrashed: string[] = [];
         let newLeadingHp = leadingIsPartner ? (player.partnerHp ?? player.hp) : player.hp;
         let downed = false;
