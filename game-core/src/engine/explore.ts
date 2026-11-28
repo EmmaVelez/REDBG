@@ -420,7 +420,10 @@ export function resolveExplore(params: ExploreParams): ExploreOutcome {
   if (effective >= effectiveHp) {
     const blockedByInventory = revealed.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (inventoryCount ?? 0) <= e.count) ?? false;
         const blockedByActions = revealed.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfActionsAtLeast' && (actionsInPlayArea ?? 0) >= e.count) ?? false;
-        if (blockedByInventory || blockedByActions) {
+        // CI-009 Rachael Foley (Ooze): an "Ammo x10" in the exploring player's
+        // Discard Pile means this Infected cannot be defeated.
+        const blockedByAmmoX10 = revealed.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfAmmoX10InDiscard' && (params.ammoX10InDiscardCount ?? 0) >= 1) ?? false;
+        if (blockedByInventory || blockedByActions || blockedByAmmoX10) {
       const shuffleBack = revealed.infectedEffects?.some(e => e.kind === 'shuffleBackIfNotDefeated' || e.kind === 'onNotDefeatedGainAmmoAndShuffle') ?? false;
       const suppressed = weapons.some(w =>
         w.weaponEffects?.some(e => e.kind === 'grantExploreAndSuppressLowHpInfected' && (revealed.hp ?? 0) <= e.hpThreshold),
@@ -555,7 +558,8 @@ export function resolveMultiExplore(params: {
     if (charDamageBonus && (params.characterDamage ?? 0) >= charDamageBonus.threshold) damage += charDamageBonus.amount;
     const cannotInv = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfInventoryAtMost' && (params.inventoryCount ?? 0) <= e.count) ?? false;
     const cannotAct = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfActionsAtLeast' && (params.actionsInPlayArea ?? 0) >= e.count) ?? false;
-    if (cannotInv || cannotAct) blockedByCannotDefeat = true;
+    const cannotAmmo = target.infectedEffects?.some(e => e.kind === 'cannotBeDefeatedIfAmmoX10InDiscard' && (params.ammoX10InDiscardCount ?? 0) >= 1) ?? false;
+    if (cannotInv || cannotAct || cannotAmmo) blockedByCannotDefeat = true;
     // CI-011 Queen Leech: its Health IS the leading exploring Character's
     // Maximum Health — it replaces the printed value outright.
     if (target.infectedEffects?.some(e => e.kind === 'onRevealHpEqualsExploringCharacterMaxHp')) {

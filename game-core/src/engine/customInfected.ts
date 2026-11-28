@@ -4,10 +4,12 @@ import { makeRng, nextInt, shuffle } from '../util/rng';
 /**
  * Custom-card-line infected helpers.
  *
- * CI-009 "Rachael Foley (First Encounter)" / MA-000 "Rachael Foley (ooze)" —
+ * CI-009 "Rachael Foley (First Encounter)" / ma-000 "Rachael Foley (ooze)" —
  * CI-009 soaks 10 damage per "Ammo x10" in the exploring player's discard pile
- * and shuffles a fresh Ooze into the Mansion when it is defeated; the Ooze is
- * shuffled straight back whenever it is defeated with 80 or less damage.
+ * and shuffles a fresh Ooze into the Mansion when it is defeated; the Ooze
+ * itself cannot be defeated while the exploring player has an "Ammo x10" in
+ * their discard pile (that gate lives in resolveExplore/resolveMultiExplore
+ * as `cannotBeDefeatedIfAmmoX10InDiscard`).
  *
  * CI-001 "Oscar - Zombie Elephant" — when he is not defeated he tramples the
  * exploring Character, trashing the highest-Damage Weapon(s) they are using.
@@ -28,13 +30,6 @@ export function ammoX10CountInDiscard(state: GameState, seat: number): number {
     if (def?.type === 'ammunition' && (def.bonuses?.ammo ?? 0) === 10) count += 1;
   }
   return count;
-}
-
-/** MA-000: defeated with `damage` or less, it is shuffled back into the Mansion. */
-export function oozeShufflesBackOnDefeat(def: CardDef | undefined, damage: number): boolean {
-  return (def?.infectedEffects ?? []).some(
-    e => e.kind === 'onDefeatShuffleBackIfDamageAtMost' && damage <= e.maxDamage,
-  );
 }
 
 /** CI-003: the per-player "Ammo x10" grant carried by this Infected's reveal. */

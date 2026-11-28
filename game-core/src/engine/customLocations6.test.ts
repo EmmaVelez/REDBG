@@ -225,14 +225,14 @@ describe('Pillar Corridor (loc-026)', () => {
     expect(out.seats[0]?.inventory.filter(id => id === chosen).length).toBe(1);
   });
 
-  it('offers a pick-to-top when the Mansion is shuffled (ooze shuffle-back)', () => {
-    // MA-000 ooze defeated with <=80 damage shuffles the WHOLE Mansion — a
+  it('offers a pick-to-top when the Mansion is shuffled (Uroboros shuffle-back)', () => {
+    // MA-010 Uroboros Aheri not-defeated shuffles the WHOLE Mansion — a
     // real single-action shuffle (send-to-bottom is NOT a shuffle).
     let s = putLocation({ ...game(), locationDeck: [] }, 'loc-026', { 0: 1 });
     s = reg(s, 'we-002#w1', 'we-002', 'hand', 0);
     s = reg(s, 'we-002#w2', 'we-002', 'hand', 0);
     s = { ...s, seats: s.seats.map((p, i) => (i === 0 ? { ...p, hand: ['we-002#w1', 'we-002#w2'] } : p)) };
-    s = stackTop(s, 'ma-000'); // 30 HP; two Longbows deal 50 (<= 80)
+    s = stackTop(s, 'ma-010'); // 90 HP; two Longbows deal 50 -> not defeated
     const out = applyAction(s, { type: 'explore', seat: 0, weapons: ['we-002#w1', 'we-002#w2'], exploreCount: 1 });
     const p = byKind(out, 'pillarShuffleTop').find(x => x.payload?.deck === 'mansion');
     expect(p).toBeDefined();

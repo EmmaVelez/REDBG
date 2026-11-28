@@ -111,7 +111,7 @@ import { applyNightmareRevealEffects, applyNightmareDefeatEffects, applyNightmar
 import { revealLocation, topLocationId, locationEndOfTurnDraws, hasTrashOnSecondGain, nextCubeCost, addCube, locationXpOnTrash, locationBuyCostReduction, hasFreeActionPlay, hasFreeActionRepeat, affordableMarketActions, locationInfectedHpBonus, hasPostTurnCleanup, hasArmedPostTurnCleanup,
   beginPostTurnCleanup, applyPostTurnCleanupChosen, pileHasXpToken, xpTokenPiles, addXpTokenToPile, mansionRevealBlocked, applyRevealEffects, clockLocationIntoPlay, parlorGoldCost, shedXpCost, pillarInvested, readingRoomInvested, statueCorridorInvested, stairwayInvested, storeroomRearrangeInvested } from './locations';
 import { MERCENARIES_CARDS } from '../data/mercenaries';
-import { ammoX10CountInDiscard, oozeShufflesBackOnDefeat, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, shuffleIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
+import { ammoX10CountInDiscard, saddlerAmmoGrantPerPlayer, shuffleCopyIntoMansion, trashHighestDamageUsedWeapons, tyrantUltimateAbyssRoll } from './customInfected';
 import { attachCounterToSeat, returnCountersToSupply } from './counters';
 import { hasFreePistolTrashAtEnd, mansionAmmoBonusReduction, hasMansionAttachmentEffect, infectedHordeBonus, finalActionBonus, virusMutatesBonus, hasShotgunTwicePerTurn, mazeDamagePenalty, hasSurvivalHorror, hasShortSupplys, applyShortSupplysHeal, rebeccaDiscardGoldBonus, checkWinBase } from './game';
 import { storeroomInvestors, suspendedCeilingInvested, gardenInvested, greenhouseInvested, helipadInvested, exhibitionInPlay, cardXp, addCardXp, removeCardXp, locationInstanceId, gainInfections, diningHallInPlay, entranceHallInvested, elevatorInvested, pileXpCount, removePileXp } from './locations';
@@ -4382,15 +4382,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           const am006Prompt = ammoUpgradePrompt(state, seat);
           if (am006Prompt !== undefined) defeatFxPrompts.push(am006Prompt);
         }
-        // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
-        // shuffled back into the Mansion instead of attached (its Decoration is
-        // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
-        const oozeShuffleBackIds = defeatedEntries
-          .filter(({ id, def }) => !negatedIds.has(id) && oozeShufflesBackOnDefeat(def, multi.effectiveDamage))
-          .map(({ id }) => id);
-        for (const id of oozeShuffleBackIds) {
-          fxState = shuffleIntoMansion(fxState, id);
-        }
         // CI-001 Oscar: when the batch is not defeated he tramples the
         // exploring Character, trashing the highest-Damage Weapon(s) they used.
         const oscarTrample = !defeated && undefeatedEntries.some(({ id, def }) =>
@@ -4467,7 +4458,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
           pendingBackstab: undefined,
           attached: [
             ...attachedBase,
-            ...defeatedIds.filter(id => !oozeShuffleBackIds.includes(id)),
+            ...defeatedIds,
             ...chainAttachedIds,
           ],
           // EX-006/EX-008 may have attached a Poison counter since `player` was
@@ -5591,11 +5582,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
             lastHp = topDef.hp ?? 0;
           }
         }
-        // MA-000 Rachael Foley (ooze): defeated with `maxDamage` or less, it is
-        // shuffled back into the Mansion instead of attached (its Decoration is
-        // still awarded, like MA-053 Lisa Trevor's bottom-of-Mansion fate).
-        const oozeShuffleBack = !infectedEffectNegated && revealedDef?.type === 'infected' &&
-          oozeShufflesBackOnDefeat(revealedDef, outcome.damage);
         // The Decoration total is adjusted for the Combo Pile change so MA-077
         // Chicken — worth 0 while in a Combo Pile by itself — is handled.
         const newAttachedIds = [...player.attached, revealedInstanceId, ...chainAttachedIds];
@@ -5638,7 +5624,7 @@ function applyActionInternal(state: GameState, action: Action): GameState {
                   xp: (player.xp ?? 0) + 1 + maximizerXp + virusMutatesBonus(state).xpBonus,
                   pendingSkillEffects: undefined,
                   pendingBackstab: undefined,
-                  attached: (defeatedToBottom || oozeShuffleBack) ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
+                  attached: defeatedToBottom ? player.attached : [...player.attached, revealedInstanceId, ...chainAttachedIds],
                   partnerAttached: reaperPartnerAttached,
                   infectionCards: infectionBySeat.get(seat) ?? player.infectionCards ?? [],
                 });
@@ -5763,10 +5749,6 @@ function applyActionInternal(state: GameState, action: Action): GameState {
               mansionDeck = defeatFxState.mansionDeck;
             }
           }
-        }
-        if (oozeShuffleBack) {
-          defeatFxState = shuffleIntoMansion(defeatFxState, revealedInstanceId);
-          mansionDeck = defeatFxState.mansionDeck;
         }
         // Custom card line: CI-003's 10x Ammo lands after the seat rebuild.
         if (saddlerAmmoGrant > 0) {

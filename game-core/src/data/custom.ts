@@ -114,10 +114,10 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     infectedEffects: [{ kind: 'onRevealRevealNextMansionCard' }],
   },
   {
-    // Fan cards (printed codes CI-009 / MA-000). Rachael Foley's first
+    // Fan card pair (BOTH cards print CI-009). Rachael Foley's first
     // encounter soaks damage from spent "Ammo x10" cards and spawns the Ooze
-    // (ma-000) into the Mansion when defeated; the Ooze itself returns to the
-    // Mansion whenever it is defeated with 80 or less damage.
+    // (ma-000) into the Mansion when defeated; the Ooze cannot be defeated
+    // while the exploring player has an "Ammo x10" in their Discard Pile.
     id: 'ci-009',
     name: 'Rachael Foley (First Encounter)',
     type: 'infected',
@@ -133,16 +133,20 @@ export const CUSTOM_CARDS: ReadonlyArray<CardDef> = [
     ],
   },
   {
+    // Fan card (prints CI-009, paired with the First Encounter above). The
+    // Ooze is undefeatable while the exploring player has an "Ammo x10" in
+    // their Discard Pile — which is exactly what the First Encounter soak
+    // encourages, so the pair reads as one encounter.
     id: 'ma-000',
     name: 'Rachael Foley (ooze)',
     type: 'infected',
     set: 'custom',
-    text: 'If this Infected is Defeated with 80 or less Damage, shuffle it back into the Mansion (it deals no damage this turn).',
+    text: 'When Revealed, if Exploring Player has a 10ammo in their discard pile this Infected cannot be defeated.',
     copies: 1,
-    hp: 30,
-    attack: 50,
-    decorations: 5,
-    infectedEffects: [{ kind: 'onDefeatShuffleBackIfDamageAtMost', maxDamage: 80 }],
+    hp: 70,
+    attack: 65,
+    decorations: 8,
+    infectedEffects: [{ kind: 'cannotBeDefeatedIfAmmoX10InDiscard' }],
   },
   {
     // Fan card (printed code CI-001). Oscar tramples the exploring Character

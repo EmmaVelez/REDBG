@@ -98,10 +98,10 @@ describe('CI-009 / MA-000 data', () => {
       type: 'infected',
       set: 'custom',
       copies: 1,
-      hp: 30,
-      attack: 50,
-      decorations: 5,
-      infectedEffects: [{ kind: 'onDefeatShuffleBackIfDamageAtMost', maxDamage: 80 }],
+      hp: 70,
+      attack: 65,
+      decorations: 8,
+      infectedEffects: [{ kind: 'cannotBeDefeatedIfAmmoX10InDiscard' }],
     }));
   });
 
@@ -176,24 +176,40 @@ describe('CI-009 defeat', () => {
 });
 
 describe('MA-000 Rachael Foley (ooze)', () => {
-  it('shuffles back into the Mansion when defeated with 80 or less damage', () => {
-    const { state, ids } = setMansionTop(rachaelGame({ level: 1, hp: 80, turnAmmo: 80 }), ['ma-000']);
-    const { state: armed, id } = addWeapon(state, 0, 'we-006'); // 50 damage
+  it('cannot be defeated while an Ammo x10 sits in the exploring player\'s Discard Pile', () => {
+    // we-012 Full-Bore: 40 + 30 (>100 Ammo) = 70 damage >= 70 HP -> would
+    // defeat, but the single Ammo x10 in the discard blocks it; the Ooze
+    // hits back for its 65 Damage and goes to the bottom of the Mansion.
+    let s = rachaelGame({ level: 1, hp: 100, turnAmmo: 120 });
+    s = addDiscard(s, 0, 'am-001', 1);
+    const { state, ids } = setMansionTop(s, ['ma-000']);
+    const { state: armed, id } = addWeapon(state, 0, 'we-012');
     const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
-    expect(next.seats[0]?.hp).toBe(80);
-    // Not attached, but the Decoration is still awarded.
+    expect(next.seats[0]?.hp).toBe(35);
     expect(next.seats[0]?.attached).not.toContain(ids[0]);
-    expect(next.seats[0]?.decorations).toBe(5);
+    expect(next.seats[0]?.decorations).toBe(0);
     expect(next.mansionDeck).toContain(ids[0]);
   });
 
-  it('is attached normally when defeated with more than 80 damage', () => {
-    const { state, ids } = setMansionTop(rachaelGame({ level: 1, hp: 80, turnAmmo: 80 }), ['ma-000']);
-    const { state: armed, id } = addWeapon(state, 0, 'we-008'); // 100 damage, instant kill
+  it('is defeated normally when the Discard Pile holds no Ammo x10', () => {
+    const { state, ids } = setMansionTop(rachaelGame({ level: 1, hp: 80, turnAmmo: 120 }), ['ma-000']);
+    const { state: armed, id } = addWeapon(state, 0, 'we-012'); // 70 >= 70 HP
     const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 1 });
+    expect(next.seats[0]?.hp).toBe(80); // defeated -> no hit taken
     expect(next.seats[0]?.attached).toContain(ids[0]);
-    expect(next.seats[0]?.decorations).toBe(5);
-    expect(next.mansionDeck).not.toContain(ids[0]);
+    expect(next.seats[0]?.decorations).toBe(8);
+  });
+
+  it('blocks the pooled battle in a multi-explore too', () => {
+    // ma-000 (70) + ma-002 (20) = 90 combined; we-012 (70) + we-006 (50) = 120.
+    let s = rachaelGame({ level: 1, hp: 100, turnAmmo: 120, exploresLeft: 2 });
+    s = addDiscard(s, 0, 'am-001', 1);
+    const { state, ids } = setMansionTop(s, ['ma-000', 'ma-002']);
+    const { state: armed, id: w1 } = addWeapon(state, 0, 'we-012');
+    const { state: armed2, id: w2 } = addWeapon(armed, 0, 'we-006');
+    const next = applyAction(armed2, { type: 'explore', seat: 0, weapons: [w1, w2], exploreCount: 2 });
+    expect(next.seats[0]?.attached).not.toContain(ids[0]);
+    expect(next.seats[0]?.decorations).toBe(0);
   });
 });
 
@@ -213,18 +229,16 @@ describe('CI-009 / MA-000 in a multi-explore', () => {
     expect(mansionCopies(next, 'ma-000')).toHaveLength(2);
   });
 
-  it('shuffles the Ooze back when the batch damage is 80 or less', () => {
+  it('defeats the whole batch when the Discard Pile holds no Ammo x10', () => {
     const { state, ids } = setMansionTop(
-      rachaelGame({ level: 1, hp: 100, turnAmmo: 80, exploresLeft: 2 }),
+      rachaelGame({ level: 1, hp: 100, turnAmmo: 130, exploresLeft: 2 }),
       ['ma-000', 'ma-002'],
     );
-    const { state: armed, id } = addWeapon(state, 0, 'we-006'); // 50 damage
-    const next = applyAction(armed, { type: 'explore', seat: 0, weapons: [id], exploreCount: 2 });
-    // Combined 30 + 20 = 50 Health vs 50 damage -> defeated; the Ooze
-    // (50 <= 80) returns to the Mansion while ma-002 is attached.
-    expect(next.seats[0]?.attached).toContain(ids[1]);
-    expect(next.seats[0]?.attached).not.toContain(ids[0]);
-    expect(next.mansionDeck).toContain(ids[0]);
-    expect(next.seats[0]?.decorations).toBe(5 + 1);
+    const { state: armed, id: w1 } = addWeapon(state, 0, 'we-012'); // 70 with the ammo bonus
+    const { state: armed2, id: w2 } = addWeapon(armed, 0, 'we-006'); // 50
+    const next = applyAction(armed2, { type: 'explore', seat: 0, weapons: [w1, w2], exploreCount: 2 });
+    // Combined 70 + 20 = 90 Health vs 120 damage -> both defeated, nothing blocks.
+    expect(next.seats[0]?.attached).toEqual(expect.arrayContaining(ids));
+    expect(next.seats[0]?.decorations).toBe(8 + 1);
   });
 });

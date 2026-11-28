@@ -288,6 +288,7 @@ export type InfectedEffect =
   | { readonly kind: "cannotBeDefeatedIfActionsAtLeast"; readonly count: number } // Novistador
   | { readonly kind: "onDefeatGainGoldAndBuy"; readonly gold: number; readonly buys: number } // Zombie Security Guard
   | { readonly kind: "cannotBeDefeatedIfInventoryAtMost"; readonly count: number } // Verdugo
+  | { readonly kind: "cannotBeDefeatedIfAmmoX10InDiscard" } // CI-009 Rachael Foley (Ooze): an "Ammo x10" in the exploring player's Discard Pile makes it undefeatable this battle
   | { readonly kind: "onDefeatHealExploring"; readonly amount: number } // Ivy
   | { readonly kind: "onRevealBonusDamageIfCharacterDamaged"; readonly threshold: number; readonly amount: number } // Neptune
   | { readonly kind: "mostDecoratedLowersMaxHp"; readonly amount: number } // Hunter
@@ -334,7 +335,6 @@ export type InfectedEffect =
   | { readonly kind: "onRevealDamageReductionPerAmmoX10InDiscard"; readonly amount: number } // CI-009: takes `amount` less damage per "Ammo x10" in the exploring player's discard pile
   | { readonly kind: "onDefeatShuffleCardIntoMansion"; readonly cardId: string } // CI-009: on defeat, shuffle a fresh copy of `cardId` into the Mansion
   | { readonly kind: "onRevealRollD6ForEffect" } // TUA-001 Tyrant Ultimate Abyss: roll d6 on reveal for random effect
-  | { readonly kind: "onDefeatShuffleBackIfDamageAtMost"; readonly maxDamage: number } // MA-000 (ooze): defeated with <= maxDamage -> shuffled back into the Mansion instead of attached
   // --- Custom card line: CI-001 / CI-003 (Oscar, Saddler) ---
   | { readonly kind: "onNotDefeatedTrashHighestDamageUsedWeapons" } // CI-001 Oscar: on not-defeated, trash the highest-Damage Weapon(s) the exploring Character is using
   | { readonly kind: "onRevealEachPlayerGainsAmmoX10"; readonly count: number } // CI-003 Saddler (First Encounter): on reveal, every player gains `count` "Ammo x10"
